@@ -96,7 +96,7 @@ export default function Login() {
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
               onClick={() => {
                 const result = login(email);
-                if (!result.ok) {
+                if (result.ok === false) {
                   toast({
                     title: "Não foi possível entrar",
                     description: result.message,

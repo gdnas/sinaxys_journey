@@ -567,11 +567,13 @@ export const mockDb = {
     assignmentId: string,
     moduleId: string,
     answersByQuestionId: Record<string, string>,
-  ) {
+  ): { score: number; passed: boolean; minScore: number } {
     const db = loadDb();
     const mod = db.modules.find((m) => m.id === moduleId);
     const p = db.moduleProgress.find((x) => x.assignmentId === assignmentId && x.moduleId === moduleId);
-    if (!mod || !p || p.status !== "AVAILABLE") return { score: 0, passed: false };
+
+    const minScore = mod?.minScore ?? 70;
+    if (!mod || !p || p.status !== "AVAILABLE") return { score: 0, passed: false, minScore };
 
     const questions = db.quizQuestions
       .filter((q) => q.moduleId === moduleId)
@@ -586,7 +588,6 @@ export const mockDb = {
     }
 
     const score = questions.length ? Math.round((correct / questions.length) * 100) : 0;
-    const minScore = mod.minScore ?? 70;
     const passed = score >= minScore;
 
     p.attemptsCount += 1;
