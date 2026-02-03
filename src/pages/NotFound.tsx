@@ -1,5 +1,7 @@
-import { useLocation } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 const NotFound = () => {
   const location = useLocation();
@@ -12,13 +14,18 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Return to Home
-        </a>
+    <div className="min-h-screen bg-[color:var(--sinaxys-bg)] px-4 py-10">
+      <div className="mx-auto max-w-xl rounded-3xl border bg-white p-6">
+        <h1 className="text-2xl font-semibold text-[color:var(--sinaxys-ink)]">Página não encontrada</h1>
+        <p className="mt-2 text-sm text-muted-foreground">
+          O caminho <span className="font-medium text-[color:var(--sinaxys-ink)]">{location.pathname}</span> não existe nesta versão.
+        </p>
+        <Button asChild variant="outline" className="mt-5 rounded-xl">
+          <Link to="/">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar
+          </Link>
+        </Button>
       </div>
     </div>
   );
