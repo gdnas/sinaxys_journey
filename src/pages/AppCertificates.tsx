@@ -40,15 +40,15 @@ export default function AppCertificates() {
                     Emitido em {formatShortDate(c.issuedAt)} • Código {c.certificateCode}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button asChild variant="outline" className="rounded-xl">
+                <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center md:w-auto">
+                  <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
                     <Link to={`/app/certificates/${c.id}`}>
                       Ver
                     </Link>
                   </Button>
                   <Button
                     variant="outline"
-                    className="rounded-xl"
+                    className="w-full rounded-xl sm:w-auto"
                     onClick={() => {
                       window.open(`/app/certificates/${c.id}?print=1`, "_blank");
                     }}

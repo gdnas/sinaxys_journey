@@ -33,7 +33,7 @@ export default function AppDashboard() {
           {next ? (
             <Button
               asChild
-              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:w-auto"
             >
               <Link to={`/app/tracks/${next.assignment.id}`}>
                 Continuar
@@ -41,7 +41,7 @@ export default function AppDashboard() {
               </Link>
             </Button>
           ) : (
-            <Button asChild variant="outline" className="h-11 rounded-xl">
+            <Button asChild variant="outline" className="h-11 w-full rounded-xl md:w-auto">
               <Link to="/app/certificates">
                 Ver certificados
                 <Award className="ml-2 h-4 w-4" />

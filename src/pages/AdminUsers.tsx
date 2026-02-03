@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
@@ -65,12 +66,12 @@ export default function AdminUsers() {
             }}
           >
             <DialogTrigger asChild>
-              <Button className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+              <Button className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:w-auto">
                 <UserPlus className="mr-2 h-4 w-4" />
                 Novo usuário
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-3xl">
+            <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Criar usuário</DialogTitle>
               </DialogHeader>
@@ -114,9 +115,9 @@ export default function AdminUsers() {
                   </div>
                 ) : null}
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <Button
-                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
                   disabled={name.trim().length < 3 || email.trim().length < 6}
                   onClick={() => {
                     try {
@@ -144,7 +145,44 @@ export default function AdminUsers() {
           </Dialog>
         </div>
 
-        <div className="mt-5 overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)]">
+        {/* Mobile cards */}
+        <div className="mt-5 grid gap-3 md:hidden">
+          {users.map((u) => {
+            const dept = u.departmentId ? departments.find((d) => d.id === u.departmentId) : undefined;
+            return (
+              <div key={u.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{u.name}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{u.email}</div>
+                  </div>
+                  <Switch
+                    checked={u.active}
+                    onCheckedChange={(v) => {
+                      mockDb.setUserActive(u.id, v);
+                      force((x) => x + 1);
+                    }}
+                  />
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                    {roleLabel(u.role)}
+                  </Badge>
+                  <span className="text-xs text-muted-foreground">{dept?.name ?? "—"}</span>
+                  {!u.active ? (
+                    <Badge className="rounded-full bg-muted text-muted-foreground hover:bg-muted">Inativo</Badge>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop table */}
+        <div className="mt-5 hidden overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
           <Table>
             <TableHeader>
               <TableRow>

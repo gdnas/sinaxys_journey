@@ -84,7 +84,7 @@ export default function HeadCollaboratorDetail() {
           <p className="mt-1 text-sm text-muted-foreground">
             Você só pode visualizar colaboradores do seu departamento.
           </p>
-          <Button asChild variant="outline" className="mt-4 rounded-xl">
+          <Button asChild variant="outline" className="mt-4 w-full rounded-xl sm:w-auto">
             <Link to="/head">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar
@@ -105,7 +105,7 @@ export default function HeadCollaboratorDetail() {
             {collaborator.email} • {deptName}
           </div>
         </div>
-        <Button asChild variant="outline" className="rounded-xl">
+        <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
           <Link to="/head">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
@@ -256,11 +256,11 @@ export default function HeadCollaboratorDetail() {
                                           p?.checkpointAnswerText ? (
                                             <Dialog>
                                               <DialogTrigger asChild>
-                                                <Button variant="outline" className="mt-1 rounded-xl">
+                                                <Button variant="outline" className="mt-1 w-full rounded-xl sm:w-auto">
                                                   Ver resposta
                                                 </Button>
                                               </DialogTrigger>
-                                              <DialogContent className="rounded-3xl">
+                                              <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
                                                 <DialogHeader>
                                                   <DialogTitle>Resposta do checkpoint</DialogTitle>
                                                 </DialogHeader>

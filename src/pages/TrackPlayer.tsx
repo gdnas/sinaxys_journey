@@ -128,13 +128,13 @@ export default function TrackPlayer() {
                 />
               </div>
 
-              <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-center">
+              <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
                 <div className="text-sm text-muted-foreground">
                   Ao concluir, você libera o próximo módulo automaticamente.
                 </div>
                 <Button
                   disabled={!available}
-                  className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60"
+                  className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
                   onClick={() => {
                     mockDb.completeVideo(detail.assignment.id, module.id);
                     const updated = mockDb.getAssignmentDetail(detail.assignment.id);
@@ -184,7 +184,7 @@ export default function TrackPlayer() {
               <div className="flex items-center justify-end">
                 <Button
                   disabled={!available || checkpointAnswer.trim().length < 12}
-                  className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60"
+                  className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
                   onClick={() => {
                     mockDb.submitCheckpoint(detail.assignment.id, module.id, checkpointAnswer);
                     setCheckpointAnswer("");
@@ -259,7 +259,7 @@ export default function TrackPlayer() {
               <div className="flex items-center justify-end">
                 <Button
                   disabled={!available || quiz.questions.some((q) => !quizAnswers[q.id])}
-                  className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60"
+                  className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
                   onClick={() => {
                     const result = mockDb.submitQuiz(detail.assignment.id, module.id, quizAnswers);
                     setQuizResult(result);
