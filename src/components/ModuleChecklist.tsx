@@ -1,4 +1,4 @@
-import { CheckCircle2, Lock, PlayCircle, ClipboardCheck, HelpCircle } from "lucide-react";
+import { CheckCircle2, Lock, PlayCircle, ClipboardCheck, HelpCircle, BookOpenText } from "lucide-react";
 import type { ModuleProgress, TrackModule } from "@/lib/domain";
 import { cn } from "@/lib/utils";
 
@@ -6,6 +6,8 @@ function moduleIcon(type: TrackModule["type"]) {
   switch (type) {
     case "VIDEO":
       return <PlayCircle className="h-4 w-4" />;
+    case "MATERIAL":
+      return <BookOpenText className="h-4 w-4" />;
     case "QUIZ":
       return <HelpCircle className="h-4 w-4" />;
     case "CHECKPOINT":

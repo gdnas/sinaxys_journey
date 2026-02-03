@@ -8,6 +8,7 @@ import {
   ClipboardCheck,
   HelpCircle,
   Target,
+  BookOpenText,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,8 @@ function moduleIcon(type: TrackModule["type"], p?: ModuleProgress) {
       return <HelpCircle className="h-4 w-4" />;
     case "CHECKPOINT":
       return <ClipboardCheck className="h-4 w-4" />;
+    case "MATERIAL":
+      return <BookOpenText className="h-4 w-4" />;
   }
 }
 

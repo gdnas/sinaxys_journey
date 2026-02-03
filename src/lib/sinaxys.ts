@@ -76,3 +76,15 @@ export function getYouTubeEmbedUrl(url: string) {
 
   return url;
 }
+
+export function getFigmaEmbedUrl(url: string) {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.replace("www.", "");
+    if (!host.includes("figma.com")) return null;
+    const encoded = encodeURIComponent(url);
+    return `https://www.figma.com/embed?embed_host=share&url=${encoded}`;
+  } catch {
+    return null;
+  }
+}

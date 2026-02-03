@@ -301,8 +301,11 @@ export default function HeadDashboard() {
                                       ? "Vídeo"
                                       : currentModule.type === "QUIZ"
                                         ? "Quiz"
-                                        : "Checkpoint"}
+                                        : currentModule.type === "CHECKPOINT"
+                                          ? "Checkpoint"
+                                          : "Material"}
                                   </Badge>
+
                                   {needsAttention ? (
                                     <Badge className="rounded-full bg-rose-100 text-rose-800 hover:bg-rose-100">
                                       Precisa de atenção

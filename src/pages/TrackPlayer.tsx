@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ModuleChecklist } from "@/components/ModuleChecklist";
+import { ResourceEmbed } from "@/components/ResourceEmbed";
 import { useToast } from "@/hooks/use-toast";
 import type { TrackModule } from "@/lib/domain";
 import { mockDb } from "@/lib/mockDb";
@@ -146,6 +147,53 @@ export default function TrackPlayer() {
                     toast({
                       title: "Módulo concluído",
                       description: "Boa. Seguimos em sequência — o próximo conteúdo já foi liberado.",
+                    });
+                  }}
+                >
+                  {completed ? (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" /> Concluído
+                    </>
+                  ) : (
+                    "Concluir"
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : null}
+
+          {/* MATERIAL (ex.: apresentação no Figma) */}
+          {module.type === "MATERIAL" ? (
+            <div className="mt-6 grid gap-4">
+              <div className="flex items-start gap-3 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Material vivo</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Este conteúdo é mantido por link (ex.: Figma). Quando o material é atualizado na origem, a trilha reflete a versão mais recente.
+                  </p>
+                </div>
+              </div>
+
+              <ResourceEmbed url={module.materialUrl ?? ""} title={module.title} />
+
+              <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
+                <div className="text-sm text-muted-foreground">
+                  Ao concluir, você libera o próximo módulo automaticamente.
+                </div>
+                <Button
+                  disabled={!available}
+                  className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
+                  onClick={() => {
+                    mockDb.completeVideo(detail.assignment.id, module.id);
+                    const updated = mockDb.getAssignmentDetail(detail.assignment.id);
+                    if (updated) {
+                      const nextAvail = updated.modules.find((m) => updated.progressByModuleId[m.id]?.status === "AVAILABLE");
+                      if (nextAvail) setCurrentModuleId(nextAvail.id);
+                      else setCurrentModuleId(module.id);
+                    }
+                    toast({
+                      title: "Material concluído",
+                      description: "Conteúdo registrado. Seguimos em sequência — o próximo módulo já foi liberado.",
                     });
                   }}
                 >

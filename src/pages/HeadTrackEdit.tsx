@@ -1,6 +1,17 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Plus, MoveUp, MoveDown, Trash2, PlayCircle, ClipboardCheck, HelpCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Plus,
+  MoveUp,
+  MoveDown,
+  Trash2,
+  PlayCircle,
+  ClipboardCheck,
+  HelpCircle,
+  BookOpenText,
+  Pencil,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +29,8 @@ function typeLabel(t: TrackModule["type"]) {
   switch (t) {
     case "VIDEO":
       return "Vídeo";
+    case "MATERIAL":
+      return "Material";
     case "QUIZ":
       return "Quiz";
     case "CHECKPOINT":
@@ -29,6 +42,8 @@ function typeIcon(t: TrackModule["type"]) {
   switch (t) {
     case "VIDEO":
       return <PlayCircle className="h-4 w-4" />;
+    case "MATERIAL":
+      return <BookOpenText className="h-4 w-4" />;
     case "QUIZ":
       return <HelpCircle className="h-4 w-4" />;
     case "CHECKPOINT":
@@ -49,10 +64,25 @@ export default function HeadTrackEdit() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [materialUrl, setMaterialUrl] = useState("");
   const [minScore, setMinScore] = useState("70");
   const [checkpointPrompt, setCheckpointPrompt] = useState("");
   const [tfPrompt, setTfPrompt] = useState("");
   const [tfCorrect, setTfCorrect] = useState<"true" | "false">("true");
+
+  // Edit existing module (needed to update reading material links over time)
+  const [editOpen, setEditOpen] = useState(false);
+  const [editModuleId, setEditModuleId] = useState<string | null>(null);
+  const editModule = useMemo(
+    () => (editModuleId ? modules.find((m) => m.id === editModuleId) ?? null : null),
+    [editModuleId, modules],
+  );
+  const [editTitle, setEditTitle] = useState("");
+  const [editDescription, setEditDescription] = useState("");
+  const [editYoutubeUrl, setEditYoutubeUrl] = useState("");
+  const [editMaterialUrl, setEditMaterialUrl] = useState("");
+  const [editCheckpointPrompt, setEditCheckpointPrompt] = useState("");
+  const [editMinScore, setEditMinScore] = useState("70");
 
   if (!user || user.role !== "HEAD") return null;
   if (!track || !trackId) {
@@ -92,16 +122,161 @@ export default function HeadTrackEdit() {
     setTitle("");
     setDescription("");
     setYoutubeUrl("");
+    setMaterialUrl("");
     setMinScore("70");
     setCheckpointPrompt("");
     setTfPrompt("");
     setTfCorrect("true");
   };
 
+  const openEdit = (m: TrackModule) => {
+    setEditModuleId(m.id);
+    setEditTitle(m.title);
+    setEditDescription(m.description ?? "");
+    setEditYoutubeUrl(m.youtubeUrl ?? "");
+    setEditMaterialUrl(m.materialUrl ?? "");
+    setEditCheckpointPrompt(m.checkpointPrompt ?? "");
+    setEditMinScore(String(m.minScore ?? 70));
+    setEditOpen(true);
+  };
+
+  const saveEdit = () => {
+    if (!editModule) return;
+
+    const updated: TrackModule = {
+      ...editModule,
+      title: editTitle.trim(),
+      description: editDescription.trim() || undefined,
+      youtubeUrl: editModule.type === "VIDEO" ? editYoutubeUrl.trim() : undefined,
+      materialUrl: editModule.type === "MATERIAL" ? editMaterialUrl.trim() : undefined,
+      checkpointPrompt: editModule.type === "CHECKPOINT" ? editCheckpointPrompt.trim() : undefined,
+      minScore: editModule.type === "QUIZ" ? Number(editMinScore) || 70 : undefined,
+    };
+
+    mockDb.upsertModule(updated);
+    setEditOpen(false);
+    force((x) => x + 1);
+  };
+
+  const isEditValid = (() => {
+    if (!editModule) return false;
+    if (editTitle.trim().length < 4) return false;
+    if (editModule.type === "VIDEO" && editYoutubeUrl.trim().length < 10) return false;
+    if (editModule.type === "MATERIAL" && editMaterialUrl.trim().length < 10) return false;
+    if (editModule.type === "CHECKPOINT" && editCheckpointPrompt.trim().length < 10) return false;
+    if (editModule.type === "QUIZ" && !editMinScore.trim()) return false;
+    return true;
+  })();
+
   const nextOrder = (modules.reduce((max, m) => Math.max(max, m.orderIndex), 0) || 0) + 1;
 
   return (
     <div className="grid gap-6">
+      {/* Edit dialog */}
+      <Dialog
+        open={editOpen}
+        onOpenChange={(v) => {
+          setEditOpen(v);
+          if (!v) setEditModuleId(null);
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Editar módulo</DialogTitle>
+          </DialogHeader>
+
+          <ScrollArea className="max-h-[70vh] pr-4">
+            <div className="grid gap-4">
+              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo</div>
+                <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                  {editModule ? typeLabel(editModule.type) : "—"}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Atualize o link do material sempre que necessário — sem recriar a trilha.
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Título</Label>
+                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="rounded-xl" />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Descrição (opcional)</Label>
+                <Textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  className="min-h-24 rounded-2xl"
+                />
+              </div>
+
+              {editModule?.type === "VIDEO" ? (
+                <div className="grid gap-2">
+                  <Label>Link do YouTube</Label>
+                  <Input value={editYoutubeUrl} onChange={(e) => setEditYoutubeUrl(e.target.value)} className="rounded-xl" />
+                </div>
+              ) : null}
+
+              {editModule?.type === "MATERIAL" ? (
+                <div className="grid gap-2">
+                  <Label>Link do material (Figma)</Label>
+                  <Input
+                    value={editMaterialUrl}
+                    onChange={(e) => setEditMaterialUrl(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="https://www.figma.com/..."
+                  />
+                </div>
+              ) : null}
+
+              {editModule?.type === "CHECKPOINT" ? (
+                <div className="grid gap-2">
+                  <Label>Pergunta do checkpoint</Label>
+                  <Textarea
+                    value={editCheckpointPrompt}
+                    onChange={(e) => setEditCheckpointPrompt(e.target.value)}
+                    className="min-h-24 rounded-2xl"
+                  />
+                </div>
+              ) : null}
+
+              {editModule?.type === "QUIZ" ? (
+                <div className="grid gap-2">
+                  <Label>Nota mínima (%)</Label>
+                  <Input
+                    value={editMinScore}
+                    onChange={(e) => setEditMinScore(e.target.value)}
+                    className="rounded-xl"
+                    inputMode="numeric"
+                  />
+                  <div className="text-xs text-muted-foreground">
+                    No MVP, o editor do quiz é intencionalmente simples. A pergunta pode ser ajustada na próxima iteração.
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </ScrollArea>
+
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button
+              variant="outline"
+              className="w-full rounded-xl sm:w-auto"
+              onClick={() => setEditOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
+              disabled={!isEditValid}
+              onClick={saveEdit}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex flex-col justify-between gap-3 rounded-3xl border bg-white p-6 md:flex-row md:items-center">
         <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor de trilha</div>
@@ -143,6 +318,7 @@ export default function HeadTrackEdit() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="VIDEO">Vídeo</SelectItem>
+                        <SelectItem value="MATERIAL">Material (Figma)</SelectItem>
                         <SelectItem value="QUIZ">Quiz</SelectItem>
                         <SelectItem value="CHECKPOINT">Checkpoint</SelectItem>
                       </SelectContent>
@@ -163,6 +339,21 @@ export default function HeadTrackEdit() {
                     <div className="grid gap-2">
                       <Label>Link do YouTube</Label>
                       <Input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} className="rounded-xl" placeholder="https://www.youtube.com/watch?v=..." />
+                    </div>
+                  ) : null}
+
+                  {moduleType === "MATERIAL" ? (
+                    <div className="grid gap-2">
+                      <Label>Link do material (Figma)</Label>
+                      <Input
+                        value={materialUrl}
+                        onChange={(e) => setMaterialUrl(e.target.value)}
+                        className="rounded-xl"
+                        placeholder="https://www.figma.com/..."
+                      />
+                      <div className="text-xs text-muted-foreground">
+                        Dica: use o link de compartilhamento da apresentação. Ao trocar o link, o material é atualizado sem precisar recriar a trilha.
+                      </div>
                     </div>
                   ) : null}
 
@@ -208,6 +399,7 @@ export default function HeadTrackEdit() {
                   disabled={
                     title.trim().length < 4 ||
                     (moduleType === "VIDEO" && youtubeUrl.trim().length < 10) ||
+                    (moduleType === "MATERIAL" && materialUrl.trim().length < 10) ||
                     (moduleType === "CHECKPOINT" && checkpointPrompt.trim().length < 10) ||
                     (moduleType === "QUIZ" && (tfPrompt.trim().length < 8 || !minScore.trim()))
                   }
@@ -220,8 +412,9 @@ export default function HeadTrackEdit() {
                       type: moduleType,
                       title: title.trim(),
                       description: description.trim() || undefined,
-                      xpReward: moduleType === "VIDEO" ? 20 : moduleType === "CHECKPOINT" ? 30 : 40,
+                      xpReward: moduleType === "VIDEO" ? 20 : moduleType === "MATERIAL" ? 20 : moduleType === "CHECKPOINT" ? 30 : 40,
                       youtubeUrl: moduleType === "VIDEO" ? youtubeUrl.trim() : undefined,
+                      materialUrl: moduleType === "MATERIAL" ? materialUrl.trim() : undefined,
                       checkpointPrompt: moduleType === "CHECKPOINT" ? checkpointPrompt.trim() : undefined,
                       minScore: moduleType === "QUIZ" ? Number(minScore) || 70 : undefined,
                     };
@@ -288,6 +481,9 @@ export default function HeadTrackEdit() {
                       {m.type === "VIDEO" && m.youtubeUrl ? (
                         <div className="mt-2 text-xs text-muted-foreground">YouTube: {m.youtubeUrl}</div>
                       ) : null}
+                      {m.type === "MATERIAL" && m.materialUrl ? (
+                        <div className="mt-2 text-xs text-muted-foreground">Material: {m.materialUrl}</div>
+                      ) : null}
                       {m.type === "QUIZ" ? (
                         <div className="mt-2 text-xs text-muted-foreground">Nota mínima: {m.minScore ?? 70}%</div>
                       ) : null}
@@ -301,8 +497,18 @@ export default function HeadTrackEdit() {
                         variant="outline"
                         size="icon"
                         className="rounded-xl"
+                        onClick={() => openEdit(m)}
+                        aria-label="Editar módulo"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-xl"
                         disabled={idx === 0}
                         onClick={() => move(m.id, -1)}
+                        aria-label="Mover para cima"
                       >
                         <MoveUp className="h-4 w-4" />
                       </Button>
@@ -312,6 +518,7 @@ export default function HeadTrackEdit() {
                         className="rounded-xl"
                         disabled={idx === modules.length - 1}
                         onClick={() => move(m.id, 1)}
+                        aria-label="Mover para baixo"
                       >
                         <MoveDown className="h-4 w-4" />
                       </Button>
@@ -323,6 +530,7 @@ export default function HeadTrackEdit() {
                           mockDb.deleteModule(m.id);
                           force((x) => x + 1);
                         }}
+                        aria-label="Remover módulo"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>

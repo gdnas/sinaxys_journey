@@ -34,7 +34,7 @@ export type LearningTrack = {
   createdAt: string;
 };
 
-export type ModuleType = "VIDEO" | "QUIZ" | "CHECKPOINT";
+export type ModuleType = "VIDEO" | "QUIZ" | "CHECKPOINT" | "MATERIAL";
 
 export type TrackModule = {
   id: string;
@@ -46,6 +46,8 @@ export type TrackModule = {
   xpReward: number;
   // VIDEO
   youtubeUrl?: string;
+  // MATERIAL (ex.: apresentação no Figma)
+  materialUrl?: string;
   // QUIZ
   minScore?: number; // 0..100
   // CHECKPOINT
