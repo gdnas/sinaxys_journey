@@ -37,6 +37,56 @@ function randomCode() {
   return `SJ-${base}-${base2}`;
 }
 
+// NEW: keep assignment progress in sync when modules are added after an assignment already exists.
+function syncAssignmentProgress(db: Db, assignmentId: string) {
+  const assignment = db.assignments.find((a) => a.id === assignmentId);
+  if (!assignment) return;
+
+  const orderedModules = db.modules
+    .filter((m) => m.trackId === assignment.trackId)
+    .sort((a, b) => a.orderIndex - b.orderIndex);
+
+  const progress = db.moduleProgress.filter((p) => p.assignmentId === assignmentId);
+  const byModuleId = new Map(progress.map((p) => [p.moduleId, p] as const));
+
+  let changed = false;
+
+  // Ensure every module has a progress row
+  for (const m of orderedModules) {
+    if (byModuleId.has(m.id)) continue;
+    const p: ModuleProgress = {
+      id: uid("mpr"),
+      assignmentId,
+      moduleId: m.id,
+      status: "LOCKED",
+      attemptsCount: 0,
+    };
+    db.moduleProgress.push(p);
+    byModuleId.set(m.id, p);
+    changed = true;
+  }
+
+  // Recompute sequencing (single AVAILABLE) unless already completed.
+  if (assignment.status === "COMPLETED") {
+    // keep as-is
+  } else {
+    const firstNotCompleted = orderedModules.find((m) => byModuleId.get(m.id)?.status !== "COMPLETED");
+
+    for (const m of orderedModules) {
+      const p = byModuleId.get(m.id)!;
+      if (p.status === "COMPLETED") continue;
+
+      const nextStatus = firstNotCompleted?.id === m.id ? "AVAILABLE" : "LOCKED";
+      if (p.status !== nextStatus) {
+        p.status = nextStatus;
+        changed = true;
+      }
+    }
+  }
+
+  if (changed) saveDb(db);
+}
+
 export function loadDb(): Db {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
@@ -438,22 +488,30 @@ export const mockDb = {
     const db = loadDb();
     const assignment = db.assignments.find((a) => a.id === assignmentId);
     if (!assignment) return null;
-    const track = db.tracks.find((t) => t.id === assignment.trackId)!;
-    const modules = db.modules
+
+    syncAssignmentProgress(db, assignmentId);
+    const refreshed = loadDb();
+    const assignment2 = refreshed.assignments.find((a) => a.id === assignmentId)!;
+
+    const track = refreshed.tracks.find((t) => t.id === assignment2.trackId)!;
+    const modules = refreshed.modules
       .filter((m) => m.trackId === track.id)
       .sort((a, b) => a.orderIndex - b.orderIndex);
-    const progress = db.moduleProgress.filter((p) => p.assignmentId === assignmentId);
+    const progress = refreshed.moduleProgress.filter((p) => p.assignmentId === assignmentId);
     const progressByModuleId = Object.fromEntries(progress.map((p) => [p.moduleId, p]));
-    return { assignment, track, modules, progressByModuleId };
+    return { assignment: assignment2, track, modules, progressByModuleId };
   },
 
   getAssignmentsForUser(userId: string) {
     const db = loadDb();
-    return db.assignments
+    db.assignments.filter((a) => a.userId === userId).forEach((a) => syncAssignmentProgress(db, a.id));
+    const refreshed = loadDb();
+
+    return refreshed.assignments
       .filter((a) => a.userId === userId)
       .map((a) => {
-        const track = db.tracks.find((t) => t.id === a.trackId)!;
-        const stats = computeAssignmentStats(db, a.id);
+        const track = refreshed.tracks.find((t) => t.id === a.trackId)!;
+        const stats = computeAssignmentStats(refreshed, a.id);
         return {
           assignment: a,
           track,
@@ -486,13 +544,21 @@ export const mockDb = {
   getCollaboratorsOverview(departmentId: string): CollaboratorOverview[] {
     const db = loadDb();
     const collaborators = db.users.filter((u) => u.departmentId === departmentId && u.role === "COLABORADOR" && u.active);
+    db.assignments
+      .filter((a) => collaborators.some((c) => c.id === a.userId))
+      .forEach((a) => syncAssignmentProgress(db, a.id));
 
-    return collaborators.map((user) => {
-      const assignments = db.assignments
+    const refreshed = loadDb();
+    const collaborators2 = refreshed.users.filter(
+      (u) => u.departmentId === departmentId && u.role === "COLABORADOR" && u.active,
+    );
+
+    return collaborators2.map((user) => {
+      const assignments = refreshed.assignments
         .filter((a) => a.userId === user.id)
         .map((assignment) => {
-          const track = db.tracks.find((t) => t.id === assignment.trackId)!;
-          const stats = computeAssignmentStats(db, assignment.id);
+          const track = refreshed.tracks.find((t) => t.id === assignment.trackId)!;
+          const stats = computeAssignmentStats(refreshed, assignment.id);
           return {
             assignment,
             track,
