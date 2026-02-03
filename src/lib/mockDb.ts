@@ -381,6 +381,8 @@ export type CollaboratorOverview = {
     completedModules: number;
     totalModules: number;
     progressPct: number;
+    currentModuleTitle?: string;
+    needsAttention?: boolean;
   }[];
 };
 
@@ -445,6 +447,29 @@ function issueCertificateIfCompleted(db: Db, assignmentId: string) {
   };
 
   db.certificates.push(cert);
+}
+
+function computeNeedsAttention(db: Db, assignmentId: string) {
+  const mps = db.moduleProgress.filter((p) => p.assignmentId === assignmentId);
+  // needs attention when current AVAILABLE quiz has been attempted and not passed
+  const available = mps.find((p) => p.status === "AVAILABLE");
+  if (!available) return false;
+  const mod = db.modules.find((m) => m.id === available.moduleId);
+  if (!mod || mod.type !== "QUIZ") return false;
+  return (available.attemptsCount ?? 0) > 0 && available.passed === false;
+}
+
+function computeCurrentModuleTitle(db: Db, assignmentId: string) {
+  const assignment = db.assignments.find((a) => a.id === assignmentId);
+  if (!assignment) return undefined;
+  const orderedModules = db.modules
+    .filter((m) => m.trackId === assignment.trackId)
+    .sort((a, b) => a.orderIndex - b.orderIndex);
+  const mp = db.moduleProgress
+    .filter((p) => p.assignmentId === assignmentId)
+    .find((p) => p.status === "AVAILABLE");
+  const mod = mp ? orderedModules.find((m) => m.id === mp.moduleId) : undefined;
+  return mod?.title;
 }
 
 export const mockDb = {
@@ -565,6 +590,8 @@ export const mockDb = {
             completedModules: stats.done,
             totalModules: stats.total,
             progressPct: stats.progressPct,
+            currentModuleTitle: computeCurrentModuleTitle(refreshed, assignment.id),
+            needsAttention: computeNeedsAttention(refreshed, assignment.id),
           };
         });
       return { user, assignments };
