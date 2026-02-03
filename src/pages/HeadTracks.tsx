@@ -52,12 +52,12 @@ export default function HeadTracks() {
 
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+              <Button className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Criar trilha
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-3xl">
+            <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Criar trilha</DialogTitle>
               </DialogHeader>
@@ -76,9 +76,9 @@ export default function HeadTracks() {
                   />
                 </div>
               </div>
-              <DialogFooter>
+              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <Button
-                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
                   disabled={title.trim().length < 6 || description.trim().length < 10}
                   onClick={() => {
                     const t = mockDb.createTrack({ departmentId: deptId, title, description, createdByUserId: user.id });
@@ -105,8 +105,8 @@ export default function HeadTracks() {
                 className="flex flex-col justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] p-4 md:flex-row md:items-center"
               >
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="min-w-0 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
                     {t.published ? (
                       <Badge className="rounded-full bg-emerald-100 text-emerald-800 hover:bg-emerald-100">Publicada</Badge>
                     ) : (
@@ -116,8 +116,8 @@ export default function HeadTracks() {
                   <div className="mt-1 text-xs text-muted-foreground">Criada em {formatShortDate(t.createdAt)}</div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button asChild variant="outline" className="rounded-xl">
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end md:w-auto">
+                  <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
                     <Link to={`/head/tracks/${t.id}/edit`}>
                       <Pencil className="mr-2 h-4 w-4" />
                       Editar
@@ -125,7 +125,7 @@ export default function HeadTracks() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="rounded-xl"
+                    className="w-full rounded-xl sm:w-auto"
                     onClick={() => {
                       mockDb.setTrackPublished(t.id, !t.published);
                       force((x) => x + 1);

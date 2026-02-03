@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type { TrackModule } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
@@ -102,13 +103,13 @@ export default function HeadTrackEdit() {
   return (
     <div className="grid gap-6">
       <div className="flex flex-col justify-between gap-3 rounded-3xl border bg-white p-6 md:flex-row md:items-center">
-        <div>
+        <div className="min-w-0">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor de trilha</div>
-          <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)]">{track.title}</div>
+          <div className="mt-1 truncate text-xl font-semibold text-[color:var(--sinaxys-ink)]">{track.title}</div>
           <div className="mt-1 text-sm text-muted-foreground">{track.description}</div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline" className="rounded-xl">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
             <Link to="/head/tracks">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Voltar
@@ -122,86 +123,88 @@ export default function HeadTrackEdit() {
             }}
           >
             <DialogTrigger asChild>
-              <Button className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+              <Button className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto">
                 <Plus className="mr-2 h-4 w-4" />
                 Adicionar módulo
               </Button>
             </DialogTrigger>
-            <DialogContent className="rounded-3xl">
+            <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
               <DialogHeader>
                 <DialogTitle>Novo módulo</DialogTitle>
               </DialogHeader>
 
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label>Tipo</Label>
-                  <Select value={moduleType} onValueChange={(v) => setModuleType(v as TrackModule["type"]) }>
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue placeholder="Selecione…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="VIDEO">Vídeo</SelectItem>
-                      <SelectItem value="QUIZ">Quiz</SelectItem>
-                      <SelectItem value="CHECKPOINT">Checkpoint</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label>Título</Label>
-                  <Input value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl" />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label>Descrição (opcional)</Label>
-                  <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-24 rounded-2xl" />
-                </div>
-
-                {moduleType === "VIDEO" ? (
+              <ScrollArea className="max-h-[70vh] pr-4">
+                <div className="grid gap-4">
                   <div className="grid gap-2">
-                    <Label>Link do YouTube</Label>
-                    <Input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} className="rounded-xl" placeholder="https://www.youtube.com/watch?v=..." />
+                    <Label>Tipo</Label>
+                    <Select value={moduleType} onValueChange={(v) => setModuleType(v as TrackModule["type"]) }>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue placeholder="Selecione…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="VIDEO">Vídeo</SelectItem>
+                        <SelectItem value="QUIZ">Quiz</SelectItem>
+                        <SelectItem value="CHECKPOINT">Checkpoint</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                ) : null}
 
-                {moduleType === "CHECKPOINT" ? (
                   <div className="grid gap-2">
-                    <Label>Pergunta do checkpoint</Label>
-                    <Textarea value={checkpointPrompt} onChange={(e) => setCheckpointPrompt(e.target.value)} className="min-h-24 rounded-2xl" placeholder="Ex.: Em 4–6 linhas, descreva…" />
+                    <Label>Título</Label>
+                    <Input value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl" />
                   </div>
-                ) : null}
 
-                {moduleType === "QUIZ" ? (
-                  <div className="grid gap-3">
-                    <div className="grid gap-2">
-                      <Label>Nota mínima (%)</Label>
-                      <Input value={minScore} onChange={(e) => setMinScore(e.target.value)} className="rounded-xl" inputMode="numeric" />
-                    </div>
-                    <Separator />
-                    <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Pergunta (V/F) — MVP</div>
-                    <div className="grid gap-2">
-                      <Label>Enunciado</Label>
-                      <Textarea value={tfPrompt} onChange={(e) => setTfPrompt(e.target.value)} className="min-h-20 rounded-2xl" />
-                    </div>
-                    <div className="grid gap-2">
-                      <Label>Resposta correta</Label>
-                      <Select value={tfCorrect} onValueChange={(v) => setTfCorrect(v as "true" | "false") }>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="true">Verdadeiro</SelectItem>
-                          <SelectItem value="false">Falso</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="grid gap-2">
+                    <Label>Descrição (opcional)</Label>
+                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-24 rounded-2xl" />
                   </div>
-                ) : null}
-              </div>
 
-              <DialogFooter>
+                  {moduleType === "VIDEO" ? (
+                    <div className="grid gap-2">
+                      <Label>Link do YouTube</Label>
+                      <Input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} className="rounded-xl" placeholder="https://www.youtube.com/watch?v=..." />
+                    </div>
+                  ) : null}
+
+                  {moduleType === "CHECKPOINT" ? (
+                    <div className="grid gap-2">
+                      <Label>Pergunta do checkpoint</Label>
+                      <Textarea value={checkpointPrompt} onChange={(e) => setCheckpointPrompt(e.target.value)} className="min-h-24 rounded-2xl" placeholder="Ex.: Em 4–6 linhas, descreva…" />
+                    </div>
+                  ) : null}
+
+                  {moduleType === "QUIZ" ? (
+                    <div className="grid gap-3">
+                      <div className="grid gap-2">
+                        <Label>Nota mínima (%)</Label>
+                        <Input value={minScore} onChange={(e) => setMinScore(e.target.value)} className="rounded-xl" inputMode="numeric" />
+                      </div>
+                      <Separator />
+                      <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Pergunta (V/F) — MVP</div>
+                      <div className="grid gap-2">
+                        <Label>Enunciado</Label>
+                        <Textarea value={tfPrompt} onChange={(e) => setTfPrompt(e.target.value)} className="min-h-20 rounded-2xl" />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Resposta correta</Label>
+                        <Select value={tfCorrect} onValueChange={(v) => setTfCorrect(v as "true" | "false") }>
+                          <SelectTrigger className="rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="true">Verdadeiro</SelectItem>
+                            <SelectItem value="false">Falso</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </ScrollArea>
+
+              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <Button
-                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
                   disabled={
                     title.trim().length < 4 ||
                     (moduleType === "VIDEO" && youtubeUrl.trim().length < 10) ||
@@ -293,15 +296,28 @@ export default function HeadTrackEdit() {
                       ) : null}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" className="rounded-xl" disabled={idx === 0} onClick={() => move(m.id, -1)}>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-xl"
+                        disabled={idx === 0}
+                        onClick={() => move(m.id, -1)}
+                      >
                         <MoveUp className="h-4 w-4" />
                       </Button>
-                      <Button variant="outline" className="rounded-xl" disabled={idx === modules.length - 1} onClick={() => move(m.id, 1)}>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-xl"
+                        disabled={idx === modules.length - 1}
+                        onClick={() => move(m.id, 1)}
+                      >
                         <MoveDown className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
+                        size="icon"
                         className="rounded-xl"
                         onClick={() => {
                           mockDb.deleteModule(m.id);
