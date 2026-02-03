@@ -13,6 +13,7 @@ import CertificateView from "./pages/CertificateView";
 import HeadDashboard from "./pages/HeadDashboard";
 import HeadTracks from "./pages/HeadTracks";
 import HeadTrackEdit from "./pages/HeadTrackEdit";
+import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
 import AdminUsers from "./pages/AdminUsers";
 import { AuthProvider } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
@@ -72,6 +73,14 @@ const App = () => (
                 element={
                   <RequireAuth roles={["HEAD"]}>
                     <HeadDashboard />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/head/collaborators/:userId"
+                element={
+                  <RequireAuth roles={["HEAD"]}>
+                    <HeadCollaboratorDetail />
                   </RequireAuth>
                 }
               />

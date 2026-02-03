@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { UserPlus, TrendingUp } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -81,7 +82,14 @@ export default function HeadDashboard() {
                   const base = row.assignments.length ? row.assignments : [null];
                   return base.map((a, idx) => (
                     <TableRow key={`${row.user.id}_${a?.assignment.id ?? idx}`}>
-                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{row.user.name}</TableCell>
+                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
+                        <Link
+                          to={`/head/collaborators/${row.user.id}`}
+                          className="rounded-md underline-offset-4 hover:underline"
+                        >
+                          {row.user.name}
+                        </Link>
+                      </TableCell>
                       <TableCell>
                         {a ? (
                           <div>
@@ -123,57 +131,63 @@ export default function HeadDashboard() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Dialog
-                          open={assignDialogForUserId === row.user.id}
-                          onOpenChange={(open) => {
-                            setSelectedTrackId("");
-                            setAssignDialogForUserId(open ? row.user.id : null);
-                          }}
-                        >
-                          <DialogTrigger asChild>
-                            <Button variant="outline" className="rounded-xl">
-                              <UserPlus className="mr-2 h-4 w-4" />
-                              Atribuir trilha
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="rounded-3xl">
-                            <DialogHeader>
-                              <DialogTitle>Atribuir trilha</DialogTitle>
-                            </DialogHeader>
-                            <div className="grid gap-2">
-                              <div className="text-sm text-muted-foreground">Colaborador: <span className="font-medium text-[color:var(--sinaxys-ink)]">{row.user.name}</span></div>
-                              <Select value={selectedTrackId} onValueChange={setSelectedTrackId}>
-                                <SelectTrigger className="rounded-xl">
-                                  <SelectValue placeholder="Selecione uma trilha publicada…" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {deptTracks.map((t) => (
-                                    <SelectItem key={t.id} value={t.id}>
-                                      {t.title}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <DialogFooter>
-                              <Button
-                                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                                disabled={!selectedTrackId}
-                                onClick={() => {
-                                  mockDb.assignTrack({
-                                    trackId: selectedTrackId,
-                                    userId: row.user.id,
-                                    assignedByUserId: user.id,
-                                  });
-                                  setAssignDialogForUserId(null);
-                                  force((x) => x + 1);
-                                }}
-                              >
-                                Confirmar atribuição
+                        <div className="flex items-center justify-end gap-2">
+                          <Button asChild variant="outline" className="rounded-xl">
+                            <Link to={`/head/collaborators/${row.user.id}`}>Ver detalhe</Link>
+                          </Button>
+
+                          <Dialog
+                            open={assignDialogForUserId === row.user.id}
+                            onOpenChange={(open) => {
+                              setSelectedTrackId("");
+                              setAssignDialogForUserId(open ? row.user.id : null);
+                            }}
+                          >
+                            <DialogTrigger asChild>
+                              <Button variant="outline" className="rounded-xl">
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                Atribuir trilha
                               </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
+                            </DialogTrigger>
+                            <DialogContent className="rounded-3xl">
+                              <DialogHeader>
+                                <DialogTitle>Atribuir trilha</DialogTitle>
+                              </DialogHeader>
+                              <div className="grid gap-2">
+                                <div className="text-sm text-muted-foreground">Colaborador: <span className="font-medium text-[color:var(--sinaxys-ink)]">{row.user.name}</span></div>
+                                <Select value={selectedTrackId} onValueChange={setSelectedTrackId}>
+                                  <SelectTrigger className="rounded-xl">
+                                    <SelectValue placeholder="Selecione uma trilha publicada…" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {deptTracks.map((t) => (
+                                      <SelectItem key={t.id} value={t.id}>
+                                        {t.title}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <DialogFooter>
+                                <Button
+                                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                                  disabled={!selectedTrackId}
+                                  onClick={() => {
+                                    mockDb.assignTrack({
+                                      trackId: selectedTrackId,
+                                      userId: row.user.id,
+                                      assignedByUserId: user.id,
+                                    });
+                                    setAssignDialogForUserId(null);
+                                    force((x) => x + 1);
+                                  }}
+                                >
+                                  Confirmar atribuição
+                                </Button>
+                              </DialogFooter>
+                            </DialogContent>
+                          </Dialog>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ));
