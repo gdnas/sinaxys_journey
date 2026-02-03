@@ -72,6 +72,7 @@ export default function HeadDashboard() {
                 <TableHead>Colaborador</TableHead>
                 <TableHead>Trilha</TableHead>
                 <TableHead className="w-[220px]">Progresso</TableHead>
+                <TableHead>Próxima etapa</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -80,121 +81,168 @@ export default function HeadDashboard() {
               {overview.length ? (
                 overview.flatMap((row) => {
                   const base = row.assignments.length ? row.assignments : [null];
-                  return base.map((a, idx) => (
-                    <TableRow key={`${row.user.id}_${a?.assignment.id ?? idx}`}>
-                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
-                        <Link
-                          to={`/head/collaborators/${row.user.id}`}
-                          className="rounded-md underline-offset-4 hover:underline"
-                        >
-                          {row.user.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        {a ? (
-                          <div>
-                            <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{a.track.title}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {a.completedModules} de {a.totalModules} módulos
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-muted-foreground">Sem trilha atribuída</div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {a ? (
-                          <div className="grid gap-2">
-                            <Progress value={a.progressPct} className="h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
-                            <div className="text-xs text-muted-foreground">{a.progressPct}%</div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-muted-foreground">—</div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {a ? (
-                          <Badge
-                            className={
-                              "rounded-full " +
-                              (a.assignment.status === "COMPLETED"
-                                ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
-                                : a.assignment.status === "IN_PROGRESS"
-                                  ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
-                                  : "bg-amber-100 text-amber-800 hover:bg-amber-100")
-                            }
-                          >
-                            {statusLabel(a.assignment.status)}
-                          </Badge>
-                        ) : (
-                          <Badge className="rounded-full bg-muted text-muted-foreground hover:bg-muted">—</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button asChild variant="outline" className="rounded-xl">
-                            <Link to={`/head/collaborators/${row.user.id}`}>Ver detalhe</Link>
-                          </Button>
+                  return base.map((a, idx) => {
+                    const detail = a ? mockDb.getAssignmentDetail(a.assignment.id) : null;
+                    const currentModule = detail?.modules.find(
+                      (m) => detail.progressByModuleId[m.id]?.status === "AVAILABLE",
+                    );
+                    const currentProgress = currentModule
+                      ? detail?.progressByModuleId[currentModule.id]
+                      : undefined;
+                    const needsAttention =
+                      !!a &&
+                      !!currentModule &&
+                      currentModule.type === "QUIZ" &&
+                      (currentProgress?.attemptsCount ?? 0) > 0 &&
+                      currentProgress?.passed === false;
 
-                          <Dialog
-                            open={assignDialogForUserId === row.user.id}
-                            onOpenChange={(open) => {
-                              setSelectedTrackId("");
-                              setAssignDialogForUserId(open ? row.user.id : null);
-                            }}
+                    return (
+                      <TableRow key={`${row.user.id}_${a?.assignment.id ?? idx}`}>
+                        <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
+                          <Link
+                            to={`/head/collaborators/${row.user.id}`}
+                            className="rounded-md underline-offset-4 hover:underline"
                           >
-                            <DialogTrigger asChild>
-                              <Button variant="outline" className="rounded-xl">
-                                <UserPlus className="mr-2 h-4 w-4" />
-                                Atribuir trilha
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="rounded-3xl">
-                              <DialogHeader>
-                                <DialogTitle>Atribuir trilha</DialogTitle>
-                              </DialogHeader>
-                              <div className="grid gap-2">
-                                <div className="text-sm text-muted-foreground">Colaborador: <span className="font-medium text-[color:var(--sinaxys-ink)]">{row.user.name}</span></div>
-                                <Select value={selectedTrackId} onValueChange={setSelectedTrackId}>
-                                  <SelectTrigger className="rounded-xl">
-                                    <SelectValue placeholder="Selecione uma trilha publicada…" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {deptTracks.map((t) => (
-                                      <SelectItem key={t.id} value={t.id}>
-                                        {t.title}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                            {row.user.name}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          {a ? (
+                            <div>
+                              <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{a.track.title}</div>
+                              <div className="text-xs text-muted-foreground">
+                                {a.completedModules} de {a.totalModules} módulos
                               </div>
-                              <DialogFooter>
-                                <Button
-                                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                                  disabled={!selectedTrackId}
-                                  onClick={() => {
-                                    mockDb.assignTrack({
-                                      trackId: selectedTrackId,
-                                      userId: row.user.id,
-                                      assignedByUserId: user.id,
-                                    });
-                                    setAssignDialogForUserId(null);
-                                    force((x) => x + 1);
-                                  }}
-                                >
-                                  Confirmar atribuição
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">Sem trilha atribuída</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {a ? (
+                            <div className="grid gap-2">
+                              <Progress value={a.progressPct} className="h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
+                              <div className="text-xs text-muted-foreground">{a.progressPct}%</div>
+                            </div>
+                          ) : (
+                            <div className="text-sm text-muted-foreground">—</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {a ? (
+                            currentModule ? (
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">
+                                  {currentModule.title}
+                                </div>
+                                <div className="mt-1 flex items-center gap-2">
+                                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                                    {currentModule.type === "VIDEO"
+                                      ? "Vídeo"
+                                      : currentModule.type === "QUIZ"
+                                        ? "Quiz"
+                                        : "Checkpoint"}
+                                  </Badge>
+                                  {needsAttention ? (
+                                    <Badge className="rounded-full bg-rose-100 text-rose-800 hover:bg-rose-100">
+                                      Precisa de atenção
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-sm text-muted-foreground">—</div>
+                            )
+                          ) : (
+                            <div className="text-sm text-muted-foreground">—</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {a ? (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Badge
+                                className={
+                                  "rounded-full " +
+                                  (a.assignment.status === "COMPLETED"
+                                    ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+                                    : a.assignment.status === "IN_PROGRESS"
+                                      ? "bg-blue-100 text-blue-800 hover:bg-blue-100"
+                                      : "bg-amber-100 text-amber-800 hover:bg-amber-100")
+                                }
+                              >
+                                {statusLabel(a.assignment.status)}
+                              </Badge>
+                            </div>
+                          ) : (
+                            <Badge className="rounded-full bg-muted text-muted-foreground hover:bg-muted">—</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button asChild variant="outline" className="rounded-xl">
+                              <Link to={`/head/collaborators/${row.user.id}`}>Ver detalhe</Link>
+                            </Button>
+
+                            <Dialog
+                              open={assignDialogForUserId === row.user.id}
+                              onOpenChange={(open) => {
+                                setSelectedTrackId("");
+                                setAssignDialogForUserId(open ? row.user.id : null);
+                              }}
+                            >
+                              <DialogTrigger asChild>
+                                <Button variant="outline" className="rounded-xl">
+                                  <UserPlus className="mr-2 h-4 w-4" />
+                                  Atribuir trilha
                                 </Button>
-                              </DialogFooter>
-                            </DialogContent>
-                          </Dialog>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ));
+                              </DialogTrigger>
+                              <DialogContent className="rounded-3xl">
+                                <DialogHeader>
+                                  <DialogTitle>Atribuir trilha</DialogTitle>
+                                </DialogHeader>
+                                <div className="grid gap-2">
+                                  <div className="text-sm text-muted-foreground">Colaborador: <span className="font-medium text-[color:var(--sinaxys-ink)]">{row.user.name}</span></div>
+                                  <Select value={selectedTrackId} onValueChange={setSelectedTrackId}>
+                                    <SelectTrigger className="rounded-xl">
+                                      <SelectValue placeholder="Selecione uma trilha publicada…" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {deptTracks.map((t) => (
+                                        <SelectItem key={t.id} value={t.id}>
+                                          {t.title}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <DialogFooter>
+                                  <Button
+                                    className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                                    disabled={!selectedTrackId}
+                                    onClick={() => {
+                                      mockDb.assignTrack({
+                                        trackId: selectedTrackId,
+                                        userId: row.user.id,
+                                        assignedByUserId: user.id,
+                                      });
+                                      setAssignDialogForUserId(null);
+                                      force((x) => x + 1);
+                                    }}
+                                  >
+                                    Confirmar atribuição
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  });
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                     Nenhum colaborador ativo no departamento.
                   </TableCell>
                 </TableRow>

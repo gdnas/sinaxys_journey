@@ -133,6 +133,10 @@ export default function HeadCollaboratorDetail() {
                 const done = a.completedModules;
                 const pct = computeProgress(done, total);
 
+                const current = detail?.modules.find(
+                  (m) => detail.progressByModuleId[m.id]?.status === "AVAILABLE",
+                );
+
                 return (
                   <AccordionItem key={a.assignment.id} value={a.assignment.id} className="border-b-0">
                     <div className="rounded-2xl border border-[color:var(--sinaxys-border)]">
@@ -144,6 +148,12 @@ export default function HeadCollaboratorDetail() {
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">
                               {done} de {total} módulos • {pct}%
+                              {current ? (
+                                <>
+                                  <span className="mx-2">•</span>
+                                  Próxima etapa: <span className="font-medium text-[color:var(--sinaxys-ink)]">{current.title}</span>
+                                </>
+                              ) : null}
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -175,6 +185,8 @@ export default function HeadCollaboratorDetail() {
                             <div className="grid gap-2">
                               {detail.modules.map((m) => {
                                 const p = detail.progressByModuleId[m.id];
+                                const quizNeedsAttention =
+                                  m.type === "QUIZ" && (p?.attemptsCount ?? 0) > 0 && p?.passed === false;
 
                                 return (
                                   <div
@@ -203,6 +215,11 @@ export default function HeadCollaboratorDetail() {
                                             </div>
                                             <div className="mt-1 flex flex-wrap items-center gap-2">
                                               {statusBadge(p)}
+                                              {quizNeedsAttention ? (
+                                                <Badge className="rounded-full bg-rose-100 text-rose-800 hover:bg-rose-100">
+                                                  Precisa de atenção
+                                                </Badge>
+                                              ) : null}
                                               <span className="text-xs text-muted-foreground">+{m.xpReward} XP</span>
                                             </div>
                                             {m.description ? (
@@ -220,8 +237,20 @@ export default function HeadCollaboratorDetail() {
                                               <>
                                                 <br />
                                                 Nota: <span className="font-medium text-[color:var(--sinaxys-ink)]">{p.score}%</span>
+                                                <span className="text-muted-foreground"> (mín.: {m.minScore ?? 70}%)</span>
+                                                <br />
+                                                Resultado: {p.passed ? (
+                                                  <span className="font-medium text-emerald-700">Aprovado</span>
+                                                ) : (
+                                                  <span className="font-medium text-rose-700">Reprovado</span>
+                                                )}
                                               </>
-                                            ) : null}
+                                            ) : (
+                                              <>
+                                                <br />
+                                                Nota mínima: <span className="font-medium text-[color:var(--sinaxys-ink)]">{m.minScore ?? 70}%</span>
+                                              </>
+                                            )}
                                           </div>
                                         ) : m.type === "CHECKPOINT" ? (
                                           p?.checkpointAnswerText ? (
