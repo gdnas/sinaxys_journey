@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus, Rocket, Pencil, Eye, EyeOff } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import { formatShortDate } from "@/lib/sinaxys";
 
 export default function HeadTracks() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const deptId = user?.departmentId;
   const [version, force] = useState(0);
 
@@ -86,8 +87,7 @@ export default function HeadTracks() {
                     setTitle("");
                     setDescription("");
                     force((x) => x + 1);
-                    // go edit
-                    window.location.href = `/head/tracks/${t.id}/edit`;
+                    navigate(`/head/tracks/${t.id}/edit`);
                   }}
                 >
                   Criar e editar

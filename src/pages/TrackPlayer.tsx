@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
-import { CheckCircle2, Lock, Trophy } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, Lock, Trophy } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { ModuleChecklist } from "@/components/ModuleChecklist";
 import { ResourceEmbed } from "@/components/ResourceEmbed";
 import { useToast } from "@/hooks/use-toast";
-import type { TrackModule } from "@/lib/domain";
 import { mockDb } from "@/lib/mockDb";
 import { computeProgress, getYouTubeEmbedUrl } from "@/lib/sinaxys";
 
@@ -19,12 +18,21 @@ export default function TrackPlayer() {
   const params = useParams();
   const assignmentId = params.assignmentId ?? "";
 
-  const detail = mockDb.getAssignmentDetail(assignmentId);
-  const [currentModuleId, setCurrentModuleId] = useState(() => {
-    if (!detail) return "";
+  const [version, setVersion] = useState(0);
+  const detail = useMemo(() => mockDb.getAssignmentDetail(assignmentId), [assignmentId, version]);
+
+  const [currentModuleId, setCurrentModuleId] = useState<string>("");
+
+  useEffect(() => {
+    if (!detail) return;
+
+    // Keep selection stable when possible; otherwise fall back to AVAILABLE or first module.
+    const stillExists = detail.modules.some((m) => m.id === currentModuleId);
+    if (stillExists && currentModuleId) return;
+
     const available = detail.modules.find((m) => detail.progressByModuleId[m.id]?.status === "AVAILABLE");
-    return available?.id ?? detail.modules[0]?.id ?? "";
-  });
+    setCurrentModuleId(available?.id ?? detail.modules[0]?.id ?? "");
+  }, [detail?.assignment.id]);
 
   const module = detail?.modules.find((m) => m.id === currentModuleId);
   const mp = module ? detail?.progressByModuleId[module.id] : undefined;
@@ -44,17 +52,34 @@ export default function TrackPlayer() {
   const quiz = useMemo(() => {
     if (!module || module.type !== "QUIZ") return null;
     return mockDb.getQuizForModule(module.id);
-  }, [module]);
+  }, [module?.id, module?.type]);
 
   const [checkpointAnswer, setCheckpointAnswer] = useState("");
   const [quizAnswers, setQuizAnswers] = useState<Record<string, string>>({});
   const [quizResult, setQuizResult] = useState<null | { score: number; passed: boolean; minScore: number }>(null);
 
+  // Reset module-local state when changing module
+  useEffect(() => {
+    setCheckpointAnswer("");
+    setQuizAnswers({});
+    setQuizResult(null);
+  }, [module?.id]);
+
   if (!detail || !module || !mp) {
     return (
       <div className="rounded-3xl border bg-white p-6">
-        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilha não encontrada</div>
-        <p className="mt-1 text-sm text-muted-foreground">Verifique o link ou retorne ao seu painel.</p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilha não encontrada</div>
+            <p className="mt-1 text-sm text-muted-foreground">Verifique o link ou retorne ao seu painel.</p>
+          </div>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link to="/app">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar
+            </Link>
+          </Button>
+        </div>
       </div>
     );
   }
@@ -63,9 +88,32 @@ export default function TrackPlayer() {
   const completed = mp.status === "COMPLETED";
   const available = mp.status === "AVAILABLE";
 
+  const refresh = () => setVersion((v) => v + 1);
+
+  const goNextIfAny = () => {
+    const updated = mockDb.getAssignmentDetail(detail.assignment.id);
+    if (!updated) return;
+
+    const nextAvail = updated.modules.find((m) => updated.progressByModuleId[m.id]?.status === "AVAILABLE");
+    if (nextAvail) setCurrentModuleId(nextAvail.id);
+    refresh();
+  };
+
   return (
     <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
       <div className="grid gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link to="/app">
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Minha jornada
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="rounded-xl">
+            <Link to="/app/certificates">Certificados</Link>
+          </Button>
+        </div>
+
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div>
@@ -110,7 +158,7 @@ export default function TrackPlayer() {
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulo bloqueado</div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Conclua o módulo anterior para liberar este conteúdo. A sequência existe para garantir consistência no aprendizado.
+                  Conclua o módulo anterior para liberar este conteúdo.
                 </p>
               </div>
             </div>
@@ -131,23 +179,18 @@ export default function TrackPlayer() {
 
               <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
                 <div className="text-sm text-muted-foreground">
-                  Ao concluir, você libera o próximo módulo automaticamente.
+                  Ao concluir, o próximo módulo é liberado automaticamente.
                 </div>
                 <Button
                   disabled={!available}
                   className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
                   onClick={() => {
                     mockDb.completeVideo(detail.assignment.id, module.id);
-                    const updated = mockDb.getAssignmentDetail(detail.assignment.id);
-                    if (updated) {
-                      const nextAvail = updated.modules.find((m) => updated.progressByModuleId[m.id]?.status === "AVAILABLE");
-                      if (nextAvail) setCurrentModuleId(nextAvail.id);
-                      else setCurrentModuleId(module.id);
-                    }
                     toast({
                       title: "Módulo concluído",
                       description: "Boa. Seguimos em sequência — o próximo conteúdo já foi liberado.",
                     });
+                    goNextIfAny();
                   }}
                 >
                   {completed ? (
@@ -162,39 +205,25 @@ export default function TrackPlayer() {
             </div>
           ) : null}
 
-          {/* MATERIAL (ex.: apresentação no Figma) */}
+          {/* MATERIAL */}
           {module.type === "MATERIAL" ? (
             <div className="mt-6 grid gap-4">
-              <div className="flex items-start gap-3 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-                <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Material vivo</div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Este conteúdo é mantido por link (ex.: Figma). Quando o material é atualizado na origem, a trilha reflete a versão mais recente.
-                  </p>
-                </div>
-              </div>
-
               <ResourceEmbed url={module.materialUrl ?? ""} title={module.title} />
 
               <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
                 <div className="text-sm text-muted-foreground">
-                  Ao concluir, você libera o próximo módulo automaticamente.
+                  Ao concluir, o próximo módulo é liberado automaticamente.
                 </div>
                 <Button
                   disabled={!available}
                   className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
                   onClick={() => {
                     mockDb.completeVideo(detail.assignment.id, module.id);
-                    const updated = mockDb.getAssignmentDetail(detail.assignment.id);
-                    if (updated) {
-                      const nextAvail = updated.modules.find((m) => updated.progressByModuleId[m.id]?.status === "AVAILABLE");
-                      if (nextAvail) setCurrentModuleId(nextAvail.id);
-                      else setCurrentModuleId(module.id);
-                    }
                     toast({
                       title: "Material concluído",
-                      description: "Conteúdo registrado. Seguimos em sequência — o próximo módulo já foi liberado.",
+                      description: "Conteúdo registrado. O próximo módulo já está disponível.",
                     });
+                    goNextIfAny();
                   }}
                 >
                   {completed ? (
@@ -226,7 +255,7 @@ export default function TrackPlayer() {
                   className="min-h-32 rounded-2xl"
                   disabled={!available}
                 />
-                <div className="text-xs text-muted-foreground">No MVP, este checkpoint é auto-conclusivo. Evolução: aprovação pelo head.</div>
+                <div className="text-xs text-muted-foreground">No MVP, este checkpoint é auto-conclusivo.</div>
               </div>
 
               <div className="flex items-center justify-end">
@@ -235,16 +264,11 @@ export default function TrackPlayer() {
                   className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
                   onClick={() => {
                     mockDb.submitCheckpoint(detail.assignment.id, module.id, checkpointAnswer);
-                    setCheckpointAnswer("");
-                    const updated = mockDb.getAssignmentDetail(detail.assignment.id);
-                    if (updated) {
-                      const nextAvail = updated.modules.find((m) => updated.progressByModuleId[m.id]?.status === "AVAILABLE");
-                      if (nextAvail) setCurrentModuleId(nextAvail.id);
-                    }
                     toast({
                       title: "Checkpoint concluído",
-                      description: "Ótimo. A clareza da sua resposta fortalece o aprendizado — e o próximo módulo já está disponível.",
+                      description: "Ótimo. O próximo módulo já está disponível.",
                     });
+                    goNextIfAny();
                   }}
                 >
                   Concluir checkpoint
@@ -264,7 +288,9 @@ export default function TrackPlayer() {
               <div className="grid gap-4">
                 {quiz.questions.map((q) => (
                   <div key={q.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{q.orderIndex}. {q.prompt}</div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                      {q.orderIndex}. {q.prompt}
+                    </div>
                     <RadioGroup
                       className="mt-3 grid gap-2"
                       value={quizAnswers[q.id] ?? ""}
@@ -288,14 +314,10 @@ export default function TrackPlayer() {
                 <div
                   className={
                     "rounded-2xl border p-4 " +
-                    (quizResult.passed
-                      ? "border-emerald-200 bg-emerald-50"
-                      : "border-amber-200 bg-amber-50")
+                    (quizResult.passed ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")
                   }
                 >
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                    Resultado: {quizResult.score}%
-                  </div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Resultado: {quizResult.score}%</div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {quizResult.passed
                       ? "Aprovado. O próximo módulo foi liberado automaticamente."
@@ -311,12 +333,20 @@ export default function TrackPlayer() {
                   onClick={() => {
                     const result = mockDb.submitQuiz(detail.assignment.id, module.id, quizAnswers);
                     setQuizResult(result);
+
                     if (result.passed) {
-                      const updated = mockDb.getAssignmentDetail(detail.assignment.id);
-                      if (updated) {
-                        const nextAvail = updated.modules.find((m) => updated.progressByModuleId[m.id]?.status === "AVAILABLE");
-                        if (nextAvail) setCurrentModuleId(nextAvail.id);
-                      }
+                      toast({
+                        title: "Quiz aprovado",
+                        description: "Boa. Seguimos em sequência — o próximo módulo já foi liberado.",
+                      });
+                      goNextIfAny();
+                    } else {
+                      toast({
+                        title: "Quiz não aprovado",
+                        description: "Sem problema — revise e tente novamente.",
+                        variant: "destructive",
+                      });
+                      refresh();
                     }
                   }}
                 >
@@ -326,7 +356,6 @@ export default function TrackPlayer() {
             </div>
           ) : null}
 
-          {/* Conclusão da trilha */}
           {detail.assignment.status === "COMPLETED" ? (
             <div className="mt-6 flex items-start gap-3 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
               <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white">
@@ -334,9 +363,7 @@ export default function TrackPlayer() {
               </div>
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilha concluída</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Certificado emitido automaticamente. Você pode acessá-lo na área de certificados.
-                </p>
+                <p className="mt-1 text-sm text-muted-foreground">Seu certificado está disponível na área de certificados.</p>
               </div>
             </div>
           ) : null}
@@ -353,7 +380,6 @@ export default function TrackPlayer() {
             if (!p) return;
             if (p.status === "LOCKED") return;
             setCurrentModuleId(id);
-            setQuizResult(null);
           }}
         />
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,6 +15,8 @@ export default function Login() {
   const { toast } = useToast();
   const { user, login } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = (location.state as { from?: string } | null)?.from;
 
   const users = useMemo(() => mockDb.getUsers().filter((u) => u.active), []);
 
@@ -104,7 +106,7 @@ export default function Login() {
                   });
                   return;
                 }
-                navigate("/");
+                navigate(from ?? "/");
               }}
             >
               Continuar

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { UserPlus, Shield } from "lucide-react";
+import { Search, UserPlus, Shield } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,10 +19,17 @@ import { roleLabel } from "@/lib/sinaxys";
 export default function AdminUsers() {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [, force] = useState(0);
+  const [version, setVersion] = useState(0);
 
-  const departments = useMemo(() => mockDb.getDepartments(), []);
-  const users = useMemo(() => mockDb.getUsers().slice().sort((a, b) => a.name.localeCompare(b.name)), [force]);
+  const departments = useMemo(() => mockDb.getDepartments(), [version]);
+  const users = useMemo(() => mockDb.getUsers().slice().sort((a, b) => a.name.localeCompare(b.name)), [version]);
+
+  const [query, setQuery] = useState("");
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return users;
+    return users.filter((u) => u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q));
+  }, [users, query]);
 
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -53,101 +60,113 @@ export default function AdminUsers() {
             <p className="mt-1 text-sm text-muted-foreground">Ative/desative acesso sem apagar histórico.</p>
           </div>
 
-          <Dialog
-            open={open}
-            onOpenChange={(v) => {
-              setOpen(v);
-              if (!v) {
-                setName("");
-                setEmail("");
-                setRole("COLABORADOR");
-                setDeptId(departments[0]?.id ?? "");
-              }
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:w-auto">
-                <UserPlus className="mr-2 h-4 w-4" />
-                Novo usuário
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
-              <DialogHeader>
-                <DialogTitle>Criar usuário</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-4">
-                <div className="grid gap-2">
-                  <Label>Nome</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>E-mail</Label>
-                  <Input value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-xl" placeholder="nome@sinaxys.com" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Papel</Label>
-                  <Select value={role} onValueChange={(v) => setRole(v as Role)}>
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="COLABORADOR">Colaborador</SelectItem>
-                      <SelectItem value="HEAD">Head de Departamento</SelectItem>
-                      <SelectItem value="ADMIN">Admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                {role !== "ADMIN" ? (
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+            <div className="relative w-full md:w-[280px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por nome ou e-mail..."
+                className="h-11 rounded-xl pl-9"
+              />
+            </div>
+
+            <Dialog
+              open={open}
+              onOpenChange={(v) => {
+                setOpen(v);
+                if (!v) {
+                  setName("");
+                  setEmail("");
+                  setRole("COLABORADOR");
+                  setDeptId(departments[0]?.id ?? "");
+                }
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:w-auto">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Novo usuário
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Criar usuário</DialogTitle>
+                </DialogHeader>
+                <div className="grid gap-4">
                   <div className="grid gap-2">
-                    <Label>Departamento</Label>
-                    <Select value={deptId} onValueChange={setDeptId}>
+                    <Label>Nome</Label>
+                    <Input value={name} onChange={(e) => setName(e.target.value)} className="rounded-xl" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>E-mail</Label>
+                    <Input value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-xl" placeholder="nome@sinaxys.com" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Papel</Label>
+                    <Select value={role} onValueChange={(v) => setRole(v as Role)}>
                       <SelectTrigger className="rounded-xl">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {departments.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.name}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value="COLABORADOR">Colaborador</SelectItem>
+                        <SelectItem value="HEAD">Head de Departamento</SelectItem>
+                        <SelectItem value="ADMIN">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
-                ) : null}
-              </div>
-              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                <Button
-                  className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                  disabled={name.trim().length < 3 || email.trim().length < 6}
-                  onClick={() => {
-                    try {
-                      mockDb.createUser({
-                        name,
-                        email,
-                        role,
-                        departmentId: role === "ADMIN" ? undefined : deptId,
-                      });
-                      setOpen(false);
-                      force((x) => x + 1);
-                    } catch (e) {
-                      toast({
-                        title: "Não foi possível criar",
-                        description: e instanceof Error ? e.message : "Erro inesperado.",
-                        variant: "destructive",
-                      });
-                    }
-                  }}
-                >
-                  Criar
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+                  {role !== "ADMIN" ? (
+                    <div className="grid gap-2">
+                      <Label>Departamento</Label>
+                      <Select value={deptId} onValueChange={setDeptId}>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {departments.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+                </div>
+                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
+                    disabled={name.trim().length < 3 || email.trim().length < 6}
+                    onClick={() => {
+                      try {
+                        mockDb.createUser({
+                          name,
+                          email,
+                          role,
+                          departmentId: role === "ADMIN" ? undefined : deptId,
+                        });
+                        setOpen(false);
+                        setVersion((x) => x + 1);
+                      } catch (e) {
+                        toast({
+                          title: "Não foi possível criar",
+                          description: e instanceof Error ? e.message : "Erro inesperado.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    Criar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {/* Mobile cards */}
         <div className="mt-5 grid gap-3 md:hidden">
-          {users.map((u) => {
+          {filtered.map((u) => {
             const dept = u.departmentId ? departments.find((d) => d.id === u.departmentId) : undefined;
             return (
               <div key={u.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
@@ -160,7 +179,7 @@ export default function AdminUsers() {
                     checked={u.active}
                     onCheckedChange={(v) => {
                       mockDb.setUserActive(u.id, v);
-                      force((x) => x + 1);
+                      setVersion((x) => x + 1);
                     }}
                   />
                 </div>
@@ -194,7 +213,7 @@ export default function AdminUsers() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((u) => {
+              {filtered.map((u) => {
                 const dept = u.departmentId ? departments.find((d) => d.id === u.departmentId) : undefined;
                 return (
                   <TableRow key={u.id}>
@@ -212,7 +231,7 @@ export default function AdminUsers() {
                           checked={u.active}
                           onCheckedChange={(v) => {
                             mockDb.setUserActive(u.id, v);
-                            force((x) => x + 1);
+                            setVersion((x) => x + 1);
                           }}
                         />
                       </div>
@@ -223,6 +242,12 @@ export default function AdminUsers() {
             </TableBody>
           </Table>
         </div>
+
+        {!filtered.length ? (
+          <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+            Nenhum usuário encontrado para este filtro.
+          </div>
+        ) : null}
       </Card>
     </div>
   );
