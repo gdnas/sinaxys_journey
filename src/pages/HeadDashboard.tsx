@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { UserPlus, TrendingUp } from "lucide-react";
+import { UserPlus, TrendingUp, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -27,50 +27,94 @@ function statusLabel(s: string) {
   }
 }
 
+function brl(n: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
+}
+
 export default function HeadDashboard() {
   const { user } = useAuth();
   const deptId = user?.departmentId;
   const [assignDialogForUserId, setAssignDialogForUserId] = useState<string | null>(null);
   const [selectedTrackId, setSelectedTrackId] = useState<string>("");
-  const [, force] = useState(0);
+  const [version, force] = useState(0);
 
   const overview = useMemo(() => {
     if (!deptId) return [];
     return mockDb.getCollaboratorsOverview(deptId);
-  }, [deptId]);
+  }, [deptId, version]);
 
   const deptTracks = useMemo(() => {
     if (!deptId) return [];
     return mockDb.getTracksByDepartment(deptId).filter((t) => t.published);
-  }, [deptId, assignDialogForUserId]);
+  }, [deptId, assignDialogForUserId, version]);
+
+  const deptUsers = useMemo(() => {
+    if (!deptId) return [];
+    return mockDb
+      .getUsers()
+      .filter((u) => u.active && u.departmentId === deptId && (u.role === "COLABORADOR" || u.role === "HEAD"));
+  }, [deptId, version]);
+
+  const deptMonthlyCost = useMemo(() => {
+    return deptUsers.reduce((acc, u) => acc + (u.monthlyCostBRL ?? 0), 0);
+  }, [deptUsers]);
+
+  const collaboratorsMonthlyCost = useMemo(() => {
+    return deptUsers
+      .filter((u) => u.role === "COLABORADOR")
+      .reduce((acc, u) => acc + (u.monthlyCostBRL ?? 0), 0);
+  }, [deptUsers]);
 
   if (!user || user.role !== "HEAD" || !deptId) return null;
 
   return (
     <div className="grid gap-6">
-      <div className="rounded-3xl border bg-white p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Painel do departamento</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Acompanhe progresso com clareza. Se algo estiver travado, você identifica rápido.
-            </p>
-          </div>
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-            <TrendingUp className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+      <div className="grid gap-4 md:grid-cols-[1fr_360px]">
+        <div className="rounded-3xl border bg-white p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Painel do departamento</div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Acompanhe progresso com clareza. Se algo estiver travado, você identifica rápido.
+              </p>
+            </div>
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+              <TrendingUp className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+            </div>
           </div>
         </div>
+
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custo do departamento</div>
+              <p className="mt-1 text-sm text-muted-foreground">Visão rápida de custo mensal (salário/encargos).</p>
+            </div>
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+              <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-2">
+            <div className="text-xs text-muted-foreground">Total mensal</div>
+            <div className="text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(deptMonthlyCost)}</div>
+            <div className="text-xs text-muted-foreground">
+              Colaboradores: {brl(collaboratorsMonthlyCost)} • Pessoas consideradas: {deptUsers.length}
+            </div>
+          </div>
+        </Card>
       </div>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Colaboradores</div>
-        <p className="mt-1 text-sm text-muted-foreground">Trilhas atribuídas e evolução por colaborador.</p>
+        <p className="mt-1 text-sm text-muted-foreground">Trilhas atribuídas, evolução e custo por colaborador.</p>
 
         {/* Mobile: cards */}
         <div className="mt-4 grid gap-3 md:hidden">
           {overview.length ? (
             overview.map((row) => {
               const hasAssignments = row.assignments.length > 0;
+              const cost = row.user.monthlyCostBRL;
               return (
                 <div
                   key={row.user.id}
@@ -85,6 +129,9 @@ export default function HeadDashboard() {
                         {row.user.name}
                       </Link>
                       <div className="mt-1 text-xs text-muted-foreground">{row.user.email}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Custo: <span className="font-medium text-[color:var(--sinaxys-ink)]">{cost ? brl(cost) : "—"}</span>
+                      </div>
                     </div>
 
                     <Dialog
@@ -233,6 +280,7 @@ export default function HeadDashboard() {
                 <TableHead>Trilha</TableHead>
                 <TableHead className="w-[220px]">Progresso</TableHead>
                 <TableHead>Próxima etapa</TableHead>
+                <TableHead>Custo/mês</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -256,6 +304,8 @@ export default function HeadDashboard() {
                       (currentProgress?.attemptsCount ?? 0) > 0 &&
                       currentProgress?.passed === false;
 
+                    const cost = row.user.monthlyCostBRL;
+
                     return (
                       <TableRow key={`${row.user.id}_${a?.assignment.id ?? idx}`}>
                         <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
@@ -265,6 +315,7 @@ export default function HeadDashboard() {
                           >
                             {row.user.name}
                           </Link>
+                          <div className="text-xs text-muted-foreground">{row.user.email}</div>
                         </TableCell>
                         <TableCell>
                           {a ? (
@@ -319,6 +370,12 @@ export default function HeadDashboard() {
                           ) : (
                             <div className="text-sm text-muted-foreground">—</div>
                           )}
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{cost ? brl(cost) : "—"}</div>
+                          {!cost ? (
+                            <div className="text-xs text-muted-foreground">Defina no perfil</div>
+                          ) : null}
                         </TableCell>
                         <TableCell>
                           {a ? (
@@ -405,7 +462,7 @@ export default function HeadDashboard() {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
                     Nenhum colaborador ativo no departamento.
                   </TableCell>
                 </TableRow>

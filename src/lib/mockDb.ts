@@ -133,7 +133,7 @@ function seedDb(): Db {
       role: "COLABORADOR",
       departmentId: deptByName("Produto"),
       active: true,
-      salaryMonthly: 8000,
+      monthlyCostBRL: 9500,
     },
     {
       id: uid("usr"),
@@ -142,7 +142,7 @@ function seedDb(): Db {
       role: "COLABORADOR",
       departmentId: deptByName("Customer Success"),
       active: true,
-      salaryMonthly: 7500,
+      monthlyCostBRL: 6500,
     },
     {
       id: uid("usr"),
@@ -151,6 +151,7 @@ function seedDb(): Db {
       role: "HEAD",
       departmentId: deptByName("Produto"),
       active: true,
+      monthlyCostBRL: 16500,
     },
     {
       id: uid("usr"),
@@ -159,6 +160,7 @@ function seedDb(): Db {
       role: "HEAD",
       departmentId: deptByName("Customer Success"),
       active: true,
+      monthlyCostBRL: 14500,
     },
     {
       id: uid("usr"),
@@ -849,6 +851,7 @@ export const mockDb = {
       role: params.role,
       departmentId: params.role === "ADMIN" ? undefined : params.departmentId,
       active: true,
+      monthlyCostBRL: undefined,
     };
 
     db.users.push(u);
@@ -864,7 +867,7 @@ export const mockDb = {
     saveDb(db);
   },
 
-  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string; salaryMonthly?: number }) {
+  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string }) {
     const db = loadDb();
     const u = db.users.find((x) => x.id === userId);
     if (!u) return null;
@@ -872,8 +875,18 @@ export const mockDb = {
     if (typeof data.name === "string") u.name = data.name.trim();
     if (typeof data.avatarUrl === "string") u.avatarUrl = data.avatarUrl.trim() || undefined;
     if (typeof data.contractUrl === "string") u.contractUrl = data.contractUrl.trim() || undefined;
-    if (typeof data.salaryMonthly === "number" && Number.isFinite(data.salaryMonthly)) {
-      u.salaryMonthly = data.salaryMonthly;
+
+    saveDb(db);
+    return u;
+  },
+
+  updateUserCompensation(userId: string, data: { monthlyCostBRL?: number }) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) return null;
+
+    if (typeof data.monthlyCostBRL === "number" && Number.isFinite(data.monthlyCostBRL)) {
+      u.monthlyCostBRL = Math.max(0, data.monthlyCostBRL);
     }
 
     saveDb(db);

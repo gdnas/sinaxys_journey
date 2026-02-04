@@ -22,7 +22,7 @@ export type User = {
   active: boolean;
   avatarUrl?: string; // URL (ou data URL) da foto
   contractUrl?: string; // link do contrato assinado (ex.: Clicksign)
-  salaryMonthly?: number; // custo mensal (ex.: salário) em BRL
+  monthlyCostBRL?: number; // custo mensal (salário/encargos) em BRL
 };
 
 export type TrackStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "LOCKED";
