@@ -24,6 +24,7 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { QuizOption, QuizQuestion, TrackModule } from "@/lib/domain";
+import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
 
@@ -137,6 +138,7 @@ function draftFromDb(questions: QuizQuestion[], optionsByQuestionId: Record<stri
 }
 
 export default function HeadTrackEdit() {
+  const { toast } = useToast();
   const { user } = useAuth();
   const { trackId } = useParams();
   const [tick, setTick] = useState(0);
@@ -146,12 +148,13 @@ export default function HeadTrackEdit() {
 
   const [trackTitle, setTrackTitle] = useState("");
   const [trackDescription, setTrackDescription] = useState("");
+  const [savingTrack, setSavingTrack] = useState(false);
 
   useEffect(() => {
     if (!track) return;
     setTrackTitle(track.title);
     setTrackDescription(track.description);
-  }, [track?.id]);
+  }, [track?.id, track?.title, track?.description]);
 
   const trackDirty =
     !!track && (trackTitle.trim() !== track.title.trim() || trackDescription.trim() !== track.description.trim());
@@ -618,13 +621,24 @@ export default function HeadTrackEdit() {
             <div className="mt-3 flex flex-col gap-2 sm:flex-row">
               <Button
                 className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                disabled={!trackDirty || trackTitle.trim().length < 6 || trackDescription.trim().length < 10}
+                disabled={savingTrack || !trackDirty || trackTitle.trim().length < 6 || trackDescription.trim().length < 10}
                 onClick={() => {
-                  mockDb.updateTrack({ trackId: track.id, title: trackTitle, description: trackDescription });
-                  setTick((x) => x + 1);
+                  try {
+                    setSavingTrack(true);
+                    const updated = mockDb.updateTrack({ trackId: track.id, title: trackTitle, description: trackDescription });
+                    setTick((x) => x + 1);
+                    if (updated) {
+                      toast({
+                        title: "Trilha salva",
+                        description: "Nome e descrição atualizados com sucesso.",
+                      });
+                    }
+                  } finally {
+                    setSavingTrack(false);
+                  }
                 }}
               >
-                Salvar trilha
+                {savingTrack ? "Salvando…" : "Salvar trilha"}
               </Button>
               <Button
                 variant="outline"
