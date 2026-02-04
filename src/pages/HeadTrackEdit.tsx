@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -11,6 +11,7 @@ import {
   HelpCircle,
   BookOpenText,
   Pencil,
+  X,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +22,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { TrackModule } from "@/lib/domain";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import type { QuizOption, QuizQuestion, TrackModule } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
 
@@ -51,13 +53,108 @@ function typeIcon(t: TrackModule["type"]) {
   }
 }
 
+type QuizQuestionDraft = {
+  id: string;
+  type: "TRUE_FALSE" | "MULTIPLE_CHOICE";
+  prompt: string;
+  options: { id: string; text: string; isCorrect: boolean }[];
+};
+
+function tmpId(prefix: string) {
+  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
+}
+
+function optionLetter(i: number) {
+  return String.fromCharCode("A".charCodeAt(0) + i);
+}
+
+function makeTrueFalseQuestion(correct: "true" | "false" = "true"): QuizQuestionDraft {
+  return {
+    id: tmpId("qtmp"),
+    type: "TRUE_FALSE",
+    prompt: "",
+    options: [
+      { id: tmpId("otmp"), text: "Verdadeiro", isCorrect: correct === "true" },
+      { id: tmpId("otmp"), text: "Falso", isCorrect: correct === "false" },
+    ],
+  };
+}
+
+function makeMultipleChoiceQuestion(): QuizQuestionDraft {
+  const correctId = tmpId("otmp");
+  return {
+    id: tmpId("qtmp"),
+    type: "MULTIPLE_CHOICE",
+    prompt: "",
+    options: [
+      { id: correctId, text: "", isCorrect: true },
+      { id: tmpId("otmp"), text: "", isCorrect: false },
+      { id: tmpId("otmp"), text: "", isCorrect: false },
+      { id: tmpId("otmp"), text: "", isCorrect: false },
+    ],
+  };
+}
+
+function normalizeCorrect(opts: QuizQuestionDraft["options"], correctOptionId: string) {
+  return opts.map((o) => ({ ...o, isCorrect: o.id === correctOptionId }));
+}
+
+function isQuizDraftValid(minScore: string, questions: QuizQuestionDraft[]) {
+  const ms = Number(minScore);
+  if (!Number.isFinite(ms) || ms < 0 || ms > 100) return false;
+  if (!questions.length) return false;
+
+  for (const q of questions) {
+    if (q.prompt.trim().length < 8) return false;
+
+    const correctCount = q.options.filter((o) => o.isCorrect).length;
+    if (correctCount !== 1) return false;
+
+    if (q.type === "MULTIPLE_CHOICE") {
+      if (q.options.length < 2) return false;
+      if (q.options.some((o) => o.text.trim().length < 1)) return false;
+    }
+  }
+
+  return true;
+}
+
+function draftFromDb(questions: QuizQuestion[], optionsByQuestionId: Record<string, QuizOption[]>): QuizQuestionDraft[] {
+  return questions
+    .slice()
+    .sort((a, b) => a.orderIndex - b.orderIndex)
+    .map((q) => {
+      const opts = (optionsByQuestionId[q.id] ?? []).slice();
+      const correct = opts.find((o) => o.isCorrect) ?? opts[0];
+      const normalized = opts.map((o) => ({ ...o, isCorrect: o.id === correct?.id }));
+      return {
+        id: q.id,
+        type: q.type,
+        prompt: q.prompt,
+        options: normalized.map((o) => ({ id: o.id, text: o.text, isCorrect: o.isCorrect })),
+      };
+    });
+}
+
 export default function HeadTrackEdit() {
   const { user } = useAuth();
   const { trackId } = useParams();
-  const [, force] = useState(0);
+  const [tick, setTick] = useState(0);
 
-  const track = useMemo(() => (trackId ? mockDb.getTrack(trackId) : null), [trackId]);
-  const modules = useMemo(() => (trackId ? mockDb.getModulesByTrack(trackId) : []), [trackId, force]);
+  const track = useMemo(() => (trackId ? mockDb.getTrack(trackId) : null), [trackId, tick]);
+  const modules = useMemo(() => (trackId ? mockDb.getModulesByTrack(trackId) : []), [trackId, tick]);
+
+  const [trackTitle, setTrackTitle] = useState("");
+  const [trackDescription, setTrackDescription] = useState("");
+
+  useEffect(() => {
+    if (!track) return;
+    setTrackTitle(track.title);
+    setTrackDescription(track.description);
+  }, [track?.id]);
+
+  const trackDirty =
+    !!track && (trackTitle.trim() !== track.title.trim() || trackDescription.trim() !== track.description.trim());
 
   const [open, setOpen] = useState(false);
   const [moduleType, setModuleType] = useState<TrackModule["type"]>("VIDEO");
@@ -67,22 +164,23 @@ export default function HeadTrackEdit() {
   const [materialUrl, setMaterialUrl] = useState("");
   const [minScore, setMinScore] = useState("70");
   const [checkpointPrompt, setCheckpointPrompt] = useState("");
-  const [tfPrompt, setTfPrompt] = useState("");
-  const [tfCorrect, setTfCorrect] = useState<"true" | "false">("true");
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestionDraft[]>([makeTrueFalseQuestion("true")]);
 
-  // Edit existing module (needed to update reading material links over time)
+  // Edit existing module
   const [editOpen, setEditOpen] = useState(false);
   const [editModuleId, setEditModuleId] = useState<string | null>(null);
   const editModule = useMemo(
     () => (editModuleId ? modules.find((m) => m.id === editModuleId) ?? null : null),
     [editModuleId, modules],
   );
+
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editYoutubeUrl, setEditYoutubeUrl] = useState("");
   const [editMaterialUrl, setEditMaterialUrl] = useState("");
   const [editCheckpointPrompt, setEditCheckpointPrompt] = useState("");
   const [editMinScore, setEditMinScore] = useState("70");
+  const [editQuizQuestions, setEditQuizQuestions] = useState<QuizQuestionDraft[]>([]);
 
   if (!user || user.role !== "HEAD") return null;
   if (!track || !trackId) {
@@ -114,7 +212,7 @@ export default function HeadTrackEdit() {
 
     mockDb.upsertModule(a);
     mockDb.upsertModule(b);
-    force((x) => x + 1);
+    setTick((x) => x + 1);
   };
 
   const resetDialog = () => {
@@ -125,8 +223,7 @@ export default function HeadTrackEdit() {
     setMaterialUrl("");
     setMinScore("70");
     setCheckpointPrompt("");
-    setTfPrompt("");
-    setTfCorrect("true");
+    setQuizQuestions([makeTrueFalseQuestion("true")]);
   };
 
   const openEdit = (m: TrackModule) => {
@@ -137,6 +234,15 @@ export default function HeadTrackEdit() {
     setEditMaterialUrl(m.materialUrl ?? "");
     setEditCheckpointPrompt(m.checkpointPrompt ?? "");
     setEditMinScore(String(m.minScore ?? 70));
+
+    if (m.type === "QUIZ") {
+      const q = mockDb.getQuizForModule(m.id);
+      const draft = draftFromDb(q.questions, q.optionsByQuestionId);
+      setEditQuizQuestions(draft.length ? draft : [makeTrueFalseQuestion("true")]);
+    } else {
+      setEditQuizQuestions([]);
+    }
+
     setEditOpen(true);
   };
 
@@ -154,8 +260,19 @@ export default function HeadTrackEdit() {
     };
 
     mockDb.upsertModule(updated);
+
+    if (editModule.type === "QUIZ") {
+      mockDb.replaceQuiz(editModule.id, {
+        questions: editQuizQuestions.map((q) => ({
+          type: q.type,
+          prompt: q.prompt.trim(),
+          options: q.options.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
+        })),
+      });
+    }
+
     setEditOpen(false);
-    force((x) => x + 1);
+    setTick((x) => x + 1);
   };
 
   const isEditValid = (() => {
@@ -164,11 +281,18 @@ export default function HeadTrackEdit() {
     if (editModule.type === "VIDEO" && editYoutubeUrl.trim().length < 10) return false;
     if (editModule.type === "MATERIAL" && editMaterialUrl.trim().length < 10) return false;
     if (editModule.type === "CHECKPOINT" && editCheckpointPrompt.trim().length < 10) return false;
-    if (editModule.type === "QUIZ" && !editMinScore.trim()) return false;
+    if (editModule.type === "QUIZ" && !isQuizDraftValid(editMinScore, editQuizQuestions)) return false;
     return true;
   })();
 
   const nextOrder = (modules.reduce((max, m) => Math.max(max, m.orderIndex), 0) || 0) + 1;
+
+  const isNewModuleValid =
+    title.trim().length >= 4 &&
+    (moduleType !== "VIDEO" || youtubeUrl.trim().length >= 10) &&
+    (moduleType !== "MATERIAL" || materialUrl.trim().length >= 10) &&
+    (moduleType !== "CHECKPOINT" || checkpointPrompt.trim().length >= 10) &&
+    (moduleType !== "QUIZ" || isQuizDraftValid(minScore, quizQuestions));
 
   return (
     <div className="grid gap-6">
@@ -180,7 +304,7 @@ export default function HeadTrackEdit() {
           if (!v) setEditModuleId(null);
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar módulo</DialogTitle>
           </DialogHeader>
@@ -193,7 +317,7 @@ export default function HeadTrackEdit() {
                   {editModule ? typeLabel(editModule.type) : "—"}
                 </div>
                 <div className="mt-1 text-xs text-muted-foreground">
-                  Atualize o link do material sempre que necessário — sem recriar a trilha.
+                  Atualize o conteúdo sempre que necessário — sem recriar a trilha.
                 </div>
               </div>
 
@@ -242,16 +366,210 @@ export default function HeadTrackEdit() {
               ) : null}
 
               {editModule?.type === "QUIZ" ? (
-                <div className="grid gap-2">
-                  <Label>Nota mínima (%)</Label>
-                  <Input
-                    value={editMinScore}
-                    onChange={(e) => setEditMinScore(e.target.value)}
-                    className="rounded-xl"
-                    inputMode="numeric"
-                  />
-                  <div className="text-xs text-muted-foreground">
-                    No MVP, o editor do quiz é intencionalmente simples. A pergunta pode ser ajustada na próxima iteração.
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label>Nota mínima (%)</Label>
+                    <Input
+                      value={editMinScore}
+                      onChange={(e) => setEditMinScore(e.target.value)}
+                      className="rounded-xl"
+                      inputMode="numeric"
+                    />
+                    <div className="text-xs text-muted-foreground">
+                      Perguntas de múltipla escolha (A, B, C, D…). Uma alternativa correta por pergunta.
+                    </div>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Perguntas</div>
+                    <Button
+                      variant="outline"
+                      className="rounded-xl"
+                      onClick={() => setEditQuizQuestions((prev) => [...prev, makeMultipleChoiceQuestion()])}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Adicionar pergunta
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-3">
+                    {editQuizQuestions.map((q, idx) => {
+                      const correctId = q.options.find((o) => o.isCorrect)?.id ?? q.options[0]?.id;
+                      return (
+                        <div key={q.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                            <div className="min-w-0">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Pergunta {idx + 1}
+                              </div>
+                              <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                                {q.type === "TRUE_FALSE" ? "Verdadeiro/Falso" : "Múltipla escolha"}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Select
+                                value={q.type}
+                                onValueChange={(v) => {
+                                  setEditQuizQuestions((prev) =>
+                                    prev.map((x) => {
+                                      if (x.id !== q.id) return x;
+                                      return v === "TRUE_FALSE"
+                                        ? { ...makeTrueFalseQuestion("true"), id: x.id, prompt: x.prompt }
+                                        : { ...makeMultipleChoiceQuestion(), id: x.id, prompt: x.prompt };
+                                    }),
+                                  );
+                                }}
+                              >
+                                <SelectTrigger className="h-9 w-[180px] rounded-xl">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="TRUE_FALSE">Verdadeiro/Falso</SelectItem>
+                                  <SelectItem value="MULTIPLE_CHOICE">Múltipla escolha</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9 rounded-xl"
+                                disabled={editQuizQuestions.length === 1}
+                                onClick={() => setEditQuizQuestions((prev) => prev.filter((x) => x.id !== q.id))}
+                                aria-label="Remover pergunta"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 grid gap-2">
+                            <Label>Enunciado</Label>
+                            <Textarea
+                              value={q.prompt}
+                              onChange={(e) =>
+                                setEditQuizQuestions((prev) =>
+                                  prev.map((x) => (x.id === q.id ? { ...x, prompt: e.target.value } : x)),
+                                )
+                              }
+                              className="min-h-20 rounded-2xl"
+                            />
+                          </div>
+
+                          <div className="mt-4 grid gap-2">
+                            <Label>Alternativas</Label>
+
+                            {q.type === "TRUE_FALSE" ? (
+                              <Select
+                                value={correctId}
+                                onValueChange={(v) =>
+                                  setEditQuizQuestions((prev) =>
+                                    prev.map((x) => (x.id === q.id ? { ...x, options: normalizeCorrect(x.options, v) } : x)),
+                                  )
+                                }
+                              >
+                                <SelectTrigger className="rounded-xl">
+                                  <SelectValue placeholder="Selecione a correta" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {q.options.map((o) => (
+                                    <SelectItem key={o.id} value={o.id}>
+                                      {o.text}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <RadioGroup
+                                value={correctId}
+                                onValueChange={(v) =>
+                                  setEditQuizQuestions((prev) =>
+                                    prev.map((x) => (x.id === q.id ? { ...x, options: normalizeCorrect(x.options, v) } : x)),
+                                  )
+                                }
+                                className="grid gap-2"
+                              >
+                                {q.options.map((o, optIdx) => (
+                                  <div
+                                    key={o.id}
+                                    className="flex items-center gap-2 rounded-xl border border-[color:var(--sinaxys-border)] bg-white px-3 py-2"
+                                  >
+                                    <RadioGroupItem value={o.id} id={`${q.id}_${o.id}`} />
+                                    <div className="w-8 text-xs font-semibold text-muted-foreground">
+                                      {optionLetter(optIdx)}
+                                    </div>
+                                    <Input
+                                      value={o.text}
+                                      onChange={(e) =>
+                                        setEditQuizQuestions((prev) =>
+                                          prev.map((x) => {
+                                            if (x.id !== q.id) return x;
+                                            return {
+                                              ...x,
+                                              options: x.options.map((y) =>
+                                                y.id === o.id ? { ...y, text: e.target.value } : y,
+                                              ),
+                                            };
+                                          }),
+                                        )
+                                      }
+                                      placeholder={`Opção ${optionLetter(optIdx)}`}
+                                      className="h-10 rounded-xl"
+                                    />
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-9 w-9 rounded-xl"
+                                      disabled={q.options.length <= 2}
+                                      onClick={() => {
+                                        setEditQuizQuestions((prev) =>
+                                          prev.map((x) => {
+                                            if (x.id !== q.id) return x;
+                                            const nextOpts = x.options.filter((y) => y.id !== o.id);
+                                            const nextCorrectId =
+                                              nextOpts.find((y) => y.isCorrect)?.id ?? nextOpts[0]?.id;
+                                            return {
+                                              ...x,
+                                              options: normalizeCorrect(nextOpts, nextCorrectId),
+                                            };
+                                          }),
+                                        );
+                                      }}
+                                      aria-label="Remover alternativa"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ))}
+
+                                <div className="pt-1">
+                                  <Button
+                                    variant="outline"
+                                    className="rounded-xl"
+                                    disabled={q.options.length >= 6}
+                                    onClick={() => {
+                                      setEditQuizQuestions((prev) =>
+                                        prev.map((x) =>
+                                          x.id === q.id
+                                            ? {
+                                                ...x,
+                                                options: [...x.options, { id: tmpId("otmp"), text: "", isCorrect: false }],
+                                              }
+                                            : x,
+                                        ),
+                                      );
+                                    }}
+                                  >
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Adicionar alternativa
+                                  </Button>
+                                </div>
+                              </RadioGroup>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               ) : null}
@@ -259,11 +577,7 @@ export default function HeadTrackEdit() {
           </ScrollArea>
 
           <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button
-              variant="outline"
-              className="w-full rounded-xl sm:w-auto"
-              onClick={() => setEditOpen(false)}
-            >
+            <Button variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => setEditOpen(false)}>
               Cancelar
             </Button>
             <Button
@@ -277,175 +591,396 @@ export default function HeadTrackEdit() {
         </DialogContent>
       </Dialog>
 
-      <div className="flex flex-col justify-between gap-3 rounded-3xl border bg-white p-6 md:flex-row md:items-center">
-        <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor de trilha</div>
-          <div className="mt-1 truncate text-xl font-semibold text-[color:var(--sinaxys-ink)]">{track.title}</div>
-          <div className="mt-1 text-sm text-muted-foreground">{track.description}</div>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
-            <Link to="/head/tracks">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
-            </Link>
-          </Button>
-          <Dialog
-            open={open}
-            onOpenChange={(v) => {
-              setOpen(v);
-              if (!v) resetDialog();
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto">
-                <Plus className="mr-2 h-4 w-4" />
-                Adicionar módulo
+      {/* Track header + edit */}
+      <div className="rounded-3xl border bg-white p-6">
+        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor de trilha</div>
+            <div className="mt-2 grid gap-2">
+              <Label>Nome da trilha</Label>
+              <Input
+                value={trackTitle}
+                onChange={(e) => setTrackTitle(e.target.value)}
+                className="rounded-xl"
+                placeholder="Ex.: Onboarding — Produto"
+              />
+            </div>
+            <div className="mt-3 grid gap-2">
+              <Label>Descrição</Label>
+              <Textarea
+                value={trackDescription}
+                onChange={(e) => setTrackDescription(e.target.value)}
+                className="min-h-24 rounded-2xl"
+                placeholder="Explique o objetivo da trilha em 2–3 frases."
+              />
+            </div>
+
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
+              <Button
+                className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
+                disabled={!trackDirty || trackTitle.trim().length < 6 || trackDescription.trim().length < 10}
+                onClick={() => {
+                  mockDb.updateTrack({ trackId: track.id, title: trackTitle, description: trackDescription });
+                  setTick((x) => x + 1);
+                }}
+              >
+                Salvar trilha
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
-              <DialogHeader>
-                <DialogTitle>Novo módulo</DialogTitle>
-              </DialogHeader>
+              <Button
+                variant="outline"
+                className="w-full rounded-xl sm:w-auto"
+                disabled={!trackDirty}
+                onClick={() => {
+                  setTrackTitle(track.title);
+                  setTrackDescription(track.description);
+                }}
+              >
+                Descartar alterações
+              </Button>
+            </div>
+          </div>
 
-              <ScrollArea className="max-h-[70vh] pr-4">
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label>Tipo</Label>
-                    <Select value={moduleType} onValueChange={(v) => setModuleType(v as TrackModule["type"]) }>
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue placeholder="Selecione…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="VIDEO">Vídeo</SelectItem>
-                        <SelectItem value="MATERIAL">Material (Figma)</SelectItem>
-                        <SelectItem value="QUIZ">Quiz</SelectItem>
-                        <SelectItem value="CHECKPOINT">Checkpoint</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
+              <Link to="/head/tracks">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Voltar
+              </Link>
+            </Button>
 
-                  <div className="grid gap-2">
-                    <Label>Título</Label>
-                    <Input value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl" />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>Descrição (opcional)</Label>
-                    <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-24 rounded-2xl" />
-                  </div>
-
-                  {moduleType === "VIDEO" ? (
-                    <div className="grid gap-2">
-                      <Label>Link do YouTube</Label>
-                      <Input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} className="rounded-xl" placeholder="https://www.youtube.com/watch?v=..." />
-                    </div>
-                  ) : null}
-
-                  {moduleType === "MATERIAL" ? (
-                    <div className="grid gap-2">
-                      <Label>Link do material (Figma)</Label>
-                      <Input
-                        value={materialUrl}
-                        onChange={(e) => setMaterialUrl(e.target.value)}
-                        className="rounded-xl"
-                        placeholder="https://www.figma.com/..."
-                      />
-                      <div className="text-xs text-muted-foreground">
-                        Dica: use o link de compartilhamento da apresentação. Ao trocar o link, o material é atualizado sem precisar recriar a trilha.
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {moduleType === "CHECKPOINT" ? (
-                    <div className="grid gap-2">
-                      <Label>Pergunta do checkpoint</Label>
-                      <Textarea value={checkpointPrompt} onChange={(e) => setCheckpointPrompt(e.target.value)} className="min-h-24 rounded-2xl" placeholder="Ex.: Em 4–6 linhas, descreva…" />
-                    </div>
-                  ) : null}
-
-                  {moduleType === "QUIZ" ? (
-                    <div className="grid gap-3">
-                      <div className="grid gap-2">
-                        <Label>Nota mínima (%)</Label>
-                        <Input value={minScore} onChange={(e) => setMinScore(e.target.value)} className="rounded-xl" inputMode="numeric" />
-                      </div>
-                      <Separator />
-                      <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Pergunta (V/F) — MVP</div>
-                      <div className="grid gap-2">
-                        <Label>Enunciado</Label>
-                        <Textarea value={tfPrompt} onChange={(e) => setTfPrompt(e.target.value)} className="min-h-20 rounded-2xl" />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label>Resposta correta</Label>
-                        <Select value={tfCorrect} onValueChange={(v) => setTfCorrect(v as "true" | "false") }>
-                          <SelectTrigger className="rounded-xl">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="true">Verdadeiro</SelectItem>
-                            <SelectItem value="false">Falso</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </ScrollArea>
-
-              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                <Button
-                  className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                  disabled={
-                    title.trim().length < 4 ||
-                    (moduleType === "VIDEO" && youtubeUrl.trim().length < 10) ||
-                    (moduleType === "MATERIAL" && materialUrl.trim().length < 10) ||
-                    (moduleType === "CHECKPOINT" && checkpointPrompt.trim().length < 10) ||
-                    (moduleType === "QUIZ" && (tfPrompt.trim().length < 8 || !minScore.trim()))
-                  }
-                  onClick={() => {
-                    const id = mockDb.uid("mod");
-                    const base: TrackModule = {
-                      id,
-                      trackId,
-                      orderIndex: nextOrder,
-                      type: moduleType,
-                      title: title.trim(),
-                      description: description.trim() || undefined,
-                      xpReward: moduleType === "VIDEO" ? 20 : moduleType === "MATERIAL" ? 20 : moduleType === "CHECKPOINT" ? 30 : 40,
-                      youtubeUrl: moduleType === "VIDEO" ? youtubeUrl.trim() : undefined,
-                      materialUrl: moduleType === "MATERIAL" ? materialUrl.trim() : undefined,
-                      checkpointPrompt: moduleType === "CHECKPOINT" ? checkpointPrompt.trim() : undefined,
-                      minScore: moduleType === "QUIZ" ? Number(minScore) || 70 : undefined,
-                    };
-
-                    mockDb.upsertModule(base);
-
-                    if (moduleType === "QUIZ") {
-                      mockDb.replaceQuiz(id, {
-                        questions: [
-                          {
-                            type: "TRUE_FALSE",
-                            prompt: tfPrompt.trim(),
-                            options: [
-                              { text: "Verdadeiro", isCorrect: tfCorrect === "true" },
-                              { text: "Falso", isCorrect: tfCorrect === "false" },
-                            ],
-                          },
-                        ],
-                      });
-                    }
-
-                    setOpen(false);
-                    resetDialog();
-                    force((x) => x + 1);
-                  }}
-                >
-                  Adicionar
+            <Dialog
+              open={open}
+              onOpenChange={(v) => {
+                setOpen(v);
+                if (!v) resetDialog();
+              }}
+            >
+              <DialogTrigger asChild>
+                <Button className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Adicionar módulo
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Novo módulo</DialogTitle>
+                </DialogHeader>
+
+                <ScrollArea className="max-h-[70vh] pr-4">
+                  <div className="grid gap-4">
+                    <div className="grid gap-2">
+                      <Label>Tipo</Label>
+                      <Select value={moduleType} onValueChange={(v) => setModuleType(v as TrackModule["type"]) }>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Selecione…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="VIDEO">Vídeo</SelectItem>
+                          <SelectItem value="MATERIAL">Material (Figma)</SelectItem>
+                          <SelectItem value="QUIZ">Quiz</SelectItem>
+                          <SelectItem value="CHECKPOINT">Checkpoint</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Título</Label>
+                      <Input value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl" />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Descrição (opcional)</Label>
+                      <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-24 rounded-2xl" />
+                    </div>
+
+                    {moduleType === "VIDEO" ? (
+                      <div className="grid gap-2">
+                        <Label>Link do YouTube</Label>
+                        <Input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} className="rounded-xl" placeholder="https://www.youtube.com/watch?v=..." />
+                      </div>
+                    ) : null}
+
+                    {moduleType === "MATERIAL" ? (
+                      <div className="grid gap-2">
+                        <Label>Link do material (Figma)</Label>
+                        <Input
+                          value={materialUrl}
+                          onChange={(e) => setMaterialUrl(e.target.value)}
+                          className="rounded-xl"
+                          placeholder="https://www.figma.com/..."
+                        />
+                        <div className="text-xs text-muted-foreground">
+                          Dica: use o link de compartilhamento. Ao trocar o link, o material é atualizado sem recriar a trilha.
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {moduleType === "CHECKPOINT" ? (
+                      <div className="grid gap-2">
+                        <Label>Pergunta do checkpoint</Label>
+                        <Textarea value={checkpointPrompt} onChange={(e) => setCheckpointPrompt(e.target.value)} className="min-h-24 rounded-2xl" placeholder="Ex.: Em 4–6 linhas, descreva…" />
+                      </div>
+                    ) : null}
+
+                    {moduleType === "QUIZ" ? (
+                      <div className="grid gap-4">
+                        <div className="grid gap-2">
+                          <Label>Nota mínima (%)</Label>
+                          <Input value={minScore} onChange={(e) => setMinScore(e.target.value)} className="rounded-xl" inputMode="numeric" />
+                          <div className="text-xs text-muted-foreground">
+                            Você pode criar perguntas de Verdadeiro/Falso ou Múltipla escolha (A, B, C, D…).
+                          </div>
+                        </div>
+
+                        <Separator />
+
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Perguntas</div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button
+                              variant="outline"
+                              className="rounded-xl"
+                              onClick={() => setQuizQuestions((prev) => [...prev, makeTrueFalseQuestion("true")])}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              V/F
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="rounded-xl"
+                              onClick={() => setQuizQuestions((prev) => [...prev, makeMultipleChoiceQuestion()])}
+                            >
+                              <Plus className="mr-2 h-4 w-4" />
+                              Múltipla escolha
+                            </Button>
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3">
+                          {quizQuestions.map((q, idx) => {
+                            const correctId = q.options.find((o) => o.isCorrect)?.id ?? q.options[0]?.id;
+                            return (
+                              <div key={q.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                                  <div className="min-w-0">
+                                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                      Pergunta {idx + 1}
+                                    </div>
+                                    <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                                      {q.type === "TRUE_FALSE" ? "Verdadeiro/Falso" : "Múltipla escolha"}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Select
+                                      value={q.type}
+                                      onValueChange={(v) => {
+                                        setQuizQuestions((prev) =>
+                                          prev.map((x) => {
+                                            if (x.id !== q.id) return x;
+                                            return v === "TRUE_FALSE"
+                                              ? { ...makeTrueFalseQuestion("true"), id: x.id, prompt: x.prompt }
+                                              : { ...makeMultipleChoiceQuestion(), id: x.id, prompt: x.prompt };
+                                          }),
+                                        );
+                                      }}
+                                    >
+                                      <SelectTrigger className="h-9 w-[180px] rounded-xl">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="TRUE_FALSE">Verdadeiro/Falso</SelectItem>
+                                        <SelectItem value="MULTIPLE_CHOICE">Múltipla escolha</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-9 w-9 rounded-xl"
+                                      disabled={quizQuestions.length === 1}
+                                      onClick={() => setQuizQuestions((prev) => prev.filter((x) => x.id !== q.id))}
+                                      aria-label="Remover pergunta"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 grid gap-2">
+                                  <Label>Enunciado</Label>
+                                  <Textarea
+                                    value={q.prompt}
+                                    onChange={(e) =>
+                                      setQuizQuestions((prev) =>
+                                        prev.map((x) => (x.id === q.id ? { ...x, prompt: e.target.value } : x)),
+                                      )
+                                    }
+                                    className="min-h-20 rounded-2xl"
+                                  />
+                                </div>
+
+                                <div className="mt-4 grid gap-2">
+                                  <Label>Alternativas</Label>
+
+                                  {q.type === "TRUE_FALSE" ? (
+                                    <Select
+                                      value={correctId}
+                                      onValueChange={(v) =>
+                                        setQuizQuestions((prev) =>
+                                          prev.map((x) => (x.id === q.id ? { ...x, options: normalizeCorrect(x.options, v) } : x)),
+                                        )
+                                      }
+                                    >
+                                      <SelectTrigger className="rounded-xl">
+                                        <SelectValue placeholder="Selecione a correta" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {q.options.map((o) => (
+                                          <SelectItem key={o.id} value={o.id}>
+                                            {o.text}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <RadioGroup
+                                      value={correctId}
+                                      onValueChange={(v) =>
+                                        setQuizQuestions((prev) =>
+                                          prev.map((x) => (x.id === q.id ? { ...x, options: normalizeCorrect(x.options, v) } : x)),
+                                        )
+                                      }
+                                      className="grid gap-2"
+                                    >
+                                      {q.options.map((o, optIdx) => (
+                                        <div
+                                          key={o.id}
+                                          className="flex items-center gap-2 rounded-xl border border-[color:var(--sinaxys-border)] bg-white px-3 py-2"
+                                        >
+                                          <RadioGroupItem value={o.id} id={`${q.id}_${o.id}`} />
+                                          <div className="w-8 text-xs font-semibold text-muted-foreground">
+                                            {optionLetter(optIdx)}
+                                          </div>
+                                          <Input
+                                            value={o.text}
+                                            onChange={(e) =>
+                                              setQuizQuestions((prev) =>
+                                                prev.map((x) => {
+                                                  if (x.id !== q.id) return x;
+                                                  return {
+                                                    ...x,
+                                                    options: x.options.map((y) =>
+                                                      y.id === o.id ? { ...y, text: e.target.value } : y,
+                                                    ),
+                                                  };
+                                                }),
+                                              )
+                                            }
+                                            placeholder={`Opção ${optionLetter(optIdx)}`}
+                                            className="h-10 rounded-xl"
+                                          />
+                                          <Button
+                                            variant="outline"
+                                            size="icon"
+                                            className="h-9 w-9 rounded-xl"
+                                            disabled={q.options.length <= 2}
+                                            onClick={() => {
+                                              setQuizQuestions((prev) =>
+                                                prev.map((x) => {
+                                                  if (x.id !== q.id) return x;
+                                                  const nextOpts = x.options.filter((y) => y.id !== o.id);
+                                                  const nextCorrectId =
+                                                    nextOpts.find((y) => y.isCorrect)?.id ?? nextOpts[0]?.id;
+                                                  return {
+                                                    ...x,
+                                                    options: normalizeCorrect(nextOpts, nextCorrectId),
+                                                  };
+                                                }),
+                                              );
+                                            }}
+                                            aria-label="Remover alternativa"
+                                          >
+                                            <X className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      ))}
+
+                                      <div className="pt-1">
+                                        <Button
+                                          variant="outline"
+                                          className="rounded-xl"
+                                          disabled={q.options.length >= 6}
+                                          onClick={() => {
+                                            setQuizQuestions((prev) =>
+                                              prev.map((x) =>
+                                                x.id === q.id
+                                                  ? {
+                                                      ...x,
+                                                      options: [...x.options, { id: tmpId("otmp"), text: "", isCorrect: false }],
+                                                    }
+                                                  : x,
+                                              ),
+                                            );
+                                          }}
+                                        >
+                                          <Plus className="mr-2 h-4 w-4" />
+                                          Adicionar alternativa
+                                        </Button>
+                                      </div>
+                                    </RadioGroup>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+                </ScrollArea>
+
+                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
+                    disabled={!isNewModuleValid}
+                    onClick={() => {
+                      const id = mockDb.uid("mod");
+                      const base: TrackModule = {
+                        id,
+                        trackId,
+                        orderIndex: nextOrder,
+                        type: moduleType,
+                        title: title.trim(),
+                        description: description.trim() || undefined,
+                        xpReward: moduleType === "VIDEO" ? 20 : moduleType === "MATERIAL" ? 20 : moduleType === "CHECKPOINT" ? 30 : 40,
+                        youtubeUrl: moduleType === "VIDEO" ? youtubeUrl.trim() : undefined,
+                        materialUrl: moduleType === "MATERIAL" ? materialUrl.trim() : undefined,
+                        checkpointPrompt: moduleType === "CHECKPOINT" ? checkpointPrompt.trim() : undefined,
+                        minScore: moduleType === "QUIZ" ? Number(minScore) || 70 : undefined,
+                      };
+
+                      mockDb.upsertModule(base);
+
+                      if (moduleType === "QUIZ") {
+                        mockDb.replaceQuiz(id, {
+                          questions: quizQuestions.map((q) => ({
+                            type: q.type,
+                            prompt: q.prompt.trim(),
+                            options: q.options.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
+                          })),
+                        });
+                      }
+
+                      setOpen(false);
+                      resetDialog();
+                      setTick((x) => x + 1);
+                    }}
+                  >
+                    Adicionar
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
       </div>
 
@@ -528,7 +1063,7 @@ export default function HeadTrackEdit() {
                         className="rounded-xl"
                         onClick={() => {
                           mockDb.deleteModule(m.id);
-                          force((x) => x + 1);
+                          setTick((x) => x + 1);
                         }}
                         aria-label="Remover módulo"
                       >

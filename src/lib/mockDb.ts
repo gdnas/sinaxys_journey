@@ -758,6 +758,16 @@ export const mockDb = {
     return t;
   },
 
+  updateTrack(params: { trackId: string; title: string; description: string }) {
+    const db = loadDb();
+    const t = db.tracks.find((x) => x.id === params.trackId);
+    if (!t) return null;
+    t.title = params.title.trim();
+    t.description = params.description.trim();
+    saveDb(db);
+    return t;
+  },
+
   setTrackPublished(trackId: string, published: boolean) {
     const db = loadDb();
     const t = db.tracks.find((x) => x.id === trackId);
