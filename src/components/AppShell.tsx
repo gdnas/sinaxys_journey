@@ -1,5 +1,5 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Shield, Users, LayoutDashboard, GraduationCap, Award, Menu, User as UserIcon } from "lucide-react";
+import { LogOut, Shield, Users, LayoutDashboard, GraduationCap, Award, Menu, User as UserIcon, Network } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -45,6 +45,12 @@ const nav: NavItem[] = [
     label: "Usuários",
     icon: <Shield className="h-4 w-4" />,
     roles: ["ADMIN"],
+  },
+  {
+    to: "/org",
+    label: "Organograma",
+    icon: <Network className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
   {
     to: "/profile",

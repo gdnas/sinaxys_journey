@@ -96,7 +96,27 @@ export function loadDb(): Db {
   }
 
   try {
-    return JSON.parse(raw) as Db;
+    const parsed = JSON.parse(raw) as Db;
+
+    // Light migration: if organograma não existe, cria uma hierarquia padrão.
+    const needsOrg = Array.isArray(parsed.users) && parsed.users.length > 0 && parsed.users.every((u) => !u.managerId);
+    if (needsOrg) {
+      const admin = parsed.users.find((u) => u.role === "ADMIN" && u.active);
+      const heads = parsed.users.filter((u) => u.role === "HEAD" && u.active);
+      if (admin) {
+        for (const h of heads) h.managerId = admin.id;
+      }
+
+      // colaboradores reportam para o head do mesmo departamento (se existir)
+      for (const c of parsed.users.filter((u) => u.role === "COLABORADOR" && u.active)) {
+        const h = heads.find((x) => x.departmentId && x.departmentId === c.departmentId);
+        if (h) c.managerId = h.id;
+      }
+
+      saveDb(parsed);
+    }
+
+    return parsed;
   } catch {
     const seeded = seedDb();
     saveDb(seeded);
@@ -134,6 +154,7 @@ function seedDb(): Db {
       departmentId: deptByName("Produto"),
       active: true,
       monthlyCostBRL: 9500,
+      // managerId set after we create the heads
     },
     {
       id: uid("usr"),
@@ -143,6 +164,7 @@ function seedDb(): Db {
       departmentId: deptByName("Customer Success"),
       active: true,
       monthlyCostBRL: 6500,
+      // managerId set after we create the heads
     },
     {
       id: uid("usr"),
@@ -152,6 +174,7 @@ function seedDb(): Db {
       departmentId: deptByName("Produto"),
       active: true,
       monthlyCostBRL: 16500,
+      // managerId set after we create the admin
     },
     {
       id: uid("usr"),
@@ -161,6 +184,7 @@ function seedDb(): Db {
       departmentId: deptByName("Customer Success"),
       active: true,
       monthlyCostBRL: 14500,
+      // managerId set after we create the admin
     },
     {
       id: uid("usr"),
@@ -168,8 +192,21 @@ function seedDb(): Db {
       email: "admin@sinaxys.com",
       role: "ADMIN",
       active: true,
+      // topo do organograma (sem gestor)
     },
   ];
+
+  // Seed: organograma simples (admin -> heads -> colaboradores)
+  const admin = users.find((u) => u.role === "ADMIN")!;
+  const camila = users.find((u) => u.email === "camila@sinaxys.com")!;
+  const diego = users.find((u) => u.email === "diego@sinaxys.com")!;
+  const aline = users.find((u) => u.email === "aline@sinaxys.com")!;
+  const bruno = users.find((u) => u.email === "bruno@sinaxys.com")!;
+
+  camila.managerId = admin.id;
+  diego.managerId = admin.id;
+  aline.managerId = camila.id;
+  bruno.managerId = diego.id;
 
   const findUser = (email: string) => users.find((u) => u.email === email)!;
 
@@ -889,6 +926,32 @@ export const mockDb = {
       u.monthlyCostBRL = Math.max(0, data.monthlyCostBRL);
     }
 
+    saveDb(db);
+    return u;
+  },
+
+  updateUserManager(userId: string, managerId: string | null) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) return null;
+
+    const nextManagerId = managerId ?? undefined;
+    if (nextManagerId === u.id) throw new Error("Um usuário não pode ser gestor dele mesmo.");
+
+    // Prevent cycles (simple): ensure new manager is not a descendant of the user.
+    if (nextManagerId) {
+      const byId = new Map(db.users.map((x) => [x.id, x] as const));
+      let cursor: string | undefined = nextManagerId;
+      const seen = new Set<string>();
+      while (cursor) {
+        if (cursor === u.id) throw new Error("Movimento inválido: criaria um ciclo no organograma.");
+        if (seen.has(cursor)) break; // defensive
+        seen.add(cursor);
+        cursor = byId.get(cursor)?.managerId;
+      }
+    }
+
+    u.managerId = nextManagerId;
     saveDb(db);
     return u;
   },

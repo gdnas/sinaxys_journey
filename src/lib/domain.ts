@@ -23,6 +23,7 @@ export type User = {
   avatarUrl?: string; // URL (ou data URL) da foto
   contractUrl?: string; // link do contrato assinado (ex.: Clicksign)
   monthlyCostBRL?: number; // custo mensal (salário/encargos) em BRL
+  managerId?: string; // id do gestor direto (pode ser HEAD ou ADMIN)
 };
 
 export type TrackStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "LOCKED";
