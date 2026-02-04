@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { UserPlus, TrendingUp, Wallet } from "lucide-react";
+import { Eye, UserPlus, TrendingUp, Wallet } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -65,7 +65,7 @@ export default function HeadDashboard() {
   if (!user || user.role !== "HEAD" || !deptId) return null;
 
   return (
-    <div className="grid gap-6">
+    <div className="grid max-w-full gap-6">
       <div className="grid gap-4 md:grid-cols-[1fr_360px]">
         <div className="rounded-3xl border bg-white p-6">
           <div className="flex items-start justify-between gap-4">
@@ -132,7 +132,9 @@ export default function HeadDashboard() {
                       <div className="mt-1 text-xs text-muted-foreground">{row.user.email}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         Custo: <span className="font-medium text-[color:var(--sinaxys-ink)]">{cost ? brl(cost) : "—"}</span>
-                        <span className="ml-2">• Hora: <span className="font-medium text-[color:var(--sinaxys-ink)]">{cost ? brlPerHourFromMonthly(cost) : "—"}</span></span>
+                        <span className="ml-2">
+                          • Hora: <span className="font-medium text-[color:var(--sinaxys-ink)]">{cost ? brlPerHourFromMonthly(cost) : "—"}</span>
+                        </span>
                       </div>
                     </div>
 
@@ -144,9 +146,14 @@ export default function HeadDashboard() {
                       }}
                     >
                       <DialogTrigger asChild>
-                        <Button variant="outline" className="h-9 rounded-xl px-3">
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Atribuir
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 rounded-xl"
+                          aria-label="Atribuir trilha"
+                          title="Atribuir trilha"
+                        >
+                          <UserPlus className="h-4 w-4" />
                         </Button>
                       </DialogTrigger>
                       <DialogContent className="rounded-3xl">
@@ -244,9 +251,18 @@ export default function HeadDashboard() {
                               </div>
                             ) : null}
 
-                            <div className="mt-4">
-                              <Button asChild variant="outline" className="w-full rounded-xl bg-white">
-                                <Link to={`/head/collaborators/${row.user.id}`}>Ver detalhe</Link>
+                            <div className="mt-4 flex items-center justify-end">
+                              <Button
+                                asChild
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9 rounded-xl bg-white"
+                                aria-label="Ver detalhe"
+                                title="Ver detalhe"
+                              >
+                                <Link to={`/head/collaborators/${row.user.id}`}>
+                                  <Eye className="h-4 w-4" />
+                                </Link>
                               </Button>
                             </div>
                           </div>
@@ -256,9 +272,18 @@ export default function HeadDashboard() {
                   ) : (
                     <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
                       Sem trilha atribuída.
-                      <div className="mt-2">
-                        <Button asChild variant="outline" className="w-full rounded-xl bg-white">
-                          <Link to={`/head/collaborators/${row.user.id}`}>Ver detalhe</Link>
+                      <div className="mt-2 flex items-center justify-end">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 rounded-xl bg-white"
+                          aria-label="Ver detalhe"
+                          title="Ver detalhe"
+                        >
+                          <Link to={`/head/collaborators/${row.user.id}`}>
+                            <Eye className="h-4 w-4" />
+                          </Link>
                         </Button>
                       </div>
                     </div>
@@ -274,8 +299,8 @@ export default function HeadDashboard() {
         </div>
 
         {/* Desktop: table */}
-        <div className="mt-4 hidden overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
-          <Table>
+        <div className="mt-4 hidden max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
+          <Table className="min-w-[980px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Colaborador</TableHead>
@@ -410,8 +435,17 @@ export default function HeadDashboard() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <Button asChild variant="outline" className="rounded-xl">
-                              <Link to={`/head/collaborators/${row.user.id}`}>Ver detalhe</Link>
+                            <Button
+                              asChild
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 rounded-xl"
+                              aria-label="Ver detalhe"
+                              title="Ver detalhe"
+                            >
+                              <Link to={`/head/collaborators/${row.user.id}`}>
+                                <Eye className="h-4 w-4" />
+                              </Link>
                             </Button>
 
                             <Dialog
@@ -422,9 +456,14 @@ export default function HeadDashboard() {
                               }}
                             >
                               <DialogTrigger asChild>
-                                <Button variant="outline" className="rounded-xl">
-                                  <UserPlus className="mr-2 h-4 w-4" />
-                                  Atribuir trilha
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-9 w-9 rounded-xl"
+                                  aria-label="Atribuir trilha"
+                                  title="Atribuir trilha"
+                                >
+                                  <UserPlus className="h-4 w-4" />
                                 </Button>
                               </DialogTrigger>
                               <DialogContent className="rounded-3xl">

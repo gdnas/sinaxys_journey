@@ -101,9 +101,13 @@ export default function AdminUsers() {
               }}
             >
               <DialogTrigger asChild>
-                <Button className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:w-auto">
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Novo usuário
+                <Button
+                  size="icon"
+                  className="h-11 w-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  aria-label="Novo usuário"
+                  title="Novo usuário"
+                >
+                  <UserPlus className="h-4 w-4" />
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
@@ -220,8 +224,8 @@ export default function AdminUsers() {
         </div>
 
         {/* Desktop table */}
-        <div className="mt-5 hidden overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
-          <Table>
+        <div className="mt-5 hidden max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
+          <Table className="min-w-[820px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>

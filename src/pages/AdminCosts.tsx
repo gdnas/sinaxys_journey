@@ -111,8 +111,8 @@ export default function AdminCosts() {
         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Departamentos</div>
         <p className="mt-1 text-sm text-muted-foreground">Custo mensal e custo/hora (base {HOURS_PER_MONTH}h/mês).</p>
 
-        <div className="mt-4 hidden overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
-          <Table>
+        <div className="mt-4 hidden max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
+          <Table className="min-w-[820px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Departamento</TableHead>

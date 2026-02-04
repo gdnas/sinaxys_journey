@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
-import { ImageIcon, Palette, RotateCcw, Save } from "lucide-react";
+import { ImageIcon, Palette, RotateCcw, Save, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { loadCompanySettings, useCompany } from "@/lib/company";
 import type { CompanyColors } from "@/lib/domain";
@@ -80,39 +81,52 @@ export default function AdminBrand() {
             Ajuste o nome, o logo e o esquema de cores. As mudanças são aplicadas na hora e ficam salvas no ambiente desta empresa.
           </p>
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button
-            variant="outline"
-            className="rounded-xl"
-            onClick={() => {
-              resetCompany();
-              const fresh = loadCompanySettings();
-              setName(fresh.name);
-              setTagline(fresh.tagline);
-              setLogoDataUrl(fresh.logoDataUrl);
-              setColors(fresh.colors);
-              toast({ title: "Marca restaurada", description: "Voltamos para o padrão da empresa." });
-            }}
-          >
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Restaurar padrão
-          </Button>
-          <Button
-            className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-            disabled={!dirty}
-            onClick={() => {
-              setCompany({
-                name: name.trim() || company.name,
-                tagline: tagline.trim() || company.tagline,
-                logoDataUrl,
-                colors,
-              });
-              toast({ title: "Marca atualizada", description: "Nome, logo e cores foram aplicados." });
-            }}
-          >
-            <Save className="mr-2 h-4 w-4" />
-            Salvar
-          </Button>
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-xl"
+                aria-label="Restaurar padrão"
+                onClick={() => {
+                  resetCompany();
+                  const fresh = loadCompanySettings();
+                  setName(fresh.name);
+                  setTagline(fresh.tagline);
+                  setLogoDataUrl(fresh.logoDataUrl);
+                  setColors(fresh.colors);
+                  toast({ title: "Marca restaurada", description: "Voltamos para o padrão da empresa." });
+                }}
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Restaurar padrão</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={!dirty}
+                aria-label="Salvar"
+                onClick={() => {
+                  setCompany({
+                    name: name.trim() || company.name,
+                    tagline: tagline.trim() || company.tagline,
+                    logoDataUrl,
+                    colors,
+                  });
+                  toast({ title: "Marca atualizada", description: "Nome, logo e cores foram aplicados." });
+                }}
+              >
+                <Save className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Salvar</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -156,9 +170,9 @@ export default function AdminBrand() {
               <Label>Logo</Label>
               <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/30 p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="grid h-12 w-12 place-items-center overflow-hidden rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
+                  <div className="grid h-16 w-28 place-items-center overflow-hidden rounded-2xl bg-white p-2 ring-1 ring-[color:var(--sinaxys-border)]">
                     {logoDataUrl ? (
-                      <img src={logoDataUrl} alt="Logo" className="h-full w-full object-cover" />
+                      <img src={logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
                     ) : (
                       <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">sem logo</div>
                     )}
@@ -185,14 +199,22 @@ export default function AdminBrand() {
                       reader.readAsDataURL(file);
                     }}
                   />
-                  <Button
-                    variant="outline"
-                    className="rounded-xl"
-                    onClick={() => setLogoDataUrl(undefined)}
-                    disabled={!logoDataUrl}
-                  >
-                    Remover
-                  </Button>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-xl"
+                        onClick={() => setLogoDataUrl(undefined)}
+                        disabled={!logoDataUrl}
+                        aria-label="Remover logo"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Remover</TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </div>
@@ -252,9 +274,9 @@ export default function AdminBrand() {
         <div className="mt-5 overflow-hidden rounded-3xl border border-[color:var(--sinaxys-border)]">
           <div className="bg-white/90 px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center overflow-hidden rounded-2xl bg-[color:var(--sinaxys-primary)]">
+              <div className="grid h-12 w-16 place-items-center overflow-hidden rounded-2xl bg-[color:var(--sinaxys-primary)] p-2">
                 {logoDataUrl ? (
-                  <img src={logoDataUrl} alt="Logo" className="h-full w-full object-cover" />
+                  <img src={logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
                 ) : (
                   <span className="text-sm font-semibold text-white">{(name.trim()[0] ?? "S").toUpperCase()}</span>
                 )}
@@ -267,8 +289,12 @@ export default function AdminBrand() {
                 <div className="rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
                   Chip
                 </div>
-                <Button className="h-9 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-                  CTA
+                <Button
+                  size="icon"
+                  className="h-9 w-9 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  aria-label="Ação"
+                >
+                  <Save className="h-4 w-4" />
                 </Button>
               </div>
             </div>

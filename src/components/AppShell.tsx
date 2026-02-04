@@ -18,6 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { mockDb } from "@/lib/mockDb";
@@ -156,9 +157,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const companies = user.role === "MASTERADMIN" ? mockDb.getCompanies() : [];
 
   return (
-    <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
+    <div className="min-h-screen overflow-x-hidden bg-[color:var(--sinaxys-bg)]">
       <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 md:px-6">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 md:px-6">
           <div className="flex items-center gap-3">
             {/* Mobile menu */}
             <Sheet>
@@ -207,7 +208,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Link to={"/"} className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-[color:var(--sinaxys-primary)]">
                 {company.logoDataUrl ? (
-                  <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-cover" />
+                  <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
                 ) : (
                   <span className="text-sm font-semibold text-white">{initials(company.name || "SJ")}</span>
                 )}
@@ -255,23 +256,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
             </button>
 
-            <Button
-              variant="outline"
-              className="rounded-full border-[color:var(--sinaxys-border)] bg-white"
-              onClick={() => {
-                logout();
-                navigate("/login");
-              }}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Sair</span>
-              <span className="sm:hidden">Sair</span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full border-[color:var(--sinaxys-border)] bg-white"
+                  onClick={() => {
+                    logout();
+                    navigate("/login");
+                  }}
+                  aria-label="Sair"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Sair</TooltipContent>
+            </Tooltip>
           </div>
         </div>
       </header>
 
-      <div className="mx-auto max-w-6xl px-4 py-6 md:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
           <aside className="hidden rounded-2xl border bg-white p-3 md:block">
             {user.role === "MASTERADMIN" ? (
@@ -301,7 +307,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <JourneyRuleCard />
           </aside>
 
-          <main className="min-w-0">{children}</main>
+          <main className="min-w-0 max-w-full">{children}</main>
         </div>
       </div>
     </div>

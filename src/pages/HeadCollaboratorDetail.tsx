@@ -109,10 +109,16 @@ export default function HeadCollaboratorDetail() {
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Colaborador não encontrado</div>
               <div className="mt-1 text-sm text-muted-foreground">Talvez ele tenha sido desativado ou removido.</div>
             </div>
-            <Button asChild variant="outline" className="rounded-xl">
+            <Button
+              asChild
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-xl"
+              aria-label="Voltar"
+              title="Voltar"
+            >
               <Link to="/head">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
+                <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
           </div>
@@ -132,10 +138,16 @@ export default function HeadCollaboratorDetail() {
                 Você só pode ver colaboradores ativos do seu próprio departamento.
               </div>
             </div>
-            <Button asChild variant="outline" className="rounded-xl">
+            <Button
+              asChild
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-xl"
+              aria-label="Voltar"
+              title="Voltar"
+            >
               <Link to="/head">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
+                <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
           </div>
@@ -172,7 +184,8 @@ export default function HeadCollaboratorDetail() {
                 </span>
                 <span className="text-muted-foreground/60">•</span>
                 <span>
-                  Custo hora: <span className="font-semibold text-[color:var(--sinaxys-ink)]">{monthly ? brlPerHourFromMonthly(monthly) : "—"}</span>
+                  Custo hora:{" "}
+                  <span className="font-semibold text-[color:var(--sinaxys-ink)]">{monthly ? brlPerHourFromMonthly(monthly) : "—"}</span>
                 </span>
                 <span className="text-muted-foreground/60">(base {HOURS_PER_MONTH}h/mês)</span>
               </div>
@@ -180,10 +193,16 @@ export default function HeadCollaboratorDetail() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button asChild variant="outline" className="rounded-xl">
+            <Button
+              asChild
+              variant="outline"
+              size="icon"
+              className="h-10 w-10 rounded-xl"
+              aria-label="Voltar"
+              title="Voltar"
+            >
               <Link to="/head">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
+                <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>
           </div>
