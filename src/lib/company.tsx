@@ -1,23 +1,11 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import type { Company, CompanyColors } from "@/lib/domain";
+import { useAuth } from "@/lib/auth";
+import { mockDb } from "@/lib/mockDb";
 
-export type CompanyColors = {
-  ink: string;
-  primary: string;
-  bg: string;
-  tint: string;
-  border: string;
-};
+export type CompanyBrand = Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">;
 
-export type CompanySettings = {
-  name: string;
-  tagline: string;
-  logoDataUrl?: string;
-  colors: CompanyColors;
-};
-
-const COMPANY_KEY = "sinaxys-journey-company:v1";
-
-const defaultSettings: CompanySettings = {
+const DEFAULT_BRAND: CompanyBrand = {
   name: "Sinaxys Journey",
   tagline: "Aprendizado com clareza. Evolução com propósito.",
   logoDataUrl: undefined,
@@ -83,84 +71,114 @@ function hexToHsl(hex: string) {
   };
 }
 
-function mergeSettings(raw: unknown): CompanySettings {
-  const base = structuredClone(defaultSettings);
-  if (!raw || typeof raw !== "object") return base;
+function mergeBrand(raw: Partial<CompanyBrand> | null | undefined): CompanyBrand {
+  const base: CompanyBrand = structuredClone(DEFAULT_BRAND);
+  if (!raw) return base;
 
-  const r = raw as Partial<CompanySettings>;
+  if (typeof raw.name === "string" && raw.name.trim()) base.name = raw.name.trim();
+  if (typeof raw.tagline === "string" && raw.tagline.trim()) base.tagline = raw.tagline.trim();
+  if (typeof raw.logoDataUrl === "string" && raw.logoDataUrl.startsWith("data:")) base.logoDataUrl = raw.logoDataUrl;
 
-  if (typeof r.name === "string" && r.name.trim()) base.name = r.name.trim();
-  if (typeof r.tagline === "string" && r.tagline.trim()) base.tagline = r.tagline.trim();
-  if (typeof r.logoDataUrl === "string" && r.logoDataUrl.startsWith("data:")) base.logoDataUrl = r.logoDataUrl;
-
-  const colors = (r.colors ?? {}) as Partial<CompanyColors>;
+  const colors = (raw.colors ?? {}) as Partial<CompanyColors>;
   for (const k of ["ink", "primary", "bg", "tint", "border"] as const) {
     const v = colors[k];
     const norm = typeof v === "string" ? normalizeHex(v) : null;
-    if (norm) base.colors[k] = norm;
+    if (norm) (base.colors as any)[k] = norm;
   }
 
   return base;
 }
 
-export function loadCompanySettings(): CompanySettings {
-  const raw = localStorage.getItem(COMPANY_KEY);
-  if (!raw) return defaultSettings;
-  try {
-    return mergeSettings(JSON.parse(raw));
-  } catch {
-    return defaultSettings;
-  }
-}
-
-export function saveCompanySettings(settings: CompanySettings) {
-  localStorage.setItem(COMPANY_KEY, JSON.stringify(settings));
-}
-
-export function applyCompanyTheme(settings: CompanySettings) {
+export function applyCompanyTheme(brand: CompanyBrand) {
   const root = document.documentElement;
 
-  root.style.setProperty("--sinaxys-ink", settings.colors.ink);
-  root.style.setProperty("--sinaxys-primary", settings.colors.primary);
-  root.style.setProperty("--sinaxys-bg", settings.colors.bg);
-  root.style.setProperty("--sinaxys-tint", settings.colors.tint);
-  root.style.setProperty("--sinaxys-border", settings.colors.border);
+  root.style.setProperty("--sinaxys-ink", brand.colors.ink);
+  root.style.setProperty("--sinaxys-primary", brand.colors.primary);
+  root.style.setProperty("--sinaxys-bg", brand.colors.bg);
+  root.style.setProperty("--sinaxys-tint", brand.colors.tint);
+  root.style.setProperty("--sinaxys-border", brand.colors.border);
 
   // Keep shadcn primary in sync for components that rely on it.
-  const primaryHsl = hexToHsl(settings.colors.primary);
+  const primaryHsl = hexToHsl(brand.colors.primary);
   if (primaryHsl) {
     root.style.setProperty("--primary", `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
     root.style.setProperty("--ring", `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
   }
 }
 
+export function bootstrapCompanyTheme() {
+  // Applies the last selected company theme before the React tree mounts.
+  try {
+    const activeCompanyId = localStorage.getItem("sinaxys-journey-active-company:v1");
+    const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
+    applyCompanyTheme(mergeBrand(c ?? undefined));
+  } catch {
+    applyCompanyTheme(DEFAULT_BRAND);
+  }
+}
+
 type CompanyState = {
-  company: CompanySettings;
-  setCompany: (next: CompanySettings) => void;
+  companyId: string | null;
+  company: CompanyBrand;
+  setCompany: (next: Partial<CompanyBrand>) => void;
   resetCompany: () => void;
 };
 
 const CompanyContext = createContext<CompanyState | null>(null);
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
-  const [company, setCompanyState] = useState<CompanySettings>(() => loadCompanySettings());
+  const { activeCompanyId } = useAuth();
+
+  const [companyId, setCompanyId] = useState<string | null>(activeCompanyId);
+  const [company, setCompanyState] = useState<CompanyBrand>(() => {
+    const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
+    return mergeBrand(c ?? undefined);
+  });
+
+  useEffect(() => {
+    if (companyId === activeCompanyId) return;
+    setCompanyId(activeCompanyId);
+    const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
+    setCompanyState(mergeBrand(c ?? undefined));
+  }, [activeCompanyId, companyId]);
+
+  useEffect(() => {
+    applyCompanyTheme(company);
+  }, [company]);
 
   const value = useMemo<CompanyState>(() => {
     return {
+      companyId,
       company,
       setCompany(next) {
-        const merged = mergeSettings(next);
-        saveCompanySettings(merged);
-        applyCompanyTheme(merged);
+        if (!companyId) {
+          setCompanyState((prev) => mergeBrand({ ...prev, ...next }));
+          return;
+        }
+        const merged = mergeBrand({ ...company, ...next });
+        mockDb.updateCompanyBrand(companyId, {
+          name: merged.name,
+          tagline: merged.tagline,
+          logoDataUrl: merged.logoDataUrl,
+          colors: merged.colors,
+        });
         setCompanyState(merged);
       },
       resetCompany() {
-        saveCompanySettings(defaultSettings);
-        applyCompanyTheme(defaultSettings);
-        setCompanyState(defaultSettings);
+        if (!companyId) {
+          setCompanyState(DEFAULT_BRAND);
+          return;
+        }
+        mockDb.updateCompanyBrand(companyId, {
+          name: DEFAULT_BRAND.name,
+          tagline: DEFAULT_BRAND.tagline,
+          logoDataUrl: DEFAULT_BRAND.logoDataUrl,
+          colors: DEFAULT_BRAND.colors,
+        });
+        setCompanyState(DEFAULT_BRAND);
       },
     };
-  }, [company]);
+  }, [companyId, company]);
 
   return <CompanyContext.Provider value={value}>{children}</CompanyContext.Provider>;
 }
@@ -169,4 +187,11 @@ export function useCompany() {
   const ctx = useContext(CompanyContext);
   if (!ctx) throw new Error("useCompany deve ser usado dentro de <CompanyProvider>.");
   return ctx;
+}
+
+export function loadCompanySettings(): CompanyBrand {
+  // Backward-compatible helper: returns the active company brand.
+  const activeCompanyId = localStorage.getItem("sinaxys-journey-active-company:v1");
+  const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
+  return mergeBrand(c ?? undefined);
 }

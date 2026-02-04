@@ -1,7 +1,9 @@
 import {
   type Certificate,
+  type Company,
   type Db,
   type Department,
+  type Invite,
   type LearningTrack,
   type ModuleProgress,
   type QuizOption,
@@ -35,6 +37,27 @@ function randomCode() {
   const base = Math.random().toString(36).toUpperCase().slice(2, 6);
   const base2 = Math.random().toString(36).toUpperCase().slice(2, 6);
   return `SJ-${base}-${base2}`;
+}
+
+function randomToken() {
+  const a = Math.random().toString(36).slice(2);
+  const b = Math.random().toString(36).slice(2);
+  return `${a}${b}`.replace(/[^a-z0-9]/gi, "").slice(0, 28);
+}
+
+function defaultCompanyBrand(): Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors"> {
+  return {
+    name: "Sinaxys Journey",
+    tagline: "Aprendizado com clareza. Evolução com propósito.",
+    logoDataUrl: undefined,
+    colors: {
+      ink: "#20105B",
+      primary: "#542AEF",
+      bg: "#F6F4FF",
+      tint: "#EFEAFF",
+      border: "#E6E1FF",
+    },
+  };
 }
 
 // NEW: keep assignment progress in sync when modules are added after an assignment already exists.
@@ -87,6 +110,36 @@ function syncAssignmentProgress(db: Db, assignmentId: string) {
   if (changed) saveDb(db);
 }
 
+function ensureMultiCompany(db: Db) {
+  // Migration: if companies do not exist, create a default company and attach all existing records to it.
+  if (Array.isArray((db as any).companies) && Array.isArray((db as any).invites)) return;
+
+  const brand = defaultCompanyBrand();
+  const companyId = uid("cmp");
+
+  (db as any).companies = [
+    {
+      id: companyId,
+      ...brand,
+      createdAt: nowIso(),
+    } satisfies Company,
+  ];
+  (db as any).invites = [] as Invite[];
+
+  // attach companyId to users
+  db.users.forEach((u) => {
+    if (!u.companyId && u.role !== "MASTERADMIN") {
+      (u as any).companyId = companyId;
+    }
+  });
+
+  // attach companyId to departments + tracks
+  db.departments.forEach((d) => ((d as any).companyId = companyId));
+  db.tracks.forEach((t) => ((t as any).companyId = companyId));
+
+  saveDb(db);
+}
+
 export function loadDb(): Db {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
@@ -97,6 +150,8 @@ export function loadDb(): Db {
 
   try {
     const parsed = JSON.parse(raw) as Db;
+
+    ensureMultiCompany(parsed);
 
     // Light migration: if organograma não existe, cria uma hierarquia padrão.
     const needsOrg = Array.isArray(parsed.users) && parsed.users.length > 0 && parsed.users.every((u) => !u.managerId);
@@ -133,13 +188,20 @@ export function resetDb() {
 }
 
 function seedDb(): Db {
+  const companyId = uid("cmp");
+  const company: Company = {
+    id: companyId,
+    ...defaultCompanyBrand(),
+    createdAt: nowIso(),
+  };
+
   const departments: Department[] = [
-    { id: uid("dept"), name: "Financeiro" },
-    { id: uid("dept"), name: "Suporte" },
-    { id: uid("dept"), name: "Customer Success" },
-    { id: uid("dept"), name: "Comercial" },
-    { id: uid("dept"), name: "Marketing" },
-    { id: uid("dept"), name: "Produto" },
+    { id: uid("dept"), companyId, name: "Financeiro" },
+    { id: uid("dept"), companyId, name: "Suporte" },
+    { id: uid("dept"), companyId, name: "Customer Success" },
+    { id: uid("dept"), companyId, name: "Comercial" },
+    { id: uid("dept"), companyId, name: "Marketing" },
+    { id: uid("dept"), companyId, name: "Produto" },
   ];
 
   const deptByName = (name: Department["name"]) =>
@@ -148,6 +210,7 @@ function seedDb(): Db {
   const users: User[] = [
     {
       id: uid("usr"),
+      companyId,
       name: "Aline Ramos",
       email: "aline@sinaxys.com",
       role: "COLABORADOR",
@@ -159,6 +222,7 @@ function seedDb(): Db {
     },
     {
       id: uid("usr"),
+      companyId,
       name: "Bruno Teixeira",
       email: "bruno@sinaxys.com",
       role: "COLABORADOR",
@@ -170,6 +234,7 @@ function seedDb(): Db {
     },
     {
       id: uid("usr"),
+      companyId,
       name: "Camila Souza",
       email: "camila@sinaxys.com",
       role: "HEAD",
@@ -181,6 +246,7 @@ function seedDb(): Db {
     },
     {
       id: uid("usr"),
+      companyId,
       name: "Diego Martins",
       email: "diego@sinaxys.com",
       role: "HEAD",
@@ -192,12 +258,21 @@ function seedDb(): Db {
     },
     {
       id: uid("usr"),
+      companyId,
       name: "Admin Sinaxys",
       email: "admin@sinaxys.com",
       role: "ADMIN",
       active: true,
       phone: "+55 11 90000-0000",
       // topo do organograma (sem gestor)
+    },
+    {
+      id: uid("usr"),
+      name: "Master Admin",
+      email: "master@sinaxys.com",
+      role: "MASTERADMIN",
+      active: true,
+      // global
     },
   ];
 
@@ -229,6 +304,7 @@ function seedDb(): Db {
   }) {
     const t: LearningTrack = {
       id: uid("trk"),
+      companyId,
       departmentId: deptByName(params.departmentName),
       title: params.title,
       description: params.description,
@@ -400,6 +476,8 @@ function seedDb(): Db {
   createAssignment(trkCS.id, "bruno@sinaxys.com", "diego@sinaxys.com");
 
   return {
+    companies: [company],
+    invites: [],
     departments,
     users,
     tracks,
@@ -518,6 +596,11 @@ function computeCurrentModuleTitle(db: Db, assignmentId: string) {
   return mod?.title;
 }
 
+function companyOfUser(db: Db, userId: string) {
+  const u = db.users.find((x) => x.id === userId);
+  return u?.companyId;
+}
+
 export const mockDb = {
   uid,
   nowIso,
@@ -531,6 +614,104 @@ export const mockDb = {
     resetDb();
   },
 
+  // Multi-company
+  getCompanies() {
+    return loadDb().companies.slice().sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  },
+  getCompany(companyId: string) {
+    return loadDb().companies.find((c) => c.id === companyId) ?? null;
+  },
+  createCompany(params: { name: string; tagline?: string }) {
+    const db = loadDb();
+    const base = defaultCompanyBrand();
+    const c: Company = {
+      id: uid("cmp"),
+      name: params.name.trim(),
+      tagline: params.tagline?.trim() || base.tagline,
+      logoDataUrl: base.logoDataUrl,
+      colors: base.colors,
+      createdAt: nowIso(),
+    };
+    db.companies.push(c);
+
+    // Seed departments for the new company
+    const names: Department["name"][] = ["Financeiro", "Suporte", "Customer Success", "Comercial", "Marketing", "Produto"];
+    for (const n of names) {
+      db.departments.push({ id: uid("dept"), companyId: c.id, name: n });
+    }
+
+    saveDb(db);
+    return c;
+  },
+  updateCompanyBrand(companyId: string, data: Partial<Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">>) {
+    const db = loadDb();
+    const c = db.companies.find((x) => x.id === companyId);
+    if (!c) return null;
+
+    if (typeof data.name === "string" && data.name.trim()) c.name = data.name.trim();
+    if (typeof data.tagline === "string" && data.tagline.trim()) c.tagline = data.tagline.trim();
+    if (typeof data.logoDataUrl === "string") c.logoDataUrl = data.logoDataUrl || undefined;
+    if (data.colors && typeof data.colors === "object") c.colors = data.colors as any;
+
+    saveDb(db);
+    return c;
+  },
+
+  createInvite(params: { companyId: string; email: string; role: User["role"]; name?: string }) {
+    const db = loadDb();
+    const email = params.email.trim().toLowerCase();
+    if (!email.includes("@")) throw new Error("E-mail inválido.");
+
+    const inv: Invite = {
+      id: uid("inv"),
+      token: randomToken(),
+      companyId: params.companyId,
+      email,
+      role: params.role,
+      name: params.name?.trim() || undefined,
+      createdAt: nowIso(),
+    };
+    db.invites.push(inv);
+    saveDb(db);
+    return inv;
+  },
+  getInviteByToken(token: string) {
+    const db = loadDb();
+    return db.invites.find((i) => i.token === token) ?? null;
+  },
+  acceptInvite(token: string, params?: { name?: string }) {
+    const db = loadDb();
+    const inv = db.invites.find((i) => i.token === token);
+    if (!inv) throw new Error("Convite inválido.");
+    if (inv.usedAt) throw new Error("Este convite já foi utilizado.");
+
+    const existing = db.users.find((u) => u.email.toLowerCase() === inv.email.toLowerCase());
+    if (existing) {
+      inv.usedAt = nowIso();
+      // ensure companyId/role
+      existing.companyId = inv.companyId;
+      existing.role = inv.role;
+      existing.name = (params?.name ?? inv.name ?? existing.name).trim();
+      existing.active = true;
+      saveDb(db);
+      return existing;
+    }
+
+    const u: User = {
+      id: uid("usr"),
+      companyId: inv.companyId,
+      name: (params?.name ?? inv.name ?? inv.email.split("@")[0]).trim(),
+      email: inv.email,
+      role: inv.role,
+      active: true,
+    };
+
+    db.users.push(u);
+    inv.usedAt = nowIso();
+    saveDb(db);
+    return u;
+  },
+
   // Auth
   findUserByEmail(email: string) {
     const db = loadDb();
@@ -538,14 +719,20 @@ export const mockDb = {
   },
 
   // Queries
-  getDepartments() {
-    return loadDb().departments;
+  getDepartments(companyId?: string) {
+    const db = loadDb();
+    if (!companyId) return db.departments;
+    return db.departments.filter((d) => d.companyId === companyId);
   },
-  getUsers() {
-    return loadDb().users;
+  getUsers(companyId?: string) {
+    const db = loadDb();
+    if (!companyId) return db.users;
+    return db.users.filter((u) => u.companyId === companyId);
   },
-  getTracks() {
-    return loadDb().tracks;
+  getTracks(companyId?: string) {
+    const db = loadDb();
+    if (!companyId) return db.tracks;
+    return db.tracks.filter((t) => t.companyId === companyId);
   },
   getTrack(trackId: string) {
     return loadDb().tracks.find((t) => t.id === trackId);
@@ -790,8 +977,13 @@ export const mockDb = {
 
   createTrack(params: { departmentId: string; title: string; description: string; createdByUserId: string }) {
     const db = loadDb();
+    const creatorCompanyId = companyOfUser(db, params.createdByUserId);
+    const dept = db.departments.find((d) => d.id === params.departmentId);
+    if (!dept) throw new Error("Departamento inválido.");
+
     const t: LearningTrack = {
       id: uid("trk"),
+      companyId: creatorCompanyId ?? dept.companyId,
       departmentId: params.departmentId,
       title: params.title.trim(),
       description: params.description.trim(),
@@ -881,17 +1073,18 @@ export const mockDb = {
   },
 
   // Admin
-  createUser(params: { name: string; email: string; role: User["role"]; departmentId?: string }) {
+  createUser(params: { companyId: string; name: string; email: string; role: User["role"]; departmentId?: string }) {
     const db = loadDb();
     const exists = db.users.some((u) => u.email.toLowerCase() === params.email.toLowerCase());
     if (exists) throw new Error("E-mail já cadastrado.");
 
     const u: User = {
       id: uid("usr"),
+      companyId: params.companyId,
       name: params.name.trim(),
       email: params.email.trim().toLowerCase(),
       role: params.role,
-      departmentId: params.role === "ADMIN" ? undefined : params.departmentId,
+      departmentId: params.role === "ADMIN" || params.role === "MASTERADMIN" ? undefined : params.departmentId,
       active: true,
       monthlyCostBRL: undefined,
     };

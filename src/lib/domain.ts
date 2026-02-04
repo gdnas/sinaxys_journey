@@ -1,4 +1,4 @@
-export type Role = "ADMIN" | "HEAD" | "COLABORADOR";
+export type Role = "MASTERADMIN" | "ADMIN" | "HEAD" | "COLABORADOR";
 
 export type DepartmentName =
   | "Financeiro"
@@ -8,13 +8,43 @@ export type DepartmentName =
   | "Marketing"
   | "Produto";
 
+export type CompanyColors = {
+  ink: string;
+  primary: string;
+  bg: string;
+  tint: string;
+  border: string;
+};
+
+export type Company = {
+  id: string;
+  name: string;
+  tagline: string;
+  logoDataUrl?: string;
+  colors: CompanyColors;
+  createdAt: string;
+};
+
+export type Invite = {
+  id: string;
+  token: string;
+  companyId: string;
+  email: string;
+  role: Role; // geralmente ADMIN/HEAD/COLABORADOR
+  name?: string;
+  createdAt: string;
+  usedAt?: string;
+};
+
 export type Department = {
   id: string;
+  companyId: string;
   name: DepartmentName;
 };
 
 export type User = {
   id: string;
+  companyId?: string; // MASTERADMIN pode ser global
   name: string;
   email: string;
   role: Role;
@@ -31,6 +61,7 @@ export type TrackStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "LOCKED"
 
 export type LearningTrack = {
   id: string;
+  companyId: string;
   departmentId: string;
   title: string;
   description: string;
@@ -113,6 +144,8 @@ export type Certificate = {
 };
 
 export type Db = {
+  companies: Company[];
+  invites: Invite[];
   departments: Department[];
   users: User[];
   tracks: LearningTrack[];

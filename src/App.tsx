@@ -16,6 +16,7 @@ import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
 import AdminUsers from "./pages/AdminUsers";
 import AdminBrand from "./pages/AdminBrand";
+import MasterCompanies from "./pages/MasterCompanies";
 import Profile from "./pages/Profile";
 import OrgChart from "./pages/OrgChart";
 import PersonProfile from "./pages/PersonProfile";
@@ -31,18 +32,28 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <CompanyProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <CompanyProvider>
           <BrowserRouter>
             <AppShell>
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
 
+                {/* Master */}
+                <Route
+                  path="/master/companies"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN"]}>
+                      <MasterCompanies />
+                    </RequireAuth>
+                  }
+                />
+
                 <Route
                   path="/profile"
                   element={
-                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                       <Profile />
                     </RequireAuth>
                   }
@@ -51,7 +62,7 @@ const App = () => (
                 <Route
                   path="/org"
                   element={
-                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                       <OrgChart />
                     </RequireAuth>
                   }
@@ -60,7 +71,7 @@ const App = () => (
                 <Route
                   path="/people/:userId"
                   element={
-                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                       <PersonProfile />
                     </RequireAuth>
                   }
@@ -157,8 +168,8 @@ const App = () => (
               </Routes>
             </AppShell>
           </BrowserRouter>
-        </AuthProvider>
-      </CompanyProvider>
+        </CompanyProvider>
+      </AuthProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

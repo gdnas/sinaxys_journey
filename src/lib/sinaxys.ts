@@ -11,6 +11,8 @@ export const SINAXYS = {
 
 export function roleLabel(role: Role) {
   switch (role) {
+    case "MASTERADMIN":
+      return "Master Admin";
     case "ADMIN":
       return "Admin";
     case "HEAD":

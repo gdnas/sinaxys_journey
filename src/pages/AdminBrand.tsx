@@ -6,12 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
-import {
-  loadCompanySettings,
-  useCompany,
-  type CompanyColors,
-  type CompanySettings,
-} from "@/lib/company";
+import { loadCompanySettings, useCompany } from "@/lib/company";
+import type { CompanyColors } from "@/lib/domain";
 
 function normalizeHexOrEmpty(v: string) {
   const t = v.trim();
@@ -81,7 +77,7 @@ export default function AdminBrand() {
         <div>
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Empresa & Marca</div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ajuste o nome, o logo e o esquema de cores. As mudanças são aplicadas na hora e ficam salvas neste navegador.
+            Ajuste o nome, o logo e o esquema de cores. As mudanças são aplicadas na hora e ficam salvas no ambiente desta empresa.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -95,7 +91,7 @@ export default function AdminBrand() {
               setTagline(fresh.tagline);
               setLogoDataUrl(fresh.logoDataUrl);
               setColors(fresh.colors);
-              toast({ title: "Marca restaurada", description: "Voltamos para o padrão da plataforma." });
+              toast({ title: "Marca restaurada", description: "Voltamos para o padrão da empresa." });
             }}
           >
             <RotateCcw className="mr-2 h-4 w-4" />
@@ -105,13 +101,12 @@ export default function AdminBrand() {
             className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
             disabled={!dirty}
             onClick={() => {
-              const next: CompanySettings = {
+              setCompany({
                 name: name.trim() || company.name,
                 tagline: tagline.trim() || company.tagline,
                 logoDataUrl,
                 colors,
-              };
-              setCompany(next);
+              });
               toast({ title: "Marca atualizada", description: "Nome, logo e cores foram aplicados." });
             }}
           >
@@ -141,7 +136,7 @@ export default function AdminBrand() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="h-11 rounded-xl"
-                placeholder="Sinaxys Journey"
+                placeholder="Ex.: Acme University"
               />
             </div>
             <div className="grid gap-2">
@@ -151,7 +146,7 @@ export default function AdminBrand() {
                 value={tagline}
                 onChange={(e) => setTagline(e.target.value)}
                 className="h-11 rounded-xl"
-                placeholder="Aprendizado com clareza. Evolução com propósito."
+                placeholder="Ex.: Onboarding e evolução com ritmo"
               />
             </div>
 
@@ -170,7 +165,7 @@ export default function AdminBrand() {
                   </div>
                   <div>
                     <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Arquivo de imagem</div>
-                    <div className="text-xs text-muted-foreground">PNG/JPG/SVG (fica salvo como data URL).</div>
+                    <div className="text-xs text-muted-foreground">PNG/JPG/SVG (fica salvo no ambiente).</div>
                   </div>
                 </div>
 
