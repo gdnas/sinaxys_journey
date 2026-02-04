@@ -299,20 +299,20 @@ export default function OrgChart() {
 
           <div className="mt-5 grid gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 text-[color:var(--sinaxys-ink)]">
-                  Dica: use a setinha para recolher/expandir equipes.
+              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="max-w-full rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 leading-snug text-[color:var(--sinaxys-ink)]">
+                  Dica: use a setinha para expandir.
                 </span>
                 {user.role === "HEAD" ? (
-                  <span className="rounded-full bg-amber-100 px-3 py-1 text-amber-900">
-                    Você pode mover apenas seus liderados diretos.
+                  <span className="max-w-full rounded-full bg-amber-100 px-3 py-1 leading-snug text-amber-900">
+                    Você move: liderados diretos.
                   </span>
                 ) : user.role === "ADMIN" ? (
-                  <span className="rounded-full bg-emerald-100 px-3 py-1 text-emerald-900">
-                    Admin pode reorganizar qualquer pessoa.
+                  <span className="max-w-full rounded-full bg-emerald-100 px-3 py-1 leading-snug text-emerald-900">
+                    Admin move: qualquer pessoa.
                   </span>
                 ) : (
-                  <span className="rounded-full bg-muted px-3 py-1">Somente visualização.</span>
+                  <span className="max-w-full rounded-full bg-muted px-3 py-1 leading-snug">Somente visualização.</span>
                 )}
               </div>
 
