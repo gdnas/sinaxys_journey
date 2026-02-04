@@ -18,11 +18,24 @@ import { roleLabel } from "@/lib/sinaxys";
 
 export default function AdminUsers() {
   const { toast } = useToast();
-  const { user } = useAuth();
+  const { user, activeCompanyId } = useAuth();
   const [version, setVersion] = useState(0);
 
-  const departments = useMemo(() => mockDb.getDepartments(), [version]);
-  const users = useMemo(() => mockDb.getUsers().slice().sort((a, b) => a.name.localeCompare(b.name)), [version]);
+  const companyId = user?.role === "MASTERADMIN" ? activeCompanyId : user?.companyId;
+
+  const departments = useMemo(() => {
+    if (!companyId) return [];
+    return mockDb.getDepartments(companyId);
+  }, [version, companyId]);
+
+  const users = useMemo(() => {
+    if (!companyId) return [];
+    return mockDb
+      .getUsers(companyId)
+      .filter((u) => u.role !== "MASTERADMIN")
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [version, companyId]);
 
   const [query, setQuery] = useState("");
   const filtered = useMemo(() => {
@@ -37,7 +50,9 @@ export default function AdminUsers() {
   const [role, setRole] = useState<Role>("COLABORADOR");
   const [deptId, setDeptId] = useState<string>(departments[0]?.id ?? "");
 
-  if (!user || user.role !== "ADMIN") return null;
+  const canView = !!user && (user.role === "ADMIN" || user.role === "MASTERADMIN");
+
+  if (!canView) return null;
 
   return (
     <div className="grid gap-6">
@@ -45,7 +60,9 @@ export default function AdminUsers() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Usuários</div>
-            <p className="mt-1 text-sm text-muted-foreground">Cadastre colaboradores e heads. Simples, previsível e auditável.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Cadastre colaboradores e heads. O papel Master Admin é global e não é gerenciado aqui.
+            </p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
             <Shield className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -100,7 +117,7 @@ export default function AdminUsers() {
                   </div>
                   <div className="grid gap-2">
                     <Label>E-mail</Label>
-                    <Input value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-xl" placeholder="nome@sinaxys.com" />
+                    <Input value={email} onChange={(e) => setEmail(e.target.value)} className="rounded-xl" placeholder="nome@empresa.com" />
                   </div>
                   <div className="grid gap-2">
                     <Label>Papel</Label>
@@ -136,10 +153,12 @@ export default function AdminUsers() {
                 <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                   <Button
                     className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                    disabled={name.trim().length < 3 || email.trim().length < 6}
+                    disabled={name.trim().length < 3 || email.trim().length < 6 || !companyId}
                     onClick={() => {
+                      if (!companyId) return;
                       try {
                         mockDb.createUser({
+                          companyId,
                           name,
                           email,
                           role,

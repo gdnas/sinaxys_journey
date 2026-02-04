@@ -11,6 +11,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
+import { brl, brlPerHourFromMonthly, HOURS_PER_MONTH } from "@/lib/costs";
 
 function statusLabel(s: string) {
   switch (s) {
@@ -25,10 +26,6 @@ function statusLabel(s: string) {
     default:
       return s;
   }
-}
-
-function brl(n: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 }
 
 export default function HeadDashboard() {
@@ -88,7 +85,7 @@ export default function HeadDashboard() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custo do departamento</div>
-              <p className="mt-1 text-sm text-muted-foreground">Visão rápida de custo mensal (salário/encargos).</p>
+              <p className="mt-1 text-sm text-muted-foreground">Mensal e custo/hora (base {HOURS_PER_MONTH}h/mês).</p>
             </div>
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
               <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -98,6 +95,10 @@ export default function HeadDashboard() {
           <div className="mt-4 grid gap-2">
             <div className="text-xs text-muted-foreground">Total mensal</div>
             <div className="text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(deptMonthlyCost)}</div>
+
+            <div className="text-xs text-muted-foreground">Custo por hora (departamento)</div>
+            <div className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">{brlPerHourFromMonthly(deptMonthlyCost)}</div>
+
             <div className="text-xs text-muted-foreground">
               Colaboradores: {brl(collaboratorsMonthlyCost)} • Pessoas consideradas: {deptUsers.length}
             </div>
@@ -131,6 +132,7 @@ export default function HeadDashboard() {
                       <div className="mt-1 text-xs text-muted-foreground">{row.user.email}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         Custo: <span className="font-medium text-[color:var(--sinaxys-ink)]">{cost ? brl(cost) : "—"}</span>
+                        <span className="ml-2">• Hora: <span className="font-medium text-[color:var(--sinaxys-ink)]">{cost ? brlPerHourFromMonthly(cost) : "—"}</span></span>
                       </div>
                     </div>
 
@@ -281,6 +283,7 @@ export default function HeadDashboard() {
                 <TableHead className="w-[220px]">Progresso</TableHead>
                 <TableHead>Próxima etapa</TableHead>
                 <TableHead>Custo/mês</TableHead>
+                <TableHead>Hora</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -378,6 +381,14 @@ export default function HeadDashboard() {
                           ) : null}
                         </TableCell>
                         <TableCell>
+                          <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">
+                            {cost ? brlPerHourFromMonthly(cost) : "—"}
+                          </div>
+                          {!cost ? (
+                            <div className="text-xs text-muted-foreground">Base: {HOURS_PER_MONTH}h/mês</div>
+                          ) : null}
+                        </TableCell>
+                        <TableCell>
                           {a ? (
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge
@@ -462,7 +473,7 @@ export default function HeadDashboard() {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                     Nenhum colaborador ativo no departamento.
                   </TableCell>
                 </TableRow>

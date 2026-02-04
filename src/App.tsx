@@ -16,6 +16,7 @@ import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
 import AdminUsers from "./pages/AdminUsers";
 import AdminBrand from "./pages/AdminBrand";
+import AdminCosts from "./pages/AdminCosts";
 import MasterCompanies from "./pages/MasterCompanies";
 import Profile from "./pages/Profile";
 import OrgChart from "./pages/OrgChart";
@@ -149,15 +150,23 @@ const App = () => (
                 <Route
                   path="/admin/users"
                   element={
-                    <RequireAuth roles={["ADMIN"]}>
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
                       <AdminUsers />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/costs"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
+                      <AdminCosts />
                     </RequireAuth>
                   }
                 />
                 <Route
                   path="/admin/brand"
                   element={
-                    <RequireAuth roles={["ADMIN"]}>
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
                       <AdminBrand />
                     </RequireAuth>
                   }

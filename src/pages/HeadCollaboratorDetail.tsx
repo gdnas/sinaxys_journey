@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
+import { brl, brlPerHourFromMonthly, HOURS_PER_MONTH } from "@/lib/costs";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -34,10 +35,6 @@ function statusLabel(s: string) {
     default:
       return s;
   }
-}
-
-function brl(n: number) {
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(n);
 }
 
 export default function HeadCollaboratorDetail() {
@@ -147,6 +144,8 @@ export default function HeadCollaboratorDetail() {
     );
   }
 
+  const monthly = collaborator.monthlyCostBRL ?? 0;
+
   return (
     <div className="grid gap-6">
       <div className="rounded-3xl border bg-white p-6">
@@ -167,8 +166,15 @@ export default function HeadCollaboratorDetail() {
                 </Badge>
               </div>
               <div className="mt-1 text-sm text-muted-foreground">{collaborator.email}</div>
-              <div className="mt-2 text-xs text-muted-foreground">
-                XP acumulado: <span className="font-semibold text-[color:var(--sinaxys-ink)]">{totalXp}</span>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span>
+                  XP acumulado: <span className="font-semibold text-[color:var(--sinaxys-ink)]">{totalXp}</span>
+                </span>
+                <span className="text-muted-foreground/60">•</span>
+                <span>
+                  Custo hora: <span className="font-semibold text-[color:var(--sinaxys-ink)]">{monthly ? brlPerHourFromMonthly(monthly) : "—"}</span>
+                </span>
+                <span className="text-muted-foreground/60">(base {HOURS_PER_MONTH}h/mês)</span>
               </div>
             </div>
           </div>
@@ -322,7 +328,7 @@ export default function HeadCollaboratorDetail() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custo mensal</div>
-                <p className="mt-1 text-sm text-muted-foreground">Salário + encargos (para visão do custo do depto).</p>
+                <p className="mt-1 text-sm text-muted-foreground">Salário + encargos (base {HOURS_PER_MONTH}h/mês para custo/hora).</p>
               </div>
               <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
                 <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -339,7 +345,9 @@ export default function HeadCollaboratorDetail() {
                 placeholder="Ex.: 6500"
               />
               <div className="text-xs text-muted-foreground">
-                {monthlyCost.trim() ? "Prévia: " + brl(Number(monthlyCost)) : "Sem custo definido"}
+                {monthlyCost.trim()
+                  ? `Prévia: ${brl(Number(monthlyCost))} • Hora: ${brlPerHourFromMonthly(Number(monthlyCost))}`
+                  : "Sem custo definido"}
               </div>
             </div>
 

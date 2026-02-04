@@ -11,6 +11,7 @@ import {
   Network,
   Palette,
   Building2,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -65,13 +66,19 @@ const nav: NavItem[] = [
     to: "/admin/users",
     label: "Usuários",
     icon: <Shield className="h-4 w-4" />,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "MASTERADMIN"],
+  },
+  {
+    to: "/admin/costs",
+    label: "Custos",
+    icon: <Wallet className="h-4 w-4" />,
+    roles: ["ADMIN", "MASTERADMIN"],
   },
   {
     to: "/admin/brand",
     label: "Empresa & marca",
     icon: <Palette className="h-4 w-4" />,
-    roles: ["ADMIN"],
+    roles: ["ADMIN", "MASTERADMIN"],
   },
   {
     to: "/org",
