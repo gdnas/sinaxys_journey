@@ -1,11 +1,23 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Shield, Users, LayoutDashboard, GraduationCap, Award, Menu, User as UserIcon, Network } from "lucide-react";
+import {
+  LogOut,
+  Shield,
+  Users,
+  LayoutDashboard,
+  GraduationCap,
+  Award,
+  Menu,
+  User as UserIcon,
+  Network,
+  Palette,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
-import { SINAXYS, roleLabel } from "@/lib/sinaxys";
+import { useCompany } from "@/lib/company";
+import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -44,6 +56,12 @@ const nav: NavItem[] = [
     to: "/admin/users",
     label: "Usuários",
     icon: <Shield className="h-4 w-4" />,
+    roles: ["ADMIN"],
+  },
+  {
+    to: "/admin/brand",
+    label: "Empresa & marca",
+    icon: <Palette className="h-4 w-4" />,
     roles: ["ADMIN"],
   },
   {
@@ -113,6 +131,7 @@ function initials(name: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
+  const { company } = useCompany();
   const navigate = useNavigate();
 
   if (!user) return <>{children}</>;
@@ -149,19 +168,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Sheet>
 
             <Link to={"/"} className="flex items-center gap-3">
-              <div
-                className="grid h-9 w-9 place-items-center rounded-xl"
-                style={{ backgroundColor: SINAXYS.colors.primary }}
-              >
-                <span className="text-sm font-semibold text-white">SJ</span>
+              <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-[color:var(--sinaxys-primary)]">
+                {company.logoDataUrl ? (
+                  <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-cover" />
+                ) : (
+                  <span className="text-sm font-semibold text-white">{initials(company.name || "SJ")}</span>
+                )}
               </div>
               <div className="leading-tight">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                  {SINAXYS.name}
-                </div>
-                <div className="hidden text-xs text-muted-foreground sm:block">
-                  Aprendizado com clareza. Evolução com propósito.
-                </div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{company.name}</div>
+                <div className="hidden text-xs text-muted-foreground sm:block">{company.tagline}</div>
               </div>
             </Link>
           </div>

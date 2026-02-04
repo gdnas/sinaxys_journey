@@ -15,10 +15,12 @@ import HeadTracks from "./pages/HeadTracks";
 import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
 import AdminUsers from "./pages/AdminUsers";
+import AdminBrand from "./pages/AdminBrand";
 import Profile from "./pages/Profile";
 import OrgChart from "./pages/OrgChart";
 import PersonProfile from "./pages/PersonProfile";
 import { AuthProvider } from "@/lib/auth";
+import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 
@@ -29,124 +31,134 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <AuthProvider>
-        <BrowserRouter>
-          <AppShell>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
+      <CompanyProvider>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppShell>
+              <Routes>
+                <Route path="/" element={<Index />} />
+                <Route path="/login" element={<Login />} />
 
-              <Route
-                path="/profile"
-                element={
-                  <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                    <Profile />
-                  </RequireAuth>
-                }
-              />
+                <Route
+                  path="/profile"
+                  element={
+                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                      <Profile />
+                    </RequireAuth>
+                  }
+                />
 
-              <Route
-                path="/org"
-                element={
-                  <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                    <OrgChart />
-                  </RequireAuth>
-                }
-              />
+                <Route
+                  path="/org"
+                  element={
+                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                      <OrgChart />
+                    </RequireAuth>
+                  }
+                />
 
-              <Route
-                path="/people/:userId"
-                element={
-                  <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                    <PersonProfile />
-                  </RequireAuth>
-                }
-              />
+                <Route
+                  path="/people/:userId"
+                  element={
+                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                      <PersonProfile />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* Colaborador */}
-              <Route
-                path="/app"
-                element={
-                  <RequireAuth roles={["COLABORADOR"]}>
-                    <AppDashboard />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/app/tracks/:assignmentId"
-                element={
-                  <RequireAuth roles={["COLABORADOR"]}>
-                    <TrackPlayer />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/app/certificates"
-                element={
-                  <RequireAuth roles={["COLABORADOR"]}>
-                    <AppCertificates />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/app/certificates/:certificateId"
-                element={
-                  <RequireAuth roles={["COLABORADOR"]}>
-                    <CertificateView />
-                  </RequireAuth>
-                }
-              />
+                {/* Colaborador */}
+                <Route
+                  path="/app"
+                  element={
+                    <RequireAuth roles={["COLABORADOR"]}>
+                      <AppDashboard />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/app/tracks/:assignmentId"
+                  element={
+                    <RequireAuth roles={["COLABORADOR"]}>
+                      <TrackPlayer />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/app/certificates"
+                  element={
+                    <RequireAuth roles={["COLABORADOR"]}>
+                      <AppCertificates />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/app/certificates/:certificateId"
+                  element={
+                    <RequireAuth roles={["COLABORADOR"]}>
+                      <CertificateView />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* Head */}
-              <Route
-                path="/head"
-                element={
-                  <RequireAuth roles={["HEAD"]}>
-                    <HeadDashboard />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/head/collaborators/:userId"
-                element={
-                  <RequireAuth roles={["HEAD"]}>
-                    <HeadCollaboratorDetail />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/head/tracks"
-                element={
-                  <RequireAuth roles={["HEAD"]}>
-                    <HeadTracks />
-                  </RequireAuth>
-                }
-              />
-              <Route
-                path="/head/tracks/:trackId/edit"
-                element={
-                  <RequireAuth roles={["HEAD"]}>
-                    <HeadTrackEdit />
-                  </RequireAuth>
-                }
-              />
+                {/* Head */}
+                <Route
+                  path="/head"
+                  element={
+                    <RequireAuth roles={["HEAD"]}>
+                      <HeadDashboard />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/head/collaborators/:userId"
+                  element={
+                    <RequireAuth roles={["HEAD"]}>
+                      <HeadCollaboratorDetail />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/head/tracks"
+                  element={
+                    <RequireAuth roles={["HEAD"]}>
+                      <HeadTracks />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/head/tracks/:trackId/edit"
+                  element={
+                    <RequireAuth roles={["HEAD"]}>
+                      <HeadTrackEdit />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* Admin */}
-              <Route
-                path="/admin/users"
-                element={
-                  <RequireAuth roles={["ADMIN"]}>
-                    <AdminUsers />
-                  </RequireAuth>
-                }
-              />
+                {/* Admin */}
+                <Route
+                  path="/admin/users"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminUsers />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/brand"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminBrand />
+                    </RequireAuth>
+                  }
+                />
 
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </AppShell>
-        </BrowserRouter>
-      </AuthProvider>
+                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </AppShell>
+          </BrowserRouter>
+        </AuthProvider>
+      </CompanyProvider>
     </TooltipProvider>
   </QueryClientProvider>
 );

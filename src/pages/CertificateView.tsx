@@ -4,11 +4,13 @@ import { ArrowLeft, Printer, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
+import { useCompany } from "@/lib/company";
 import { mockDb } from "@/lib/mockDb";
 import { formatLongDate } from "@/lib/sinaxys";
 
 export default function CertificateView() {
   const { user } = useAuth();
+  const { company } = useCompany();
   const { certificateId } = useParams();
   const [sp] = useSearchParams();
   const printMode = sp.get("print") === "1";
@@ -71,7 +73,7 @@ export default function CertificateView() {
             <div className="flex items-start justify-between gap-6">
               <div>
                 <div className="text-xs font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
-                  Sinaxys Journey
+                  {company.name}
                 </div>
                 <h1 className="mt-2 text-2xl font-semibold leading-tight text-[color:var(--sinaxys-ink)] md:text-3xl">
                   Certificado de Conclusão

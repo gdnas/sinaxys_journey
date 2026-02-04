@@ -8,12 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { useCompany } from "@/lib/company";
 import { mockDb } from "@/lib/mockDb";
-import { SINAXYS, roleLabel } from "@/lib/sinaxys";
+import { roleLabel } from "@/lib/sinaxys";
 
 export default function Login() {
   const { toast } = useToast();
   const { user, login } = useAuth();
+  const { company } = useCompany();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
@@ -31,20 +33,15 @@ export default function Login() {
             Plataforma interna de onboarding e aprendizagem contínua
           </div>
 
-          <h1 className="mt-4 text-3xl font-semibold leading-tight text-[color:var(--sinaxys-ink)] md:text-4xl">
-            Sinaxys Journey
-          </h1>
+          <h1 className="mt-4 text-3xl font-semibold leading-tight text-[color:var(--sinaxys-ink)] md:text-4xl">{company.name}</h1>
           <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground">
             Uma experiência sequencial, clara e mensurável para acelerar o onboarding e sustentar evolução constante — com o mesmo padrão de
-            confiança que a Sinaxys entrega em saúde.
+            confiança que a organização busca entregar.
           </p>
 
           <div className="mt-6 rounded-2xl border bg-white p-4">
             <div className="flex items-start gap-3">
-              <div
-                className="grid h-10 w-10 place-items-center rounded-2xl"
-                style={{ backgroundColor: SINAXYS.colors.primary }}
-              >
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-primary)]">
                 <KeyRound className="h-5 w-5 text-white" />
               </div>
               <div>
@@ -87,7 +84,7 @@ export default function Login() {
               <Label htmlFor="email">E-mail</Label>
               <Input
                 id="email"
-                placeholder="nome@sinaxys.com"
+                placeholder="nome@empresa.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="rounded-xl"
