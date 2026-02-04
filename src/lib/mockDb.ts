@@ -133,6 +133,7 @@ function seedDb(): Db {
       role: "COLABORADOR",
       departmentId: deptByName("Produto"),
       active: true,
+      salaryMonthly: 8000,
     },
     {
       id: uid("usr"),
@@ -141,6 +142,7 @@ function seedDb(): Db {
       role: "COLABORADOR",
       departmentId: deptByName("Customer Success"),
       active: true,
+      salaryMonthly: 7500,
     },
     {
       id: uid("usr"),
@@ -862,7 +864,7 @@ export const mockDb = {
     saveDb(db);
   },
 
-  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string }) {
+  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string; salaryMonthly?: number }) {
     const db = loadDb();
     const u = db.users.find((x) => x.id === userId);
     if (!u) return null;
@@ -870,6 +872,9 @@ export const mockDb = {
     if (typeof data.name === "string") u.name = data.name.trim();
     if (typeof data.avatarUrl === "string") u.avatarUrl = data.avatarUrl.trim() || undefined;
     if (typeof data.contractUrl === "string") u.contractUrl = data.contractUrl.trim() || undefined;
+    if (typeof data.salaryMonthly === "number" && Number.isFinite(data.salaryMonthly)) {
+      u.salaryMonthly = data.salaryMonthly;
+    }
 
     saveDb(db);
     return u;
