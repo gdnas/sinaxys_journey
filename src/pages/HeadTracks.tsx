@@ -14,12 +14,12 @@ import { formatShortDate } from "@/lib/sinaxys";
 export default function HeadTracks() {
   const { user } = useAuth();
   const deptId = user?.departmentId;
-  const [, force] = useState(0);
+  const [version, force] = useState(0);
 
   const tracks = useMemo(() => {
     if (!deptId) return [];
     return mockDb.getTracksByDepartment(deptId);
-  }, [deptId]);
+  }, [deptId, version]);
 
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");

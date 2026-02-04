@@ -20,6 +20,8 @@ export type User = {
   role: Role;
   departmentId?: string;
   active: boolean;
+  avatarUrl?: string; // URL (ou data URL) da foto
+  contractUrl?: string; // link do contrato assinado (ex.: Clicksign)
 };
 
 export type TrackStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "LOCKED";

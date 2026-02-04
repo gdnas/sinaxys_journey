@@ -3,8 +3,6 @@ import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Plus,
-  MoveUp,
-  MoveDown,
   Trash2,
   PlayCircle,
   ClipboardCheck,
@@ -12,6 +10,7 @@ import {
   BookOpenText,
   Pencil,
   X,
+  GripVertical,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -146,6 +145,33 @@ export default function HeadTrackEdit() {
   const track = useMemo(() => (trackId ? mockDb.getTrack(trackId) : null), [trackId, tick]);
   const modules = useMemo(() => (trackId ? mockDb.getModulesByTrack(trackId) : []), [trackId, tick]);
 
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOverId, setDragOverId] = useState<string | null>(null);
+
+  const reorder = (fromId: string, toId: string) => {
+    const ordered = modules.slice().sort((a, b) => a.orderIndex - b.orderIndex);
+    const from = ordered.findIndex((m) => m.id === fromId);
+    const to = ordered.findIndex((m) => m.id === toId);
+    if (from < 0 || to < 0 || from === to) return;
+
+    const next = ordered.slice();
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+
+    next.forEach((m, idx) => {
+      const nextOrder = idx + 1;
+      if (m.orderIndex === nextOrder) return;
+      mockDb.upsertModule({ ...m, orderIndex: nextOrder });
+    });
+
+    toast({
+      title: "Ordem atualizada",
+      description: "A sequência de desbloqueio foi ajustada.",
+    });
+
+    setTick((x) => x + 1);
+  };
+
   const [trackTitle, setTrackTitle] = useState("");
   const [trackDescription, setTrackDescription] = useState("");
   const [savingTrack, setSavingTrack] = useState(false);
@@ -200,23 +226,6 @@ export default function HeadTrackEdit() {
       </div>
     );
   }
-
-  const move = (id: string, dir: -1 | 1) => {
-    const ordered = modules.slice().sort((a, b) => a.orderIndex - b.orderIndex);
-    const idx = ordered.findIndex((m) => m.id === id);
-    const swapIdx = idx + dir;
-    if (idx < 0 || swapIdx < 0 || swapIdx >= ordered.length) return;
-
-    const a = ordered[idx];
-    const b = ordered[swapIdx];
-    const aOrder = a.orderIndex;
-    a.orderIndex = b.orderIndex;
-    b.orderIndex = aOrder;
-
-    mockDb.upsertModule(a);
-    mockDb.upsertModule(b);
-    setTick((x) => x + 1);
-  };
 
   const resetDialog = () => {
     setModuleType("VIDEO");
@@ -626,13 +635,28 @@ export default function HeadTrackEdit() {
                   try {
                     setSavingTrack(true);
                     const updated = mockDb.updateTrack({ trackId: track.id, title: trackTitle, description: trackDescription });
+                    const after = mockDb.getTrack(track.id);
                     setTick((x) => x + 1);
-                    if (updated) {
-                      toast({
-                        title: "Trilha salva",
-                        description: "Nome e descrição atualizados com sucesso.",
-                      });
-                    }
+
+                    const ok =
+                      !!updated &&
+                      !!after &&
+                      after.title.trim() === trackTitle.trim() &&
+                      after.description.trim() === trackDescription.trim();
+
+                    toast(
+                      ok
+                        ? {
+                            title: "Trilha salva",
+                            description: "Nome e descrição atualizados com sucesso.",
+                          }
+                        : {
+                            title: "Não foi possível salvar",
+                            description:
+                              "A alteração não foi persistida. Tente novamente e, se continuar, atualize a página.",
+                            variant: "destructive",
+                          },
+                    );
                   } finally {
                     setSavingTrack(false);
                   }
@@ -1000,93 +1024,120 @@ export default function HeadTrackEdit() {
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulos</div>
-        <p className="mt-1 text-sm text-muted-foreground">A sequência é obrigatória: a ordem define o desbloqueio.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          A sequência é obrigatória: arraste os cards para ajustar o desbloqueio.
+        </p>
 
         <div className="mt-4 grid gap-3">
           {modules.length ? (
             modules
               .slice()
               .sort((a, b) => a.orderIndex - b.orderIndex)
-              .map((m, idx) => (
-                <div key={m.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                  <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <div className="grid h-9 w-9 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                          {typeIcon(m.type)}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                            {idx + 1}. {m.title}
+              .map((m, idx) => {
+                const over = dragOverId === m.id && draggingId && draggingId !== m.id;
+                return (
+                  <div
+                    key={m.id}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      if (draggingId) setDragOverId(m.id);
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverId === m.id) setDragOverId(null);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const fromId = e.dataTransfer.getData("text/plain") || draggingId;
+                      if (!fromId) return;
+                      reorder(fromId, m.id);
+                      setDraggingId(null);
+                      setDragOverId(null);
+                    }}
+                    className={
+                      "rounded-2xl border p-4 transition " +
+                      (over
+                        ? "border-[color:var(--sinaxys-primary)] bg-[color:var(--sinaxys-tint)]/60"
+                        : "border-[color:var(--sinaxys-border)]")
+                    }
+                  >
+                    <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <button
+                            draggable
+                            onDragStart={(e) => {
+                              e.dataTransfer.setData("text/plain", m.id);
+                              e.dataTransfer.effectAllowed = "move";
+                              setDraggingId(m.id);
+                              setDragOverId(null);
+                            }}
+                            onDragEnd={() => {
+                              setDraggingId(null);
+                              setDragOverId(null);
+                            }}
+                            className="grid h-9 w-9 place-items-center rounded-xl border border-[color:var(--sinaxys-border)] bg-white text-muted-foreground transition hover:bg-[color:var(--sinaxys-tint)] active:cursor-grabbing"
+                            aria-label="Arrastar para reordenar"
+                            title="Arrastar para reordenar"
+                          >
+                            <GripVertical className="h-4 w-4" />
+                          </button>
+
+                          <div className="grid h-9 w-9 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                            {typeIcon(m.type)}
                           </div>
-                          <div className="mt-0.5 text-xs text-muted-foreground">{typeLabel(m.type)} • +{m.xpReward} XP</div>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                              {idx + 1}. {m.title}
+                            </div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">{typeLabel(m.type)} • +{m.xpReward} XP</div>
+                          </div>
                         </div>
+
+                        {m.description ? (
+                          <div className="mt-2 text-sm text-muted-foreground">{m.description}</div>
+                        ) : null}
+
+                        {m.type === "VIDEO" && m.youtubeUrl ? (
+                          <div className="mt-2 text-xs text-muted-foreground">YouTube: {m.youtubeUrl}</div>
+                        ) : null}
+                        {m.type === "MATERIAL" && m.materialUrl ? (
+                          <div className="mt-2 text-xs text-muted-foreground">Material: {m.materialUrl}</div>
+                        ) : null}
+                        {m.type === "QUIZ" ? (
+                          <div className="mt-2 text-xs text-muted-foreground">Nota mínima: {m.minScore ?? 70}%</div>
+                        ) : null}
+                        {m.type === "CHECKPOINT" && m.checkpointPrompt ? (
+                          <div className="mt-2 text-xs text-muted-foreground">Pergunta: {m.checkpointPrompt}</div>
+                        ) : null}
                       </div>
 
-                      {m.description ? (
-                        <div className="mt-2 text-sm text-muted-foreground">{m.description}</div>
-                      ) : null}
-
-                      {m.type === "VIDEO" && m.youtubeUrl ? (
-                        <div className="mt-2 text-xs text-muted-foreground">YouTube: {m.youtubeUrl}</div>
-                      ) : null}
-                      {m.type === "MATERIAL" && m.materialUrl ? (
-                        <div className="mt-2 text-xs text-muted-foreground">Material: {m.materialUrl}</div>
-                      ) : null}
-                      {m.type === "QUIZ" ? (
-                        <div className="mt-2 text-xs text-muted-foreground">Nota mínima: {m.minScore ?? 70}%</div>
-                      ) : null}
-                      {m.type === "CHECKPOINT" && m.checkpointPrompt ? (
-                        <div className="mt-2 text-xs text-muted-foreground">Pergunta: {m.checkpointPrompt}</div>
-                      ) : null}
-                    </div>
-
-                    <div className="flex flex-wrap items-center justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="rounded-xl"
-                        onClick={() => openEdit(m)}
-                        aria-label="Editar módulo"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="rounded-xl"
-                        disabled={idx === 0}
-                        onClick={() => move(m.id, -1)}
-                        aria-label="Mover para cima"
-                      >
-                        <MoveUp className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="rounded-xl"
-                        disabled={idx === modules.length - 1}
-                        onClick={() => move(m.id, 1)}
-                        aria-label="Mover para baixo"
-                      >
-                        <MoveDown className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        className="rounded-xl"
-                        onClick={() => {
-                          mockDb.deleteModule(m.id);
-                          setTick((x) => x + 1);
-                        }}
-                        aria-label="Remover módulo"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex flex-wrap items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="rounded-xl"
+                          onClick={() => openEdit(m)}
+                          aria-label="Editar módulo"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="rounded-xl"
+                          onClick={() => {
+                            mockDb.deleteModule(m.id);
+                            setTick((x) => x + 1);
+                          }}
+                          aria-label="Remover módulo"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
+                );
+              })
           ) : (
             <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
               Sem módulos ainda. Adicione o primeiro para estruturar a sequência.

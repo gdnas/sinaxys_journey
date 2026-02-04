@@ -861,4 +861,17 @@ export const mockDb = {
     u.active = active;
     saveDb(db);
   },
+
+  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string }) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) return null;
+
+    if (typeof data.name === "string") u.name = data.name.trim();
+    if (typeof data.avatarUrl === "string") u.avatarUrl = data.avatarUrl.trim() || undefined;
+    if (typeof data.contractUrl === "string") u.contractUrl = data.contractUrl.trim() || undefined;
+
+    saveDb(db);
+    return u;
+  },
 };

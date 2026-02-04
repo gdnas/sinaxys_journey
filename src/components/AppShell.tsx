@@ -1,8 +1,9 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { LogOut, Shield, Users, LayoutDashboard, GraduationCap, Award, Menu } from "lucide-react";
+import { LogOut, Shield, Users, LayoutDashboard, GraduationCap, Award, Menu, User as UserIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth";
 import { SINAXYS, roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,12 @@ const nav: NavItem[] = [
     label: "Usuários",
     icon: <Shield className="h-4 w-4" />,
     roles: ["ADMIN"],
+  },
+  {
+    to: "/profile",
+    label: "Meu perfil",
+    icon: <UserIcon className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
 ];
 
@@ -89,6 +96,13 @@ function JourneyRuleCard() {
       </p>
     </div>
   );
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
+  return (a + b).toUpperCase();
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -147,10 +161,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden text-right md:block">
-              <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{user.name}</div>
-              <div className="text-xs text-muted-foreground">{roleLabel(user.role)}</div>
-            </div>
+            <button
+              type="button"
+              className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)]"
+              onClick={() => navigate("/profile")}
+              aria-label="Abrir perfil"
+            >
+              <Avatar className="h-9 w-9">
+                <AvatarImage src={user.avatarUrl} alt={user.name} />
+                <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                  {initials(user.name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="hidden text-right md:block">
+                <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{user.name}</div>
+                <div className="text-xs text-muted-foreground">{roleLabel(user.role)}</div>
+              </div>
+            </button>
+
             <Button
               variant="outline"
               className="rounded-full border-[color:var(--sinaxys-border)] bg-white"

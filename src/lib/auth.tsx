@@ -8,6 +8,7 @@ type AuthState = {
   user: User | null;
   login: (email: string) => { ok: true } | { ok: false; message: string };
   logout: () => void;
+  refresh?: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -23,12 +24,13 @@ function saveUserId(id: string | null) {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(() => loadUserId());
+  const [version, setVersion] = useState(0);
 
   const user = useMemo(() => {
     if (!userId) return null;
     const u = mockDb.get().users.find((x) => x.id === userId);
     return u?.active ? u : null;
-  }, [userId]);
+  }, [userId, version]);
 
   const value: AuthState = {
     user,
@@ -37,11 +39,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!u) return { ok: false, message: "Não encontramos este usuário ativo. Verifique o e-mail." };
       saveUserId(u.id);
       setUserId(u.id);
+      setVersion((v) => v + 1);
       return { ok: true };
     },
     logout() {
       saveUserId(null);
       setUserId(null);
+      setVersion((v) => v + 1);
+    },
+    refresh() {
+      setVersion((v) => v + 1);
     },
   };
 

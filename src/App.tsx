@@ -15,6 +15,7 @@ import HeadTracks from "./pages/HeadTracks";
 import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
 import AdminUsers from "./pages/AdminUsers";
+import Profile from "./pages/Profile";
 import { AuthProvider } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -32,6 +33,15 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/login" element={<Login />} />
+
+              <Route
+                path="/profile"
+                element={
+                  <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                    <Profile />
+                  </RequireAuth>
+                }
+              />
 
               {/* Colaborador */}
               <Route
