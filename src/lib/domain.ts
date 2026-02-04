@@ -24,6 +24,7 @@ export type User = {
   contractUrl?: string; // link do contrato assinado (ex.: Clicksign)
   monthlyCostBRL?: number; // custo mensal (salário/encargos) em BRL
   managerId?: string; // id do gestor direto (pode ser HEAD ou ADMIN)
+  phone?: string; // celular para contato (E.164 ou texto livre)
 };
 
 export type TrackStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "LOCKED";

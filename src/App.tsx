@@ -17,6 +17,7 @@ import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
 import AdminUsers from "./pages/AdminUsers";
 import Profile from "./pages/Profile";
 import OrgChart from "./pages/OrgChart";
+import PersonProfile from "./pages/PersonProfile";
 import { AuthProvider } from "@/lib/auth";
 import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
@@ -49,6 +50,15 @@ const App = () => (
                 element={
                   <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                     <OrgChart />
+                  </RequireAuth>
+                }
+              />
+
+              <Route
+                path="/people/:userId"
+                element={
+                  <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                    <PersonProfile />
                   </RequireAuth>
                 }
               />

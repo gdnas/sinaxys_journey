@@ -154,6 +154,7 @@ function seedDb(): Db {
       departmentId: deptByName("Produto"),
       active: true,
       monthlyCostBRL: 9500,
+      phone: "+55 11 98888-1111",
       // managerId set after we create the heads
     },
     {
@@ -164,6 +165,7 @@ function seedDb(): Db {
       departmentId: deptByName("Customer Success"),
       active: true,
       monthlyCostBRL: 6500,
+      phone: "+55 21 97777-2222",
       // managerId set after we create the heads
     },
     {
@@ -174,6 +176,7 @@ function seedDb(): Db {
       departmentId: deptByName("Produto"),
       active: true,
       monthlyCostBRL: 16500,
+      phone: "+55 11 96666-3333",
       // managerId set after we create the admin
     },
     {
@@ -184,6 +187,7 @@ function seedDb(): Db {
       departmentId: deptByName("Customer Success"),
       active: true,
       monthlyCostBRL: 14500,
+      phone: "+55 21 95555-4444",
       // managerId set after we create the admin
     },
     {
@@ -192,6 +196,7 @@ function seedDb(): Db {
       email: "admin@sinaxys.com",
       role: "ADMIN",
       active: true,
+      phone: "+55 11 90000-0000",
       // topo do organograma (sem gestor)
     },
   ];
@@ -904,7 +909,7 @@ export const mockDb = {
     saveDb(db);
   },
 
-  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string }) {
+  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string; phone?: string }) {
     const db = loadDb();
     const u = db.users.find((x) => x.id === userId);
     if (!u) return null;
@@ -912,6 +917,7 @@ export const mockDb = {
     if (typeof data.name === "string") u.name = data.name.trim();
     if (typeof data.avatarUrl === "string") u.avatarUrl = data.avatarUrl.trim() || undefined;
     if (typeof data.contractUrl === "string") u.contractUrl = data.contractUrl.trim() || undefined;
+    if (typeof data.phone === "string") u.phone = data.phone.trim() || undefined;
 
     saveDb(db);
     return u;

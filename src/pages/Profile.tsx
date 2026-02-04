@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, ImagePlus, LayoutDashboard, Save, ShieldCheck } from "lucide-react";
+import { FileText, ImagePlus, LayoutDashboard, Save, ShieldCheck, UserRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +28,7 @@ export default function Profile() {
   const [name, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [contractUrl, setContractUrl] = useState("");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -35,13 +36,21 @@ export default function Profile() {
     setName(user.name);
     setAvatarUrl(user.avatarUrl ?? "");
     setContractUrl(user.contractUrl ?? "");
+    setPhone(user.phone ?? "");
   }, [user?.id]);
 
   const dirty =
     !!user &&
     (name.trim() !== user.name.trim() ||
       (avatarUrl.trim() || "") !== (user.avatarUrl ?? "") ||
-      (contractUrl.trim() || "") !== (user.contractUrl ?? ""));
+      (contractUrl.trim() || "") !== (user.contractUrl ?? "") ||
+      (phone.trim() || "") !== (user.phone ?? ""));
+
+  const leader = useMemo(() => {
+    if (!user?.managerId) return null;
+    const db = mockDb.get();
+    return db.users.find((u) => u.id === user.managerId && u.active) ?? null;
+  }, [user?.id, user?.managerId]);
 
   const assignments = useMemo(() => {
     if (!user) return [];
@@ -151,6 +160,16 @@ export default function Profile() {
               </div>
 
               <div className="grid gap-2">
+                <Label>Celular</Label>
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="Ex.: +55 11 98888-1111"
+                />
+              </div>
+
+              <div className="grid gap-2">
                 <Label>Foto (URL opcional)</Label>
                 <Input
                   value={avatarUrl}
@@ -198,6 +217,7 @@ export default function Profile() {
                         name,
                         avatarUrl,
                         contractUrl,
+                        phone,
                       });
                       if (!updated) {
                         toast({
@@ -295,6 +315,43 @@ export default function Profile() {
         </div>
 
         <div className="grid gap-6">
+          {user.role === "COLABORADOR" ? (
+            <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Seu líder direto</div>
+              <p className="mt-1 text-sm text-muted-foreground">Para alinhamentos e desbloqueios, aqui está o seu ponto focal.</p>
+
+              <div className="mt-4">
+                {leader ? (
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar className="h-10 w-10 ring-2 ring-[color:var(--sinaxys-border)]">
+                        <AvatarImage src={leader.avatarUrl} alt={leader.name} />
+                        <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                          {initials(leader.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{leader.name}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{roleLabel(leader.role)} • {leader.email}</div>
+                      </div>
+                    </div>
+
+                    <Button asChild variant="outline" className="rounded-xl">
+                      <Link to={`/people/${leader.id}`}>
+                        <UserRound className="mr-2 h-4 w-4" />
+                        Ver perfil
+                      </Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                    Nenhum líder definido ainda.
+                  </div>
+                )}
+              </div>
+            </Card>
+          ) : null}
+
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Contrato</div>
             <p className="mt-1 text-sm text-muted-foreground">Acesso rápido ao documento assinado.</p>
