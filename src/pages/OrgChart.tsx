@@ -8,7 +8,9 @@ import {
   Mail,
   Network,
   Phone,
+  Sitemap,
   UserRound,
+  WrapText,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +19,8 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import type { User } from "@/lib/domain";
@@ -50,6 +54,8 @@ function canMoveNode(params: { viewer: User; node: User }) {
   return node.managerId === viewer.id;
 }
 
+type OrgViewMode = "list" | "tree";
+
 export default function OrgChart() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -66,6 +72,7 @@ export default function OrgChart() {
 
   const [scope, setScope] = useState<string>("__all__");
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const [view, setView] = useState<OrgViewMode>("list");
 
   const [movingUserId, setMovingUserId] = useState<string | null>(null);
   const [selectedManagerId, setSelectedManagerId] = useState<string>("");
@@ -159,9 +166,19 @@ export default function OrgChart() {
       });
   }, [movingUser, allUsers]);
 
-  const selectedPerson = selectedPersonId ? allUsers.find((u) => u.id === selectedPersonId && u.active) ?? null : null;
+  const selectedPerson = selectedPersonId
+    ? allUsers.find((u) => u.id === selectedPersonId && u.active) ?? null
+    : null;
 
-  function Node({ node, depth }: { node: User; depth: number }) {
+  function PersonCard({
+    node,
+    depth,
+    compact,
+  }: {
+    node: User;
+    depth: number;
+    compact?: boolean;
+  }) {
     const directReports = childrenByManager.get(node.id) ?? [];
     const isCollapsed = collapsed.has(node.id);
 
@@ -173,99 +190,132 @@ export default function OrgChart() {
     const canMove = canMoveNode({ viewer: user, node });
 
     return (
-      <div className="grid gap-3">
-        <div className="flex items-stretch gap-3">
-          <button
-            type="button"
-            className={
-              "mt-3 grid h-8 w-8 place-items-center rounded-xl border bg-white text-muted-foreground transition hover:bg-[color:var(--sinaxys-tint)] " +
-              (directReports.length ? "opacity-100" : "opacity-0 pointer-events-none")
-            }
-            aria-label={isCollapsed ? "Expandir" : "Recolher"}
-            onClick={(e) => {
-              e.stopPropagation();
-              setCollapsed((prev) => {
-                const next = new Set(prev);
-                if (next.has(node.id)) next.delete(node.id);
-                else next.add(node.id);
-                return next;
-              });
-            }}
-          >
-            {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-          </button>
+      <Card
+        role="button"
+        tabIndex={0}
+        onClick={() => setSelectedPersonId(node.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") setSelectedPersonId(node.id);
+        }}
+        className={
+          (compact
+            ? "w-[220px] rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-3 shadow-sm transition hover:bg-[color:var(--sinaxys-tint)]/35"
+            : "w-full cursor-pointer rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-4 shadow-sm transition hover:bg-[color:var(--sinaxys-tint)]/35 md:p-5") +
+          (isMe ? " ring-2 ring-[color:var(--sinaxys-primary)]/40" : "")
+        }
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <Avatar className={compact ? "h-9 w-9 ring-2 ring-[color:var(--sinaxys-border)]" : "h-11 w-11 ring-2 ring-[color:var(--sinaxys-border)]"}>
+              <AvatarImage src={node.avatarUrl} alt={node.name} />
+              <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                {initials(node.name)}
+              </AvatarFallback>
+            </Avatar>
 
-          <Card
-            role="button"
-            tabIndex={0}
-            onClick={() => setSelectedPersonId(node.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") setSelectedPersonId(node.id);
-            }}
-            className={
-              "w-full cursor-pointer rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-4 shadow-sm transition hover:bg-[color:var(--sinaxys-tint)]/35 md:p-5 " +
-              (isMe ? "ring-2 ring-[color:var(--sinaxys-primary)]/40" : "")
-            }
-          >
-            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-11 w-11 ring-2 ring-[color:var(--sinaxys-border)]">
-                  <AvatarImage src={node.avatarUrl} alt={node.name} />
-                  <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                    {initials(node.name)}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] md:text-base">
-                      {node.name}
-                    </div>
-                    {isMe ? (
-                      <Badge className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">
-                        Você
-                      </Badge>
-                    ) : null}
-                    <Badge className={"rounded-full " + nodeAccent(depth)}>
-                      Nível {depth + 1}
-                    </Badge>
-                  </div>
-
-                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                    <span className="font-medium text-[color:var(--sinaxys-ink)]">{roleLabel(node.role)}</span>
-                    {dept ? (
-                      <span className="rounded-full bg-[color:var(--sinaxys-tint)] px-2 py-0.5 text-[color:var(--sinaxys-ink)]">
-                        {dept}
-                      </span>
-                    ) : null}
-                    <span className="rounded-full bg-muted px-2 py-0.5">Lidera {teamSize}</span>
-                  </div>
-
-                  <div className="mt-2 text-xs text-muted-foreground">
-                    Reporta para:{" "}
-                    <span className="font-medium text-[color:var(--sinaxys-ink)]">{mgr?.name ?? "—"}</span>
-                  </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className={compact ? "truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]" : "truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] md:text-base"}>
+                  {node.name}
                 </div>
+                {isMe ? (
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">
+                    Você
+                  </Badge>
+                ) : null}
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                {canMove ? (
+              <div className={compact ? "mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground" : "mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"}>
+                <span className="font-medium text-[color:var(--sinaxys-ink)]">{roleLabel(node.role)}</span>
+                {dept ? (
+                  <span className="rounded-full bg-[color:var(--sinaxys-tint)] px-2 py-0.5 text-[color:var(--sinaxys-ink)]">
+                    {dept}
+                  </span>
+                ) : null}
+                <span className="rounded-full bg-muted px-2 py-0.5">Lidera {teamSize}</span>
+              </div>
+
+              {!compact ? (
+                <div className="mt-2 text-xs text-muted-foreground">
+                  Reporta para:{" "}
+                  <span className="font-medium text-[color:var(--sinaxys-ink)]">{mgr?.name ?? "—"}</span>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {directReports.length ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
                   <Button
                     variant="outline"
-                    className="rounded-xl"
+                    size="icon"
+                    className="h-9 w-9 rounded-xl"
+                    aria-label={isCollapsed ? "Expandir" : "Recolher"}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCollapsed((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(node.id)) next.delete(node.id);
+                        else next.add(node.id);
+                        return next;
+                      });
+                    }}
+                  >
+                    {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{isCollapsed ? "Expandir" : "Recolher"}</TooltipContent>
+              </Tooltip>
+            ) : null}
+
+            {canMove ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 rounded-xl"
+                    aria-label="Mover"
                     onClick={(e) => {
                       e.stopPropagation();
                       setMovingUserId(node.id);
                       setSelectedManagerId(node.managerId ?? "__none__");
                     }}
                   >
-                    <ArrowUpDown className="mr-2 h-4 w-4" />
-                    Mover
+                    <ArrowUpDown className="h-4 w-4" />
                   </Button>
-                ) : null}
-              </div>
-            </div>
-          </Card>
+                </TooltipTrigger>
+                <TooltipContent>Mover</TooltipContent>
+              </Tooltip>
+            ) : null}
+
+            {!compact ? (
+              <Badge className={"rounded-full " + nodeAccent(depth)}>Nível {depth + 1}</Badge>
+            ) : null}
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  function Node({ node, depth }: { node: User; depth: number }) {
+    const directReports = childrenByManager.get(node.id) ?? [];
+    const isCollapsed = collapsed.has(node.id);
+
+    return (
+      <div className="grid gap-3">
+        <div className="flex items-stretch gap-3">
+          <div
+            className={
+              "mt-3 grid h-8 w-8 place-items-center rounded-xl border bg-white text-muted-foreground transition hover:bg-[color:var(--sinaxys-tint)] " +
+              (directReports.length ? "opacity-100" : "opacity-0 pointer-events-none")
+            }
+            aria-hidden
+          />
+
+          <PersonCard node={node} depth={depth} />
         </div>
 
         {directReports.length && !isCollapsed ? (
@@ -281,6 +331,33 @@ export default function OrgChart() {
     );
   }
 
+  function TreeNode({ node, depth }: { node: User; depth: number }) {
+    const children = childrenByManager.get(node.id) ?? [];
+    const isCollapsed = collapsed.has(node.id);
+
+    return (
+      <div className="inline-flex flex-col items-center">
+        <PersonCard node={node} depth={depth} compact />
+
+        {children.length && !isCollapsed ? (
+          <div className="mt-3 flex flex-col items-center">
+            <div className="h-6 w-px bg-[color:var(--sinaxys-border)]" />
+
+            <div className="relative inline-flex items-start gap-6 pt-6">
+              <div className="absolute left-0 right-0 top-0 h-px bg-[color:var(--sinaxys-border)]" />
+              {children.map((c) => (
+                <div key={c.id} className="relative flex flex-col items-center">
+                  <div className="absolute left-1/2 top-0 h-6 w-px -translate-x-1/2 bg-[color:var(--sinaxys-border)]" />
+                  <TreeNode node={c} depth={depth + 1} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-6">
       <div className="grid gap-4 md:grid-cols-[1fr_360px]">
@@ -288,9 +365,7 @@ export default function OrgChart() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Organograma</div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Clique em qualquer card para ver contato e abrir o perfil.
-              </p>
+              <p className="mt-1 text-sm text-muted-foreground">Clique em qualquer pessoa para ver contato e abrir o perfil.</p>
             </div>
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
               <Network className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -301,7 +376,7 @@ export default function OrgChart() {
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span className="max-w-full rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 leading-snug text-[color:var(--sinaxys-ink)]">
-                  Dica: use a setinha para expandir.
+                  Dica: use o ícone para expandir.
                 </span>
                 {user.role === "HEAD" ? (
                   <span className="max-w-full rounded-full bg-amber-100 px-3 py-1 leading-snug text-amber-900">
@@ -316,40 +391,75 @@ export default function OrgChart() {
                 )}
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                  <Filter className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <div className="flex items-center justify-end gap-2">
+                  <ToggleGroup
+                    type="single"
+                    value={view}
+                    onValueChange={(v) => {
+                      const next = (v as OrgViewMode) || "list";
+                      setView(next);
+                    }}
+                    className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-1"
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <ToggleGroupItem
+                          value="list"
+                          aria-label="Lista"
+                          className="h-10 w-10 rounded-xl data-[state=on]:bg-[color:var(--sinaxys-tint)]"
+                        >
+                          <WrapText className="h-4 w-4" />
+                        </ToggleGroupItem>
+                      </TooltipTrigger>
+                      <TooltipContent>Lista</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <ToggleGroupItem
+                          value="tree"
+                          aria-label="Árvore"
+                          className="h-10 w-10 rounded-xl data-[state=on]:bg-[color:var(--sinaxys-tint)]"
+                        >
+                          <Sitemap className="h-4 w-4" />
+                        </ToggleGroupItem>
+                      </TooltipTrigger>
+                      <TooltipContent>Árvore</TooltipContent>
+                    </Tooltip>
+                  </ToggleGroup>
                 </div>
-                <Select
-                  value={scope}
-                  onValueChange={(v) => {
-                    setScope(v);
-                    setCollapsed(new Set());
-                  }}
-                >
-                  <SelectTrigger className="h-11 w-[240px] rounded-xl">
-                    <SelectValue placeholder="Filtrar" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__all__">Empresa toda</SelectItem>
-                    {user.departmentId ? <SelectItem value="__my__">Meu time</SelectItem> : null}
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+
+                <div className="flex items-center gap-2">
+                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                    <Filter className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                  </div>
+                  <Select
+                    value={scope}
+                    onValueChange={(v) => {
+                      setScope(v);
+                      setCollapsed(new Set());
+                    }}
+                  >
+                    <SelectTrigger className="h-11 w-[240px] rounded-xl">
+                      <SelectValue placeholder="Filtrar" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__all__">Empresa toda</SelectItem>
+                      {user.departmentId ? <SelectItem value="__my__">Meu time</SelectItem> : null}
+                      {departments.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
 
             <div className="text-xs text-muted-foreground">
               Mostrando: <span className="font-medium text-[color:var(--sinaxys-ink)]">{users.length}</span> pessoas
-              {deptIdForScope ? (
-                <>
-                  {" "}• Inclui cadeia de gestores para manter o contexto
-                </>
-              ) : null}
+              {deptIdForScope ? <> • Inclui cadeia de gestores para manter o contexto</> : null}
             </div>
           </div>
         </div>
@@ -377,13 +487,23 @@ export default function OrgChart() {
 
       <div className="grid gap-4">
         {roots.length ? (
-          roots.map((r) => <Node key={r.id} node={r} depth={0} />)
+          view === "list" ? (
+            roots.map((r) => <Node key={r.id} node={r} depth={0} />)
+          ) : (
+            <div className="max-w-full overflow-x-auto rounded-3xl border bg-white p-4 md:p-6">
+              <div className="min-w-max">
+                <div className="flex items-start justify-center gap-10">
+                  {roots.map((r) => (
+                    <TreeNode key={r.id} node={r} depth={0} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )
         ) : (
           <div className="rounded-3xl border bg-white p-6">
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Nenhuma estrutura encontrada</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Neste filtro, não encontramos pessoas com time/gestor definido.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Neste filtro, não encontramos pessoas com time/gestor definido.</p>
           </div>
         )}
       </div>
@@ -404,7 +524,7 @@ export default function OrgChart() {
             <div className="grid gap-4">
               <div className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
                 <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex min-w-0 items-center gap-3">
                     <Avatar className="h-12 w-12 ring-2 ring-[color:var(--sinaxys-border)]">
                       <AvatarImage src={selectedPerson.avatarUrl} alt={selectedPerson.name} />
                       <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
@@ -412,14 +532,10 @@ export default function OrgChart() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                        {selectedPerson.name}
-                      </div>
+                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{selectedPerson.name}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {roleLabel(selectedPerson.role)}
-                        {selectedPerson.departmentId ? (
-                          <> • {departmentsById.get(selectedPerson.departmentId) ?? "—"}</>
-                        ) : null}
+                        {selectedPerson.departmentId ? <> • {departmentsById.get(selectedPerson.departmentId) ?? "—"}</> : null}
                       </div>
                     </div>
                   </div>
@@ -453,9 +569,7 @@ export default function OrgChart() {
                 <div className="text-xs text-muted-foreground">
                   Reporta para:{" "}
                   <span className="font-medium text-[color:var(--sinaxys-ink)]">
-                    {selectedPerson.managerId
-                      ? allUsers.find((u) => u.id === selectedPerson.managerId)?.name ?? "—"
-                      : "—"}
+                    {selectedPerson.managerId ? allUsers.find((u) => u.id === selectedPerson.managerId)?.name ?? "—" : "—"}
                   </span>
                 </div>
               </div>
@@ -467,10 +581,7 @@ export default function OrgChart() {
               Fechar
             </Button>
             {selectedPerson ? (
-              <Button
-                asChild
-                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              >
+              <Button asChild className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
                 <Link to={`/people/${selectedPerson.id}`}>
                   <UserRound className="mr-2 h-4 w-4" />
                   Abrir perfil
