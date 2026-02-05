@@ -82,7 +82,7 @@ export type TrackModule = {
   xpReward: number;
   // VIDEO
   youtubeUrl?: string;
-  // MATERIAL (ex.: apresentação no Figma)
+  // MATERIAL (link externo: ex.: Figma, ClickUp, Notion)
   materialUrl?: string;
   // QUIZ
   minScore?: number; // 0..100

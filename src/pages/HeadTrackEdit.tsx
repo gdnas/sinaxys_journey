@@ -397,12 +397,12 @@ export default function HeadTrackEdit() {
 
               {editModule?.type === "MATERIAL" ? (
                 <div className="grid gap-2">
-                  <Label>Link do material (Figma)</Label>
+                  <Label>Link do material (Figma, ClickUp ou outro)</Label>
                   <Input
                     value={editMaterialUrl}
                     onChange={(e) => setEditMaterialUrl(e.target.value)}
                     className="rounded-xl"
-                    placeholder="https://www.figma.com/..."
+                    placeholder="https://..."
                   />
                 </div>
               ) : null}
@@ -922,7 +922,7 @@ export default function HeadTrackEdit() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="VIDEO">Vídeo</SelectItem>
-                          <SelectItem value="MATERIAL">Material (Figma)</SelectItem>
+                          <SelectItem value="MATERIAL">Material (link)</SelectItem>
                           <SelectItem value="QUIZ">Quiz</SelectItem>
                           <SelectItem value="CHECKPOINT">Checkpoint</SelectItem>
                         </SelectContent>
@@ -948,15 +948,15 @@ export default function HeadTrackEdit() {
 
                     {moduleType === "MATERIAL" ? (
                       <div className="grid gap-2">
-                        <Label>Link do material (Figma)</Label>
+                        <Label>Link do material (Figma, ClickUp ou outro)</Label>
                         <Input
                           value={materialUrl}
                           onChange={(e) => setMaterialUrl(e.target.value)}
                           className="rounded-xl"
-                          placeholder="https://www.figma.com/..."
+                          placeholder="https://..."
                         />
                         <div className="text-xs text-muted-foreground">
-                          Dica: use o link de compartilhamento. Ao trocar o link, o material é atualizado sem recriar a trilha.
+                          Aceita links externos (ex.: Figma, ClickUp, Notion, Drive). Se não der para embutir, o aluno abre em nova aba.
                         </div>
                       </div>
                     ) : null}
