@@ -8,7 +8,6 @@ import {
   Mail,
   Network,
   Phone,
-  Sitemap,
   UserRound,
   WrapText,
 } from "lucide-react";
@@ -421,7 +420,7 @@ export default function OrgChart() {
                           aria-label="Árvore"
                           className="h-10 w-10 rounded-xl data-[state=on]:bg-[color:var(--sinaxys-tint)]"
                         >
-                          <Sitemap className="h-4 w-4" />
+                          <Network className="h-4 w-4" />
                         </ToggleGroupItem>
                       </TooltipTrigger>
                       <TooltipContent>Árvore</TooltipContent>
