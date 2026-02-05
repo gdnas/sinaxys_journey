@@ -170,9 +170,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const visible = nav.filter((n) => n.roles.includes(user.role));
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-[color:var(--sinaxys-bg)]">
+    <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
       <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-3 md:px-6">
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             {/* Mobile menu */}
             <Sheet>
@@ -257,9 +257,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6">
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
-          <aside className="hidden rounded-2xl border bg-white p-3 md:block">
+      <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-8">
+          <aside className="hidden rounded-2xl border bg-white p-3 lg:block">
             <SideNav items={visible} />
             {user.role !== "MASTERADMIN" ? (
               <>

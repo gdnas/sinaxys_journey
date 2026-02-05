@@ -66,7 +66,7 @@ export default function HeadDashboard() {
 
   return (
     <div className="grid max-w-full gap-6">
-      <div className="grid gap-4 md:grid-cols-[1fr_360px]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
         <div className="rounded-3xl border bg-white p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -300,7 +300,7 @@ export default function HeadDashboard() {
 
         {/* Desktop: table */}
         <div className="mt-4 hidden max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
-          <Table className="min-w-[980px]">
+          <Table className="min-w-[1020px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Colaborador</TableHead>
