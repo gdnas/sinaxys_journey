@@ -139,17 +139,6 @@ export default function OrgChart() {
     return merged;
   }, [childrenByManager, users, byId]);
 
-  const teamSizeById = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const u of users) m.set(u.id, 0);
-    for (const u of users) {
-      if (!u.managerId) continue;
-      if (!m.has(u.managerId)) continue;
-      m.set(u.managerId, (m.get(u.managerId) ?? 0) + 1);
-    }
-    return m;
-  }, [users]);
-
   const movingUser = movingUserId ? byId.get(movingUserId) ?? null : null;
 
   const managerOptions = useMemo(() => {
@@ -185,7 +174,6 @@ export default function OrgChart() {
 
     const mgr = node.managerId ? allUsers.find((u) => u.id === node.managerId && u.active) : undefined;
     const dept = node.departmentId ? departmentsById.get(node.departmentId) : undefined;
-    const teamSize = teamSizeById.get(node.id) ?? 0;
 
     const isMe = user.id === node.id;
     const canMove = canMoveNode({ viewer: user, node });
@@ -219,11 +207,6 @@ export default function OrgChart() {
                 <div className={compact ? "truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]" : "truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] md:text-base"}>
                   {node.name}
                 </div>
-                {isMe ? (
-                  <Badge className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">
-                    Você
-                  </Badge>
-                ) : null}
               </div>
 
               <div className={compact ? "mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground" : "mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"}>
@@ -233,7 +216,6 @@ export default function OrgChart() {
                     {dept}
                   </span>
                 ) : null}
-                <span className="rounded-full bg-muted px-2 py-0.5">Lidera {teamSize}</span>
               </div>
 
               {!compact ? (
@@ -385,9 +367,6 @@ export default function OrgChart() {
             <div>
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Organograma</div>
               <p className="mt-1 text-sm text-muted-foreground">Clique em qualquer pessoa para ver contato e abrir o perfil.</p>
-            </div>
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-              <Network className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
             </div>
           </div>
 
