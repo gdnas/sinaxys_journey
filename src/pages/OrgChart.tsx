@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowUpDown,
@@ -77,6 +77,7 @@ export default function OrgChart() {
   const [selectedManagerId, setSelectedManagerId] = useState<string>("");
 
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
+  const [detailManagerId, setDetailManagerId] = useState<string>("");
 
   if (!user) return null;
 
@@ -157,6 +158,24 @@ export default function OrgChart() {
   const selectedPerson = selectedPersonId
     ? allUsers.find((u) => u.id === selectedPersonId && u.active) ?? null
     : null;
+
+  useEffect(() => {
+    if (!selectedPerson) return;
+    setDetailManagerId(selectedPerson.managerId ?? "__none__");
+  }, [selectedPersonId, selectedPerson?.managerId]);
+
+  const detailManagerOptions = useMemo(() => {
+    if (!selectedPerson) return [] as User[];
+
+    return allUsers
+      .filter((u) => u.active && u.id !== selectedPerson.id)
+      .filter((u) => u.role === "ADMIN" || u.role === "HEAD")
+      .sort((a, b) => {
+        const rr = roleRank(a.role) - roleRank(b.role);
+        if (rr !== 0) return rr;
+        return a.name.localeCompare(b.name);
+      });
+  }, [selectedPerson, allUsers]);
 
   function PersonCard({
     node,
@@ -260,7 +279,7 @@ export default function OrgChart() {
                     variant="outline"
                     size="icon"
                     className="h-9 w-9 rounded-xl"
-                    aria-label="Mover"
+                    aria-label="Alterar gestor"
                     onClick={(e) => {
                       e.stopPropagation();
                       setMovingUserId(node.id);
@@ -270,7 +289,7 @@ export default function OrgChart() {
                     <ArrowUpDown className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Mover</TooltipContent>
+                <TooltipContent>Alterar gestor</TooltipContent>
               </Tooltip>
             ) : null}
 
@@ -549,11 +568,82 @@ export default function OrgChart() {
 
                 <Separator className="my-4" />
 
-                <div className="text-xs text-muted-foreground">
-                  Reporta para:{" "}
-                  <span className="font-medium text-[color:var(--sinaxys-ink)]">
-                    {selectedPerson.managerId ? allUsers.find((u) => u.id === selectedPerson.managerId)?.name ?? "—" : "—"}
-                  </span>
+                <div className="grid gap-3">
+                  <div className="text-xs text-muted-foreground">
+                    Reporta para:{" "}
+                    <span className="font-medium text-[color:var(--sinaxys-ink)]">
+                      {selectedPerson.managerId
+                        ? allUsers.find((u) => u.id === selectedPerson.managerId)?.name ?? "—"
+                        : "—"}
+                    </span>
+                  </div>
+
+                  {canMoveNode({ viewer: user, node: selectedPerson }) ? (
+                    <div className="grid gap-2 rounded-2xl bg-[color:var(--sinaxys-tint)] p-3">
+                      <div className="text-xs font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
+                        Alterar gestor direto
+                      </div>
+                      <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                        <div className="grid gap-2">
+                          <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Novo gestor</div>
+                          <Select value={detailManagerId} onValueChange={setDetailManagerId}>
+                            <SelectTrigger className="rounded-xl bg-white">
+                              <SelectValue placeholder="Selecione…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {user.role === "ADMIN" ? (
+                                <SelectItem value="__none__">Sem gestor (topo)</SelectItem>
+                              ) : null}
+                              {detailManagerOptions.map((m) => (
+                                <SelectItem key={m.id} value={m.id}>
+                                  {m.name} — {roleLabel(m.role)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <div className="text-xs text-muted-foreground">
+                            Admin pode alterar qualquer pessoa. Head pode alterar apenas seus liderados diretos.
+                          </div>
+                        </div>
+
+                        <Button
+                          className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                          disabled={!detailManagerId}
+                          onClick={() => {
+                            try {
+                              if (!selectedPerson) return;
+                              if (!canMoveNode({ viewer: user, node: selectedPerson })) {
+                                toast({
+                                  title: "Ação não permitida",
+                                  description: "Você só pode alterar seus liderados diretos.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+
+                              const next = detailManagerId === "__none__" ? null : detailManagerId;
+                              mockDb.updateUserManager(selectedPerson.id, next);
+
+                              toast({
+                                title: "Gestor atualizado",
+                                description: "O campo 'Reporta para' foi alterado.",
+                              });
+                              setSelectedPersonId(null);
+                              force((x) => x + 1);
+                            } catch (e) {
+                              toast({
+                                title: "Não foi possível alterar",
+                                description: e instanceof Error ? e.message : "Tente novamente.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                        >
+                          Salvar
+                        </Button>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               </div>
             </div>
