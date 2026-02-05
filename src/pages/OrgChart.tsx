@@ -63,7 +63,7 @@ export default function OrgChart() {
 
   const { allUsers, departments, departmentsById } = useMemo(() => {
     const db = mockDb.get();
-    const allUsers = db.users.filter((u) => u.active);
+    const allUsers = db.users.filter((u) => u.active && u.role !== "MASTERADMIN");
     const departments = db.departments.slice().sort((a, b) => a.name.localeCompare(b.name));
     const departmentsById = new Map(db.departments.map((d) => [d.id, d.name] as const));
     return { allUsers, departments, departmentsById };
@@ -173,10 +173,12 @@ export default function OrgChart() {
     node,
     depth,
     compact,
+    showCollapseButton = true,
   }: {
     node: User;
     depth: number;
     compact?: boolean;
+    showCollapseButton?: boolean;
   }) {
     const directReports = childrenByManager.get(node.id) ?? [];
     const isCollapsed = collapsed.has(node.id);
@@ -244,7 +246,7 @@ export default function OrgChart() {
           </div>
 
           <div className="flex items-center gap-2">
-            {directReports.length ? (
+            {showCollapseButton && directReports.length ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -306,15 +308,33 @@ export default function OrgChart() {
     return (
       <div className="grid gap-3">
         <div className="flex items-stretch gap-3">
-          <div
-            className={
-              "mt-3 grid h-8 w-8 place-items-center rounded-xl border bg-white text-muted-foreground transition hover:bg-[color:var(--sinaxys-tint)] " +
-              (directReports.length ? "opacity-100" : "opacity-0 pointer-events-none")
-            }
-            aria-hidden
-          />
+          {directReports.length ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="mt-3 h-8 w-8 rounded-xl"
+                  aria-label={isCollapsed ? "Expandir" : "Recolher"}
+                  onClick={() => {
+                    setCollapsed((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(node.id)) next.delete(node.id);
+                      else next.add(node.id);
+                      return next;
+                    });
+                  }}
+                >
+                  {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{isCollapsed ? "Expandir" : "Recolher"}</TooltipContent>
+            </Tooltip>
+          ) : (
+            <div className="mt-3 h-8 w-8 opacity-0" aria-hidden />
+          )}
 
-          <PersonCard node={node} depth={depth} />
+          <PersonCard node={node} depth={depth} showCollapseButton={false} />
         </div>
 
         {directReports.length && !isCollapsed ? (
@@ -373,22 +393,7 @@ export default function OrgChart() {
 
           <div className="mt-5 grid gap-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="max-w-full rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 leading-snug text-[color:var(--sinaxys-ink)]">
-                  Dica: use o ícone para expandir.
-                </span>
-                {user.role === "HEAD" ? (
-                  <span className="max-w-full rounded-full bg-amber-100 px-3 py-1 leading-snug text-amber-900">
-                    Você move: liderados diretos.
-                  </span>
-                ) : user.role === "ADMIN" ? (
-                  <span className="max-w-full rounded-full bg-emerald-100 px-3 py-1 leading-snug text-emerald-900">
-                    Admin move: qualquer pessoa.
-                  </span>
-                ) : (
-                  <span className="max-w-full rounded-full bg-muted px-3 py-1 leading-snug">Somente visualização.</span>
-                )}
-              </div>
+              <div />
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="flex items-center justify-end gap-2">
