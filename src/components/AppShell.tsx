@@ -180,7 +180,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <Button
                   variant="outline"
                   size="icon"
-                  className="rounded-xl md:hidden"
+                  className="rounded-xl xl:hidden"
                   aria-label="Abrir menu"
                 >
                   <Menu className="h-4 w-4" />
@@ -258,8 +258,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </header>
 
       <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-8">
-          <aside className="hidden rounded-2xl border bg-white p-3 lg:block">
+        <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[260px_minmax(0,1fr)] xl:gap-8">
+          <aside className="hidden rounded-2xl border bg-white p-3 xl:block">
             <SideNav items={visible} />
             {user.role !== "MASTERADMIN" ? (
               <>

@@ -110,8 +110,8 @@ export default function HeadDashboard() {
         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Colaboradores</div>
         <p className="mt-1 text-sm text-muted-foreground">Trilhas atribuídas, evolução e custo por colaborador.</p>
 
-        {/* Mobile: cards */}
-        <div className="mt-4 grid gap-3 md:hidden">
+        {/* Mobile / responsive: cards */}
+        <div className="mt-4 grid gap-3 xl:hidden">
           {overview.length ? (
             overview.map((row) => {
               const hasAssignments = row.assignments.length > 0;
@@ -298,9 +298,9 @@ export default function HeadDashboard() {
           )}
         </div>
 
-        {/* Desktop: table */}
-        <div className="mt-4 hidden max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
-          <Table className="min-w-[1020px]">
+        {/* Wide screens: table */}
+        <div className="mt-4 hidden max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)] xl:block">
+          <Table className="w-full">
             <TableHeader>
               <TableRow>
                 <TableHead>Colaborador</TableHead>
