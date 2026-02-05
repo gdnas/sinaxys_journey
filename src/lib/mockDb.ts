@@ -1098,10 +1098,18 @@ export const mockDb = {
     return u;
   },
 
-  updateUserAdmin(userId: string, data: Partial<Pick<User, "name" | "role" | "companyId" | "departmentId" | "active">>) {
+  updateUserAdmin(userId: string, data: Partial<Pick<User, "name" | "email" | "role" | "companyId" | "departmentId" | "active">>) {
     const db = loadDb();
     const u = db.users.find((x) => x.id === userId);
     if (!u) return null;
+
+    if (typeof data.email === "string") {
+      const next = data.email.trim().toLowerCase();
+      if (!next.includes("@")) throw new Error("E-mail inválido.");
+      const exists = db.users.some((x) => x.id !== u.id && x.email.toLowerCase() === next);
+      if (exists) throw new Error("E-mail já cadastrado.");
+      u.email = next;
+    }
 
     if (typeof data.name === "string" && data.name.trim()) u.name = data.name.trim();
 

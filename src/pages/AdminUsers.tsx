@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Search, UserPlus, Shield } from "lucide-react";
+import { Check, Pencil, Search, UserPlus, UserRound, X, Shield } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,8 +13,9 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
-import type { Role } from "@/lib/domain";
+import type { Role, User } from "@/lib/domain";
 import { roleLabel } from "@/lib/sinaxys";
+import { UserDetailsDialog } from "@/components/users/UserDetailsDialog";
 
 export default function AdminUsers() {
   const { toast } = useToast();
@@ -49,6 +50,60 @@ export default function AdminUsers() {
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("COLABORADOR");
   const [deptId, setDeptId] = useState<string>(departments[0]?.id ?? "");
+
+  const [detailsUserId, setDetailsUserId] = useState<string | null>(null);
+  const detailsUser = detailsUserId ? users.find((u) => u.id === detailsUserId) ?? null : null;
+
+  const [rowEditId, setRowEditId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{
+    name: string;
+    email: string;
+    role: Role;
+    departmentId?: string;
+    active: boolean;
+  } | null>(null);
+
+  const deptLabel = (deptId?: string) => departments.find((d) => d.id === deptId)?.name ?? "—";
+
+  const deptOptionsForRole = (r: Role) => (r === "ADMIN" ? [] : departments);
+
+  const beginEdit = (u: User) => {
+    setRowEditId(u.id);
+    setDraft({
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      departmentId: u.departmentId,
+      active: u.active,
+    });
+  };
+
+  const cancelEdit = () => {
+    setRowEditId(null);
+    setDraft(null);
+  };
+
+  const saveEdit = () => {
+    if (!companyId || !rowEditId || !draft) return;
+    try {
+      mockDb.updateUserAdmin(rowEditId, {
+        name: draft.name.trim(),
+        email: draft.email.trim().toLowerCase(),
+        role: draft.role,
+        companyId,
+        departmentId: draft.role === "ADMIN" ? undefined : draft.departmentId,
+        active: draft.active,
+      });
+      setVersion((x) => x + 1);
+      cancelEdit();
+    } catch (e) {
+      toast({
+        title: "Não foi possível salvar",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const canView = !!user && (user.role === "ADMIN" || user.role === "MASTERADMIN");
 
@@ -198,13 +253,24 @@ export default function AdminUsers() {
                     <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{u.name}</div>
                     <div className="mt-1 text-xs text-muted-foreground">{u.email}</div>
                   </div>
-                  <Switch
-                    checked={u.active}
-                    onCheckedChange={(v) => {
-                      mockDb.setUserActive(u.id, v);
-                      setVersion((x) => x + 1);
-                    }}
-                  />
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl"
+                      aria-label="Detalhes"
+                      onClick={() => setDetailsUserId(u.id)}
+                    >
+                      <UserRound className="h-4 w-4" />
+                    </Button>
+                    <Switch
+                      checked={u.active}
+                      onCheckedChange={(v) => {
+                        mockDb.setUserActive(u.id, v);
+                        setVersion((x) => x + 1);
+                      }}
+                    />
+                  </div>
                 </div>
 
                 <Separator className="my-4" />
@@ -225,7 +291,7 @@ export default function AdminUsers() {
 
         {/* Desktop table */}
         <div className="mt-5 hidden max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)] md:block">
-          <Table className="min-w-[820px]">
+          <Table className="min-w-[980px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
@@ -233,30 +299,141 @@ export default function AdminUsers() {
                 <TableHead>Papel</TableHead>
                 <TableHead>Departamento</TableHead>
                 <TableHead className="text-right">Ativo</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((u) => {
-                const dept = u.departmentId ? departments.find((d) => d.id === u.departmentId) : undefined;
+                const isEditing = rowEditId === u.id;
+                const d = isEditing ? draft : null;
+
                 return (
                   <TableRow key={u.id}>
-                    <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{u.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{u.email}</TableCell>
-                    <TableCell>
-                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                        {roleLabel(u.role)}
-                      </Badge>
+                    <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
+                      {isEditing && d ? (
+                        <Input
+                          className="h-9 rounded-xl"
+                          value={d.name}
+                          onChange={(e) => setDraft({ ...d, name: e.target.value })}
+                        />
+                      ) : (
+                        u.name
+                      )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{dept?.name ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {isEditing && d ? (
+                        <Input
+                          className="h-9 rounded-xl"
+                          value={d.email}
+                          onChange={(e) => setDraft({ ...d, email: e.target.value })}
+                        />
+                      ) : (
+                        u.email
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {isEditing && d ? (
+                        <Select
+                          value={d.role}
+                          onValueChange={(v) => {
+                            const nextRole = v as Role;
+                            const nextDept = nextRole === "ADMIN" ? undefined : (d.departmentId ?? departments[0]?.id);
+                            setDraft({ ...d, role: nextRole, departmentId: nextDept });
+                          }}
+                        >
+                          <SelectTrigger className="h-9 rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="COLABORADOR">Colaborador</SelectItem>
+                            <SelectItem value="HEAD">Head de Departamento</SelectItem>
+                            <SelectItem value="ADMIN">Admin</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                          {roleLabel(u.role)}
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {isEditing && d ? (
+                        d.role === "ADMIN" ? (
+                          "—"
+                        ) : (
+                          <Select
+                            value={d.departmentId ?? departments[0]?.id ?? ""}
+                            onValueChange={(v) => setDraft({ ...d, departmentId: v })}
+                          >
+                            <SelectTrigger className="h-9 rounded-xl">
+                              <SelectValue placeholder="Selecione…" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {deptOptionsForRole(d.role).map((dept) => (
+                                <SelectItem key={dept.id} value={dept.id}>
+                                  {dept.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )
+                      ) : (
+                        deptLabel(u.departmentId)
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end">
+                        {isEditing && d ? (
+                          <Switch checked={d.active} onCheckedChange={(v) => setDraft({ ...d, active: v })} />
+                        ) : (
+                          <Switch
+                            checked={u.active}
+                            onCheckedChange={(v) => {
+                              mockDb.setUserActive(u.id, v);
+                              setVersion((x) => x + 1);
+                            }}
+                          />
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Switch
-                          checked={u.active}
-                          onCheckedChange={(v) => {
-                            mockDb.setUserActive(u.id, v);
-                            setVersion((x) => x + 1);
-                          }}
-                        />
+                        {isEditing ? (
+                          <>
+                            <Button
+                              size="icon"
+                              className="h-9 w-9 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                              aria-label="Salvar"
+                              onClick={saveEdit}
+                            >
+                              <Check className="h-4 w-4" />
+                            </Button>
+                            <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" aria-label="Cancelar" onClick={cancelEdit}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 rounded-xl"
+                              aria-label="Detalhes"
+                              onClick={() => setDetailsUserId(u.id)}
+                            >
+                              <UserRound className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 rounded-xl"
+                              aria-label="Editar na tabela"
+                              onClick={() => beginEdit(u)}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -272,6 +449,16 @@ export default function AdminUsers() {
           </div>
         ) : null}
       </Card>
+
+      <UserDetailsDialog
+        open={!!detailsUserId}
+        onOpenChange={(v) => setDetailsUserId(v ? detailsUserId : null)}
+        viewerRole={(user?.role ?? "ADMIN") as Role}
+        viewerCompanyId={companyId}
+        companies={mockDb.getCompanies()}
+        user={detailsUser}
+        onSaved={() => setVersion((x) => x + 1)}
+      />
     </div>
   );
 }
