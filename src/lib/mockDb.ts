@@ -180,7 +180,14 @@ export function loadDb(): Db {
 }
 
 export function saveDb(db: Db) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+  } catch (e) {
+    // Surface storage issues (e.g. quota exceeded) so UI can show an error toast.
+    throw new Error(
+      "Não foi possível salvar. O armazenamento do navegador pode estar cheio — tente remover itens antigos ou recarregar a página.",
+    );
+  }
 }
 
 export function resetDb() {
@@ -1024,11 +1031,26 @@ export const mockDb = {
 
   deleteModule(moduleId: string) {
     const db = loadDb();
+
+    // Remove module
     db.modules = db.modules.filter((m) => m.id !== moduleId);
-    db.quizQuestions = db.quizQuestions.filter((q) => q.moduleId !== moduleId);
+
+    // Remove quiz data for this module
     const questionIds = db.quizQuestions.filter((q) => q.moduleId === moduleId).map((q) => q.id);
+    db.quizQuestions = db.quizQuestions.filter((q) => q.moduleId !== moduleId);
     db.quizOptions = db.quizOptions.filter((o) => !questionIds.includes(o.questionId));
-    // keep progress as-is (MVP simplificação)
+
+    // IMPORTANT: remove progress rows that point to the deleted module
+    const affectedAssignmentIds = Array.from(
+      new Set(db.moduleProgress.filter((p) => p.moduleId === moduleId).map((p) => p.assignmentId)),
+    );
+    db.moduleProgress = db.moduleProgress.filter((p) => p.moduleId !== moduleId);
+
+    // Ensure each affected assignment still has a single AVAILABLE if needed
+    for (const asgId of affectedAssignmentIds) {
+      unlockNextIfAny(db, asgId);
+    }
+
     saveDb(db);
   },
 
@@ -1044,10 +1066,14 @@ export const mockDb = {
     return { questions, optionsByQuestionId };
   },
 
-  replaceQuiz(moduleId: string, data: { questions: { prompt: string; type: "TRUE_FALSE" | "MULTIPLE_CHOICE"; options: { text: string; isCorrect: boolean }[] }[] }) {
+  replaceQuiz(
+    moduleId: string,
+    data: { questions: { prompt: string; type: "TRUE_FALSE" | "MULTIPLE_CHOICE"; options: { text: string; isCorrect: boolean }[] }[] },
+  ) {
     const db = loadDb();
-    db.quizQuestions = db.quizQuestions.filter((q) => q.moduleId !== moduleId);
+
     const oldQIds = db.quizQuestions.filter((q) => q.moduleId === moduleId).map((q) => q.id);
+    db.quizQuestions = db.quizQuestions.filter((q) => q.moduleId !== moduleId);
     db.quizOptions = db.quizOptions.filter((o) => !oldQIds.includes(o.questionId));
 
     data.questions.forEach((q, idx) => {
