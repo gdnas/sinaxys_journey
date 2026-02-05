@@ -114,6 +114,7 @@ export type TrackAssignment = {
   status: TrackStatus;
   assignedByUserId: string;
   assignedAt: string;
+  dueAt?: string; // prazo para concluir a trilha
   startedAt?: string;
   completedAt?: string;
 };

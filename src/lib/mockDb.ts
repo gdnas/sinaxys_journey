@@ -153,6 +153,16 @@ export function loadDb(): Db {
 
     ensureMultiCompany(parsed);
 
+    // Migration: add dueAt field (optional) for older assignments (no-op but keeps shape stable)
+    if (Array.isArray((parsed as any).assignments)) {
+      for (const a of (parsed as any).assignments) {
+        if (a && typeof a === "object" && !("dueAt" in a)) {
+          a.dueAt = undefined;
+        }
+      }
+      saveDb(parsed);
+    }
+
     // Light migration: if organograma não existe, cria uma hierarquia padrão.
     const needsOrg = Array.isArray(parsed.users) && parsed.users.length > 0 && parsed.users.every((u) => !u.managerId);
     if (needsOrg) {
@@ -945,13 +955,19 @@ export const mockDb = {
   },
 
   // Mutations: Head/admin
-  assignTrack(params: { trackId: string; userId: string; assignedByUserId: string }) {
+  assignTrack(params: { trackId: string; userId: string; assignedByUserId: string; dueAt?: string }) {
     const db = loadDb();
     const track = db.tracks.find((t) => t.id === params.trackId);
     if (!track) return null;
 
     const already = db.assignments.find((a) => a.userId === params.userId && a.trackId === params.trackId);
-    if (already) return already;
+    if (already) {
+      // Update deadline / delegator without resetting progress
+      already.dueAt = params.dueAt ?? already.dueAt;
+      already.assignedByUserId = params.assignedByUserId;
+      saveDb(db);
+      return already;
+    }
 
     const a: TrackAssignment = {
       id: uid("asg"),
@@ -960,6 +976,7 @@ export const mockDb = {
       status: "NOT_STARTED",
       assignedByUserId: params.assignedByUserId,
       assignedAt: nowIso(),
+      dueAt: params.dueAt,
     };
 
     db.assignments.push(a);

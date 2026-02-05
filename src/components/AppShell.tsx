@@ -1,6 +1,7 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   BarChart3,
+  BookOpenText,
   Building2,
   GraduationCap,
   LogOut,
@@ -64,6 +65,12 @@ const nav: NavItem[] = [
     label: "Certificados",
     icon: <Award className="h-4 w-4" />,
     roles: ["COLABORADOR"],
+  },
+  {
+    to: "/library",
+    label: "Biblioteca de trilhas",
+    icon: <BookOpenText className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
   {
     to: "/head",

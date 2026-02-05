@@ -14,6 +14,7 @@ import HeadDashboard from "./pages/HeadDashboard";
 import HeadTracks from "./pages/HeadTracks";
 import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
+import TrackLibrary from "./pages/TrackLibrary";
 import AdminUsers from "./pages/AdminUsers";
 import AdminBrand from "./pages/AdminBrand";
 import AdminCosts from "./pages/AdminCosts";
@@ -92,6 +93,15 @@ const App = () => (
                   element={
                     <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                       <PersonProfile />
+                    </RequireAuth>
+                  }
+                />
+
+                <Route
+                  path="/library"
+                  element={
+                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                      <TrackLibrary />
                     </RequireAuth>
                   }
                 />
