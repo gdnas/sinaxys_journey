@@ -3,8 +3,10 @@ import {
   BarChart3,
   BookOpenText,
   Building2,
+  Gift,
   GraduationCap,
   LogOut,
+  Medal,
   Menu,
   Network,
   Palette,
@@ -74,6 +76,12 @@ const nav: NavItem[] = [
     roles: ["ADMIN", "COLABORADOR"],
   },
   {
+    to: "/rankings",
+    label: "Ranking",
+    icon: <Medal className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
+  },
+  {
     to: "/head",
     label: "Painel do departamento",
     icon: <Users className="h-4 w-4" />,
@@ -95,6 +103,12 @@ const nav: NavItem[] = [
     to: "/admin/users/import",
     label: "Importar planilha",
     icon: <Upload className="h-4 w-4" />,
+    roles: ["ADMIN"],
+  },
+  {
+    to: "/admin/rewards",
+    label: "Tiers & premiações",
+    icon: <Gift className="h-4 w-4" />,
     roles: ["ADMIN"],
   },
   {

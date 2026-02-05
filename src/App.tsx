@@ -15,8 +15,10 @@ import HeadTracks from "./pages/HeadTracks";
 import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
 import TrackLibrary from "./pages/TrackLibrary";
+import Rankings from "./pages/Rankings";
 import AdminUsers from "./pages/AdminUsers";
 import AdminImportUsers from "./pages/AdminImportUsers";
+import AdminRewards from "./pages/AdminRewards";
 import AdminBrand from "./pages/AdminBrand";
 import AdminCosts from "./pages/AdminCosts";
 import MasterCompanies from "./pages/MasterCompanies";
@@ -110,6 +112,15 @@ const App = () => (
                   }
                 />
 
+                <Route
+                  path="/rankings"
+                  element={
+                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                      <Rankings />
+                    </RequireAuth>
+                  }
+                />
+
                 {/* Colaborador */}
                 <Route
                   path="/app"
@@ -192,6 +203,14 @@ const App = () => (
                   element={
                     <RequireAuth roles={["ADMIN"]}>
                       <AdminImportUsers />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/rewards"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminRewards />
                     </RequireAuth>
                   }
                 />

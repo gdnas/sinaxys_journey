@@ -8,6 +8,7 @@ import {
   type ModuleProgress,
   type QuizOption,
   type QuizQuestion,
+  type RewardTier,
   type TrackAssignment,
   type TrackModule,
   type User,
@@ -161,6 +162,12 @@ export function loadDb(): Db {
           a.dueAt = undefined;
         }
       }
+      saveDb(parsed);
+    }
+
+    // Migration: reward tiers
+    if (!Array.isArray((parsed as any).rewardTiers)) {
+      (parsed as any).rewardTiers = [];
       saveDb(parsed);
     }
 
@@ -493,6 +500,39 @@ function seedDb(): Db {
   createAssignment(trkProduto.id, "aline@sinaxys.com", "camila@sinaxys.com");
   createAssignment(trkCS.id, "bruno@sinaxys.com", "diego@sinaxys.com");
 
+  const rewardTiers: RewardTier[] = [
+    {
+      id: uid("tier"),
+      companyId,
+      name: "Bronze",
+      minXp: 200,
+      prize: "Kit Sinaxys",
+      description: "Primeiro marco de consistência.",
+      active: true,
+      createdAt: nowIso(),
+    },
+    {
+      id: uid("tier"),
+      companyId,
+      name: "Prata",
+      minXp: 600,
+      prize: "Voucher",
+      description: "Ritmo forte e aprendizado contínuo.",
+      active: true,
+      createdAt: nowIso(),
+    },
+    {
+      id: uid("tier"),
+      companyId,
+      name: "Ouro",
+      minXp: 1200,
+      prize: "Dia de experiência",
+      description: "Excelência sustentada e alto impacto.",
+      active: true,
+      createdAt: nowIso(),
+    },
+  ];
+
   return {
     companies: [company],
     invites: [],
@@ -505,6 +545,7 @@ function seedDb(): Db {
     assignments,
     moduleProgress,
     certificates,
+    rewardTiers,
   };
 }
 
@@ -645,6 +686,25 @@ function wouldCreateCycle(db: Db, userId: string, nextManagerId: string) {
     cursor = byId.get(cursor)?.managerId;
   }
   return false;
+}
+
+function computeUserXp(db: Db, userId: string) {
+  const assignmentIds = db.assignments.filter((a) => a.userId === userId).map((a) => a.id);
+  const completedMp = db.moduleProgress.filter((p) => assignmentIds.includes(p.assignmentId) && p.status === "COMPLETED");
+  const byModuleId = new Map(db.modules.map((m) => [m.id, m] as const));
+  return completedMp.reduce((acc, p) => acc + (byModuleId.get(p.moduleId)?.xpReward ?? 0), 0);
+}
+
+function computeUserTier(db: Db, companyId: string, xp: number) {
+  const tiers = (db.rewardTiers ?? [])
+    .filter((t) => t.companyId === companyId && t.active)
+    .slice()
+    .sort((a, b) => a.minXp - b.minXp);
+  let current: RewardTier | null = null;
+  for (const t of tiers) {
+    if (xp >= t.minXp) current = t;
+  }
+  return current;
 }
 
 export const mockDb = {
@@ -882,6 +942,107 @@ export const mockDb = {
     return db.tracks
       .filter((t) => t.departmentId === departmentId)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  // Gamificação
+  getRewardTiers(companyId: string) {
+    const db = loadDb();
+    return (db.rewardTiers ?? [])
+      .filter((t) => t.companyId === companyId)
+      .slice()
+      .sort((a, b) => a.minXp - b.minXp);
+  },
+
+  upsertRewardTier(
+    companyId: string,
+    data: Omit<RewardTier, "id" | "companyId" | "createdAt"> & { id?: string },
+  ) {
+    const db = loadDb();
+    if (!Array.isArray((db as any).rewardTiers)) (db as any).rewardTiers = [];
+
+    const minXp = Math.max(0, Math.floor(Number(data.minXp) || 0));
+    const name = data.name.trim();
+
+    if (name.length < 2) throw new Error("Nome do tier é obrigatório.");
+
+    const clash = (db.rewardTiers ?? []).find(
+      (t) => t.companyId === companyId && t.minXp === minXp && t.id !== data.id,
+    );
+    if (clash) throw new Error(`Já existe um tier com XP mínimo ${minXp}.`);
+
+    if (data.id) {
+      const existing = db.rewardTiers.find((t) => t.id === data.id);
+      if (!existing) throw new Error("Tier não encontrado.");
+      existing.name = name;
+      existing.minXp = minXp;
+      existing.prize = data.prize.trim();
+      existing.description = data.description?.trim() || undefined;
+      existing.active = !!data.active;
+      saveDb(db);
+      return existing;
+    }
+
+    const tier: RewardTier = {
+      id: uid("tier"),
+      companyId,
+      name,
+      minXp,
+      prize: data.prize.trim(),
+      description: data.description?.trim() || undefined,
+      active: !!data.active,
+      createdAt: nowIso(),
+    };
+    db.rewardTiers.push(tier);
+    saveDb(db);
+    return tier;
+  },
+
+  deleteRewardTier(tierId: string) {
+    const db = loadDb();
+    db.rewardTiers = (db.rewardTiers ?? []).filter((t) => t.id !== tierId);
+    saveDb(db);
+  },
+
+  getXpLeaderboard(companyId: string) {
+    const db = loadDb();
+
+    const users = db.users
+      .filter((u) => u.companyId === companyId)
+      .filter((u) => u.active)
+      .filter((u) => u.role === "HEAD" || u.role === "COLABORADOR")
+      .slice();
+
+    const entries = users
+      .map((u) => {
+        const xp = computeUserXp(db, u.id);
+        return { user: u, xp, tier: computeUserTier(db, companyId, xp) };
+      })
+      .sort((a, b) => b.xp - a.xp || a.user.name.localeCompare(b.user.name));
+
+    return entries.map((e, idx) => ({ ...e, rank: idx + 1 }));
+  },
+
+  getTeamXpLeaderboard(companyId: string) {
+    const db = loadDb();
+    const depts = db.departments.filter((d) => d.companyId === companyId);
+
+    const eligibleUsers = db.users
+      .filter((u) => u.companyId === companyId)
+      .filter((u) => u.active)
+      .filter((u) => u.role === "HEAD" || u.role === "COLABORADOR")
+      .filter((u) => !!u.departmentId);
+
+    const xpByUserId = new Map(eligibleUsers.map((u) => [u.id, computeUserXp(db, u.id)] as const));
+
+    return depts
+      .map((d) => {
+        const members = eligibleUsers.filter((u) => u.departmentId === d.id);
+        const totalXp = members.reduce((acc, u) => acc + (xpByUserId.get(u.id) ?? 0), 0);
+        const membersCount = members.length;
+        const avgXp = membersCount ? Math.round(totalXp / membersCount) : 0;
+        return { departmentId: d.id, membersCount, totalXp, avgXp };
+      })
+      .filter((x) => x.membersCount > 0);
   },
 
   // Mutations: assignment progress

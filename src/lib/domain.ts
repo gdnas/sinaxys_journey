@@ -144,6 +144,17 @@ export type Certificate = {
   snapshotDepartmentName: string;
 };
 
+export type RewardTier = {
+  id: string;
+  companyId: string;
+  name: string;
+  minXp: number;
+  prize: string;
+  description?: string;
+  active: boolean;
+  createdAt: string;
+};
+
 export type Db = {
   companies: Company[];
   invites: Invite[];
@@ -156,4 +167,5 @@ export type Db = {
   assignments: TrackAssignment[];
   moduleProgress: ModuleProgress[];
   certificates: Certificate[];
+  rewardTiers: RewardTier[];
 };
