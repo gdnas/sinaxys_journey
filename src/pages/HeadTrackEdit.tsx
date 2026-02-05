@@ -11,6 +11,10 @@ import {
   Pencil,
   X,
   GripVertical,
+  Users,
+  UserPlus,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +26,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Badge } from "@/components/ui/badge";
 import type { QuizOption, QuizQuestion, TrackModule } from "@/lib/domain";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -148,6 +153,21 @@ export default function HeadTrackEdit() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverId, setDragOverId] = useState<string | null>(null);
 
+  const deptId = user?.departmentId;
+
+  const deptUsers = useMemo(() => {
+    if (!deptId) return [];
+    return mockDb
+      .getUsers()
+      .filter((u) => u.active && u.departmentId === deptId && u.role === "COLABORADOR")
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [deptId, tick]);
+
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [assignMode, setAssignMode] = useState<"team" | "person">("team");
+  const [assignUserId, setAssignUserId] = useState<string>("");
+  const [assignTrackId, setAssignTrackId] = useState<string | null>(null);
+
   const reorder = (fromId: string, toId: string) => {
     const ordered = modules.slice().sort((a, b) => a.orderIndex - b.orderIndex);
     const from = ordered.findIndex((m) => m.id === fromId);
@@ -161,7 +181,15 @@ export default function HeadTrackEdit() {
     next.forEach((m, idx) => {
       const nextOrder = idx + 1;
       if (m.orderIndex === nextOrder) return;
-      mockDb.upsertModule({ ...m, orderIndex: nextOrder });
+      try {
+        mockDb.upsertModule({ ...m, orderIndex: nextOrder });
+      } catch (e) {
+        toast({
+          title: "Não foi possível salvar",
+          description: e instanceof Error ? e.message : "Tente novamente.",
+          variant: "destructive",
+        });
+      }
     });
 
     toast({
@@ -271,20 +299,33 @@ export default function HeadTrackEdit() {
       minScore: editModule.type === "QUIZ" ? Number(editMinScore) || 70 : undefined,
     };
 
-    mockDb.upsertModule(updated);
+    try {
+      mockDb.upsertModule(updated);
 
-    if (editModule.type === "QUIZ") {
-      mockDb.replaceQuiz(editModule.id, {
-        questions: editQuizQuestions.map((q) => ({
-          type: q.type,
-          prompt: q.prompt.trim(),
-          options: q.options.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
-        })),
+      if (editModule.type === "QUIZ") {
+        mockDb.replaceQuiz(editModule.id, {
+          questions: editQuizQuestions.map((q) => ({
+            type: q.type,
+            prompt: q.prompt.trim(),
+            options: q.options.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
+          })),
+        });
+      }
+
+      toast({
+        title: "Módulo salvo",
+        description: "As alterações foram aplicadas.",
+      });
+
+      setEditOpen(false);
+      setTick((x) => x + 1);
+    } catch (e) {
+      toast({
+        title: "Não foi possível salvar",
+        description: e instanceof Error ? e.message : "Tente novamente.",
+        variant: "destructive",
       });
     }
-
-    setEditOpen(false);
-    setTick((x) => x + 1);
   };
 
   const isEditValid = (() => {
@@ -632,8 +673,8 @@ export default function HeadTrackEdit() {
                 className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
                 disabled={savingTrack || !trackDirty || trackTitle.trim().length < 6 || trackDescription.trim().length < 10}
                 onClick={() => {
+                  setSavingTrack(true);
                   try {
-                    setSavingTrack(true);
                     const updated = mockDb.updateTrack({ trackId: track.id, title: trackTitle, description: trackDescription });
                     const after = mockDb.getTrack(track.id);
                     setTick((x) => x + 1);
@@ -657,6 +698,12 @@ export default function HeadTrackEdit() {
                             variant: "destructive",
                           },
                     );
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível salvar",
+                      description: e instanceof Error ? e.message : "Tente novamente.",
+                      variant: "destructive",
+                    });
                   } finally {
                     setSavingTrack(false);
                   }
@@ -679,6 +726,167 @@ export default function HeadTrackEdit() {
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Badge
+              className={
+                "rounded-full " +
+                (track.published
+                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
+                  : "bg-amber-100 text-amber-800 hover:bg-amber-100")
+              }
+            >
+              {track.published ? "Publicada" : "Rascunho"}
+            </Badge>
+
+            <Button
+              variant="outline"
+              className="w-full rounded-xl sm:w-auto"
+              onClick={() => {
+                try {
+                  mockDb.setTrackPublished(track.id, !track.published);
+                  toast({
+                    title: track.published ? "Trilha despublicada" : "Trilha publicada",
+                    description: track.published
+                      ? "Ela deixa de aparecer para o time."
+                      : "Agora você pode atribuir para pessoas/equipe.",
+                  });
+                  setTick((x) => x + 1);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível atualizar",
+                    description: e instanceof Error ? e.message : "Tente novamente.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              {track.published ? (
+                <>
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  Despublicar
+                </>
+              ) : (
+                <>
+                  <Eye className="mr-2 h-4 w-4" />
+                  Publicar
+                </>
+              )}
+            </Button>
+
+            <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
+                  disabled={!track.published}
+                  title={!track.published ? "Publique a trilha para poder atribuir" : undefined}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Atribuir
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Atribuir trilha</DialogTitle>
+                </DialogHeader>
+
+                <div className="grid gap-3">
+                  {!track.published ? (
+                    <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
+                      Publique a trilha para conseguir atribuir.
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-2">
+                    <Label>Destino</Label>
+                    <Select value={assignMode} onValueChange={(v) => setAssignMode(v as any)}>
+                      <SelectTrigger className="rounded-xl">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="team">Equipe (departamento)</SelectItem>
+                        <SelectItem value="person">Pessoa</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {assignMode === "team" ? (
+                    <div className="rounded-2xl border border-[color:var(--sinaxys-border)] p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Equipe do departamento</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {deptUsers.length} colaboradores ativos serão atribuídos.
+                          </div>
+                        </div>
+                        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                          <Users className="h-5 w-5" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid gap-2">
+                      <Label>Pessoa</Label>
+                      <Select value={assignUserId} onValueChange={setAssignUserId}>
+                        <SelectTrigger className="rounded-xl">
+                          <SelectValue placeholder="Selecione…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {deptUsers.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                </div>
+
+                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => setAssignOpen(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
+                    disabled={!track.published || (assignMode === "team" ? deptUsers.length === 0 : !assignUserId)}
+                    onClick={() => {
+                      try {
+                        if (!track.published) return;
+
+                        if (assignMode === "team") {
+                          deptUsers.forEach((u) => {
+                            mockDb.assignTrack({ trackId: track.id, userId: u.id, assignedByUserId: user.id });
+                          });
+                          toast({
+                            title: "Trilha atribuída",
+                            description: `Enviada para ${deptUsers.length} colaboradores.`,
+                          });
+                        } else {
+                          mockDb.assignTrack({ trackId: track.id, userId: assignUserId, assignedByUserId: user.id });
+                          const name = deptUsers.find((x) => x.id === assignUserId)?.name;
+                          toast({
+                            title: "Trilha atribuída",
+                            description: name ? `Enviada para ${name}.` : "Enviada.",
+                          });
+                        }
+
+                        setAssignOpen(false);
+                        setAssignUserId("");
+                        setTick((x) => x + 1);
+                      } catch (e) {
+                        toast({
+                          title: "Não foi possível atribuir",
+                          description: e instanceof Error ? e.message : "Tente novamente.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    Atribuir
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
             <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
               <Link to="/head/tracks">
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -981,36 +1189,49 @@ export default function HeadTrackEdit() {
                     className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
                     disabled={!isNewModuleValid}
                     onClick={() => {
-                      const id = mockDb.uid("mod");
-                      const base: TrackModule = {
-                        id,
-                        trackId,
-                        orderIndex: nextOrder,
-                        type: moduleType,
-                        title: title.trim(),
-                        description: description.trim() || undefined,
-                        xpReward: moduleType === "VIDEO" ? 20 : moduleType === "MATERIAL" ? 20 : moduleType === "CHECKPOINT" ? 30 : 40,
-                        youtubeUrl: moduleType === "VIDEO" ? youtubeUrl.trim() : undefined,
-                        materialUrl: moduleType === "MATERIAL" ? materialUrl.trim() : undefined,
-                        checkpointPrompt: moduleType === "CHECKPOINT" ? checkpointPrompt.trim() : undefined,
-                        minScore: moduleType === "QUIZ" ? Number(minScore) || 70 : undefined,
-                      };
+                      try {
+                        const id = mockDb.uid("mod");
+                        const base: TrackModule = {
+                          id,
+                          trackId,
+                          orderIndex: nextOrder,
+                          type: moduleType,
+                          title: title.trim(),
+                          description: description.trim() || undefined,
+                          xpReward: moduleType === "VIDEO" ? 20 : moduleType === "MATERIAL" ? 20 : moduleType === "CHECKPOINT" ? 30 : 40,
+                          youtubeUrl: moduleType === "VIDEO" ? youtubeUrl.trim() : undefined,
+                          materialUrl: moduleType === "MATERIAL" ? materialUrl.trim() : undefined,
+                          checkpointPrompt: moduleType === "CHECKPOINT" ? checkpointPrompt.trim() : undefined,
+                          minScore: moduleType === "QUIZ" ? Number(minScore) || 70 : undefined,
+                        };
 
-                      mockDb.upsertModule(base);
+                        mockDb.upsertModule(base);
 
-                      if (moduleType === "QUIZ") {
-                        mockDb.replaceQuiz(id, {
-                          questions: quizQuestions.map((q) => ({
-                            type: q.type,
-                            prompt: q.prompt.trim(),
-                            options: q.options.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
-                          })),
+                        if (moduleType === "QUIZ") {
+                          mockDb.replaceQuiz(id, {
+                            questions: quizQuestions.map((q) => ({
+                              type: q.type,
+                              prompt: q.prompt.trim(),
+                              options: q.options.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
+                            })),
+                          });
+                        }
+
+                        toast({
+                          title: "Módulo adicionado",
+                          description: "Ele já foi salvo na trilha.",
+                        });
+
+                        setOpen(false);
+                        resetDialog();
+                        setTick((x) => x + 1);
+                      } catch (e) {
+                        toast({
+                          title: "Não foi possível salvar",
+                          description: e instanceof Error ? e.message : "Tente novamente.",
+                          variant: "destructive",
                         });
                       }
-
-                      setOpen(false);
-                      resetDialog();
-                      setTick((x) => x + 1);
                     }}
                   >
                     Adicionar
@@ -1126,8 +1347,17 @@ export default function HeadTrackEdit() {
                           size="icon"
                           className="rounded-xl"
                           onClick={() => {
-                            mockDb.deleteModule(m.id);
-                            setTick((x) => x + 1);
+                            try {
+                              mockDb.deleteModule(m.id);
+                              toast({ title: "Módulo removido" });
+                              setTick((x) => x + 1);
+                            } catch (e) {
+                              toast({
+                                title: "Não foi possível remover",
+                                description: e instanceof Error ? e.message : "Tente novamente.",
+                                variant: "destructive",
+                              });
+                            }
                           }}
                           aria-label="Remover módulo"
                         >
