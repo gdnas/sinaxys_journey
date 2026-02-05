@@ -9,6 +9,7 @@ import {
   Network,
   Palette,
   Shield,
+  Upload,
   User as UserIcon,
   Users,
   Wallet,
@@ -67,10 +68,10 @@ const nav: NavItem[] = [
     roles: ["COLABORADOR"],
   },
   {
-    to: "/library",
-    label: "Biblioteca de trilhas",
-    icon: <BookOpenText className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR"],
+    to: "/tracks",
+    label: "Trilhas",
+    icon: <GraduationCap className="h-4 w-4" />,
+    roles: ["ADMIN", "COLABORADOR"],
   },
   {
     to: "/head",
@@ -88,6 +89,12 @@ const nav: NavItem[] = [
     to: "/admin/users",
     label: "Usuários",
     icon: <Shield className="h-4 w-4" />,
+    roles: ["ADMIN"],
+  },
+  {
+    to: "/admin/users/import",
+    label: "Importar planilha",
+    icon: <Upload className="h-4 w-4" />,
     roles: ["ADMIN"],
   },
   {

@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
@@ -16,6 +16,7 @@ import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
 import TrackLibrary from "./pages/TrackLibrary";
 import AdminUsers from "./pages/AdminUsers";
+import AdminImportUsers from "./pages/AdminImportUsers";
 import AdminBrand from "./pages/AdminBrand";
 import AdminCosts from "./pages/AdminCosts";
 import MasterCompanies from "./pages/MasterCompanies";
@@ -97,10 +98,13 @@ const App = () => (
                   }
                 />
 
+                {/* Compat: rota antiga */}
+                <Route path="/library" element={<Navigate to="/tracks" replace />} />
+
                 <Route
-                  path="/library"
+                  path="/tracks"
                   element={
-                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                    <RequireAuth roles={["ADMIN", "COLABORADOR"]}>
                       <TrackLibrary />
                     </RequireAuth>
                   }
@@ -180,6 +184,14 @@ const App = () => (
                   element={
                     <RequireAuth roles={["ADMIN"]}>
                       <AdminUsers />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/users/import"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminImportUsers />
                     </RequireAuth>
                   }
                 />

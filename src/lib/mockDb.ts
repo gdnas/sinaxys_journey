@@ -619,6 +619,34 @@ function companyOfUser(db: Db, userId: string) {
   return u?.companyId;
 }
 
+function normalizeText(s: string) {
+  return s
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\s+/g, " ");
+}
+
+function findDepartmentIdByName(db: Db, companyId: string, name: string) {
+  const n = normalizeText(name);
+  const d = db.departments.find((x) => x.companyId === companyId && normalizeText(x.name) === n);
+  return d?.id ?? null;
+}
+
+function wouldCreateCycle(db: Db, userId: string, nextManagerId: string) {
+  const byId = new Map(db.users.map((x) => [x.id, x] as const));
+  let cursor: string | undefined = nextManagerId;
+  const seen = new Set<string>();
+  while (cursor) {
+    if (cursor === userId) return true;
+    if (seen.has(cursor)) return true;
+    seen.add(cursor);
+    cursor = byId.get(cursor)?.managerId;
+  }
+  return false;
+}
+
 export const mockDb = {
   uid,
   nowIso,
@@ -1240,5 +1268,108 @@ export const mockDb = {
     u.managerId = nextManagerId;
     saveDb(db);
     return u;
+  },
+
+  importUsersBulk(params: {
+    companyId: string;
+    rows: Array<{
+      email: string;
+      name: string;
+      role: "HEAD" | "COLABORADOR";
+      department: string;
+      managerEmail?: string;
+      phone?: string;
+      monthlyCostBRL?: number;
+      contractUrl?: string;
+      avatarUrl?: string;
+      active?: boolean;
+    }>;
+  }) {
+    const db = loadDb();
+
+    // Ensure departments exist for company
+    const deptIds = new Map(db.departments.filter((d) => d.companyId === params.companyId).map((d) => [normalizeText(d.name), d.id] as const));
+
+    const byEmail = new Map(
+      db.users
+        .filter((u) => u.companyId === params.companyId)
+        .map((u) => [u.email.toLowerCase(), u] as const),
+    );
+
+    const createdEmails: string[] = [];
+    let created = 0;
+    let updated = 0;
+
+    // First pass: create/update users (without managerId)
+    for (const r of params.rows) {
+      const email = r.email.trim().toLowerCase();
+      if (!email.includes("@")) throw new Error(`E-mail inválido: ${r.email}`);
+      if (!r.name.trim()) throw new Error(`Nome ausente para ${email}`);
+      if (r.role !== "HEAD" && r.role !== "COLABORADOR") throw new Error(`Role inválido para ${email}`);
+
+      const deptId = findDepartmentIdByName(db, params.companyId, r.department);
+      if (!deptId) {
+        const known = Array.from(deptIds.keys()).join(", ");
+        throw new Error(`Departamento não encontrado para ${email}: “${r.department}”.`);
+      }
+
+      const existing = byEmail.get(email);
+
+      if (!existing) {
+        const u: User = {
+          id: uid("usr"),
+          companyId: params.companyId,
+          name: r.name.trim(),
+          email,
+          role: r.role,
+          departmentId: deptId,
+          active: typeof r.active === "boolean" ? r.active : true,
+          avatarUrl: r.avatarUrl?.trim() || undefined,
+          contractUrl: r.contractUrl?.trim() || undefined,
+          monthlyCostBRL: typeof r.monthlyCostBRL === "number" ? Math.max(0, r.monthlyCostBRL) : undefined,
+          phone: r.phone?.trim() || undefined,
+          managerId: undefined,
+        };
+
+        db.users.push(u);
+        byEmail.set(email, u);
+        created += 1;
+        createdEmails.push(email);
+      } else {
+        existing.name = r.name.trim();
+        existing.role = r.role;
+        existing.departmentId = deptId;
+        if (typeof r.active === "boolean") existing.active = r.active;
+        if (typeof r.monthlyCostBRL === "number") existing.monthlyCostBRL = Math.max(0, r.monthlyCostBRL);
+        if (typeof r.phone === "string") existing.phone = r.phone.trim() || undefined;
+        if (typeof r.contractUrl === "string") existing.contractUrl = r.contractUrl.trim() || undefined;
+        if (typeof r.avatarUrl === "string") existing.avatarUrl = r.avatarUrl.trim() || undefined;
+        updated += 1;
+      }
+    }
+
+    // Second pass: set managerId by managerEmail (after ensuring all targets exist)
+    let managersLinked = 0;
+
+    for (const r of params.rows) {
+      const email = r.email.trim().toLowerCase();
+      const u = byEmail.get(email);
+      if (!u) continue;
+
+      const mEmail = r.managerEmail?.trim().toLowerCase();
+      if (!mEmail) continue;
+      const manager = byEmail.get(mEmail);
+      if (!manager) {
+        throw new Error(`Gestor não encontrado para ${email}: ${mEmail}. Garanta que ele exista na planilha ou já esteja cadastrado.`);
+      }
+      if (manager.id === u.id) throw new Error(`Gestor inválido para ${email}: não pode ser ele mesmo.`);
+      if (wouldCreateCycle(db, u.id, manager.id)) throw new Error(`Vínculo inválido para ${email}: criaria um ciclo no organograma.`);
+
+      u.managerId = manager.id;
+      managersLinked += 1;
+    }
+
+    saveDb(db);
+    return { created, updated, managersLinked };
   },
 };
