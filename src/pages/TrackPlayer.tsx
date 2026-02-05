@@ -255,7 +255,7 @@ export default function TrackPlayer() {
                   className="min-h-32 rounded-2xl"
                   disabled={!available}
                 />
-                <div className="text-xs text-muted-foreground">No MVP, este checkpoint é auto-conclusivo.</div>
+                <div className="text-xs text-muted-foreground">Este checkpoint é auto-conclusivo.</div>
               </div>
 
               <div className="flex items-center justify-end">

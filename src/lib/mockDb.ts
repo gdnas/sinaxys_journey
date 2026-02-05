@@ -12,6 +12,7 @@ import {
   type TrackModule,
   type User,
 } from "@/lib/domain";
+import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 
 const STORAGE_KEY = "sinaxys-journey-db:v1";
 
@@ -49,7 +50,7 @@ function defaultCompanyBrand(): Pick<Company, "name" | "tagline" | "logoDataUrl"
   return {
     name: "Sinaxys Journey",
     tagline: "Aprendizado com clareza. Evolução com propósito.",
-    logoDataUrl: undefined,
+    logoDataUrl: SINAXYS_LOGO_DATA_URL,
     colors: {
       ink: "#20105B",
       primary: "#542AEF",

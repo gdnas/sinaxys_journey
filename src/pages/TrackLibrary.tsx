@@ -98,7 +98,6 @@ export default function TrackLibrary() {
   }, [openTrackId, tracks]);
 
   const assignees = useMemo(() => {
-    // Delegação: para pessoas que efetivamente conseguem fazer a jornada no MVP.
     const onlyCollaborators = users.filter((u) => u.role === "COLABORADOR");
     const q = delegateUserQuery.trim().toLowerCase();
     if (!q) return onlyCollaborators;
@@ -398,7 +397,7 @@ export default function TrackLibrary() {
                                               </div>
 
                                               <div className="text-xs text-muted-foreground">
-                                                No MVP, a delegação cria uma atribuição na "Minha jornada" do colaborador.
+                                                A delegação cria uma atribuição na "Minha jornada" do colaborador.
                                               </div>
                                             </div>
                                           </div>

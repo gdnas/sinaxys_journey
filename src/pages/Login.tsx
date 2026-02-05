@@ -45,9 +45,9 @@ export default function Login() {
                 <KeyRound className="h-5 w-5 text-white" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Acesso simples (MVP)</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Acesso simples</div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Para validar fluxo e usabilidade, o login é por e-mail cadastrado. A autenticação completa entra na próxima etapa.
+                  Entre com um e-mail cadastrado (ou escolha um usuário de demonstração) para acessar a plataforma.
                 </p>
               </div>
             </div>

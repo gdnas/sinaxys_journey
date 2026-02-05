@@ -2,13 +2,14 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from "
 import type { Company, CompanyColors } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
+import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 
 export type CompanyBrand = Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">;
 
 const DEFAULT_BRAND: CompanyBrand = {
   name: "Sinaxys Journey",
   tagline: "Aprendizado com clareza. Evolução com propósito.",
-  logoDataUrl: undefined,
+  logoDataUrl: SINAXYS_LOGO_DATA_URL,
   colors: {
     ink: "#20105B",
     primary: "#542AEF",
