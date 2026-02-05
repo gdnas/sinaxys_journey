@@ -1,27 +1,26 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
-  LogOut,
-  Shield,
-  Users,
-  LayoutDashboard,
+  BarChart3,
+  Building2,
   GraduationCap,
-  Award,
+  LogOut,
   Menu,
-  User as UserIcon,
   Network,
   Palette,
-  Building2,
+  Shield,
+  User as UserIcon,
+  Users,
   Wallet,
+  LayoutDashboard,
+  Award,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { mockDb } from "@/lib/mockDb";
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 
@@ -33,12 +32,27 @@ type NavItem = {
 };
 
 const nav: NavItem[] = [
+  // Master admin (plataforma)
+  {
+    to: "/master/overview",
+    label: "Visão geral",
+    icon: <BarChart3 className="h-4 w-4" />,
+    roles: ["MASTERADMIN"],
+  },
   {
     to: "/master/companies",
     label: "Empresas",
     icon: <Building2 className="h-4 w-4" />,
     roles: ["MASTERADMIN"],
   },
+  {
+    to: "/master/users",
+    label: "Usuários",
+    icon: <Shield className="h-4 w-4" />,
+    roles: ["MASTERADMIN"],
+  },
+
+  // Produto (empresa)
   {
     to: "/app",
     label: "Minha jornada",
@@ -67,25 +81,25 @@ const nav: NavItem[] = [
     to: "/admin/users",
     label: "Usuários",
     icon: <Shield className="h-4 w-4" />,
-    roles: ["ADMIN", "MASTERADMIN"],
+    roles: ["ADMIN"],
   },
   {
     to: "/admin/costs",
     label: "Custos",
     icon: <Wallet className="h-4 w-4" />,
-    roles: ["ADMIN", "MASTERADMIN"],
+    roles: ["ADMIN"],
   },
   {
     to: "/admin/brand",
     label: "Empresa & marca",
     icon: <Palette className="h-4 w-4" />,
-    roles: ["ADMIN", "MASTERADMIN"],
+    roles: ["ADMIN"],
   },
   {
     to: "/org",
     label: "Organograma",
     icon: <Network className="h-4 w-4" />,
-    roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
   {
     to: "/profile",
@@ -147,14 +161,13 @@ function initials(name: string) {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const { user, logout, activeCompanyId, setActiveCompanyId } = useAuth();
+  const { user, logout } = useAuth();
   const { company } = useCompany();
   const navigate = useNavigate();
 
   if (!user) return <>{children}</>;
 
   const visible = nav.filter((n) => n.roles.includes(user.role));
-  const companies = user.role === "MASTERADMIN" ? mockDb.getCompanies() : [];
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[color:var(--sinaxys-bg)]">
@@ -178,29 +191,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <SheetTitle className="text-[color:var(--sinaxys-ink)]">Menu</SheetTitle>
                 </SheetHeader>
                 <div className="mt-4 grid gap-3">
-                  {user.role === "MASTERADMIN" ? (
-                    <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
-                        Empresa ativa
-                      </div>
-                      <Select value={activeCompanyId ?? ""} onValueChange={(v) => setActiveCompanyId(v)}>
-                        <SelectTrigger className="mt-2 h-11 rounded-xl">
-                          <SelectValue placeholder="Selecione…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {companies.map((c) => (
-                            <SelectItem key={c.id} value={c.id}>
-                              {c.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : null}
-
                   <SideNav items={visible} />
-                  <Separator />
-                  <JourneyRuleCard />
+                  {user.role !== "MASTERADMIN" ? (
+                    <>
+                      <Separator />
+                      <JourneyRuleCard />
+                    </>
+                  ) : null}
                 </div>
               </SheetContent>
             </Sheet>
@@ -218,23 +215,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <div className="hidden text-xs text-muted-foreground sm:block">{company.tagline}</div>
               </div>
             </Link>
-
-            {user.role === "MASTERADMIN" ? (
-              <div className="hidden md:block">
-                <Select value={activeCompanyId ?? ""} onValueChange={(v) => setActiveCompanyId(v)}>
-                  <SelectTrigger className="ml-2 h-9 w-[240px] rounded-full border-[color:var(--sinaxys-border)] bg-white">
-                    <SelectValue placeholder="Empresa…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
           </div>
 
           <div className="flex items-center gap-3">
@@ -280,31 +260,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[240px_1fr]">
           <aside className="hidden rounded-2xl border bg-white p-3 md:block">
-            {user.role === "MASTERADMIN" ? (
-              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
-                  Empresa ativa
-                </div>
-                <Select value={activeCompanyId ?? ""} onValueChange={(v) => setActiveCompanyId(v)}>
-                  <SelectTrigger className="mt-2 h-11 rounded-xl">
-                    <SelectValue placeholder="Selecione…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {companies.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <SideNav items={visible} />
+            {user.role !== "MASTERADMIN" ? (
+              <>
+                <Separator className="my-3" />
+                <JourneyRuleCard />
+              </>
             ) : null}
-
-            <div className={user.role === "MASTERADMIN" ? "mt-3" : ""}>
-              <SideNav items={visible} />
-            </div>
-            <Separator className="my-3" />
-            <JourneyRuleCard />
           </aside>
 
           <main className="min-w-0 max-w-full">{children}</main>

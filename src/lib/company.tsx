@@ -107,7 +107,7 @@ export function applyCompanyTheme(brand: CompanyBrand) {
 }
 
 export function bootstrapCompanyTheme() {
-  // Applies the last selected company theme before the React tree mounts.
+  // Applies a saved theme before React mounts. After login, CompanyProvider will correct it.
   try {
     const activeCompanyId = localStorage.getItem("sinaxys-journey-active-company:v1");
     const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
@@ -127,20 +127,32 @@ type CompanyState = {
 const CompanyContext = createContext<CompanyState | null>(null);
 
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
-  const { activeCompanyId } = useAuth();
+  const { user, activeCompanyId } = useAuth();
 
-  const [companyId, setCompanyId] = useState<string | null>(activeCompanyId);
+  const isMaster = user?.role === "MASTERADMIN";
+
+  const [companyId, setCompanyId] = useState<string | null>(() => {
+    if (isMaster) return null;
+    return activeCompanyId;
+  });
+
   const [company, setCompanyState] = useState<CompanyBrand>(() => {
+    if (isMaster) return DEFAULT_BRAND;
     const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
     return mergeBrand(c ?? undefined);
   });
 
   useEffect(() => {
-    if (companyId === activeCompanyId) return;
+    if (isMaster) {
+      setCompanyId(null);
+      setCompanyState(DEFAULT_BRAND);
+      return;
+    }
+
     setCompanyId(activeCompanyId);
     const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
     setCompanyState(mergeBrand(c ?? undefined));
-  }, [activeCompanyId, companyId]);
+  }, [isMaster, activeCompanyId]);
 
   useEffect(() => {
     applyCompanyTheme(company);
@@ -152,6 +164,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       company,
       setCompany(next) {
         if (!companyId) {
+          // MasterAdmin uses platform theme only
           setCompanyState((prev) => mergeBrand({ ...prev, ...next }));
           return;
         }
@@ -190,7 +203,7 @@ export function useCompany() {
 }
 
 export function loadCompanySettings(): CompanyBrand {
-  // Backward-compatible helper: returns the active company brand.
+  // Backward-compatible helper: returns the last selected company brand.
   const activeCompanyId = localStorage.getItem("sinaxys-journey-active-company:v1");
   const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
   return mergeBrand(c ?? undefined);

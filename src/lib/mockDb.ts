@@ -1073,14 +1073,18 @@ export const mockDb = {
   },
 
   // Admin
-  createUser(params: { companyId: string; name: string; email: string; role: User["role"]; departmentId?: string }) {
+  createUser(params: { companyId?: string; name: string; email: string; role: User["role"]; departmentId?: string }) {
     const db = loadDb();
     const exists = db.users.some((u) => u.email.toLowerCase() === params.email.toLowerCase());
     if (exists) throw new Error("E-mail já cadastrado.");
 
+    if (params.role !== "MASTERADMIN" && !params.companyId) {
+      throw new Error("Empresa é obrigatória para este papel.");
+    }
+
     const u: User = {
       id: uid("usr"),
-      companyId: params.companyId,
+      companyId: params.role === "MASTERADMIN" ? undefined : params.companyId,
       name: params.name.trim(),
       email: params.email.trim().toLowerCase(),
       role: params.role,
@@ -1090,6 +1094,45 @@ export const mockDb = {
     };
 
     db.users.push(u);
+    saveDb(db);
+    return u;
+  },
+
+  updateUserAdmin(userId: string, data: Partial<Pick<User, "name" | "role" | "companyId" | "departmentId" | "active">>) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) return null;
+
+    if (typeof data.name === "string" && data.name.trim()) u.name = data.name.trim();
+
+    if (data.role) {
+      u.role = data.role;
+      if (u.role === "MASTERADMIN") {
+        u.companyId = undefined;
+        u.departmentId = undefined;
+      }
+      if (u.role === "ADMIN") {
+        u.departmentId = undefined;
+      }
+    }
+
+    if (data.companyId !== undefined) {
+      // only applies to non-master roles
+      if (u.role !== "MASTERADMIN") {
+        u.companyId = data.companyId;
+      }
+    }
+
+    if (data.departmentId !== undefined) {
+      if (u.role === "HEAD" || u.role === "COLABORADOR") {
+        u.departmentId = data.departmentId;
+      } else {
+        u.departmentId = undefined;
+      }
+    }
+
+    if (typeof data.active === "boolean") u.active = data.active;
+
     saveDb(db);
     return u;
   },

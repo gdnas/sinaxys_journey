@@ -18,6 +18,8 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminBrand from "./pages/AdminBrand";
 import AdminCosts from "./pages/AdminCosts";
 import MasterCompanies from "./pages/MasterCompanies";
+import MasterOverview from "./pages/MasterOverview";
+import MasterUsers from "./pages/MasterUsers";
 import Profile from "./pages/Profile";
 import OrgChart from "./pages/OrgChart";
 import PersonProfile from "./pages/PersonProfile";
@@ -41,12 +43,28 @@ const App = () => (
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
 
-                {/* Master */}
+                {/* Master (plataforma) */}
+                <Route
+                  path="/master/overview"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN"]}>
+                      <MasterOverview />
+                    </RequireAuth>
+                  }
+                />
                 <Route
                   path="/master/companies"
                   element={
                     <RequireAuth roles={["MASTERADMIN"]}>
                       <MasterCompanies />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/master/users"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN"]}>
+                      <MasterUsers />
                     </RequireAuth>
                   }
                 />
@@ -63,7 +81,7 @@ const App = () => (
                 <Route
                   path="/org"
                   element={
-                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                       <OrgChart />
                     </RequireAuth>
                   }
@@ -72,7 +90,7 @@ const App = () => (
                 <Route
                   path="/people/:userId"
                   element={
-                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                       <PersonProfile />
                     </RequireAuth>
                   }
@@ -146,11 +164,11 @@ const App = () => (
                   }
                 />
 
-                {/* Admin */}
+                {/* Admin (empresa) */}
                 <Route
                   path="/admin/users"
                   element={
-                    <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
+                    <RequireAuth roles={["ADMIN"]}>
                       <AdminUsers />
                     </RequireAuth>
                   }
@@ -158,7 +176,7 @@ const App = () => (
                 <Route
                   path="/admin/costs"
                   element={
-                    <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
+                    <RequireAuth roles={["ADMIN"]}>
                       <AdminCosts />
                     </RequireAuth>
                   }
@@ -166,7 +184,7 @@ const App = () => (
                 <Route
                   path="/admin/brand"
                   element={
-                    <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
+                    <RequireAuth roles={["ADMIN"]}>
                       <AdminBrand />
                     </RequireAuth>
                   }
