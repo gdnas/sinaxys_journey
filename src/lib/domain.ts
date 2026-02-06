@@ -202,12 +202,64 @@ export type Invoice = {
   userId: string;
   companyId: string;
   title: string;
-  invoiceUrl: string; // link no Conta Azul (ou outra ferramenta)
+  invoiceUrl: string; // data URL do arquivo (PDF/imagem)
   amountBRL?: number;
   issuedAt?: string; // ISO
   status: InvoiceStatus;
   paidAt?: string; // ISO
   createdAt: string;
+};
+
+export type NotificationType =
+  | "TRACK_ASSIGNED"
+  | "VACATION_REQUEST"
+  | "VACATION_DECISION"
+  | "COMPENSATION_UPDATED";
+
+export type Notification = {
+  id: string;
+  userId: string;
+  type: NotificationType;
+  title: string;
+  body?: string;
+  createdAt: string;
+  readAt?: string;
+  data?: Record<string, any>;
+};
+
+export type ContractDocument = {
+  id: string;
+  userId: string;
+  companyId: string;
+  title: string;
+  fileDataUrl: string; // PDF/imagem (data URL)
+  createdAt: string;
+};
+
+export type CompensationEntry = {
+  id: string;
+  userId: string;
+  companyId: string;
+  amountBRL: number;
+  effectiveAt: string; // ISO
+  createdAt: string;
+  createdByUserId?: string;
+  note?: string;
+};
+
+export type VacationRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export type VacationRequest = {
+  id: string;
+  userId: string;
+  companyId: string;
+  startDate: string; // ISO date (YYYY-MM-DD) or ISO
+  days: 10;
+  status: VacationRequestStatus;
+  createdAt: string;
+  decidedAt?: string;
+  decidedByUserId?: string;
+  decisionNote?: string;
 };
 
 export type Db = {
@@ -226,4 +278,8 @@ export type Db = {
   pointsRules: PointsRule[];
   pointsEvents: PointsEvent[];
   invoices: Invoice[];
+  notifications: Notification[];
+  contractDocuments: ContractDocument[];
+  compensationHistory: CompensationEntry[];
+  vacationRequests: VacationRequest[];
 };

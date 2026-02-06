@@ -1,12 +1,16 @@
 import {
   type Certificate,
   type Company,
+  type CompensationEntry,
+  type ContractDocument,
   type Db,
   type Department,
   type Invite,
   type Invoice,
   type LearningTrack,
   type ModuleProgress,
+  type Notification,
+  type NotificationType,
   type PointsEvent,
   type PointsRule,
   type PointsRuleKey,
@@ -16,6 +20,8 @@ import {
   type TrackAssignment,
   type TrackModule,
   type User,
+  type VacationRequest,
+  type VacationRequestStatus,
 } from "@/lib/domain";
 import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 
@@ -241,6 +247,49 @@ function ensureMultiCompany(db: Db) {
   saveDb(db);
 }
 
+function ensureSystemCollections(db: Db) {
+  if (!Array.isArray((db as any).notifications)) (db as any).notifications = [];
+  if (!Array.isArray((db as any).contractDocuments)) (db as any).contractDocuments = [];
+  if (!Array.isArray((db as any).compensationHistory)) (db as any).compensationHistory = [];
+  if (!Array.isArray((db as any).vacationRequests)) (db as any).vacationRequests = [];
+}
+
+function createNotification(db: Db, params: Omit<Notification, "id" | "createdAt"> & { id?: string; createdAt?: string }) {
+  ensureSystemCollections(db);
+  const n: Notification = {
+    id: params.id ?? uid("ntf"),
+    userId: params.userId,
+    type: params.type,
+    title: params.title,
+    body: params.body,
+    createdAt: params.createdAt ?? nowIso(),
+    readAt: params.readAt,
+    data: params.data,
+  };
+  db.notifications.push(n);
+  return n;
+}
+
+function resolveManagerForVacation(db: Db, userId: string) {
+  const u = db.users.find((x) => x.id === userId);
+  if (!u || !u.companyId) return null;
+
+  if (u.managerId) {
+    const m = db.users.find((x) => x.id === u.managerId && x.active);
+    if (m) return m;
+  }
+
+  // fallback: first active admin of company
+  const admin = db.users.find((x) => x.companyId === u.companyId && x.role === "ADMIN" && x.active);
+  return admin ?? null;
+}
+
+function yearFromIsoDate(iso: string) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return null;
+  return d.getFullYear();
+}
+
 function ensureDefaultUsers(db: Db) {
   const companyId = db.companies[0]?.id;
   if (!companyId) return;
@@ -287,6 +336,7 @@ export function loadDb(): Db {
     const parsed = JSON.parse(raw) as Db;
 
     ensureMultiCompany(parsed);
+    ensureSystemCollections(parsed);
 
     // Migration: add dueAt field (optional) for older assignments (no-op but keeps shape stable)
     if (Array.isArray((parsed as any).assignments)) {
@@ -676,6 +726,20 @@ function seedDb(): Db {
   const moduleProgress: ModuleProgress[] = [];
   const certificates: Certificate[] = [];
   const invoices: Invoice[] = [];
+  const notifications: Notification[] = [];
+  const contractDocuments: ContractDocument[] = [];
+  const compensationHistory: CompensationEntry[] = users
+    .filter((u) => u.companyId && typeof u.monthlyCostBRL === "number")
+    .map((u) => ({
+      id: uid("cmpH"),
+      userId: u.id,
+      companyId: u.companyId!,
+      amountBRL: u.monthlyCostBRL!,
+      effectiveAt: u.joinedAt ?? nowIso(),
+      createdAt: nowIso(),
+      note: "Valor inicial",
+    }));
+  const vacationRequests: VacationRequest[] = [];
 
   function createAssignment(trackId: string, userEmail: string, assignedByEmail: string) {
     const a: TrackAssignment = {
@@ -760,6 +824,10 @@ function seedDb(): Db {
     pointsRules,
     pointsEvents,
     invoices,
+    notifications,
+    contractDocuments,
+    compensationHistory,
+    vacationRequests,
   };
 }
 
@@ -1511,6 +1579,7 @@ export const mockDb = {
   // Mutations: Head/admin
   assignTrack(params: { trackId: string; userId: string; assignedByUserId: string; dueAt?: string }) {
     const db = loadDb();
+    ensureSystemCollections(db);
     const track = db.tracks.find((t) => t.id === params.trackId);
     if (!track) return null;
 
@@ -1548,6 +1617,18 @@ export const mockDb = {
         attemptsCount: 0,
       });
     });
+
+    const assignee = db.users.find((u) => u.id === params.userId);
+    const assigner = db.users.find((u) => u.id === params.assignedByUserId);
+    if (assignee) {
+      createNotification(db, {
+        userId: assignee.id,
+        type: "TRACK_ASSIGNED",
+        title: "Nova trilha atribuída",
+        body: `${assigner?.name ?? "Alguém"} atribuiu “${track.title}” para você.`,
+        data: { assignmentId: a.id, trackId: track.id, dueAt: a.dueAt },
+      });
+    }
 
     saveDb(db);
     return a;
@@ -1757,19 +1838,6 @@ export const mockDb = {
     return u;
   },
 
-  updateUserCompensation(userId: string, data: { monthlyCostBRL?: number }) {
-    const db = loadDb();
-    const u = db.users.find((x) => x.id === userId);
-    if (!u) return null;
-
-    if (typeof data.monthlyCostBRL === "number" && Number.isFinite(data.monthlyCostBRL)) {
-      u.monthlyCostBRL = Math.max(0, data.monthlyCostBRL);
-    }
-
-    saveDb(db);
-    return u;
-  },
-
   updateUserManager(userId: string, managerId: string | null) {
     const db = loadDb();
     const u = db.users.find((x) => x.id === userId);
@@ -1818,7 +1886,7 @@ export const mockDb = {
     if (!u.companyId) throw new Error("Usuário sem empresa.");
 
     const url = params.invoiceUrl.trim();
-    if (url.length < 10) throw new Error("Informe um link válido para a nota fiscal.");
+    if (!url.startsWith("data:")) throw new Error("Envie um arquivo válido (PDF/imagem) para a nota fiscal.");
 
     const inv: Invoice = {
       id: uid("invf"),
@@ -1974,5 +2042,226 @@ export const mockDb = {
 
     saveDb(db);
     return { created, updated, managersLinked };
+  },
+
+  // Notifications
+  getNotificationsForUser(userId: string) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+    return (db.notifications ?? [])
+      .filter((n) => n.userId === userId)
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  markNotificationRead(notificationId: string, read: boolean) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+    const n = (db.notifications ?? []).find((x) => x.id === notificationId);
+    if (!n) return null;
+    n.readAt = read ? nowIso() : undefined;
+    saveDb(db);
+    return n;
+  },
+
+  // Contracts (Aditivos)
+  getContractDocumentsForUser(userId: string) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+    return (db.contractDocuments ?? [])
+      .filter((d) => d.userId === userId)
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  addContractDocument(params: { userId: string; title: string; fileDataUrl: string }) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+    const u = db.users.find((x) => x.id === params.userId);
+    if (!u) throw new Error("Usuário inválido.");
+    if (!u.companyId) throw new Error("Usuário sem empresa.");
+    if (!params.fileDataUrl.startsWith("data:")) throw new Error("Envie um arquivo válido (PDF/imagem). ");
+
+    const doc: ContractDocument = {
+      id: uid("ctd"),
+      userId: params.userId,
+      companyId: u.companyId,
+      title: params.title.trim() || "Contrato",
+      fileDataUrl: params.fileDataUrl,
+      createdAt: nowIso(),
+    };
+
+    db.contractDocuments.push(doc);
+    saveDb(db);
+    return doc;
+  },
+  deleteContractDocument(docId: string, userId: string) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+    const doc = (db.contractDocuments ?? []).find((d) => d.id === docId);
+    if (!doc) return;
+    if (doc.userId !== userId) throw new Error("Você não pode remover este documento.");
+    db.contractDocuments = (db.contractDocuments ?? []).filter((d) => d.id !== docId);
+    saveDb(db);
+  },
+
+  // Compensation history
+  getCompensationHistory(userId: string) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+    return (db.compensationHistory ?? [])
+      .filter((e) => e.userId === userId)
+      .slice()
+      .sort((a, b) => b.effectiveAt.localeCompare(a.effectiveAt) || b.createdAt.localeCompare(a.createdAt));
+  },
+
+  // Vacation
+  getVacationRequestsForUser(userId: string) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+    return (db.vacationRequests ?? [])
+      .filter((r) => r.userId === userId)
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  createVacationRequest(params: { userId: string; startDate: string }) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+
+    const u = db.users.find((x) => x.id === params.userId);
+    if (!u) throw new Error("Usuário inválido.");
+    if (!u.companyId) throw new Error("Usuário sem empresa.");
+
+    const start = params.startDate.trim();
+    // Accept YYYY-MM-DD from <input type="date">
+    const startIso = start.length === 10 ? new Date(`${start}T12:00:00.000Z`).toISOString() : new Date(start).toISOString();
+    const y = yearFromIsoDate(startIso);
+    if (!y) throw new Error("Data inválida.");
+
+    const usedPeriods = (db.vacationRequests ?? []).filter((r) => {
+      if (r.userId !== u.id) return false;
+      if (r.status === "REJECTED") return false;
+      const ry = yearFromIsoDate(r.startDate);
+      return ry === y;
+    }).length;
+
+    if (usedPeriods >= 2) {
+      throw new Error("Você já atingiu os 2 períodos de 10 dias de férias remuneradas para este ano.");
+    }
+
+    const req: VacationRequest = {
+      id: uid("vac"),
+      userId: u.id,
+      companyId: u.companyId,
+      startDate: startIso,
+      days: 10,
+      status: "PENDING",
+      createdAt: nowIso(),
+    };
+
+    db.vacationRequests.push(req);
+
+    const manager = resolveManagerForVacation(db, u.id);
+    if (manager) {
+      createNotification(db, {
+        userId: manager.id,
+        type: "VACATION_REQUEST",
+        title: `Pedido de férias — ${u.name}`,
+        body: `Solicitação de 10 dias a partir de ${new Date(req.startDate).toLocaleDateString("pt-BR")}.`,
+        data: { vacationRequestId: req.id, userId: u.id },
+      });
+    }
+
+    saveDb(db);
+    return req;
+  },
+  decideVacationRequest(params: { requestId: string; status: VacationRequestStatus; decidedByUserId: string; note?: string }) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+
+    const r = (db.vacationRequests ?? []).find((x) => x.id === params.requestId);
+    if (!r) throw new Error("Solicitação não encontrada.");
+
+    const decider = db.users.find((u) => u.id === params.decidedByUserId);
+    if (!decider) throw new Error("Usuário inválido.");
+
+    // Basic permission: must be manager of the requester OR admin of company OR masteradmin
+    const requester = db.users.find((u) => u.id === r.userId);
+    if (!requester) throw new Error("Solicitante inválido.");
+
+    const canDecide =
+      decider.role === "MASTERADMIN" ||
+      (decider.role === "ADMIN" && decider.companyId && decider.companyId === r.companyId) ||
+      requester.managerId === decider.id;
+
+    if (!canDecide) throw new Error("Você não tem permissão para aprovar/rejeitar este pedido.");
+
+    if (r.status !== "PENDING") throw new Error("Este pedido já foi decidido.");
+
+    r.status = params.status;
+    r.decidedAt = nowIso();
+    r.decidedByUserId = params.decidedByUserId;
+    r.decisionNote = params.note?.trim() || undefined;
+
+    createNotification(db, {
+      userId: r.userId,
+      type: "VACATION_DECISION",
+      title: params.status === "APPROVED" ? "Férias aprovadas" : "Férias rejeitadas",
+      body: `Pedido de 10 dias a partir de ${new Date(r.startDate).toLocaleDateString("pt-BR")} foi ${
+        params.status === "APPROVED" ? "aprovado" : "rejeitado"
+      }.`,
+      data: { vacationRequestId: r.id, status: r.status },
+    });
+
+    // Mark related VACATION_REQUEST notifications as read for the manager
+    for (const n of db.notifications ?? []) {
+      if (n.type !== "VACATION_REQUEST") continue;
+      if (n.data?.vacationRequestId === r.id) {
+        n.readAt = n.readAt ?? nowIso();
+      }
+    }
+
+    saveDb(db);
+    return r;
+  },
+
+  updateUserCompensation(
+    userId: string,
+    data: { monthlyCostBRL?: number },
+    opts?: { changedByUserId?: string; effectiveAt?: string; note?: string },
+  ) {
+    const db = loadDb();
+    ensureSystemCollections(db);
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) return null;
+
+    if (typeof data.monthlyCostBRL === "number" && Number.isFinite(data.monthlyCostBRL)) {
+      const next = Math.max(0, data.monthlyCostBRL);
+      const prev = u.monthlyCostBRL;
+      u.monthlyCostBRL = next;
+
+      if (u.companyId && next !== prev) {
+        const entry: CompensationEntry = {
+          id: uid("cmpH"),
+          userId: u.id,
+          companyId: u.companyId,
+          amountBRL: next,
+          effectiveAt: opts?.effectiveAt ?? nowIso(),
+          createdAt: nowIso(),
+          createdByUserId: opts?.changedByUserId,
+          note: opts?.note?.trim() || undefined,
+        };
+        db.compensationHistory.push(entry);
+
+        createNotification(db, {
+          userId: u.id,
+          type: "COMPENSATION_UPDATED",
+          title: "Atualização de remuneração",
+          body: `Seu valor mensal foi atualizado para ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(next)}.`,
+          data: { amountBRL: next },
+        });
+      }
+    }
+
+    saveDb(db);
+    return u;
   },
 };
