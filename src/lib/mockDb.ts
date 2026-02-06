@@ -20,6 +20,8 @@ import {
   type TrackAssignment,
   type TrackModule,
   type User,
+  type UserDocument,
+  type UserDocumentCategory,
   type VacationRequest,
   type VacationRequestStatus,
 } from "@/lib/domain";
@@ -289,6 +291,10 @@ function ensureContractAttachments(db: Db) {
   if (!Array.isArray((db as any).contractAttachments)) (db as any).contractAttachments = [];
 }
 
+function ensureUserDocuments(db: Db) {
+  if (!Array.isArray((db as any).userDocuments)) (db as any).userDocuments = [];
+}
+
 function ensureCompensationEvents(db: Db) {
   if (!Array.isArray((db as any).compensationEvents)) (db as any).compensationEvents = [];
 
@@ -435,7 +441,7 @@ export function loadDb(): Db {
         saveDb(parsed, { broadcast: false });
       }
 
-      // Migration: notifications / contracts / compensation / vacations
+      // Migration: notifications / contracts / user documents / compensation / vacations
       if (!Array.isArray((parsed as any).notifications)) {
         (parsed as any).notifications = [];
         saveDb(parsed, { broadcast: false });
@@ -467,6 +473,35 @@ export function loadDb(): Db {
         }
         if (changed) saveDb(parsed, { broadcast: false });
       }
+
+      if (!Array.isArray((parsed as any).userDocuments)) {
+        (parsed as any).userDocuments = [];
+        saveDb(parsed, { broadcast: false });
+      } else {
+        // Migration: userDocuments suportam FILE (data URL) e LINK.
+        let changed = false;
+        for (const d of (parsed as any).userDocuments as any[]) {
+          if (!d || typeof d !== "object") continue;
+          const url = typeof d.url === "string" ? d.url.trim() : "";
+          const legacy = typeof d.fileDataUrl === "string" ? d.fileDataUrl.trim() : "";
+          if (!url && legacy) {
+            d.url = legacy;
+            d.kind = d.kind ?? "FILE";
+            changed = true;
+          }
+          if (!d.kind) {
+            const nextUrl = (typeof d.url === "string" ? d.url : legacy) ?? "";
+            d.kind = String(nextUrl).startsWith("data:") ? "FILE" : "LINK";
+            changed = true;
+          }
+          if (!d.category) {
+            d.category = "IDENTIFICACAO";
+            changed = true;
+          }
+        }
+        if (changed) saveDb(parsed, { broadcast: false });
+      }
+
       if (!Array.isArray((parsed as any).compensationEvents)) {
         (parsed as any).compensationEvents = [];
         saveDb(parsed, { broadcast: false });
@@ -479,7 +514,7 @@ export function loadDb(): Db {
         saveDb(parsed, { broadcast: false });
       }
 
-      // Migration: password fields
+      // Migration: user extra fields
       if (Array.isArray((parsed as any).users)) {
         let changed = false;
         for (const u of (parsed as any).users) {
@@ -498,6 +533,26 @@ export function loadDb(): Db {
             }
             if (!("jobTitle" in u)) {
               u.jobTitle = undefined;
+              changed = true;
+            }
+            if (!("orgLevel" in u)) {
+              u.orgLevel = undefined;
+              changed = true;
+            }
+            if (!("payoutBankAccount" in u)) {
+              u.payoutBankAccount = undefined;
+              changed = true;
+            }
+            if (!("linkedinUrl" in u)) {
+              u.linkedinUrl = undefined;
+              changed = true;
+            }
+            if (!("facebookUrl" in u)) {
+              u.facebookUrl = undefined;
+              changed = true;
+            }
+            if (!("instagramUrl" in u)) {
+              u.instagramUrl = undefined;
               changed = true;
             }
           }
@@ -626,6 +681,7 @@ function seedDb(): Db {
   const invoices: Invoice[] = [];
   const notifications: Notification[] = [];
   const contractAttachments: ContractAttachment[] = [];
+  const userDocuments: UserDocument[] = [];
   const compensationEvents: CompensationEvent[] = [];
   const vacationRequests: VacationRequest[] = [];
   const rewardTiers: RewardTier[] = [];
@@ -651,6 +707,7 @@ function seedDb(): Db {
     invoices,
     notifications,
     contractAttachments,
+    userDocuments,
     compensationEvents,
     vacationRequests,
   };
@@ -1725,8 +1782,11 @@ export const mockDb = {
         | "monthlyCostBRL"
         | "joinedAt"
         | "managerId"
+        | "payoutBankAccount"
       >
-    >,
+    > & {
+      payoutBankAccount?: User["payoutBankAccount"] | null;
+    },
     opts?: { createdByUserId?: string },
   ) {
     const db = loadDb();
@@ -1803,6 +1863,28 @@ export const mockDb = {
       }
     }
 
+    // payoutBankAccount
+    if (data.payoutBankAccount !== undefined) {
+      if (data.payoutBankAccount === null) {
+        u.payoutBankAccount = undefined;
+      } else {
+        const raw = data.payoutBankAccount ?? {};
+        const clean = {
+          holderName: raw.holderName?.trim() || undefined,
+          holderTaxId: raw.holderTaxId?.trim() || undefined,
+          bankName: raw.bankName?.trim() || undefined,
+          pixKey: raw.pixKey?.trim() || undefined,
+          agency: raw.agency?.trim() || undefined,
+          accountNumber: raw.accountNumber?.trim() || undefined,
+          accountType: raw.accountType?.trim() || undefined,
+          notes: raw.notes?.trim() || undefined,
+        } satisfies User["payoutBankAccount"];
+
+        const hasAny = Object.values(clean).some((v) => typeof v === "string" && v.trim().length > 0);
+        u.payoutBankAccount = hasAny ? clean : undefined;
+      }
+    }
+
     // monthly cost (records history)
     if (data.monthlyCostBRL !== undefined) {
       const next = data.monthlyCostBRL;
@@ -1875,7 +1957,20 @@ export const mockDb = {
     saveDb(db);
   },
 
-  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string; phone?: string; jobTitle?: string }) {
+  updateUserProfile(
+    userId: string,
+    data: {
+      name?: string;
+      avatarUrl?: string;
+      contractUrl?: string;
+      phone?: string;
+      jobTitle?: string;
+      linkedinUrl?: string;
+      facebookUrl?: string;
+      instagramUrl?: string;
+      payoutBankAccount?: User["payoutBankAccount"] | null;
+    },
+  ) {
     const db = loadDb();
     const u = db.users.find((x) => x.id === userId);
     if (!u) return null;
@@ -1885,6 +1980,31 @@ export const mockDb = {
     if (typeof data.contractUrl === "string") u.contractUrl = data.contractUrl.trim() || undefined;
     if (typeof data.phone === "string") u.phone = data.phone.trim() || undefined;
     if (typeof data.jobTitle === "string") u.jobTitle = data.jobTitle.trim() || undefined;
+
+    if (typeof data.linkedinUrl === "string") u.linkedinUrl = data.linkedinUrl.trim() || undefined;
+    if (typeof data.facebookUrl === "string") u.facebookUrl = data.facebookUrl.trim() || undefined;
+    if (typeof data.instagramUrl === "string") u.instagramUrl = data.instagramUrl.trim() || undefined;
+
+    if (data.payoutBankAccount !== undefined) {
+      if (data.payoutBankAccount === null) {
+        u.payoutBankAccount = undefined;
+      } else {
+        const raw = data.payoutBankAccount ?? {};
+        const clean = {
+          holderName: raw.holderName?.trim() || undefined,
+          holderTaxId: raw.holderTaxId?.trim() || undefined,
+          bankName: raw.bankName?.trim() || undefined,
+          pixKey: raw.pixKey?.trim() || undefined,
+          agency: raw.agency?.trim() || undefined,
+          accountNumber: raw.accountNumber?.trim() || undefined,
+          accountType: raw.accountType?.trim() || undefined,
+          notes: raw.notes?.trim() || undefined,
+        } satisfies User["payoutBankAccount"];
+
+        const hasAny = Object.values(clean).some((v) => typeof v === "string" && v.trim().length > 0);
+        u.payoutBankAccount = hasAny ? clean : undefined;
+      }
+    }
 
     saveDb(db);
     return u;
@@ -2253,6 +2373,75 @@ export const mockDb = {
       (c) => !(c.id === params.contractAttachmentId && c.userId === params.userId),
     );
     if (db.contractAttachments.length !== before) saveDb(db);
+  },
+
+  // User documents
+  getUserDocuments(userId: string, category?: UserDocumentCategory) {
+    const db = loadDb();
+    ensureUserDocuments(db);
+    return (db.userDocuments ?? [])
+      .filter((d) => d.userId === userId)
+      .filter((d) => (category ? d.category === category : true))
+      .map((d) => {
+        const url = (d.url ?? d.fileDataUrl ?? "").trim();
+        const kind = d.kind ?? (url.startsWith("data:") ? "FILE" : "LINK");
+        return { ...d, url, kind };
+      })
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  addUserDocument(params: {
+    userId: string;
+    category: UserDocumentCategory;
+    title: string;
+    url: string;
+    kind?: "FILE" | "LINK";
+    fileDataUrl?: string;
+  }) {
+    const db = loadDb();
+    ensureUserDocuments(db);
+
+    const u = db.users.find((x) => x.id === params.userId);
+    if (!u) throw new Error("Usuário não encontrado.");
+    if (!u.companyId) throw new Error("Usuário sem empresa.");
+
+    const title = params.title.trim() || "Documento";
+
+    const rawUrl = (params.url ?? params.fileDataUrl ?? "").trim();
+    if (!rawUrl) throw new Error("Informe um arquivo ou um link.");
+
+    const inferredKind = params.kind ?? (rawUrl.startsWith("data:") ? "FILE" : "LINK");
+
+    if (inferredKind === "FILE") {
+      if (!rawUrl.startsWith("data:")) throw new Error("Arquivo inválido.");
+    } else {
+      if (!/^https?:\/\//i.test(rawUrl)) throw new Error("Link inválido. Use um URL completo (https://...).");
+    }
+
+    const doc: UserDocument = {
+      id: uid("udoc"),
+      companyId: u.companyId,
+      userId: u.id,
+      category: params.category,
+      title,
+      kind: inferredKind,
+      url: rawUrl,
+      fileDataUrl: inferredKind === "FILE" ? rawUrl : undefined,
+      createdAt: nowIso(),
+    };
+
+    db.userDocuments.push(doc);
+    saveDb(db);
+    return doc;
+  },
+
+  deleteUserDocument(params: { userId: string; documentId: string }) {
+    const db = loadDb();
+    ensureUserDocuments(db);
+    const before = db.userDocuments.length;
+    db.userDocuments = db.userDocuments.filter((d) => !(d.id === params.documentId && d.userId === params.userId));
+    if (db.userDocuments.length !== before) saveDb(db);
   },
 
   // Remuneração

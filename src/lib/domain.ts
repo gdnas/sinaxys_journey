@@ -44,6 +44,17 @@ export type Department = {
   name: DepartmentName;
 };
 
+export type PayoutBankAccount = {
+  holderName?: string; // nome/razão social
+  holderTaxId?: string; // CPF/CNPJ
+  bankName?: string;
+  pixKey?: string;
+  agency?: string;
+  accountNumber?: string;
+  accountType?: string;
+  notes?: string;
+};
+
 export type User = {
   id: string;
   companyId?: string; // MASTERADMIN pode ser global
@@ -62,6 +73,15 @@ export type User = {
    * Se não definido, a UI pode inferir pelo nível na árvore (profundidade no organograma).
    */
   orgLevel?: number;
+
+  // Dados financeiros (para recebimentos)
+  payoutBankAccount?: PayoutBankAccount;
+
+  // Redes sociais
+  linkedinUrl?: string;
+  facebookUrl?: string;
+  instagramUrl?: string;
+
   phone?: string; // celular para contato (E.164 ou texto livre)
   password?: string; // senha inicial (definida pelo admin) / senha atual
   mustChangePassword?: boolean; // exige troca no primeiro acesso
@@ -260,6 +280,21 @@ export type ContractAttachment = {
   createdAt: string;
 };
 
+export type UserDocumentCategory = "IDENTIFICACAO" | "EMPRESA";
+
+export type UserDocument = {
+  id: string;
+  companyId: string;
+  userId: string;
+  category: UserDocumentCategory;
+  title: string;
+  kind?: ContractAttachmentKind;
+  url?: string;
+  /** @deprecated Use `url` + `kind`. Mantido para retrocompatibilidade. */
+  fileDataUrl?: string;
+  createdAt: string;
+};
+
 export type CompensationEvent = {
   id: string;
   companyId: string;
@@ -304,6 +339,7 @@ export type Db = {
   invoices: Invoice[];
   notifications: Notification[];
   contractAttachments: ContractAttachment[];
+  userDocuments: UserDocument[];
   compensationEvents: CompensationEvent[];
   vacationRequests: VacationRequest[];
 };
