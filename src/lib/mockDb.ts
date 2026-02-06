@@ -25,7 +25,7 @@ import {
 } from "@/lib/domain";
 import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 
-const STORAGE_KEY = "sinaxys-journey-db:v1";
+const STORAGE_KEY = "sinaxys-journey-db:v2";
 const DB_CHANGED_EVENT = "sinaxys-db-changed";
 
 // IMPORTANT:
@@ -354,21 +354,21 @@ function ensureDefaultUsers(db: Db) {
 
   const byEmail = new Map(db.users.map((u) => [u.email.toLowerCase(), u] as const));
 
-  // Master Admin: .@journey.com
-  if (!byEmail.has(".@journey.com")) {
+  // Master Admin (produção)
+  if (!byEmail.has("guilhermenastrini@gmail.com")) {
     db.users.push({
       id: uid("usr"),
-      name: "Master Admin",
-      email: ".@journey.com",
+      name: "Guilherme Nastrini",
+      email: "guilhermenastrini@gmail.com",
       role: "MASTERADMIN",
       active: true,
-      password: "Sinaxys@123",
+      password: "Med1-01875",
       mustChangePassword: false,
       joinedAt: nowIso(),
     });
   }
 
-  // Admin: guilherme@sinaxys.com
+  // Admin (produção)
   if (!byEmail.has("guilherme@sinaxys.com")) {
     db.users.push({
       id: uid("usr"),
@@ -377,6 +377,8 @@ function ensureDefaultUsers(db: Db) {
       email: "guilherme@sinaxys.com",
       role: "ADMIN",
       active: true,
+      password: "Sinaxys@123",
+      mustChangePassword: false,
       joinedAt: nowIso(),
     });
   }
@@ -579,8 +581,7 @@ function seedDb(): Db {
     createdAt: nowIso(),
   };
 
-  const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
-
+  // Mantemos departamentos-base para facilitar criação de trilhas/usuários.
   const departments: Department[] = [
     { id: uid("dept"), companyId, name: "Financeiro" },
     { id: uid("dept"), companyId, name: "Suporte" },
@@ -590,77 +591,17 @@ function seedDb(): Db {
     { id: uid("dept"), companyId, name: "Produto" },
   ];
 
-  const deptByName = (name: Department["name"]) =>
-    departments.find((d) => d.name === name)!.id;
-
+  // Produção: começa limpo (somente 1 Master Admin + 1 Admin)
   const users: User[] = [
     {
       id: uid("usr"),
-      companyId,
-      name: "Aline Ramos",
-      email: "aline@sinaxys.com",
-      role: "COLABORADOR",
-      jobTitle: "Analista de Produto",
-      departmentId: deptByName("Produto"),
+      name: "Guilherme Nastrini",
+      email: "guilhermenastrini@gmail.com",
+      role: "MASTERADMIN",
       active: true,
-      monthlyCostBRL: 9500,
-      phone: "+55 11 98888-1111",
-      joinedAt: daysAgo(420),
-      // managerId set after we create the heads
-    },
-    {
-      id: uid("usr"),
-      companyId,
-      name: "Bruno Teixeira",
-      email: "bruno@sinaxys.com",
-      role: "COLABORADOR",
-      jobTitle: "Analista de CS",
-      departmentId: deptByName("Customer Success"),
-      active: true,
-      monthlyCostBRL: 6500,
-      phone: "+55 21 97777-2222",
-      joinedAt: daysAgo(420),
-      // managerId set after we create the heads
-    },
-    {
-      id: uid("usr"),
-      companyId,
-      name: "Camila Souza",
-      email: "camila@sinaxys.com",
-      role: "HEAD",
-      jobTitle: "Head de Produto",
-      departmentId: deptByName("Produto"),
-      active: true,
-      monthlyCostBRL: 16500,
-      phone: "+55 11 96666-3333",
-      joinedAt: daysAgo(540),
-      // managerId set after we create the admin
-    },
-    {
-      id: uid("usr"),
-      companyId,
-      name: "Diego Martins",
-      email: "diego@sinaxys.com",
-      role: "HEAD",
-      jobTitle: "Head de Customer Success",
-      departmentId: deptByName("Customer Success"),
-      active: true,
-      monthlyCostBRL: 14500,
-      phone: "+55 21 95555-4444",
-      joinedAt: daysAgo(610),
-      // managerId set after we create the admin
-    },
-    {
-      id: uid("usr"),
-      companyId,
-      name: "Admin Sinaxys",
-      email: "admin@sinaxys.com",
-      role: "ADMIN",
-      jobTitle: "Admin",
-      active: true,
-      phone: "+55 11 90000-0000",
-      joinedAt: daysAgo(800),
-      // topo do organograma (sem gestor)
+      password: "Med1-01875",
+      mustChangePassword: false,
+      joinedAt: nowIso(),
     },
     {
       id: uid("usr"),
@@ -668,278 +609,26 @@ function seedDb(): Db {
       name: "Guilherme",
       email: "guilherme@sinaxys.com",
       role: "ADMIN",
-      jobTitle: "Admin",
-      active: true,
-      joinedAt: daysAgo(300),
-    },
-    {
-      id: uid("usr"),
-      name: "Master Admin",
-      email: "master@sinaxys.com",
-      role: "MASTERADMIN",
-      active: true,
-      joinedAt: daysAgo(900),
-      // global
-    },
-    {
-      id: uid("usr"),
-      name: "Master Admin",
-      email: ".@journey.com",
-      role: "MASTERADMIN",
       active: true,
       password: "Sinaxys@123",
       mustChangePassword: false,
-      joinedAt: daysAgo(30),
+      joinedAt: nowIso(),
     },
   ];
-
-  // Seed: organograma simples (admin -> heads -> colaboradores)
-  const admin = users.find((u) => u.role === "ADMIN")!;
-  const camila = users.find((u) => u.email === "camila@sinaxys.com")!;
-  const diego = users.find((u) => u.email === "diego@sinaxys.com")!;
-  const aline = users.find((u) => u.email === "aline@sinaxys.com")!;
-  const bruno = users.find((u) => u.email === "bruno@sinaxys.com")!;
-
-  camila.managerId = admin.id;
-  diego.managerId = admin.id;
-  aline.managerId = camila.id;
-  bruno.managerId = diego.id;
-
-  const findUser = (email: string) => users.find((u) => u.email === email)!;
 
   const tracks: LearningTrack[] = [];
   const modules: TrackModule[] = [];
   const quizQuestions: QuizQuestion[] = [];
   const quizOptions: QuizOption[] = [];
-
-  function createTrack(params: {
-    departmentName: Department["name"];
-    title: string;
-    description: string;
-    createdByEmail: string;
-    published?: boolean;
-  }) {
-    const t: LearningTrack = {
-      id: uid("trk"),
-      companyId,
-      departmentId: deptByName(params.departmentName),
-      title: params.title,
-      description: params.description,
-      published: params.published ?? true,
-      createdByUserId: findUser(params.createdByEmail).id,
-      createdAt: nowIso(),
-    };
-    tracks.push(t);
-    return t;
-  }
-
-  function addVideo(trackId: string, orderIndex: number, data: Partial<TrackModule> & { title: string; youtubeUrl: string }) {
-    modules.push({
-      id: uid("mod"),
-      trackId,
-      orderIndex,
-      type: "VIDEO",
-      title: data.title,
-      description: data.description,
-      xpReward: data.xpReward ?? 20,
-      youtubeUrl: data.youtubeUrl,
-    });
-  }
-
-  function addCheckpoint(trackId: string, orderIndex: number, data: Partial<TrackModule> & { title: string; prompt: string }) {
-    modules.push({
-      id: uid("mod"),
-      trackId,
-      orderIndex,
-      type: "CHECKPOINT",
-      title: data.title,
-      description: data.description,
-      xpReward: data.xpReward ?? 30,
-      checkpointPrompt: data.prompt,
-    });
-  }
-
-  function addTrueFalseQuiz(trackId: string, orderIndex: number, data: { title: string; description?: string; minScore?: number; questions: { prompt: string; correct: boolean }[] }) {
-    const modId = uid("mod");
-    modules.push({
-      id: modId,
-      trackId,
-      orderIndex,
-      type: "QUIZ",
-      title: data.title,
-      description: data.description,
-      xpReward: 40,
-      minScore: data.minScore ?? 70,
-    });
-
-    data.questions.forEach((q, idx) => {
-      const qId = uid("qq");
-      quizQuestions.push({
-        id: qId,
-        moduleId: modId,
-        type: "TRUE_FALSE",
-        prompt: q.prompt,
-        orderIndex: idx + 1,
-      });
-      quizOptions.push(
-        { id: uid("qo"), questionId: qId, text: "Verdadeiro", isCorrect: q.correct === true },
-        { id: uid("qo"), questionId: qId, text: "Falso", isCorrect: q.correct === false },
-      );
-    });
-  }
-
-  // Seed: Trilhas exemplo (Produto e CS)
-  const trkProduto = createTrack({
-    departmentName: "Produto",
-    title: "Onboarding — Produto na Sinaxys",
-    description:
-      "Uma jornada objetiva para entender o contexto de saúde, os princípios de produto e como entregamos valor com responsabilidade.",
-    createdByEmail: "camila@sinaxys.com",
-  });
-
-  addVideo(trkProduto.id, 1, {
-    title: "Boas-vindas e contexto da Sinaxys",
-    description: "Visão do negócio, impacto em saúde e como operamos no dia a dia.",
-    youtubeUrl: "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-  });
-
-  addTrueFalseQuiz(trkProduto.id, 2, {
-    title: "Quiz — Fundamentos da jornada",
-    description: "Checagem rápida para consolidar os pontos essenciais.",
-    minScore: 70,
-    questions: [
-      { prompt: "A Sinaxys atua como fintech de saúde, integrando tecnologia e operação regulada.", correct: true },
-      { prompt: "Concluir um módulo não influencia o desbloqueio do próximo na Journey.", correct: false },
-    ],
-  });
-
-  addCheckpoint(trkProduto.id, 3, {
-    title: "Checkpoint — Como você pretende gerar impacto?",
-    prompt:
-      "Em 4–6 linhas, descreva como você pretende contribuir para a experiência do cliente e para a evolução do produto.",
-  });
-
-  addVideo(trkProduto.id, 4, {
-    title: "Ritual de produto e alinhamentos",
-    description: "Como priorizamos, decidimos e comunicamos. Clareza antes de velocidade.",
-    youtubeUrl: "https://www.youtube.com/watch?v=ysz5S6PUM-U",
-  });
-
-  const trkCS = createTrack({
-    departmentName: "Customer Success",
-    title: "Onboarding — Customer Success",
-    description:
-      "Uma trilha direta para entender a jornada do cliente, padrões de atendimento e os critérios de excelência da Sinaxys.",
-    createdByEmail: "diego@sinaxys.com",
-  });
-
-  addVideo(trkCS.id, 1, {
-    title: "Padrões de atendimento e tom de voz",
-    description:
-      "Profissional, acolhedor e pragmático. A clareza é parte da confiança.",
-    youtubeUrl: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-    xpReward: 15,
-  });
-
-  addCheckpoint(trkCS.id, 2, {
-    title: "Checkpoint — Simule uma resposta",
-    prompt:
-      "Responda a um cliente que está confuso com o status do pagamento. Seja claro, objetivo e acolhedor.",
-  });
-
-  addTrueFalseQuiz(trkCS.id, 3, {
-    title: "Quiz — Critérios de excelência",
-    minScore: 70,
-    questions: [
-      { prompt: "Engajamento é importante, mas nunca deve comprometer precisão e compliance.", correct: true },
-      { prompt: "Se o cliente insiste, podemos prometer prazos sem validação interna.", correct: false },
-    ],
-  });
-
-  // Assignments
   const assignments: TrackAssignment[] = [];
   const moduleProgress: ModuleProgress[] = [];
   const certificates: Certificate[] = [];
   const invoices: Invoice[] = [];
   const notifications: Notification[] = [];
   const contractAttachments: ContractAttachment[] = [];
-  const compensationEvents: CompensationEvent[] = users
-    .filter((u) => u.companyId && typeof u.monthlyCostBRL === "number" && Number.isFinite(u.monthlyCostBRL))
-    .map((u) => ({
-      id: uid("cmpc"),
-      companyId: u.companyId!,
-      userId: u.id,
-      monthlyCostBRL: u.monthlyCostBRL!,
-      effectiveAt: u.joinedAt ?? nowIso(),
-      createdAt: nowIso(),
-      createdByUserId: undefined,
-      note: "Inicial",
-    }));
+  const compensationEvents: CompensationEvent[] = [];
   const vacationRequests: VacationRequest[] = [];
-
-  function createAssignment(trackId: string, userEmail: string, assignedByEmail: string) {
-    const a: TrackAssignment = {
-      id: uid("asg"),
-      trackId,
-      userId: findUser(userEmail).id,
-      status: "NOT_STARTED",
-      assignedByUserId: findUser(assignedByEmail).id,
-      assignedAt: nowIso(),
-    };
-    assignments.push(a);
-
-    const trackModules = modules
-      .filter((m) => m.trackId === trackId)
-      .sort((x, y) => x.orderIndex - y.orderIndex);
-
-    trackModules.forEach((m, idx) => {
-      moduleProgress.push({
-        id: uid("mpr"),
-        assignmentId: a.id,
-        moduleId: m.id,
-        status: idx === 0 ? "AVAILABLE" : "LOCKED",
-        attemptsCount: 0,
-      });
-    });
-
-    return a;
-  }
-
-  createAssignment(trkProduto.id, "aline@sinaxys.com", "camila@sinaxys.com");
-  createAssignment(trkCS.id, "bruno@sinaxys.com", "diego@sinaxys.com");
-
-  const rewardTiers: RewardTier[] = [
-    {
-      id: uid("tier"),
-      companyId,
-      name: "Bronze",
-      minXp: 200,
-      prize: "Kit Sinaxys",
-      description: "Primeiro marco de consistência.",
-      active: true,
-      createdAt: nowIso(),
-    },
-    {
-      id: uid("tier"),
-      companyId,
-      name: "Prata",
-      minXp: 600,
-      prize: "Voucher",
-      description: "Ritmo forte e aprendizado contínuo.",
-      active: true,
-      createdAt: nowIso(),
-    },
-    {
-      id: uid("tier"),
-      companyId,
-      name: "Ouro",
-      minXp: 1200,
-      prize: "Dia de experiência",
-      description: "Excelência sustentada e alto impacto.",
-      active: true,
-      createdAt: nowIso(),
-    },
-  ];
+  const rewardTiers: RewardTier[] = [];
 
   const pointsRules = defaultPointsRules(companyId);
   const pointsEvents: PointsEvent[] = [];
