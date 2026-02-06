@@ -17,6 +17,8 @@ import { mockDb } from "@/lib/mockDb";
 import type { Role, User } from "@/lib/domain";
 import { roleLabel } from "@/lib/sinaxys";
 
+const NONE = "__none__";
+
 const ROLE_OPTIONS: { value: Role; label: string }[] = [
   { value: "ADMIN", label: "Admin" },
   { value: "HEAD", label: "Head" },
@@ -78,7 +80,7 @@ export default function AdminUsers() {
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editRole, setEditRole] = useState<Role>("COLABORADOR");
-  const [editDeptId, setEditDeptId] = useState<string>(departments[0]?.id ?? "");
+  const [editDeptId, setEditDeptId] = useState<string>(NONE);
   const [editActive, setEditActive] = useState(true);
 
   const [editJobTitle, setEditJobTitle] = useState("");
@@ -87,7 +89,7 @@ export default function AdminUsers() {
   const [editContractUrl, setEditContractUrl] = useState("");
 
   const [editJoinedAt, setEditJoinedAt] = useState(""); // YYYY-MM-DD
-  const [editManagerId, setEditManagerId] = useState<string>("");
+  const [editManagerId, setEditManagerId] = useState<string>(NONE);
   const [editMonthlyCost, setEditMonthlyCost] = useState<string>("");
   const [editMustChangePassword, setEditMustChangePassword] = useState<boolean>(false);
 
@@ -98,7 +100,7 @@ export default function AdminUsers() {
     setEditName(editing.name);
     setEditEmail(editing.email);
     setEditRole(editing.role);
-    setEditDeptId(editing.departmentId ?? departments[0]?.id ?? "");
+    setEditDeptId(editing.departmentId ?? NONE);
     setEditActive(editing.active);
 
     setEditJobTitle(editing.jobTitle ?? "");
@@ -107,7 +109,7 @@ export default function AdminUsers() {
     setEditContractUrl(editing.contractUrl ?? "");
 
     setEditJoinedAt(isoToDateInput(editing.joinedAt));
-    setEditManagerId(editing.managerId ?? "");
+    setEditManagerId(editing.managerId ?? NONE);
     setEditMonthlyCost(typeof editing.monthlyCostBRL === "number" ? String(editing.monthlyCostBRL) : "");
     setEditMustChangePassword(!!editing.mustChangePassword);
   }, [editing?.id, departments.length]);
@@ -219,18 +221,24 @@ export default function AdminUsers() {
                   {createRole !== "ADMIN" ? (
                     <div className="grid gap-2">
                       <Label>Departamento</Label>
-                      <Select value={createDeptId} onValueChange={setCreateDeptId}>
-                        <SelectTrigger className="h-11 rounded-xl">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {departments.map((d) => (
-                            <SelectItem key={d.id} value={d.id}>
-                              {d.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {departments.length ? (
+                        <Select value={createDeptId} onValueChange={setCreateDeptId}>
+                          <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {departments.map((d) => (
+                              <SelectItem key={d.id} value={d.id}>
+                                {d.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      ) : (
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                          Nenhum departamento cadastrado. Crie em Admin → Departamentos.
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
@@ -580,7 +588,15 @@ export default function AdminUsers() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div className="grid gap-2">
                       <Label>Papel</Label>
-                      <Select value={editRole} onValueChange={(v) => setEditRole(v as Role)}>
+                      <Select
+                        value={editRole}
+                        onValueChange={(v) => {
+                          const next = v as Role;
+                          setEditRole(next);
+                          if (next === "ADMIN") setEditManagerId(NONE);
+                          if (next !== "ADMIN" && editDeptId === NONE && departments[0]?.id) setEditDeptId(departments[0].id);
+                        }}
+                      >
                         <SelectTrigger className="h-11 rounded-xl">
                           <SelectValue />
                         </SelectTrigger>
@@ -599,14 +615,15 @@ export default function AdminUsers() {
                       <Input className="h-11 rounded-xl" type="date" value={editJoinedAt} onChange={(e) => setEditJoinedAt(e.target.value)} />
                     </div>
 
-                    {editRole !== "ADMIN" ? (
-                      <div className="grid gap-2">
-                        <Label>Departamento</Label>
+                    <div className="grid gap-2">
+                      <Label>Departamento</Label>
+                      {departments.length ? (
                         <Select value={editDeptId} onValueChange={setEditDeptId}>
                           <SelectTrigger className="h-11 rounded-xl">
-                            <SelectValue />
+                            <SelectValue placeholder="Selecione..." />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value={NONE}>Sem departamento</SelectItem>
                             {departments.map((d) => (
                               <SelectItem key={d.id} value={d.id}>
                                 {d.name}
@@ -614,17 +631,20 @@ export default function AdminUsers() {
                             ))}
                           </SelectContent>
                         </Select>
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                        Admin não possui departamento.
-                      </div>
-                    )}
+                      ) : (
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                          Nenhum departamento cadastrado. Crie em Admin → Departamentos.
+                        </div>
+                      )}
+                      {editRole !== "ADMIN" ? (
+                        <div className="text-xs text-muted-foreground">Obrigatório para Head e Colaborador.</div>
+                      ) : null}
+                    </div>
 
-                    <div className={"grid gap-2 " + (editRole === "ADMIN" ? "sm:col-span-2" : "") }>
+                    <div className={"grid gap-2 " + (editRole === "ADMIN" ? "sm:col-span-2" : "")}>
                       <Label>Gestor direto</Label>
                       <Select
-                        value={editRole === "ADMIN" ? "" : editManagerId}
+                        value={editRole === "ADMIN" ? NONE : editManagerId}
                         onValueChange={(v) => setEditManagerId(v)}
                         disabled={editRole === "ADMIN"}
                       >
@@ -632,7 +652,7 @@ export default function AdminUsers() {
                           <SelectValue placeholder={editRole === "ADMIN" ? "—" : "Selecione..."} />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Sem gestor</SelectItem>
+                          <SelectItem value={NONE}>Sem gestor</SelectItem>
                           {managers
                             .filter((m) => m.id !== editing.id)
                             .map((m) => (
@@ -724,13 +744,16 @@ export default function AdminUsers() {
               onClick={() => {
                 if (!editing) return;
 
-                if (editRole !== "ADMIN" && !editDeptId) {
+                if (editRole !== "ADMIN" && editDeptId === NONE) {
                   toast({ title: "Departamento obrigatório", description: "Selecione um departamento.", variant: "destructive" });
                   setEditTab("org");
                   return;
                 }
 
                 const cost = editMonthlyCost.trim() ? Number(editMonthlyCost) : null;
+
+                const deptId = editDeptId === NONE ? undefined : editDeptId;
+                const managerId = editRole === "ADMIN" ? "" : editManagerId === NONE ? "" : editManagerId;
 
                 try {
                   mockDb.updateUserCompanyAdmin(
@@ -739,14 +762,14 @@ export default function AdminUsers() {
                       name: editName,
                       email: editEmail,
                       role: editRole,
-                      departmentId: editRole === "HEAD" || editRole === "COLABORADOR" ? editDeptId : undefined,
+                      departmentId: deptId,
                       active: editActive,
                       jobTitle: editJobTitle,
                       phone: editPhone,
                       avatarUrl: editAvatarUrl,
                       contractUrl: editContractUrl,
                       joinedAt: editJoinedAt,
-                      managerId: editRole === "ADMIN" ? "" : editManagerId,
+                      managerId,
                       monthlyCostBRL: typeof cost === "number" && Number.isFinite(cost) ? cost : null,
                     },
                     { createdByUserId: user.id },

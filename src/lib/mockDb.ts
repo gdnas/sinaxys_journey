@@ -1768,18 +1768,21 @@ export const mockDb = {
       if (data.role === "MASTERADMIN") throw new Error("Não é possível promover para Master Admin aqui.");
       u.role = data.role;
 
-      // Admins don't have department/manager
+      // Admins don't have manager
       if (u.role === "ADMIN") {
-        u.departmentId = undefined;
         u.managerId = undefined;
       }
     }
 
     if (data.departmentId !== undefined) {
-      if (u.role === "HEAD" || u.role === "COLABORADOR") {
-        u.departmentId = data.departmentId;
-      } else {
+      const nextDeptId = data.departmentId || undefined;
+      if (!nextDeptId) {
         u.departmentId = undefined;
+      } else {
+        const dept = db.departments.find((d) => d.id === nextDeptId);
+        if (!dept) throw new Error("Departamento inválido.");
+        if (dept.companyId !== u.companyId) throw new Error("Departamento deve ser da mesma empresa.");
+        u.departmentId = dept.id;
       }
     }
 
