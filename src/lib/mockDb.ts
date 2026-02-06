@@ -1657,6 +1657,130 @@ export const mockDb = {
     return u;
   },
 
+  updateUserCompanyAdmin(
+    userId: string,
+    data: Partial<
+      Pick<
+        User,
+        | "name"
+        | "email"
+        | "role"
+        | "departmentId"
+        | "active"
+        | "avatarUrl"
+        | "jobTitle"
+        | "phone"
+        | "contractUrl"
+        | "monthlyCostBRL"
+        | "joinedAt"
+        | "managerId"
+      >
+    >,
+    opts?: { createdByUserId?: string },
+  ) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) throw new Error("Usuário não encontrado.");
+    if (!u.companyId) throw new Error("Usuário sem empresa.");
+    if (u.role === "MASTERADMIN") throw new Error("Não é possível editar Master Admin por aqui.");
+
+    // Email
+    if (typeof data.email === "string") {
+      const nextEmail = data.email.trim().toLowerCase();
+      if (!nextEmail.includes("@")) throw new Error("E-mail inválido.");
+      const clash = db.users.find((x) => x.email.toLowerCase() === nextEmail && x.id !== u.id);
+      if (clash) throw new Error("Já existe um usuário com este e-mail.");
+      u.email = nextEmail;
+    }
+
+    // Basic fields
+    if (typeof data.name === "string" && data.name.trim()) u.name = data.name.trim();
+    if (typeof data.avatarUrl === "string") u.avatarUrl = data.avatarUrl.trim() || undefined;
+    if (typeof data.jobTitle === "string") u.jobTitle = data.jobTitle.trim() || undefined;
+    if (typeof data.phone === "string") u.phone = data.phone.trim() || undefined;
+    if (typeof data.contractUrl === "string") u.contractUrl = data.contractUrl.trim() || undefined;
+
+    // joinedAt
+    if (typeof data.joinedAt === "string") {
+      const raw = data.joinedAt.trim();
+      if (!raw) {
+        u.joinedAt = undefined;
+      } else {
+        const ms = new Date(raw).getTime();
+        if (!Number.isFinite(ms)) throw new Error("Data de entrada inválida.");
+        u.joinedAt = new Date(ms).toISOString();
+      }
+    }
+
+    // role / department / active
+    if (data.role) {
+      if (data.role === "MASTERADMIN") throw new Error("Não é possível promover para Master Admin aqui.");
+      u.role = data.role;
+
+      // Admins don't have department/manager
+      if (u.role === "ADMIN") {
+        u.departmentId = undefined;
+        u.managerId = undefined;
+      }
+    }
+
+    if (data.departmentId !== undefined) {
+      if (u.role === "HEAD" || u.role === "COLABORADOR") {
+        u.departmentId = data.departmentId;
+      } else {
+        u.departmentId = undefined;
+      }
+    }
+
+    if (typeof data.active === "boolean") u.active = data.active;
+
+    // managerId
+    if (data.managerId !== undefined) {
+      const nextManagerId = data.managerId || null;
+      if (!nextManagerId) {
+        u.managerId = undefined;
+      } else {
+        const manager = db.users.find((x) => x.id === nextManagerId && x.active);
+        if (!manager) throw new Error("Gestor inválido.");
+        if ((manager.companyId ?? "") !== (u.companyId ?? "")) throw new Error("Gestor deve ser da mesma empresa.");
+        if (manager.role === "COLABORADOR") throw new Error("Gestor deve ser Admin ou Head.");
+        if (wouldCreateCycle(db, u.id, manager.id)) throw new Error("Movimento inválido: criaria um ciclo no organograma.");
+        u.managerId = manager.id;
+      }
+    }
+
+    // monthly cost (records history)
+    if (data.monthlyCostBRL !== undefined) {
+      const next = data.monthlyCostBRL;
+      if (next === null || next === (undefined as any)) {
+        // ignore
+      } else if (typeof next !== "number" || !Number.isFinite(next) || next < 0) {
+        throw new Error("Custo mensal inválido.");
+      } else {
+        const prev = u.monthlyCostBRL;
+        u.monthlyCostBRL = Math.max(0, next);
+
+        if (u.companyId && typeof u.monthlyCostBRL === "number" && u.monthlyCostBRL !== (prev ?? undefined)) {
+          ensureCompensationEvents(db);
+          (db.compensationEvents ?? []).push({
+            id: uid("cmpc"),
+            companyId: u.companyId,
+            userId: u.id,
+            monthlyCostBRL: u.monthlyCostBRL,
+            effectiveAt: nowIso(),
+            createdAt: nowIso(),
+            createdByUserId: opts?.createdByUserId,
+            note: "Ajuste via Admin",
+          });
+        }
+
+      }
+    }
+
+    saveDb(db);
+    return u;
+  },
+
   setUserActive(userId: string, active: boolean) {
     const db = loadDb();
     const u = db.users.find((x) => x.id === userId);
