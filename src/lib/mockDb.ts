@@ -862,12 +862,53 @@ export const mockDb = {
   getCompany(companyId: string) {
     return loadDb().companies.find((c) => c.id === companyId) ?? null;
   },
+  createCompany(params: { name: string; tagline?: string }) {
+    const db = loadDb();
+
+    const name = params.name.trim();
+    if (name.length < 3) throw new Error("Nome da empresa inválida.");
+
+    const id = uid("cmp");
+    const brand = defaultCompanyBrand();
+
+    const company: Company = {
+      id,
+      ...brand,
+      name,
+      tagline: params.tagline?.trim() || brand.tagline,
+      createdAt: nowIso(),
+    };
+
+    db.companies.push(company);
+
+    // Departments baseline
+    const deptNames: Department["name"][] = [
+      "Financeiro",
+      "Suporte",
+      "Customer Success",
+      "Comercial",
+      "Marketing",
+      "Produto",
+    ];
+    for (const depName of deptNames) {
+      db.departments.push({ id: uid("dept"), companyId: id, name: depName });
+    }
+
+    // Baseline points rules
+    ensurePointsSetup(db);
+
+    saveDb(db);
+    return company;
+  },
 
   // Sinaxys Points
   getPointsRules(companyId: string) {
     const db = loadDb();
     ensurePointsSetup(db);
-    return (db.pointsRules ?? []).filter((r) => r.companyId === companyId).slice().sort((a, b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label));
+    return (db.pointsRules ?? [])
+      .filter((r) => r.companyId === companyId)
+      .slice()
+      .sort((a, b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label));
   },
   upsertPointsRule(companyId: string, data: Omit<PointsRule, "id" | "companyId" | "createdAt"> & { id?: string }) {
     const db = loadDb();
