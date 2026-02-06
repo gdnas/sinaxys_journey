@@ -1,14 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Role, User } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
-import { mockDb } from "@/lib/mockDb";
 
-const IS_DEV = ((import.meta as any).env?.DEV ?? false) as boolean;
-
-const AUTH_KEY = "sinaxys-journey-auth:v1";
-const ACTIVE_COMPANY_KEY = IS_DEV
-  ? "sinaxys-journey-active-company:dev:v1"
-  : "sinaxys-journey-active-company:v2";
+const ACTIVE_COMPANY_KEY = "sinaxys-journey-active-company:v2";
 
 type AuthState = {
   user: User | null;
@@ -23,15 +17,6 @@ type AuthState = {
 };
 
 const AuthContext = createContext<AuthState | null>(null);
-
-function loadUserId() {
-  return localStorage.getItem(AUTH_KEY);
-}
-
-function saveUserId(id: string | null) {
-  if (!id) localStorage.removeItem(AUTH_KEY);
-  else localStorage.setItem(AUTH_KEY, id);
-}
 
 function loadActiveCompanyId() {
   return localStorage.getItem(ACTIVE_COMPANY_KEY);
@@ -75,7 +60,7 @@ async function fetchProfile(userId: string) {
   return mapped;
 }
 
-function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<User | null>(null);
   const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(() => loadActiveCompanyId());
@@ -159,13 +144,13 @@ function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
       if (!uid) return { ok: false, message: "Sessão inválida. Tente novamente." };
 
       try {
-        const p = await fetchProfile(uid);
-        setProfile(p);
-        if (p?.role !== "MASTERADMIN") {
-          saveActiveCompanyId(p?.companyId ?? null);
-          setActiveCompanyIdState(p?.companyId ?? null);
+        const prof = await fetchProfile(uid);
+        setProfile(prof);
+        if (prof?.role !== "MASTERADMIN") {
+          saveActiveCompanyId(prof?.companyId ?? null);
+          setActiveCompanyIdState(prof?.companyId ?? null);
         }
-        return { ok: true, mustChangePassword: !!p?.mustChangePassword };
+        return { ok: true, mustChangePassword: !!prof?.mustChangePassword };
       } catch (e: any) {
         return { ok: false, message: e?.message ?? "Não foi possível carregar seu perfil." };
       }
@@ -182,78 +167,6 @@ function SupabaseAuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-function MockAuthProvider({ children }: { children: React.ReactNode }) {
-  const [userId, setUserId] = useState<string | null>(() => loadUserId());
-  const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(() => loadActiveCompanyId());
-  const [version, setVersion] = useState(0);
-
-  const user = useMemo(() => {
-    if (!userId) return null;
-    const u = mockDb.get().users.find((x) => x.id === userId);
-    return u?.active ? u : null;
-  }, [userId, version]);
-
-  // Keep company selection consistent with the logged-in user.
-  const effectiveCompanyId = useMemo(() => {
-    if (!user) return null;
-    if (user.role !== "MASTERADMIN") return user.companyId ?? null;
-
-    const companies = mockDb.getCompanies();
-    if (activeCompanyId && companies.some((c) => c.id === activeCompanyId)) return activeCompanyId;
-    return companies[0]?.id ?? null;
-  }, [user, activeCompanyId, version]);
-
-  const value: AuthState = {
-    user,
-    activeCompanyId: effectiveCompanyId,
-    setActiveCompanyId(companyId) {
-      saveActiveCompanyId(companyId);
-      setActiveCompanyIdState(companyId);
-      setVersion((v) => v + 1);
-    },
-    async login(email: string, password: string) {
-      const u = mockDb.findUserByEmail(email);
-      if (!u) return { ok: false, message: "Não encontramos este usuário ativo. Verifique o e-mail." };
-
-      const verified = mockDb.verifyPassword(email, password ?? "");
-      if (!verified.ok) return { ok: false, message: verified.message };
-
-      saveUserId(u.id);
-      setUserId(u.id);
-
-      // Auto-select company
-      if (u.role !== "MASTERADMIN") {
-        saveActiveCompanyId(u.companyId ?? null);
-        setActiveCompanyIdState(u.companyId ?? null);
-      } else {
-        const companies = mockDb.getCompanies();
-        const next = loadActiveCompanyId() ?? companies[0]?.id ?? null;
-        saveActiveCompanyId(next);
-        setActiveCompanyIdState(next);
-      }
-
-      setVersion((v) => v + 1);
-      return { ok: true, mustChangePassword: !!u.mustChangePassword };
-    },
-    async logout() {
-      saveUserId(null);
-      setUserId(null);
-      setVersion((v) => v + 1);
-    },
-    refresh() {
-      setVersion((v) => v + 1);
-    },
-  };
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // DEV: volta o acesso local para demonstração.
-  if (IS_DEV) return <MockAuthProvider>{children}</MockAuthProvider>;
-  return <SupabaseAuthProvider>{children}</SupabaseAuthProvider>;
 }
 
 export function useAuth() {

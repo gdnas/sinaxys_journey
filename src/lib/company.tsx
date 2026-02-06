@@ -3,9 +3,6 @@ import type { Company, CompanyColors } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 import { supabase } from "@/integrations/supabase/client";
-import { mockDb } from "@/lib/mockDb";
-
-const IS_DEV = ((import.meta as any).env?.DEV ?? false) as boolean;
 
 export type CompanyBrand = Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">;
 
@@ -125,17 +122,6 @@ type CompanyState = {
 const CompanyContext = createContext<CompanyState | null>(null);
 
 async function fetchCompanyBrand(companyId: string): Promise<CompanyBrand> {
-  if (IS_DEV) {
-    const c = mockDb.getCompany(companyId);
-    if (!c) return mergeBrand(DEFAULT_BRAND);
-    return mergeBrand({
-      name: c.name,
-      tagline: c.tagline,
-      logoDataUrl: c.logoDataUrl,
-      colors: c.colors,
-    });
-  }
-
   const { data, error } = await supabase
     .from("companies")
     .select("name, tagline, logo_data_url, colors")
@@ -213,16 +199,6 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         const merged = mergeBrand({ ...company, ...next });
         setCompanyState(merged);
 
-        if (IS_DEV) {
-          mockDb.updateCompanyBrand(companyId, {
-            name: merged.name,
-            tagline: merged.tagline,
-            logoDataUrl: merged.logoDataUrl,
-            colors: merged.colors,
-          });
-          return;
-        }
-
         supabase
           .from("companies")
           .update({
@@ -241,16 +217,6 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
         }
 
         setCompanyState(DEFAULT_BRAND);
-
-        if (IS_DEV) {
-          mockDb.updateCompanyBrand(companyId, {
-            name: DEFAULT_BRAND.name,
-            tagline: DEFAULT_BRAND.tagline,
-            logoDataUrl: DEFAULT_BRAND.logoDataUrl,
-            colors: DEFAULT_BRAND.colors,
-          });
-          return;
-        }
 
         supabase
           .from("companies")
