@@ -1845,6 +1845,28 @@ export const mockDb = {
     return u;
   },
 
+  setUserOrgLevel(userId: string, orgLevel: number | null) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) throw new Error("Usuário não encontrado.");
+    if (u.role === "MASTERADMIN") throw new Error("Não é possível alterar o nível deste usuário.");
+
+    if (orgLevel === null) {
+      u.orgLevel = undefined;
+      saveDb(db);
+      return u;
+    }
+
+    const lvl = Math.floor(Number(orgLevel));
+    if (!Number.isFinite(lvl) || lvl < 1 || lvl > 20) {
+      throw new Error("Nível inválido. Use um número entre 1 e 20.");
+    }
+
+    u.orgLevel = lvl;
+    saveDb(db);
+    return u;
+  },
+
   setUserActive(userId: string, active: boolean) {
     const db = loadDb();
     const u = db.users.find((x) => x.id === userId);
