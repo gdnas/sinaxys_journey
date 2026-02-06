@@ -4,6 +4,7 @@ import {
   type Db,
   type Department,
   type Invite,
+  type Invoice,
   type LearningTrack,
   type ModuleProgress,
   type QuizOption,
@@ -169,6 +170,30 @@ export function loadDb(): Db {
     if (!Array.isArray((parsed as any).rewardTiers)) {
       (parsed as any).rewardTiers = [];
       saveDb(parsed);
+    }
+
+    // Migration: invoices
+    if (!Array.isArray((parsed as any).invoices)) {
+      (parsed as any).invoices = [];
+      saveDb(parsed);
+    }
+
+    // Migration: password fields
+    if (Array.isArray((parsed as any).users)) {
+      let changed = false;
+      for (const u of (parsed as any).users) {
+        if (u && typeof u === "object") {
+          if (!("password" in u)) {
+            u.password = undefined;
+            changed = true;
+          }
+          if (!("mustChangePassword" in u)) {
+            u.mustChangePassword = false;
+            changed = true;
+          }
+        }
+      }
+      if (changed) saveDb(parsed);
     }
 
     // Light migration: if organograma não existe, cria uma hierarquia padrão.
@@ -468,6 +493,7 @@ function seedDb(): Db {
   const assignments: TrackAssignment[] = [];
   const moduleProgress: ModuleProgress[] = [];
   const certificates: Certificate[] = [];
+  const invoices: Invoice[] = [];
 
   function createAssignment(trackId: string, userEmail: string, assignedByEmail: string) {
     const a: TrackAssignment = {
@@ -546,6 +572,7 @@ function seedDb(): Db {
     moduleProgress,
     certificates,
     rewardTiers,
+    invoices,
   };
 }
 
@@ -822,6 +849,27 @@ export const mockDb = {
   findUserByEmail(email: string) {
     const db = loadDb();
     return db.users.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.active);
+  },
+  verifyPassword(email: string, password: string) {
+    const u = this.findUserByEmail(email);
+    if (!u) return { ok: false as const, message: "Usuário não encontrado." };
+    if (!u.password) return { ok: true as const, user: u };
+    if (u.password !== password) return { ok: false as const, message: "Senha incorreta." };
+    return { ok: true as const, user: u };
+  },
+
+  setUserPassword(userId: string, nextPassword: string, opts?: { mustChangePassword?: boolean }) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) throw new Error("Usuário não encontrado.");
+
+    const p = nextPassword.trim();
+    if (p.length < 6) throw new Error("A senha deve ter pelo menos 6 caracteres.");
+
+    u.password = p;
+    if (typeof opts?.mustChangePassword === "boolean") u.mustChangePassword = opts.mustChangePassword;
+    saveDb(db);
+    return u;
   },
 
   // Queries
@@ -1431,6 +1479,70 @@ export const mockDb = {
     return u;
   },
 
+  // Financeiro
+  getInvoicesForUser(userId: string) {
+    const db = loadDb();
+    return (db.invoices ?? [])
+      .filter((i) => i.userId === userId)
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  createInvoice(params: {
+    userId: string;
+    title: string;
+    invoiceUrl: string;
+    amountBRL?: number;
+    issuedAt?: string;
+  }) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === params.userId);
+    if (!u) throw new Error("Usuário inválido.");
+    if (!u.companyId) throw new Error("Usuário sem empresa.");
+
+    const url = params.invoiceUrl.trim();
+    if (url.length < 10) throw new Error("Informe um link válido para a nota fiscal.");
+
+    const inv: Invoice = {
+      id: uid("invf"),
+      userId: params.userId,
+      companyId: u.companyId,
+      title: params.title.trim() || "Nota fiscal",
+      invoiceUrl: url,
+      amountBRL: typeof params.amountBRL === "number" && Number.isFinite(params.amountBRL) ? Math.max(0, params.amountBRL) : undefined,
+      issuedAt: params.issuedAt,
+      status: "PENDING",
+      paidAt: undefined,
+      createdAt: nowIso(),
+    };
+
+    db.invoices = db.invoices ?? [];
+    db.invoices.push(inv);
+    saveDb(db);
+    return inv;
+  },
+
+  setInvoicePaid(invoiceId: string, paid: boolean) {
+    const db = loadDb();
+    const inv = (db.invoices ?? []).find((i) => i.id === invoiceId);
+    if (!inv) throw new Error("Nota fiscal não encontrada.");
+
+    inv.status = paid ? "PAID" : "PENDING";
+    inv.paidAt = paid ? nowIso() : undefined;
+    saveDb(db);
+    return inv;
+  },
+
+  deleteInvoice(invoiceId: string, userId: string) {
+    const db = loadDb();
+    const inv = (db.invoices ?? []).find((i) => i.id === invoiceId);
+    if (!inv) return;
+    if (inv.userId !== userId) throw new Error("Você não pode remover esta nota.");
+    if (inv.status === "PAID") throw new Error("Não é possível remover uma nota já paga.");
+    db.invoices = (db.invoices ?? []).filter((i) => i.id !== invoiceId);
+    saveDb(db);
+  },
+
   importUsersBulk(params: {
     companyId: string;
     rows: Array<{
@@ -1444,6 +1556,7 @@ export const mockDb = {
       contractUrl?: string;
       avatarUrl?: string;
       active?: boolean;
+      initialPassword?: string;
     }>;
   }) {
     const db = loadDb();
@@ -1457,7 +1570,6 @@ export const mockDb = {
         .map((u) => [u.email.toLowerCase(), u] as const),
     );
 
-    const createdEmails: string[] = [];
     let created = 0;
     let updated = 0;
 
@@ -1472,6 +1584,11 @@ export const mockDb = {
       if (!deptId) {
         const known = Array.from(deptIds.keys()).join(", ");
         throw new Error(`Departamento não encontrado para ${email}: “${r.department}”.`);
+      }
+
+      const password = r.initialPassword?.trim();
+      if (password && password.length < 6) {
+        throw new Error(`Senha inicial muito curta para ${email} (mínimo 6 caracteres).`);
       }
 
       const existing = byEmail.get(email);
@@ -1490,12 +1607,13 @@ export const mockDb = {
           monthlyCostBRL: typeof r.monthlyCostBRL === "number" ? Math.max(0, r.monthlyCostBRL) : undefined,
           phone: r.phone?.trim() || undefined,
           managerId: undefined,
+          password: password || undefined,
+          mustChangePassword: !!password,
         };
 
         db.users.push(u);
         byEmail.set(email, u);
         created += 1;
-        createdEmails.push(email);
       } else {
         existing.name = r.name.trim();
         existing.role = r.role;
@@ -1505,6 +1623,10 @@ export const mockDb = {
         if (typeof r.phone === "string") existing.phone = r.phone.trim() || undefined;
         if (typeof r.contractUrl === "string") existing.contractUrl = r.contractUrl.trim() || undefined;
         if (typeof r.avatarUrl === "string") existing.avatarUrl = r.avatarUrl.trim() || undefined;
+        if (password) {
+          existing.password = password;
+          existing.mustChangePassword = true;
+        }
         updated += 1;
       }
     }

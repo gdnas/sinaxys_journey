@@ -9,7 +9,9 @@ type AuthState = {
   user: User | null;
   activeCompanyId: string | null;
   setActiveCompanyId: (companyId: string | null) => void;
-  login: (email: string) => { ok: true } | { ok: false; message: string };
+  login: (email: string, password?: string) =>
+    | { ok: true; mustChangePassword: boolean }
+    | { ok: false; message: string };
   logout: () => void;
   refresh?: () => void;
 };
@@ -63,9 +65,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setActiveCompanyIdState(companyId);
       setVersion((v) => v + 1);
     },
-    login(email: string) {
+    login(email: string, password?: string) {
       const u = mockDb.findUserByEmail(email);
       if (!u) return { ok: false, message: "Não encontramos este usuário ativo. Verifique o e-mail." };
+
+      // If the user has a password set, require it.
+      if (u.password) {
+        const p = (password ?? "").trim();
+        if (!p) return { ok: false, message: "Informe a senha." };
+        const verified = mockDb.verifyPassword(email, p);
+        if (!verified.ok) return { ok: false, message: verified.message };
+      }
 
       saveUserId(u.id);
       setUserId(u.id);
@@ -82,7 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       setVersion((v) => v + 1);
-      return { ok: true };
+      return { ok: true, mustChangePassword: !!u.mustChangePassword };
     },
     logout() {
       saveUserId(null);

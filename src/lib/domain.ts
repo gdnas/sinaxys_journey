@@ -55,6 +55,8 @@ export type User = {
   monthlyCostBRL?: number; // custo mensal (salário/encargos) em BRL
   managerId?: string; // id do gestor direto (pode ser HEAD ou ADMIN)
   phone?: string; // celular para contato (E.164 ou texto livre)
+  password?: string; // senha inicial (definida pelo admin) / senha atual
+  mustChangePassword?: boolean; // exige troca no primeiro acesso
 };
 
 export type TrackStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "LOCKED";
@@ -155,6 +157,21 @@ export type RewardTier = {
   createdAt: string;
 };
 
+export type InvoiceStatus = "PENDING" | "PAID";
+
+export type Invoice = {
+  id: string;
+  userId: string;
+  companyId: string;
+  title: string;
+  invoiceUrl: string; // link no Conta Azul (ou outra ferramenta)
+  amountBRL?: number;
+  issuedAt?: string; // ISO
+  status: InvoiceStatus;
+  paidAt?: string; // ISO
+  createdAt: string;
+};
+
 export type Db = {
   companies: Company[];
   invites: Invite[];
@@ -168,4 +185,5 @@ export type Db = {
   moduleProgress: ModuleProgress[];
   certificates: Certificate[];
   rewardTiers: RewardTier[];
+  invoices: Invoice[];
 };
