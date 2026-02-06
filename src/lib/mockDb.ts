@@ -1901,6 +1901,40 @@ export const mockDb = {
     }
 
     u.managerId = nextManagerId;
+
+    // If the new manager is also listed as an additional leader, remove it to avoid duplicates.
+    if (u.leaderIds?.length && nextManagerId) {
+      u.leaderIds = u.leaderIds.filter((id) => id !== nextManagerId);
+      if (!u.leaderIds.length) u.leaderIds = undefined;
+    }
+
+    saveDb(db);
+    return u;
+  },
+
+  setUserAdditionalLeaders(userId: string, leaderIds: string[]) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) return null;
+
+    const uniq = Array.from(new Set((leaderIds ?? []).filter(Boolean)));
+
+    // Validate
+    for (const lid of uniq) {
+      if (lid === u.id) throw new Error("Um usuário não pode ser líder dele mesmo.");
+      const leader = db.users.find((x) => x.id === lid);
+      if (!leader || !leader.active) throw new Error("Líder inválido.");
+      if (leader.role !== "ADMIN" && leader.role !== "HEAD") throw new Error("Apenas ADMIN ou HEAD podem ser líderes.");
+
+      // Prevent obvious cycles on the primary chain (keeps tree readable)
+      if (wouldCreateCycle(db, u.id, leader.id)) {
+        throw new Error("Vínculo inválido: criaria um ciclo no organograma.");
+      }
+    }
+
+    // Additional leaders are stored separately from the direct manager.
+    const filtered = uniq.filter((id) => id !== u.managerId);
+    u.leaderIds = filtered.length ? filtered : undefined;
     saveDb(db);
     return u;
   },
@@ -1960,7 +1994,7 @@ export const mockDb = {
           userId: r.id,
           type: "INVOICE_SUBMITTED",
           title: "Nova nota fiscal enviada",
-          message: `${u.name} enviou “${inv.title}”${amountLabel}.`,
+          message: `${u.name} enviou " ${inv.title} " ${amountLabel}.`,
           href: "/profile",
         });
       }

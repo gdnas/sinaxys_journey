@@ -57,6 +57,7 @@ export type User = {
   contractUrl?: string; // link do contrato assinado (ex.: Clicksign)
   monthlyCostBRL?: number; // custo mensal (salário/encargos) em BRL
   managerId?: string; // id do gestor direto (pode ser HEAD ou ADMIN)
+  leaderIds?: string[]; // ids de outros líderes (além do gestor direto)
   phone?: string; // celular para contato (E.164 ou texto livre)
   password?: string; // senha inicial (definida pelo admin) / senha atual
   mustChangePassword?: boolean; // exige troca no primeiro acesso
