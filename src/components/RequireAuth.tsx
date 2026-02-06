@@ -18,7 +18,8 @@ export function RequireAuth({ roles, children }: { roles?: Role[]; children: Rea
     return <Navigate to="/password" replace />;
   }
 
-  if (roles && !roles.includes(user.role)) {
+  // MASTERADMIN é super-user (pode acessar qualquer tela). A segurança real fica no RLS do Supabase.
+  if (roles && user.role !== "MASTERADMIN" && !roles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
 
