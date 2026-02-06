@@ -11,7 +11,7 @@ import { useCompany } from "@/lib/company";
 
 export default function Login() {
   const { toast } = useToast();
-  const { user, login, loading } = useAuth();
+  const { user, login, loading, authError } = useAuth();
   const { company } = useCompany();
   const navigate = useNavigate();
   const location = useLocation();
@@ -73,6 +73,12 @@ export default function Login() {
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6 shadow-sm">
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Entrar</div>
           <p className="mt-1 text-sm text-muted-foreground">Informe suas credenciais para acessar.</p>
+
+          {authError ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {authError}
+            </div>
+          ) : null}
 
           <div className="mt-5 grid gap-4">
             <div className="grid gap-2">
@@ -147,21 +153,14 @@ export default function Login() {
                       description: result.message,
                       variant: "destructive",
                     });
-                    return;
                   }
-
-                  if (result.mustChangePassword) {
-                    navigate("/password", { replace: true });
-                    return;
-                  }
-
-                  navigate(from ?? "/", { replace: true });
+                  // Se ok, o redirecionamento acontece quando o profile carregar (useEffect acima).
                 } finally {
                   setBtnLoading(false);
                 }
               }}
             >
-              {btnLoading ? "Entrando…" : "Continuar"}
+              {btnLoading || loading ? "Entrando…" : "Continuar"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>

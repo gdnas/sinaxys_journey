@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { Role, User } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -15,6 +15,7 @@ type AuthState = {
   logout: () => Promise<void>;
   refresh?: () => void;
   loading: boolean;
+  authError?: string | null;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -66,8 +67,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
   const [profileStatus, setProfileStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
+  const [authError, setAuthError] = useState<string | null>(null);
   const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(() => loadActiveCompanyId());
   const [version, setVersion] = useState(0);
+  const signOutOnceRef = useRef(false);
 
   // Initial session + auth changes
   useEffect(() => {
@@ -90,6 +93,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       const uid = session?.user?.id ?? null;
       setSessionChecked(true);
+
+      if (event === "SIGNED_IN") {
+        setAuthError(null);
+        signOutOnceRef.current = false;
+      }
 
       // Evita refetch em loop (ex.: TOKEN_REFRESHED) quando o usuário não mudou.
       setSessionUserId((prev) => {
@@ -125,22 +133,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .then(async (p) => {
         if (cancelled) return;
 
-        // Se existe sessão mas não existe profile, isso gera loops de redirect.
-        // Melhor encerrar a sessão e mostrar erro no próximo login.
+        // Se existe sessão mas não existe profile, isso dá sensação de "loga e desloga".
         if (!p) {
-          try {
-            await supabase.auth.signOut();
-          } catch {
-            // ignore
-          }
-          if (cancelled) return;
+          setAuthError("Seu perfil não foi encontrado na base. Peça ao admin para provisionar o usuário.");
           setProfile(null);
           setProfileStatus("error");
-          setSessionUserId(null);
-          setSessionChecked(true);
+
+          if (!signOutOnceRef.current) {
+            signOutOnceRef.current = true;
+            try {
+              await supabase.auth.signOut();
+            } catch {
+              // ignore
+            }
+          }
           return;
         }
 
+        setAuthError(null);
         setProfile(p);
         setProfileStatus("loaded");
 
@@ -152,17 +162,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       })
       .catch(async () => {
         if (cancelled) return;
-        // Em erro de leitura do profile, encerra a sessão para evitar loop.
-        try {
-          await supabase.auth.signOut();
-        } catch {
-          // ignore
-        }
-        if (cancelled) return;
+
+        setAuthError("Não foi possível carregar seu perfil. Verifique permissões (RLS) na tabela profiles.");
         setProfile(null);
         setProfileStatus("error");
-        setSessionUserId(null);
-        setSessionChecked(true);
+
+        if (!signOutOnceRef.current) {
+          signOutOnceRef.current = true;
+          try {
+            await supabase.auth.signOut();
+          } catch {
+            // ignore
+          }
+        }
       });
 
     return () => {
@@ -182,6 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user: profile?.active ? profile : null,
     activeCompanyId: effectiveCompanyId,
     loading,
+    authError,
     setActiveCompanyId(companyId) {
       saveActiveCompanyId(companyId);
       setActiveCompanyIdState(companyId);
@@ -193,46 +206,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!e.includes("@")) return { ok: false, message: "Informe um e-mail válido." };
       if (!p) return { ok: false, message: "Informe a senha." };
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email: e, password: p });
+      setAuthError(null);
+      signOutOnceRef.current = false;
+
+      const { error } = await supabase.auth.signInWithPassword({ email: e, password: p });
       if (error) return { ok: false, message: error.message };
 
-      const uid = data.user?.id;
-      if (!uid) return { ok: false, message: "Sessão inválida. Tente novamente." };
-
-      try {
-        setProfileStatus("loading");
-        const prof = await fetchProfile(uid);
-        if (!prof) {
-          await supabase.auth.signOut();
-          setProfile(null);
-          setProfileStatus("error");
-          setSessionUserId(null);
-          setSessionChecked(true);
-          return {
-            ok: false,
-            message: "Seu perfil não foi encontrado na base. Peça ao admin para provisionar o usuário.",
-          };
-        }
-
-        setProfile(prof);
-        setProfileStatus("loaded");
-        if (prof.role !== "MASTERADMIN") {
-          saveActiveCompanyId(prof.companyId ?? null);
-          setActiveCompanyIdState(prof.companyId ?? null);
-        }
-        return { ok: true, mustChangePassword: !!prof.mustChangePassword };
-      } catch (e: any) {
-        try {
-          await supabase.auth.signOut();
-        } catch {
-          // ignore
-        }
-        setProfile(null);
-        setProfileStatus("error");
-        setSessionUserId(null);
-        setSessionChecked(true);
-        return { ok: false, message: e?.message ?? "Não foi possível carregar seu perfil." };
-      }
+      // O redirecionamento acontece quando o profile carregar (evita corrida e loop).
+      return { ok: true, mustChangePassword: false };
     },
     async logout() {
       await supabase.auth.signOut();
