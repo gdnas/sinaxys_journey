@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
+  Bell,
+  CalendarDays,
   ExternalLink,
   FileText,
   ImagePlus,
@@ -42,11 +44,20 @@ function formatDate(iso?: string) {
   return d.toLocaleDateString("pt-BR");
 }
 
+function formatDateUtc(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "—";
+  return d.toLocaleDateString("pt-BR", { timeZone: "UTC" });
+}
+
 export default function Profile() {
   const { toast } = useToast();
   const { user, refresh } = useAuth();
+  const navigate = useNavigate();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const invoiceFileRef = useRef<HTMLInputElement | null>(null);
+  const contractFileRef = useRef<HTMLInputElement | null>(null);
 
   const [version, setVersion] = useState(0);
 
@@ -66,6 +77,13 @@ export default function Profile() {
   const [invoiceAmount, setInvoiceAmount] = useState<string>("");
   const [invoiceIssuedDate, setInvoiceIssuedDate] = useState<string>("");
   const [savingInvoice, setSavingInvoice] = useState(false);
+
+  const [contractTitle, setContractTitle] = useState("");
+  const [contractFileDataUrl, setContractFileDataUrl] = useState("");
+  const [savingContract, setSavingContract] = useState(false);
+
+  const [vacationStartDate, setVacationStartDate] = useState<string>("");
+  const [savingVacation, setSavingVacation] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -114,6 +132,31 @@ export default function Profile() {
     return mockDb.getInvoicesForUser(user.id);
   }, [user?.id, version]);
 
+  const notifications = useMemo(() => {
+    if (!user) return [];
+    return mockDb.getNotificationsForUser(user.id);
+  }, [user?.id, version]);
+
+  const unreadCount = useMemo(() => {
+    if (!user) return 0;
+    return mockDb.getUnreadNotificationsCount(user.id);
+  }, [user?.id, version]);
+
+  const contractAttachments = useMemo(() => {
+    if (!user) return [];
+    return mockDb.getContractAttachmentsForUser(user.id);
+  }, [user?.id, version]);
+
+  const compensationHistory = useMemo(() => {
+    if (!user) return [];
+    return mockDb.getCompensationHistoryForUser(user.id);
+  }, [user?.id, version]);
+
+  const vacationRequests = useMemo(() => {
+    if (!user) return [];
+    return mockDb.getVacationRequestsForUser(user.id);
+  }, [user?.id, version]);
+
   const totalXp = points?.totalXp ?? 0;
 
   const completedTracks = assignments.filter((a) => a.assignment.status === "COMPLETED").length;
@@ -123,7 +166,15 @@ export default function Profile() {
     .slice()
     .sort((a, b) => a.localeCompare(b));
 
-  const canUseFinance = user.role !== "MASTERADMIN" && !!user.companyId;
+  const canUseFinance = user?.role !== "MASTERADMIN" && !!user?.companyId;
+
+  const vacationInfo = useMemo(() => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const used = vacationRequests.filter((r) => new Date(r.startDate).getUTCFullYear() === year && r.status !== "REJECTED").length;
+    const remainingPeriods = Math.max(0, 2 - used);
+    return { year, used, remainingPeriods };
+  }, [vacationRequests]);
 
   if (!user) return null;
 
@@ -179,7 +230,7 @@ export default function Profile() {
         <div className="grid gap-6">
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Perfil</div>
-            <p className="mt-1 text-sm text-muted-foreground">Atualize sua foto e mantenha seus links importantes em um só lugar.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Atualize sua foto e mantenha seus dados em dia.</p>
 
             <div className="mt-5 grid gap-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -246,7 +297,7 @@ export default function Profile() {
               </div>
 
               <div className="grid gap-2">
-                <Label>Contrato assinado (Clicksign)</Label>
+                <Label>Contrato principal (Clicksign)</Label>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
                     value={contractUrl}
@@ -260,6 +311,9 @@ export default function Profile() {
                       Abrir
                     </a>
                   </Button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Para aditivos/versões em PDF, use "Contratos & aditivos" no painel ao lado.
                 </div>
               </div>
 
@@ -419,6 +473,303 @@ export default function Profile() {
 
         <div className="grid gap-6">
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notificações</div>
+                <p className="mt-1 text-sm text-muted-foreground">Atualizações importantes para você.</p>
+              </div>
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                <Bell className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                {unreadCount} não lidas
+              </Badge>
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                disabled={!unreadCount}
+                onClick={() => {
+                  mockDb.markAllNotificationsRead(user.id);
+                  setVersion((v) => v + 1);
+                }}
+              >
+                Marcar todas como lidas
+              </Button>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              {notifications.length ? (
+                notifications.slice(0, 8).map((n) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    className={
+                      "w-full rounded-2xl border border-[color:var(--sinaxys-border)] p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/40"
+                    }
+                    onClick={() => {
+                      mockDb.markNotificationRead(user.id, n.id);
+                      setVersion((v) => v + 1);
+                      if (n.href) navigate(n.href);
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{n.title}</div>
+                          {!n.readAt ? (
+                            <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Novo</Badge>
+                          ) : null}
+                        </div>
+                        {n.message ? (
+                          <div className="mt-1 text-sm text-muted-foreground">{n.message}</div>
+                        ) : null}
+                        <div className="mt-2 text-xs text-muted-foreground">{formatDate(n.createdAt)}</div>
+                      </div>
+                      {n.href ? (
+                        <div className="mt-1 flex shrink-0 items-center text-xs font-medium text-[color:var(--sinaxys-primary)]">
+                          Ver
+                        </div>
+                      ) : null}
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                  Nenhuma notificação por enquanto.
+                </div>
+              )}
+            </div>
+          </Card>
+
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Contratos & aditivos</div>
+                <p className="mt-1 text-sm text-muted-foreground">Envie PDFs/arquivos de aditivos e versões do contrato.</p>
+              </div>
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                <FileText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className="grid gap-2">
+                <Label>Título</Label>
+                <Input
+                  className="h-11 rounded-xl"
+                  value={contractTitle}
+                  onChange={(e) => setContractTitle(e.target.value)}
+                  placeholder="Ex.: Aditivo 01 — Ajuste de escopo"
+                />
+              </div>
+
+              <input
+                ref={contractFileRef}
+                type="file"
+                accept="application/pdf,image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    const dataUrl = String(reader.result ?? "");
+                    setContractFileDataUrl(dataUrl);
+                    setContractTitle((t) => (t.trim() ? t : file.name));
+                    toast({ title: "Arquivo anexado", description: "Agora é só enviar." });
+                  };
+                  reader.readAsDataURL(file);
+                }}
+              />
+
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full rounded-xl"
+                onClick={() => contractFileRef.current?.click()}
+              >
+                Selecionar arquivo
+              </Button>
+
+              <Button
+                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={savingContract || !contractFileDataUrl.startsWith("data:")}
+                onClick={() => {
+                  try {
+                    setSavingContract(true);
+                    mockDb.addContractAttachment({
+                      userId: user.id,
+                      title: contractTitle.trim() || "Contrato",
+                      fileDataUrl: contractFileDataUrl,
+                    });
+                    setContractTitle("");
+                    setContractFileDataUrl("");
+                    if (contractFileRef.current) contractFileRef.current.value = "";
+                    setVersion((v) => v + 1);
+                    toast({ title: "Contrato enviado" });
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível enviar",
+                      description: e instanceof Error ? e.message : "Tente novamente.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setSavingContract(false);
+                  }
+                }}
+              >
+                Enviar
+              </Button>
+
+              <Separator />
+
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus arquivos</div>
+                <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                  {contractAttachments.length}
+                </Badge>
+              </div>
+
+              <div className="grid gap-2">
+                {contractAttachments.length ? (
+                  contractAttachments.map((c) => (
+                    <div key={c.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.title}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">Enviado em {formatDate(c.createdAt)}</div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl">
+                            <a href={c.fileDataUrl} target="_blank" rel="noreferrer" aria-label="Abrir contrato">
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 rounded-xl"
+                            aria-label="Remover contrato"
+                            onClick={() => {
+                              mockDb.deleteContractAttachment({ userId: user.id, contractAttachmentId: c.id });
+                              setVersion((v) => v + 1);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                    Você ainda não enviou nenhum aditivo.
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Férias remuneradas</div>
+                <p className="mt-1 text-sm text-muted-foreground">20 dias/ano em 2 períodos de 10 dias.</p>
+              </div>
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                <CalendarDays className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                Ano {vacationInfo.year}: {vacationInfo.used}/2 períodos usados • restantes: {vacationInfo.remainingPeriods}
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Data de início (10 dias)</Label>
+                <Input
+                  type="date"
+                  className="h-11 rounded-xl"
+                  value={vacationStartDate}
+                  onChange={(e) => setVacationStartDate(e.target.value)}
+                />
+              </div>
+
+              <Button
+                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={
+                  savingVacation ||
+                  !vacationStartDate ||
+                  vacationInfo.remainingPeriods <= 0 ||
+                  user.role === "MASTERADMIN" ||
+                  !user.companyId
+                }
+                onClick={() => {
+                  try {
+                    setSavingVacation(true);
+                    mockDb.requestPaidVacation({ userId: user.id, startDate: vacationStartDate });
+                    setVacationStartDate("");
+                    setVersion((v) => v + 1);
+                    toast({
+                      title: "Pedido enviado",
+                      description: "Seu gestor recebeu uma notificação.",
+                    });
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível solicitar",
+                      description: e instanceof Error ? e.message : "Tente novamente.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setSavingVacation(false);
+                  }
+                }}
+              >
+                Solicitar férias
+              </Button>
+
+              <Separator />
+
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus pedidos</div>
+              <div className="grid gap-2">
+                {vacationRequests.length ? (
+                  vacationRequests.map((r) => (
+                    <div key={r.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                            {formatDateUtc(r.startDate)} • {r.days} dias
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">Solicitado em {formatDate(r.createdAt)}</div>
+                        </div>
+                        <Badge
+                          className={
+                            r.status === "APPROVED"
+                              ? "rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
+                              : r.status === "REJECTED"
+                                ? "rounded-full bg-rose-100 text-rose-900 hover:bg-rose-100"
+                                : "rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100"
+                          }
+                        >
+                          {r.status === "APPROVED" ? "Aprovado" : r.status === "REJECTED" ? "Recusado" : "Pendente"}
+                        </Badge>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                    Você ainda não solicitou férias.
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Segurança</div>
@@ -546,7 +897,7 @@ export default function Profile() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minha remuneração</div>
-                    <p className="mt-1 text-sm text-muted-foreground">Acompanhe o valor cadastrado para você.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Valor atual e histórico.</p>
                   </div>
                   <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
                     <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -554,7 +905,7 @@ export default function Profile() {
                 </div>
 
                 <div className="mt-4 grid gap-2">
-                  <div className="text-xs text-muted-foreground">Valor mensal</div>
+                  <div className="text-xs text-muted-foreground">Valor mensal atual</div>
                   <div className="text-2xl font-semibold text-[color:var(--sinaxys-ink)]">
                     {typeof user.monthlyCostBRL === "number" ? brl(user.monthlyCostBRL) : "—"}
                   </div>
@@ -568,6 +919,31 @@ export default function Profile() {
                       Ainda não existe um valor cadastrado para você. Fale com o admin da empresa.
                     </div>
                   ) : null}
+
+                  <Separator className="my-2" />
+
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Histórico</div>
+                  <div className="grid gap-2">
+                    {compensationHistory.length ? (
+                      compensationHistory.slice(0, 8).map((e) => (
+                        <div key={e.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{brl(e.monthlyCostBRL)}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Vigência: {formatDate(e.effectiveAt)}
+                                {e.note ? ` • ${e.note}` : ""}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                        Sem histórico registrado ainda.
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Card>
 
@@ -625,7 +1001,6 @@ export default function Profile() {
                       className="w-full rounded-xl"
                       onClick={() => invoiceFileRef.current?.click()}
                     >
-                      <FileText className="mr-2 h-4 w-4" />
                       Selecionar arquivo
                     </Button>
 

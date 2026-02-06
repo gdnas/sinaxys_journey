@@ -202,7 +202,7 @@ export type Invoice = {
   userId: string;
   companyId: string;
   title: string;
-  invoiceUrl: string; // data URL do arquivo (PDF/imagem)
+  invoiceUrl: string; // link no Conta Azul (ou outra ferramenta)
   amountBRL?: number;
   issuedAt?: string; // ISO
   status: InvoiceStatus;
@@ -210,37 +210,34 @@ export type Invoice = {
   createdAt: string;
 };
 
-export type NotificationType =
-  | "TRACK_ASSIGNED"
-  | "VACATION_REQUEST"
-  | "VACATION_DECISION"
-  | "COMPENSATION_UPDATED";
+export type NotificationType = "TRACK_ASSIGNED" | "VACATION_REQUEST";
 
 export type Notification = {
   id: string;
-  userId: string;
+  companyId?: string;
+  userId: string; // destinatário
   type: NotificationType;
   title: string;
-  body?: string;
-  createdAt: string;
+  message?: string;
+  href?: string;
   readAt?: string;
-  data?: Record<string, any>;
-};
-
-export type ContractDocument = {
-  id: string;
-  userId: string;
-  companyId: string;
-  title: string;
-  fileDataUrl: string; // PDF/imagem (data URL)
   createdAt: string;
 };
 
-export type CompensationEntry = {
+export type ContractAttachment = {
   id: string;
-  userId: string;
   companyId: string;
-  amountBRL: number;
+  userId: string;
+  title: string;
+  fileDataUrl: string; // PDF/image data URL
+  createdAt: string;
+};
+
+export type CompensationEvent = {
+  id: string;
+  companyId: string;
+  userId: string;
+  monthlyCostBRL: number;
   effectiveAt: string; // ISO
   createdAt: string;
   createdByUserId?: string;
@@ -251,15 +248,14 @@ export type VacationRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
 export type VacationRequest = {
   id: string;
-  userId: string;
   companyId: string;
-  startDate: string; // ISO date (YYYY-MM-DD) or ISO
-  days: 10;
+  userId: string;
+  startDate: string; // ISO date (00:00)
+  days: number; // we use 10-day periods
   status: VacationRequestStatus;
   createdAt: string;
   decidedAt?: string;
   decidedByUserId?: string;
-  decisionNote?: string;
 };
 
 export type Db = {
@@ -279,7 +275,7 @@ export type Db = {
   pointsEvents: PointsEvent[];
   invoices: Invoice[];
   notifications: Notification[];
-  contractDocuments: ContractDocument[];
-  compensationHistory: CompensationEntry[];
+  contractAttachments: ContractAttachment[];
+  compensationEvents: CompensationEvent[];
   vacationRequests: VacationRequest[];
 };

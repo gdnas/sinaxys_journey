@@ -1,8 +1,8 @@
 import {
   type Certificate,
   type Company,
-  type CompensationEntry,
-  type ContractDocument,
+  type CompensationEvent,
+  type ContractAttachment,
   type Db,
   type Department,
   type Invite,
@@ -247,47 +247,70 @@ function ensureMultiCompany(db: Db) {
   saveDb(db);
 }
 
-function ensureSystemCollections(db: Db) {
+function ensureNotifications(db: Db) {
   if (!Array.isArray((db as any).notifications)) (db as any).notifications = [];
-  if (!Array.isArray((db as any).contractDocuments)) (db as any).contractDocuments = [];
-  if (!Array.isArray((db as any).compensationHistory)) (db as any).compensationHistory = [];
+}
+
+function ensureContractAttachments(db: Db) {
+  if (!Array.isArray((db as any).contractAttachments)) (db as any).contractAttachments = [];
+}
+
+function ensureCompensationEvents(db: Db) {
+  if (!Array.isArray((db as any).compensationEvents)) (db as any).compensationEvents = [];
+
+  // Baseline: if a user has a monthlyCostBRL but no events, create an initial record.
+  const byUserId = new Map<string, CompensationEvent[]>(
+    (db.compensationEvents ?? []).reduce((acc, e) => {
+      const arr = acc.get(e.userId) ?? [];
+      arr.push(e);
+      acc.set(e.userId, arr);
+      return acc;
+    }, new Map<string, CompensationEvent[]>()),
+  );
+
+  let changed = false;
+  for (const u of db.users) {
+    if (!u.companyId) continue;
+    if (typeof u.monthlyCostBRL !== "number" || !Number.isFinite(u.monthlyCostBRL)) continue;
+    const existing = byUserId.get(u.id) ?? [];
+    if (existing.length) continue;
+
+    (db.compensationEvents ?? []).push({
+      id: uid("cmpc"),
+      companyId: u.companyId,
+      userId: u.id,
+      monthlyCostBRL: u.monthlyCostBRL,
+      effectiveAt: u.joinedAt ?? nowIso(),
+      createdAt: nowIso(),
+      createdByUserId: undefined,
+      note: "Inicial",
+    });
+    changed = true;
+  }
+
+  if (changed) saveDb(db);
+}
+
+function ensureVacationRequests(db: Db) {
   if (!Array.isArray((db as any).vacationRequests)) (db as any).vacationRequests = [];
 }
 
-function createNotification(db: Db, params: Omit<Notification, "id" | "createdAt"> & { id?: string; createdAt?: string }) {
-  ensureSystemCollections(db);
+function pushNotification(db: Db, data: Omit<Notification, "id" | "createdAt" | "readAt"> & { readAt?: string }) {
+  ensureNotifications(db);
   const n: Notification = {
-    id: params.id ?? uid("ntf"),
-    userId: params.userId,
-    type: params.type,
-    title: params.title,
-    body: params.body,
-    createdAt: params.createdAt ?? nowIso(),
-    readAt: params.readAt,
-    data: params.data,
+    id: uid("ntf"),
+    createdAt: nowIso(),
+    ...data,
   };
   db.notifications.push(n);
   return n;
 }
 
-function resolveManagerForVacation(db: Db, userId: string) {
-  const u = db.users.find((x) => x.id === userId);
-  if (!u || !u.companyId) return null;
-
-  if (u.managerId) {
-    const m = db.users.find((x) => x.id === u.managerId && x.active);
-    if (m) return m;
-  }
-
-  // fallback: first active admin of company
-  const admin = db.users.find((x) => x.companyId === u.companyId && x.role === "ADMIN" && x.active);
-  return admin ?? null;
-}
-
-function yearFromIsoDate(iso: string) {
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return null;
-  return d.getFullYear();
+function startOfDayIso(dateStr: string) {
+  // Expects YYYY-MM-DD
+  if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dateStr.trim())) return null;
+  const iso = new Date(`${dateStr}T00:00:00Z`).toISOString();
+  return iso;
 }
 
 function ensureDefaultUsers(db: Db) {
@@ -336,7 +359,6 @@ export function loadDb(): Db {
     const parsed = JSON.parse(raw) as Db;
 
     ensureMultiCompany(parsed);
-    ensureSystemCollections(parsed);
 
     // Migration: add dueAt field (optional) for older assignments (no-op but keeps shape stable)
     if (Array.isArray((parsed as any).assignments)) {
@@ -369,6 +391,27 @@ export function loadDb(): Db {
     // Migration: invoices
     if (!Array.isArray((parsed as any).invoices)) {
       (parsed as any).invoices = [];
+      saveDb(parsed);
+    }
+
+    // Migration: notifications / contracts / compensation / vacations
+    if (!Array.isArray((parsed as any).notifications)) {
+      (parsed as any).notifications = [];
+      saveDb(parsed);
+    }
+    if (!Array.isArray((parsed as any).contractAttachments)) {
+      (parsed as any).contractAttachments = [];
+      saveDb(parsed);
+    }
+    if (!Array.isArray((parsed as any).compensationEvents)) {
+      (parsed as any).compensationEvents = [];
+      saveDb(parsed);
+    }
+    // Ensure baseline records exist
+    ensureCompensationEvents(parsed);
+
+    if (!Array.isArray((parsed as any).vacationRequests)) {
+      (parsed as any).vacationRequests = [];
       saveDb(parsed);
     }
 
@@ -727,17 +770,18 @@ function seedDb(): Db {
   const certificates: Certificate[] = [];
   const invoices: Invoice[] = [];
   const notifications: Notification[] = [];
-  const contractDocuments: ContractDocument[] = [];
-  const compensationHistory: CompensationEntry[] = users
-    .filter((u) => u.companyId && typeof u.monthlyCostBRL === "number")
+  const contractAttachments: ContractAttachment[] = [];
+  const compensationEvents: CompensationEvent[] = users
+    .filter((u) => u.companyId && typeof u.monthlyCostBRL === "number" && Number.isFinite(u.monthlyCostBRL))
     .map((u) => ({
-      id: uid("cmpH"),
-      userId: u.id,
+      id: uid("cmpc"),
       companyId: u.companyId!,
-      amountBRL: u.monthlyCostBRL!,
+      userId: u.id,
+      monthlyCostBRL: u.monthlyCostBRL!,
       effectiveAt: u.joinedAt ?? nowIso(),
       createdAt: nowIso(),
-      note: "Valor inicial",
+      createdByUserId: undefined,
+      note: "Inicial",
     }));
   const vacationRequests: VacationRequest[] = [];
 
@@ -825,8 +869,8 @@ function seedDb(): Db {
     pointsEvents,
     invoices,
     notifications,
-    contractDocuments,
-    compensationHistory,
+    contractAttachments,
+    compensationEvents,
     vacationRequests,
   };
 }
@@ -1579,7 +1623,6 @@ export const mockDb = {
   // Mutations: Head/admin
   assignTrack(params: { trackId: string; userId: string; assignedByUserId: string; dueAt?: string }) {
     const db = loadDb();
-    ensureSystemCollections(db);
     const track = db.tracks.find((t) => t.id === params.trackId);
     if (!track) return null;
 
@@ -1618,15 +1661,23 @@ export const mockDb = {
       });
     });
 
-    const assignee = db.users.find((u) => u.id === params.userId);
-    const assigner = db.users.find((u) => u.id === params.assignedByUserId);
-    if (assignee) {
-      createNotification(db, {
-        userId: assignee.id,
+    // Notify assigned user
+    const target = db.users.find((u) => u.id === params.userId);
+    const assignedBy = db.users.find((u) => u.id === params.assignedByUserId);
+    if (target && target.active) {
+      let href = "/tracks";
+      if (target.role === "COLABORADOR") href = `/app/tracks/${a.id}`;
+      else if (target.role === "HEAD") href = "/head/tracks";
+
+      const dueLabel = params.dueAt ? new Date(params.dueAt).toLocaleDateString("pt-BR") : null;
+      const message = `Você recebeu a trilha " ${track.title} " ${assignedBy ? ` de ${assignedBy.name}` : ""}${dueLabel ? ` (prazo: ${dueLabel})` : ""}.`;
+      pushNotification(db, {
+        companyId: track.companyId,
+        userId: target.id,
         type: "TRACK_ASSIGNED",
         title: "Nova trilha atribuída",
-        body: `${assigner?.name ?? "Alguém"} atribuiu “${track.title}” para você.`,
-        data: { assignmentId: a.id, trackId: track.id, dueAt: a.dueAt },
+        message,
+        href,
       });
     }
 
@@ -2045,112 +2096,129 @@ export const mockDb = {
   },
 
   // Notifications
-  getNotificationsForUser(userId: string) {
+  getNotificationsForUser(userId: string, opts?: { unreadOnly?: boolean }) {
     const db = loadDb();
-    ensureSystemCollections(db);
+    ensureNotifications(db);
+    const unreadOnly = !!opts?.unreadOnly;
     return (db.notifications ?? [])
       .filter((n) => n.userId === userId)
+      .filter((n) => (unreadOnly ? !n.readAt : true))
       .slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
-  markNotificationRead(notificationId: string, read: boolean) {
+  getUnreadNotificationsCount(userId: string) {
+    return this.getNotificationsForUser(userId, { unreadOnly: true }).length;
+  },
+  markNotificationRead(userId: string, notificationId: string) {
     const db = loadDb();
-    ensureSystemCollections(db);
-    const n = (db.notifications ?? []).find((x) => x.id === notificationId);
-    if (!n) return null;
-    n.readAt = read ? nowIso() : undefined;
+    ensureNotifications(db);
+    const n = (db.notifications ?? []).find((x) => x.id === notificationId && x.userId === userId);
+    if (!n) return;
+    n.readAt = n.readAt ?? nowIso();
     saveDb(db);
-    return n;
+  },
+  markAllNotificationsRead(userId: string) {
+    const db = loadDb();
+    ensureNotifications(db);
+    let changed = false;
+    for (const n of db.notifications ?? []) {
+      if (n.userId !== userId) continue;
+      if (n.readAt) continue;
+      n.readAt = nowIso();
+      changed = true;
+    }
+    if (changed) saveDb(db);
   },
 
-  // Contracts (Aditivos)
-  getContractDocumentsForUser(userId: string) {
+  // Contracts (additivos)
+  getContractAttachmentsForUser(userId: string) {
     const db = loadDb();
-    ensureSystemCollections(db);
-    return (db.contractDocuments ?? [])
-      .filter((d) => d.userId === userId)
+    ensureContractAttachments(db);
+    return (db.contractAttachments ?? [])
+      .filter((c) => c.userId === userId)
       .slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
-  addContractDocument(params: { userId: string; title: string; fileDataUrl: string }) {
+  addContractAttachment(params: { userId: string; title: string; fileDataUrl: string }) {
     const db = loadDb();
-    ensureSystemCollections(db);
-    const u = db.users.find((x) => x.id === params.userId);
-    if (!u) throw new Error("Usuário inválido.");
-    if (!u.companyId) throw new Error("Usuário sem empresa.");
-    if (!params.fileDataUrl.startsWith("data:")) throw new Error("Envie um arquivo válido (PDF/imagem). ");
+    ensureContractAttachments(db);
 
-    const doc: ContractDocument = {
-      id: uid("ctd"),
-      userId: params.userId,
+    const u = db.users.find((x) => x.id === params.userId);
+    if (!u) throw new Error("Usuário não encontrado.");
+    if (!u.companyId) throw new Error("Usuário sem empresa.");
+
+    const title = params.title.trim() || "Contrato";
+    const fileDataUrl = params.fileDataUrl.trim();
+    if (!fileDataUrl.startsWith("data:")) throw new Error("Arquivo inválido.");
+
+    const c: ContractAttachment = {
+      id: uid("ctrt"),
       companyId: u.companyId,
-      title: params.title.trim() || "Contrato",
-      fileDataUrl: params.fileDataUrl,
+      userId: u.id,
+      title,
+      fileDataUrl,
       createdAt: nowIso(),
     };
 
-    db.contractDocuments.push(doc);
+    db.contractAttachments.push(c);
     saveDb(db);
-    return doc;
+    return c;
   },
-  deleteContractDocument(docId: string, userId: string) {
+  deleteContractAttachment(params: { userId: string; contractAttachmentId: string }) {
     const db = loadDb();
-    ensureSystemCollections(db);
-    const doc = (db.contractDocuments ?? []).find((d) => d.id === docId);
-    if (!doc) return;
-    if (doc.userId !== userId) throw new Error("Você não pode remover este documento.");
-    db.contractDocuments = (db.contractDocuments ?? []).filter((d) => d.id !== docId);
-    saveDb(db);
+    ensureContractAttachments(db);
+    const before = db.contractAttachments.length;
+    db.contractAttachments = db.contractAttachments.filter(
+      (c) => !(c.id === params.contractAttachmentId && c.userId === params.userId),
+    );
+    if (db.contractAttachments.length !== before) saveDb(db);
   },
 
-  // Compensation history
-  getCompensationHistory(userId: string) {
+  // Remuneração
+  getCompensationHistoryForUser(userId: string) {
     const db = loadDb();
-    ensureSystemCollections(db);
-    return (db.compensationHistory ?? [])
+    ensureCompensationEvents(db);
+    return (db.compensationEvents ?? [])
       .filter((e) => e.userId === userId)
       .slice()
-      .sort((a, b) => b.effectiveAt.localeCompare(a.effectiveAt) || b.createdAt.localeCompare(a.createdAt));
+      .sort((a, b) => b.effectiveAt.localeCompare(a.effectiveAt));
   },
 
-  // Vacation
+  // Férias
   getVacationRequestsForUser(userId: string) {
     const db = loadDb();
-    ensureSystemCollections(db);
+    ensureVacationRequests(db);
     return (db.vacationRequests ?? [])
       .filter((r) => r.userId === userId)
       .slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
-  createVacationRequest(params: { userId: string; startDate: string }) {
+  requestPaidVacation(params: { userId: string; startDate: string }) {
     const db = loadDb();
-    ensureSystemCollections(db);
+    ensureVacationRequests(db);
+    ensureNotifications(db);
 
     const u = db.users.find((x) => x.id === params.userId);
-    if (!u) throw new Error("Usuário inválido.");
+    if (!u) throw new Error("Usuário não encontrado.");
     if (!u.companyId) throw new Error("Usuário sem empresa.");
 
-    const start = params.startDate.trim();
-    // Accept YYYY-MM-DD from <input type="date">
-    const startIso = start.length === 10 ? new Date(`${start}T12:00:00.000Z`).toISOString() : new Date(start).toISOString();
-    const y = yearFromIsoDate(startIso);
-    if (!y) throw new Error("Data inválida.");
+    const startIso = startOfDayIso(params.startDate);
+    if (!startIso) throw new Error("Data inválida.");
 
-    const usedPeriods = (db.vacationRequests ?? []).filter((r) => {
-      if (r.userId !== u.id) return false;
-      if (r.status === "REJECTED") return false;
-      const ry = yearFromIsoDate(r.startDate);
-      return ry === y;
-    }).length;
+    const year = new Date(startIso).getUTCFullYear();
+    const existing = (db.vacationRequests ?? []).filter(
+      (r) => r.userId === u.id && new Date(r.startDate).getUTCFullYear() === year && r.status !== "REJECTED",
+    );
 
-    if (usedPeriods >= 2) {
-      throw new Error("Você já atingiu os 2 períodos de 10 dias de férias remuneradas para este ano.");
+    // 20 days/year split into 2 periods of 10
+    if (existing.length >= 2) {
+      throw new Error("Você já solicitou as 2 parcelas de férias remuneradas deste ano.");
     }
 
     const req: VacationRequest = {
       id: uid("vac"),
-      userId: u.id,
       companyId: u.companyId,
+      userId: u.id,
       startDate: startIso,
       days: 10,
       status: "PENDING",
@@ -2159,106 +2227,55 @@ export const mockDb = {
 
     db.vacationRequests.push(req);
 
-    const manager = resolveManagerForVacation(db, u.id);
-    if (manager) {
-      createNotification(db, {
-        userId: manager.id,
+    // Notify manager or admins
+    const recipients: string[] = [];
+    if (u.managerId) {
+      recipients.push(u.managerId);
+    } else {
+      recipients.push(...db.users.filter((x) => x.companyId === u.companyId && x.role === "ADMIN" && x.active).map((x) => x.id));
+    }
+
+    const startLabel = new Date(startIso).toLocaleDateString("pt-BR", { timeZone: "UTC" });
+    for (const toUserId of recipients) {
+      pushNotification(db, {
+        companyId: u.companyId,
+        userId: toUserId,
         type: "VACATION_REQUEST",
-        title: `Pedido de férias — ${u.name}`,
-        body: `Solicitação de 10 dias a partir de ${new Date(req.startDate).toLocaleDateString("pt-BR")}.`,
-        data: { vacationRequestId: req.id, userId: u.id },
+        title: "Pedido de férias remuneradas",
+        message: `${u.name} solicitou 10 dias a partir de ${startLabel}.`,
+        href: `/people/${u.id}`,
       });
     }
 
     saveDb(db);
     return req;
   },
-  decideVacationRequest(params: { requestId: string; status: VacationRequestStatus; decidedByUserId: string; note?: string }) {
+
+  // Admin
+  updateUserCompensation(userId: string, data: { monthlyCostBRL?: number }, opts?: { createdByUserId?: string; effectiveAt?: string; note?: string }) {
     const db = loadDb();
-    ensureSystemCollections(db);
-
-    const r = (db.vacationRequests ?? []).find((x) => x.id === params.requestId);
-    if (!r) throw new Error("Solicitação não encontrada.");
-
-    const decider = db.users.find((u) => u.id === params.decidedByUserId);
-    if (!decider) throw new Error("Usuário inválido.");
-
-    // Basic permission: must be manager of the requester OR admin of company OR masteradmin
-    const requester = db.users.find((u) => u.id === r.userId);
-    if (!requester) throw new Error("Solicitante inválido.");
-
-    const canDecide =
-      decider.role === "MASTERADMIN" ||
-      (decider.role === "ADMIN" && decider.companyId && decider.companyId === r.companyId) ||
-      requester.managerId === decider.id;
-
-    if (!canDecide) throw new Error("Você não tem permissão para aprovar/rejeitar este pedido.");
-
-    if (r.status !== "PENDING") throw new Error("Este pedido já foi decidido.");
-
-    r.status = params.status;
-    r.decidedAt = nowIso();
-    r.decidedByUserId = params.decidedByUserId;
-    r.decisionNote = params.note?.trim() || undefined;
-
-    createNotification(db, {
-      userId: r.userId,
-      type: "VACATION_DECISION",
-      title: params.status === "APPROVED" ? "Férias aprovadas" : "Férias rejeitadas",
-      body: `Pedido de 10 dias a partir de ${new Date(r.startDate).toLocaleDateString("pt-BR")} foi ${
-        params.status === "APPROVED" ? "aprovado" : "rejeitado"
-      }.`,
-      data: { vacationRequestId: r.id, status: r.status },
-    });
-
-    // Mark related VACATION_REQUEST notifications as read for the manager
-    for (const n of db.notifications ?? []) {
-      if (n.type !== "VACATION_REQUEST") continue;
-      if (n.data?.vacationRequestId === r.id) {
-        n.readAt = n.readAt ?? nowIso();
-      }
-    }
-
-    saveDb(db);
-    return r;
-  },
-
-  updateUserCompensation(
-    userId: string,
-    data: { monthlyCostBRL?: number },
-    opts?: { changedByUserId?: string; effectiveAt?: string; note?: string },
-  ) {
-    const db = loadDb();
-    ensureSystemCollections(db);
     const u = db.users.find((x) => x.id === userId);
     if (!u) return null;
 
+    const prev = u.monthlyCostBRL;
+
     if (typeof data.monthlyCostBRL === "number" && Number.isFinite(data.monthlyCostBRL)) {
-      const next = Math.max(0, data.monthlyCostBRL);
-      const prev = u.monthlyCostBRL;
-      u.monthlyCostBRL = next;
+      u.monthlyCostBRL = Math.max(0, data.monthlyCostBRL);
+    }
 
-      if (u.companyId && next !== prev) {
-        const entry: CompensationEntry = {
-          id: uid("cmpH"),
-          userId: u.id,
-          companyId: u.companyId,
-          amountBRL: next,
-          effectiveAt: opts?.effectiveAt ?? nowIso(),
-          createdAt: nowIso(),
-          createdByUserId: opts?.changedByUserId,
-          note: opts?.note?.trim() || undefined,
-        };
-        db.compensationHistory.push(entry);
-
-        createNotification(db, {
-          userId: u.id,
-          type: "COMPENSATION_UPDATED",
-          title: "Atualização de remuneração",
-          body: `Seu valor mensal foi atualizado para ${new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(next)}.`,
-          data: { amountBRL: next },
-        });
-      }
+    // Record compensation change
+    if (u.companyId && typeof u.monthlyCostBRL === "number" && u.monthlyCostBRL !== (prev ?? undefined)) {
+      ensureCompensationEvents(db);
+      (db.compensationEvents ?? []).push({
+        id: uid("cmpc"),
+        companyId: u.companyId,
+        userId: u.id,
+        monthlyCostBRL: u.monthlyCostBRL,
+        effectiveAt: opts?.effectiveAt ?? nowIso(),
+        createdAt: nowIso(),
+        createdByUserId: opts?.createdByUserId,
+        note: opts?.note,
+      });
     }
 
     saveDb(db);
