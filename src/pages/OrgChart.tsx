@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ArrowUpDown,
@@ -79,6 +79,12 @@ export default function OrgChart() {
   const [selectedPersonId, setSelectedPersonId] = useState<string | null>(null);
   const [detailManagerId, setDetailManagerId] = useState<string>("");
 
+  const treeViewportRef = useRef<HTMLDivElement | null>(null);
+  const treeContentRef = useRef<HTMLDivElement | null>(null);
+  const [treeScale, setTreeScale] = useState(1);
+
+  const collapsedKey = useMemo(() => Array.from(collapsed).sort().join("|"), [collapsed]);
+
   if (!user) return null;
 
   const deptIdForScope = scope === "__my__" ? user.departmentId : scope === "__all__" ? undefined : scope;
@@ -139,6 +145,34 @@ export default function OrgChart() {
     });
     return merged;
   }, [childrenByManager, users, byId]);
+
+  useEffect(() => {
+    if (view !== "tree") return;
+
+    const viewport = treeViewportRef.current;
+    const content = treeContentRef.current;
+    if (!viewport || !content) return;
+
+    const recalc = () => {
+      // NOTE: scrollWidth/scrollHeight ignore CSS transforms, which is what we want here.
+      const vw = viewport.clientWidth;
+      const vh = viewport.clientHeight;
+      const cw = content.scrollWidth;
+      const ch = content.scrollHeight;
+      if (!vw || !vh || !cw || !ch) return;
+
+      const pad = 16; // breathing room inside the viewport
+      const s = Math.min(1, (vw - pad) / cw, (vh - pad) / ch);
+      const clamped = Math.max(0.25, Math.min(1, s));
+      setTreeScale(clamped);
+    };
+
+    recalc();
+    const ro = new ResizeObserver(() => recalc());
+    ro.observe(viewport);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [view, roots.length, users.length, scope, collapsedKey]);
 
   const movingUser = movingUserId ? byId.get(movingUserId) ?? null : null;
 
@@ -304,6 +338,37 @@ export default function OrgChart() {
     );
   }
 
+  function PersonTreeBadge({ node }: { node: User }) {
+    const isMe = user.id === node.id;
+
+    return (
+      <button
+        type="button"
+        onClick={() => setSelectedPersonId(node.id)}
+        className={
+          "group flex w-[118px] flex-col items-center gap-2 rounded-2xl px-2 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[color:var(--sinaxys-primary)]/40" +
+          " hover:bg-[color:var(--sinaxys-tint)]/45"
+        }
+        aria-label={`Abrir ${node.name}`}
+      >
+        <Avatar
+          className={
+            "h-11 w-11 ring-2 ring-[color:var(--sinaxys-border)] transition group-hover:ring-[color:var(--sinaxys-primary)]/30" +
+            (isMe ? " ring-[color:var(--sinaxys-primary)]/50" : "")
+          }
+        >
+          <AvatarImage src={node.avatarUrl} alt={node.name} />
+          <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+            {initials(node.name)}
+          </AvatarFallback>
+        </Avatar>
+        <div className="text-pretty text-center text-xs font-semibold leading-tight text-[color:var(--sinaxys-ink)]">
+          {node.name}
+        </div>
+      </button>
+    );
+  }
+
   function Node({ node, depth }: { node: User; depth: number }) {
     const directReports = childrenByManager.get(node.id) ?? [];
     const isCollapsed = collapsed.has(node.id);
@@ -355,13 +420,12 @@ export default function OrgChart() {
 
   function TreeNode({ node, depth }: { node: User; depth: number }) {
     const children = childrenByManager.get(node.id) ?? [];
-    const isCollapsed = collapsed.has(node.id);
 
     return (
       <div className="inline-flex flex-col items-center">
-        <PersonCard node={node} depth={depth} compact />
+        <PersonTreeBadge node={node} />
 
-        {children.length && !isCollapsed ? (
+        {children.length ? (
           <div className="mt-3 flex flex-col items-center">
             <div className="h-6 w-px bg-[color:var(--sinaxys-border)]" />
 
@@ -403,6 +467,7 @@ export default function OrgChart() {
                     onValueChange={(v) => {
                       const next = (v as OrgViewMode) || "list";
                       setView(next);
+                      if (next === "tree") setCollapsed(new Set());
                     }}
                     className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-1"
                   >
@@ -494,12 +559,27 @@ export default function OrgChart() {
           view === "list" ? (
             roots.map((r) => <Node key={r.id} node={r} depth={0} />)
           ) : (
-            <div className="max-w-full overflow-x-auto rounded-3xl border bg-white p-4 md:p-6">
-              <div className="min-w-max">
-                <div className="flex items-start justify-center gap-10">
-                  {roots.map((r) => (
-                    <TreeNode key={r.id} node={r} depth={0} />
-                  ))}
+            <div className="rounded-3xl border bg-white p-4 md:p-6">
+              <div
+                ref={treeViewportRef}
+                className="relative h-[calc(100dvh-340px)] min-h-[420px] overflow-hidden rounded-2xl bg-[color:var(--sinaxys-bg)]/35"
+              >
+                <div className="absolute inset-0 flex items-start justify-center p-3 md:p-4">
+                  <div
+                    ref={treeContentRef}
+                    style={{ transform: `scale(${treeScale})`, transformOrigin: "top center" }}
+                    className="min-w-max"
+                  >
+                    <div className="flex items-start justify-center gap-10">
+                      {roots.map((r) => (
+                        <TreeNode key={r.id} node={r} depth={0} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-white/90 px-3 py-1 text-[11px] font-medium text-muted-foreground shadow-sm">
+                  Ajuste automático: {Math.round(treeScale * 100)}%
                 </div>
               </div>
             </div>
