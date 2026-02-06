@@ -20,6 +20,7 @@ import TrackLibrary from "./pages/TrackLibrary";
 import Rankings from "./pages/Rankings";
 import AdminUsers from "./pages/AdminUsers";
 import AdminImportUsers from "./pages/AdminImportUsers";
+import AdminDepartments from "./pages/AdminDepartments";
 import AdminRewards from "./pages/AdminRewards";
 import AdminBrand from "./pages/AdminBrand";
 import AdminCosts from "./pages/AdminCosts";
@@ -206,6 +207,14 @@ const App = () => (
                   element={
                     <RequireAuth roles={["ADMIN"]}>
                       <AdminUsers />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/departments"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminDepartments />
                     </RequireAuth>
                   }
                 />

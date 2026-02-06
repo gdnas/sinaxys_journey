@@ -862,6 +862,57 @@ export const mockDb = {
   getCompany(companyId: string) {
     return loadDb().companies.find((c) => c.id === companyId) ?? null;
   },
+
+  createDepartment(companyId: string, name: string) {
+    const db = loadDb();
+    const n = name.trim();
+    if (n.length < 2) throw new Error("Nome do departamento inválido.");
+
+    const exists = db.departments.some(
+      (d) => d.companyId === companyId && normalizeText(d.name) === normalizeText(n),
+    );
+    if (exists) throw new Error("Já existe um departamento com este nome.");
+
+    const d: Department = { id: uid("dept"), companyId, name: n };
+    db.departments.push(d);
+    saveDb(db);
+    return d;
+  },
+
+  updateDepartment(departmentId: string, name: string) {
+    const db = loadDb();
+    const d = db.departments.find((x) => x.id === departmentId);
+    if (!d) throw new Error("Departamento não encontrado.");
+
+    const n = name.trim();
+    if (n.length < 2) throw new Error("Nome do departamento inválido.");
+
+    const exists = db.departments.some(
+      (x) => x.companyId === d.companyId && x.id !== d.id && normalizeText(x.name) === normalizeText(n),
+    );
+    if (exists) throw new Error("Já existe um departamento com este nome.");
+
+    d.name = n;
+    saveDb(db);
+    return d;
+  },
+
+  deleteDepartment(departmentId: string) {
+    const db = loadDb();
+    const d = db.departments.find((x) => x.id === departmentId);
+    if (!d) return;
+
+    const usersUsing = db.users.filter((u) => u.departmentId === d.id).length;
+    const tracksUsing = db.tracks.filter((t) => t.departmentId === d.id).length;
+
+    if (usersUsing > 0 || tracksUsing > 0) {
+      throw new Error("Não é possível remover: há usuários e/ou trilhas vinculadas a este departamento.");
+    }
+
+    db.departments = db.departments.filter((x) => x.id !== d.id);
+    saveDb(db);
+  },
+
   createCompany(params: { name: string; tagline?: string }) {
     const db = loadDb();
 
