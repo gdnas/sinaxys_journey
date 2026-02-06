@@ -51,6 +51,7 @@ export type User = {
   departmentId?: string;
   active: boolean;
   avatarUrl?: string; // URL (ou data URL) da foto
+  jobTitle?: string; // cargo
   contractUrl?: string; // link do contrato assinado (ex.: Clicksign)
   monthlyCostBRL?: number; // custo mensal (salário/encargos) em BRL
   managerId?: string; // id do gestor direto (pode ser HEAD ou ADMIN)
@@ -210,7 +211,7 @@ export type Invoice = {
   createdAt: string;
 };
 
-export type NotificationType = "TRACK_ASSIGNED" | "VACATION_REQUEST";
+export type NotificationType = "TRACK_ASSIGNED" | "VACATION_REQUEST" | "VACATION_DECISION";
 
 export type Notification = {
   id: string;
@@ -269,6 +270,7 @@ export type VacationRequest = {
   createdAt: string;
   decidedAt?: string;
   decidedByUserId?: string;
+  decisionNote?: string; // justificativa da decisão (aprovação/recusa)
 };
 
 export type Db = {

@@ -455,6 +455,22 @@ export function loadDb(): Db {
             u.joinedAt = nowIso();
             changed = true;
           }
+          if (!("jobTitle" in u)) {
+            u.jobTitle = undefined;
+            changed = true;
+          }
+        }
+      }
+      if (changed) saveDb(parsed);
+    }
+
+    // Migration: vacation decision note
+    if (Array.isArray((parsed as any).vacationRequests)) {
+      let changed = false;
+      for (const r of (parsed as any).vacationRequests) {
+        if (r && typeof r === "object" && !("decisionNote" in r)) {
+          r.decisionNote = undefined;
+          changed = true;
         }
       }
       if (changed) saveDb(parsed);
@@ -537,11 +553,12 @@ function seedDb(): Db {
       name: "Aline Ramos",
       email: "aline@sinaxys.com",
       role: "COLABORADOR",
+      jobTitle: "Analista de Produto",
       departmentId: deptByName("Produto"),
       active: true,
       monthlyCostBRL: 9500,
       phone: "+55 11 98888-1111",
-      joinedAt: daysAgo(220),
+      joinedAt: daysAgo(420),
       // managerId set after we create the heads
     },
     {
@@ -550,6 +567,7 @@ function seedDb(): Db {
       name: "Bruno Teixeira",
       email: "bruno@sinaxys.com",
       role: "COLABORADOR",
+      jobTitle: "Analista de CS",
       departmentId: deptByName("Customer Success"),
       active: true,
       monthlyCostBRL: 6500,
@@ -563,6 +581,7 @@ function seedDb(): Db {
       name: "Camila Souza",
       email: "camila@sinaxys.com",
       role: "HEAD",
+      jobTitle: "Head de Produto",
       departmentId: deptByName("Produto"),
       active: true,
       monthlyCostBRL: 16500,
@@ -576,6 +595,7 @@ function seedDb(): Db {
       name: "Diego Martins",
       email: "diego@sinaxys.com",
       role: "HEAD",
+      jobTitle: "Head de Customer Success",
       departmentId: deptByName("Customer Success"),
       active: true,
       monthlyCostBRL: 14500,
@@ -589,6 +609,7 @@ function seedDb(): Db {
       name: "Admin Sinaxys",
       email: "admin@sinaxys.com",
       role: "ADMIN",
+      jobTitle: "Admin",
       active: true,
       phone: "+55 11 90000-0000",
       joinedAt: daysAgo(800),
@@ -600,6 +621,7 @@ function seedDb(): Db {
       name: "Guilherme",
       email: "guilherme@sinaxys.com",
       role: "ADMIN",
+      jobTitle: "Admin",
       active: true,
       joinedAt: daysAgo(300),
     },
@@ -1898,7 +1920,7 @@ export const mockDb = {
     saveDb(db);
   },
 
-  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string; phone?: string }) {
+  updateUserProfile(userId: string, data: { name?: string; avatarUrl?: string; contractUrl?: string; phone?: string; jobTitle?: string }) {
     const db = loadDb();
     const u = db.users.find((x) => x.id === userId);
     if (!u) return null;
@@ -1907,6 +1929,7 @@ export const mockDb = {
     if (typeof data.avatarUrl === "string") u.avatarUrl = data.avatarUrl.trim() || undefined;
     if (typeof data.contractUrl === "string") u.contractUrl = data.contractUrl.trim() || undefined;
     if (typeof data.phone === "string") u.phone = data.phone.trim() || undefined;
+    if (typeof data.jobTitle === "string") u.jobTitle = data.jobTitle.trim() || undefined;
 
     saveDb(db);
     return u;
@@ -2242,8 +2265,23 @@ export const mockDb = {
     if (!u) throw new Error("Usuário não encontrado.");
     if (!u.companyId) throw new Error("Usuário sem empresa.");
 
+    // Eligibility: only after 1 year
+    const joinedMs = u.joinedAt ? new Date(u.joinedAt).getTime() : NaN;
+    if (!Number.isFinite(joinedMs)) throw new Error("Não foi possível validar sua data de entrada.");
+    const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+    if (Date.now() - joinedMs < ONE_YEAR_MS) {
+      throw new Error("Pedidos de férias remuneradas são liberados apenas após 1 ano de Sinaxys.");
+    }
+
     const startIso = startOfDayIso(params.startDate);
     if (!startIso) throw new Error("Data inválida.");
+
+    // Lead time: 45 days
+    const startMs = new Date(startIso).getTime();
+    const LEAD_MS = 45 * 24 * 60 * 60 * 1000;
+    if (startMs - Date.now() < LEAD_MS) {
+      throw new Error("Solicite férias com pelo menos 45 dias de antecedência.");
+    }
 
     const year = new Date(startIso).getUTCFullYear();
     const existing = (db.vacationRequests ?? []).filter(
@@ -2263,17 +2301,20 @@ export const mockDb = {
       days: 10,
       status: "PENDING",
       createdAt: nowIso(),
+      decidedAt: undefined,
+      decidedByUserId: undefined,
+      decisionNote: undefined,
     };
 
     db.vacationRequests.push(req);
 
-    // Notify manager or admins
-    const recipients: string[] = [];
-    if (u.managerId) {
-      recipients.push(u.managerId);
-    } else {
-      recipients.push(...db.users.filter((x) => x.companyId === u.companyId && x.role === "ADMIN" && x.active).map((x) => x.id));
-    }
+    // Notify: direct manager (if any) + all admins
+    const recipients = new Set<string>();
+    if (u.managerId) recipients.add(u.managerId);
+    db.users
+      .filter((x) => x.companyId === u.companyId && x.role === "ADMIN" && x.active)
+      .forEach((x) => recipients.add(x.id));
+    recipients.delete(u.id);
 
     const startLabel = new Date(startIso).toLocaleDateString("pt-BR", { timeZone: "UTC" });
     for (const toUserId of recipients) {
@@ -2286,6 +2327,54 @@ export const mockDb = {
         href: `/people/${u.id}`,
       });
     }
+
+    saveDb(db);
+    return req;
+  },
+
+  decidePaidVacation(params: {
+    requestId: string;
+    decidedByUserId: string;
+    status: "APPROVED" | "REJECTED";
+    note: string;
+  }) {
+    const db = loadDb();
+    ensureVacationRequests(db);
+    ensureNotifications(db);
+
+    const req = (db.vacationRequests ?? []).find((r) => r.id === params.requestId);
+    if (!req) throw new Error("Pedido não encontrado.");
+    if (req.status !== "PENDING") throw new Error("Este pedido já foi decidido.");
+
+    const decider = db.users.find((u) => u.id === params.decidedByUserId && u.active);
+    if (!decider) throw new Error("Decisor inválido.");
+
+    const target = db.users.find((u) => u.id === req.userId);
+    if (!target) throw new Error("Usuário do pedido não encontrado.");
+
+    const note = params.note.trim();
+    if (!note) throw new Error("Informe uma justificativa.");
+
+    const canDecide =
+      (decider.role === "ADMIN" && decider.companyId && decider.companyId === req.companyId) ||
+      (decider.role === "HEAD" && target.managerId === decider.id);
+
+    if (!canDecide) throw new Error("Você não tem permissão para decidir este pedido.");
+
+    req.status = params.status;
+    req.decidedAt = nowIso();
+    req.decidedByUserId = decider.id;
+    req.decisionNote = note;
+
+    const startLabel = new Date(req.startDate).toLocaleDateString("pt-BR", { timeZone: "UTC" });
+    pushNotification(db, {
+      companyId: req.companyId,
+      userId: req.userId,
+      type: "VACATION_DECISION",
+      title: params.status === "APPROVED" ? "Férias aprovadas" : "Férias recusadas",
+      message: `${params.status === "APPROVED" ? "Aprovado" : "Recusado"} (início ${startLabel}). Justificativa: ${note}`,
+      href: "/profile",
+    });
 
     saveDb(db);
     return req;

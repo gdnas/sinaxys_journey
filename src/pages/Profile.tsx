@@ -56,6 +56,19 @@ function isHttpUrl(s: string) {
   return /^https?:\/\//i.test(s.trim());
 }
 
+function toDateInputValue(iso: string) {
+  const d = new Date(iso);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function daysBetween(nowMs: number, futureMs: number) {
+  const msDay = 24 * 60 * 60 * 1000;
+  return Math.floor((futureMs - nowMs) / msDay);
+}
+
 export default function Profile() {
   const { toast } = useToast();
   const { user, refresh } = useAuth();
@@ -68,6 +81,7 @@ export default function Profile() {
   const [version, setVersion] = useState(0);
 
   const [name, setName] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [contractUrl, setContractUrl] = useState("");
   const [phone, setPhone] = useState("");
@@ -94,10 +108,12 @@ export default function Profile() {
   const [savingVacation, setSavingVacation] = useState(false);
 
   const canEditContracts = user?.role === "ADMIN";
+  const canEditJobTitle = user?.role === "ADMIN";
 
   const dirty =
     !!user &&
     (name.trim() !== user.name.trim() ||
+      (jobTitle.trim() || "") !== (canEditJobTitle ? (user.jobTitle ?? "") : (jobTitle.trim() || "")) ||
       (avatarUrl.trim() || "") !== (user.avatarUrl ?? "") ||
       (canEditContracts ? (contractUrl.trim() || "") !== (user.contractUrl ?? "") : false) ||
       (phone.trim() || "") !== (user.phone ?? ""));
@@ -107,6 +123,7 @@ export default function Profile() {
   useEffect(() => {
     if (!user) return;
     setName(user.name);
+    setJobTitle(user.jobTitle ?? "");
     setAvatarUrl(user.avatarUrl ?? "");
     setContractUrl(user.contractUrl ?? "");
     setPhone(user.phone ?? "");
@@ -188,6 +205,42 @@ export default function Profile() {
     return { year, used, remainingPeriods };
   }, [vacationRequests]);
 
+  const vacationEligibility = useMemo(() => {
+    if (!user?.joinedAt) return { eligible: false, reason: "Sem data de entrada cadastrada." };
+    const joinedMs = new Date(user.joinedAt).getTime();
+    if (!Number.isFinite(joinedMs)) return { eligible: false, reason: "Data de entrada inválida." };
+
+    const msDay = 24 * 60 * 60 * 1000;
+    const tenureDays = Math.floor((Date.now() - joinedMs) / msDay);
+    if (tenureDays < 365) {
+      const remaining = 365 - tenureDays;
+      return { eligible: false, reason: `Disponível após 1 ano de casa (faltam ~${remaining} dias).` };
+    }
+
+    return { eligible: true, reason: null as string | null };
+  }, [user?.joinedAt]);
+
+  const minVacationStartDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 45);
+    return toDateInputValue(d.toISOString());
+  }, []);
+
+  const leadTimeOk = useMemo(() => {
+    if (!vacationStartDate) return false;
+    const startMs = new Date(`${vacationStartDate}T00:00:00Z`).getTime();
+    if (!Number.isFinite(startMs)) return false;
+    const delta = startMs - Date.now();
+    return delta >= 45 * 24 * 60 * 60 * 1000;
+  }, [vacationStartDate]);
+
+  const leadTimeDays = useMemo(() => {
+    if (!vacationStartDate) return null;
+    const startMs = new Date(`${vacationStartDate}T00:00:00Z`).getTime();
+    if (!Number.isFinite(startMs)) return null;
+    return daysBetween(Date.now(), startMs);
+  }, [vacationStartDate]);
+
   if (!user) return null;
 
   return (
@@ -199,7 +252,7 @@ export default function Profile() {
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Minha área</div>
             <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)]">{user.name}</div>
             <div className="mt-1 text-sm text-muted-foreground">
-              {roleLabel(user.role)} • {user.email}
+              {user.jobTitle ? `${user.jobTitle} • ` : ""}{roleLabel(user.role)} • {user.email}
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -318,6 +371,20 @@ export default function Profile() {
               </div>
 
               <div className="grid gap-2">
+                <Label>Cargo</Label>
+                <Input
+                  value={jobTitle}
+                  onChange={(e) => setJobTitle(e.target.value)}
+                  className="rounded-xl"
+                  placeholder={canEditJobTitle ? "Ex.: Analista de Produto" : "—"}
+                  disabled={!canEditJobTitle}
+                />
+                {!canEditJobTitle ? (
+                  <div className="text-xs text-muted-foreground">O cargo é definido pelo admin.</div>
+                ) : null}
+              </div>
+
+              <div className="grid gap-2">
                 <Label>Celular</Label>
                 <Input
                   value={phone}
@@ -372,6 +439,7 @@ export default function Profile() {
                       setSaving(true);
                       const updated = mockDb.updateUserProfile(user.id, {
                         name,
+                        jobTitle: canEditJobTitle ? jobTitle : undefined,
                         avatarUrl,
                         contractUrl: canEditContracts ? contractUrl : undefined,
                         phone,
@@ -1184,6 +1252,19 @@ export default function Profile() {
 
               <div className="mt-4 grid gap-3">
                 <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                  <div className="font-medium text-[color:var(--sinaxys-ink)]">Regras</div>
+                  <div className="mt-1">
+                    Solicite com <span className="font-semibold text-[color:var(--sinaxys-ink)]">45 dias</span> de antecedência.
+                    O pedido fica <span className="font-semibold text-[color:var(--sinaxys-ink)]">pendente</span> até aprovação.
+                  </div>
+                  <div className="mt-2">
+                    {vacationEligibility.eligible
+                      ? "Elegível: sim (1 ano de casa)."
+                      : `Elegível: não — ${vacationEligibility.reason}`}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
                   Ano {vacationInfo.year}: {vacationInfo.used}/2 períodos usados • restantes: {vacationInfo.remainingPeriods}
                 </div>
 
@@ -1191,10 +1272,19 @@ export default function Profile() {
                   <Label>Data de início (10 dias)</Label>
                   <Input
                     type="date"
+                    min={minVacationStartDate}
                     className="h-11 rounded-xl"
                     value={vacationStartDate}
                     onChange={(e) => setVacationStartDate(e.target.value)}
+                    disabled={!vacationEligibility.eligible || user.role === "MASTERADMIN" || !user.companyId}
                   />
+                  {leadTimeDays !== null ? (
+                    <div className={"text-xs " + (leadTimeOk ? "text-muted-foreground" : "text-rose-600")}>
+                      {leadTimeOk
+                        ? `Antecedência: ${leadTimeDays} dias.`
+                        : `Antecedência insuficiente (${leadTimeDays} dias). Mínimo: 45 dias.`}
+                    </div>
+                  ) : null}
                 </div>
 
                 <Button
@@ -1202,6 +1292,8 @@ export default function Profile() {
                   disabled={
                     savingVacation ||
                     !vacationStartDate ||
+                    !vacationEligibility.eligible ||
+                    !leadTimeOk ||
                     vacationInfo.remainingPeriods <= 0 ||
                     user.role === "MASTERADMIN" ||
                     !user.companyId
@@ -1214,7 +1306,7 @@ export default function Profile() {
                       setVersion((v) => v + 1);
                       toast({
                         title: "Pedido enviado",
-                        description: "Seu gestor recebeu uma notificação.",
+                        description: "Admins e seu head direto foram notificados para aprovar/recusar.",
                       });
                     } catch (e) {
                       toast({
@@ -1243,6 +1335,11 @@ export default function Profile() {
                               {formatDateUtc(r.startDate)} • {r.days} dias
                             </div>
                             <div className="mt-1 text-xs text-muted-foreground">Solicitado em {formatDate(r.createdAt)}</div>
+                            {r.decisionNote ? (
+                              <div className="mt-2 text-xs text-muted-foreground">
+                                Justificativa: <span className="font-medium text-[color:var(--sinaxys-ink)]">{r.decisionNote}</span>
+                              </div>
+                            ) : null}
                           </div>
                           <Badge
                             className={
