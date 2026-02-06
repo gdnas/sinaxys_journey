@@ -89,6 +89,7 @@ export default function AdminUsers() {
   const [editJoinedAt, setEditJoinedAt] = useState(""); // YYYY-MM-DD
   const [editManagerId, setEditManagerId] = useState<string>("");
   const [editMonthlyCost, setEditMonthlyCost] = useState<string>("");
+  const [editMustChangePassword, setEditMustChangePassword] = useState<boolean>(false);
 
   useEffect(() => {
     if (!editing) return;
@@ -108,6 +109,7 @@ export default function AdminUsers() {
     setEditJoinedAt(isoToDateInput(editing.joinedAt));
     setEditManagerId(editing.managerId ?? "");
     setEditMonthlyCost(typeof editing.monthlyCostBRL === "number" ? String(editing.monthlyCostBRL) : "");
+    setEditMustChangePassword(!!editing.mustChangePassword);
   }, [editing?.id, departments.length]);
 
   const managers = useMemo(() => {
@@ -233,7 +235,7 @@ export default function AdminUsers() {
                   ) : null}
 
                   <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                    Dica: após criar, use “Editar” para definir senha temporária, gestor, remuneração, cargo e outros dados.
+                    Dica: após criar, use "Editar" para definir senha temporária, gestor, remuneração, cargo e outros dados.
                   </div>
                 </div>
                 <DialogFooter>
@@ -687,10 +689,22 @@ export default function AdminUsers() {
                           Alterar senha
                         </Button>
                       </div>
+
+                      <Separator className="my-4" />
+
+                      <div className="flex items-center justify-between gap-3 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Exigir troca no próximo login</div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            Útil para bloquear acesso até o usuário definir a própria senha.
+                          </div>
+                        </div>
+                        <Switch checked={editMustChangePassword} onCheckedChange={setEditMustChangePassword} />
+                      </div>
                     </div>
 
                     <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                      Dica: se você definir uma senha temporária, marque “Exigir troca no próximo login”.
+                      Dica: se você definir uma senha temporária, marque "Exigir troca no próximo login".
                     </div>
                   </div>
                 </TabsContent>
@@ -716,7 +730,7 @@ export default function AdminUsers() {
                   return;
                 }
 
-                const cost = editMonthlyCost.trim() ? Number(editMonthlyCost) : undefined;
+                const cost = editMonthlyCost.trim() ? Number(editMonthlyCost) : null;
 
                 try {
                   mockDb.updateUserCompanyAdmin(
@@ -733,10 +747,12 @@ export default function AdminUsers() {
                       contractUrl: editContractUrl,
                       joinedAt: editJoinedAt,
                       managerId: editRole === "ADMIN" ? "" : editManagerId,
-                      monthlyCostBRL: typeof cost === "number" && Number.isFinite(cost) ? cost : undefined,
+                      monthlyCostBRL: typeof cost === "number" && Number.isFinite(cost) ? cost : null,
                     },
                     { createdByUserId: user.id },
                   );
+
+                  mockDb.setUserMustChangePassword(editing.id, editMustChangePassword);
 
                   toast({ title: "Usuário atualizado" });
                   setEditUserId(null);

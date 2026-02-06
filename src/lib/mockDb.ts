@@ -1752,8 +1752,10 @@ export const mockDb = {
     // monthly cost (records history)
     if (data.monthlyCostBRL !== undefined) {
       const next = data.monthlyCostBRL;
-      if (next === null || next === (undefined as any)) {
-        // ignore
+
+      // Allow clearing the cost
+      if (next === null) {
+        u.monthlyCostBRL = undefined;
       } else if (typeof next !== "number" || !Number.isFinite(next) || next < 0) {
         throw new Error("Custo mensal inválido.");
       } else {
@@ -1773,10 +1775,18 @@ export const mockDb = {
             note: "Ajuste via Admin",
           });
         }
-
       }
     }
 
+    saveDb(db);
+    return u;
+  },
+
+  setUserMustChangePassword(userId: string, mustChangePassword: boolean) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    if (!u) throw new Error("Usuário não encontrado.");
+    u.mustChangePassword = !!mustChangePassword;
     saveDb(db);
     return u;
   },
@@ -1885,7 +1895,7 @@ export const mockDb = {
           userId: r.id,
           type: "INVOICE_SUBMITTED",
           title: "Nova nota fiscal enviada",
-          message: `${u.name} enviou “${inv.title}”${amountLabel}.`,
+          message: `${u.name} enviou " ${inv.title} " ${amountLabel}.`,
           href: "/profile",
         });
       }
