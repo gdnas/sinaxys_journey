@@ -94,9 +94,7 @@ export default function HeadCollaboratorDetail() {
 
   const dirty =
     !!collaborator &&
-    ((contractUrl.trim() || "") !== (collaborator.contractUrl ?? "") ||
-      (monthlyCost.trim() || "") !==
-        (typeof collaborator.monthlyCostBRL === "number" ? String(collaborator.monthlyCostBRL) : ""));
+    (monthlyCost.trim() || "") !== (typeof collaborator.monthlyCostBRL === "number" ? String(collaborator.monthlyCostBRL) : "");
 
   if (!user || user.role !== "HEAD") return null;
 
@@ -330,9 +328,9 @@ export default function HeadCollaboratorDetail() {
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Input
                   value={contractUrl}
-                  onChange={(e) => setContractUrl(e.target.value)}
                   className="rounded-xl"
                   placeholder="https://app.clicksign.com/..."
+                  disabled
                 />
                 <Button asChild variant="outline" className="rounded-xl" disabled={!contractUrl.trim()}>
                   <a href={contractUrl || "#"} target="_blank" rel="noreferrer">
@@ -340,6 +338,7 @@ export default function HeadCollaboratorDetail() {
                   </a>
                 </Button>
               </div>
+              <div className="text-xs text-muted-foreground">Somente o admin pode alterar contratos.</div>
             </div>
 
             <Separator className="my-5" />
@@ -379,14 +378,11 @@ export default function HeadCollaboratorDetail() {
                   try {
                     setSaving(true);
 
-                    const updatedProfile = mockDb.updateUserProfile(collaborator.id, {
-                      contractUrl,
-                    });
                     const updatedComp = mockDb.updateUserCompensation(collaborator.id, {
                       monthlyCostBRL: monthlyCost.trim() ? Number(monthlyCost) : 0,
                     });
 
-                    if (!updatedProfile || !updatedComp) {
+                    if (!updatedComp) {
                       toast({
                         title: "Não foi possível salvar",
                         description: "Tente novamente.",
@@ -397,7 +393,7 @@ export default function HeadCollaboratorDetail() {
 
                     toast({
                       title: "Dados atualizados",
-                      description: "Contrato e custo mensal foram salvos.",
+                      description: "Custo mensal foi salvo.",
                     });
                     force((x) => x + 1);
                   } finally {

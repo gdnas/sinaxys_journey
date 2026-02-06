@@ -93,14 +93,16 @@ export default function Profile() {
   const [vacationStartDate, setVacationStartDate] = useState<string>("");
   const [savingVacation, setSavingVacation] = useState(false);
 
+  const canEditContracts = user?.role === "ADMIN";
+
   const dirty =
     !!user &&
     (name.trim() !== user.name.trim() ||
       (avatarUrl.trim() || "") !== (user.avatarUrl ?? "") ||
-      (contractUrl.trim() || "") !== (user.contractUrl ?? "") ||
+      (canEditContracts ? (contractUrl.trim() || "") !== (user.contractUrl ?? "") : false) ||
       (phone.trim() || "") !== (user.phone ?? ""));
 
-  const contractUrlDirty = !!user && (contractUrl.trim() || "") !== (user.contractUrl ?? "");
+  const contractUrlDirty = !!user && canEditContracts && (contractUrl.trim() || "") !== (user.contractUrl ?? "");
 
   useEffect(() => {
     if (!user) return;
@@ -344,15 +346,20 @@ export default function Profile() {
                     onChange={(e) => setContractUrl(e.target.value)}
                     className="rounded-xl"
                     placeholder="https://app.clicksign.com/..."
+                    disabled={!canEditContracts}
                   />
-                  <Button asChild variant="outline" className="rounded-xl" disabled={!contractUrl.trim()}>
+                  <Button asChild variant="outline" className="rounded-xl" disabled={!isHttpUrl(contractUrl)}>
                     <a href={contractUrl || "#"} target="_blank" rel="noreferrer">
                       <FileText className="mr-2 h-4 w-4" />
                       Abrir
                     </a>
                   </Button>
                 </div>
-                <div className="text-xs text-muted-foreground">Para versões/aditivos, use a aba "Documentos".</div>
+                <div className="text-xs text-muted-foreground">
+                  {canEditContracts
+                    ? "Para versões/aditivos, use a aba \"Documentos\"."
+                    : "Somente o admin pode alterar o contrato. Você pode apenas visualizar."}
+                </div>
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -366,7 +373,7 @@ export default function Profile() {
                       const updated = mockDb.updateUserProfile(user.id, {
                         name,
                         avatarUrl,
-                        contractUrl,
+                        contractUrl: canEditContracts ? contractUrl : undefined,
                         phone,
                       });
                       if (!updated) {
@@ -647,6 +654,7 @@ export default function Profile() {
                     onChange={(e) => setContractUrl(e.target.value)}
                     className="h-11 rounded-xl"
                     placeholder="https://app.clicksign.com/..."
+                    disabled={!canEditContracts}
                   />
                   <Button asChild variant="outline" className="h-11 rounded-xl" disabled={!isHttpUrl(contractUrl)}>
                     <a href={contractUrl || "#"} target="_blank" rel="noreferrer">
@@ -657,38 +665,44 @@ export default function Profile() {
                 </div>
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-xs text-muted-foreground">Esse campo é separado dos aditivos/versões abaixo.</div>
-                  <Button
-                    className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                    disabled={saving || !contractUrlDirty}
-                    onClick={() => {
-                      try {
-                        setSaving(true);
-                        const updated = mockDb.updateUserProfile(user.id, {
-                          contractUrl,
-                        });
-                        if (!updated) {
-                          toast({
-                            title: "Não foi possível salvar",
-                            description: "Tente novamente.",
-                            variant: "destructive",
+                  <div className="text-xs text-muted-foreground">
+                    {canEditContracts
+                      ? "Esse campo é separado dos aditivos/versões abaixo."
+                      : "Somente o admin pode alterar o contrato principal."}
+                  </div>
+                  {canEditContracts ? (
+                    <Button
+                      className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                      disabled={saving || !contractUrlDirty}
+                      onClick={() => {
+                        try {
+                          setSaving(true);
+                          const updated = mockDb.updateUserProfile(user.id, {
+                            contractUrl,
                           });
-                          return;
+                          if (!updated) {
+                            toast({
+                              title: "Não foi possível salvar",
+                              description: "Tente novamente.",
+                              variant: "destructive",
+                            });
+                            return;
+                          }
+                          refresh?.();
+                          setVersion((v) => v + 1);
+                          toast({
+                            title: "Contrato principal atualizado",
+                            description: "Link salvo com sucesso.",
+                          });
+                        } finally {
+                          setSaving(false);
                         }
-                        refresh?.();
-                        setVersion((v) => v + 1);
-                        toast({
-                          title: "Contrato principal atualizado",
-                          description: "Link salvo com sucesso.",
-                        });
-                      } finally {
-                        setSaving(false);
-                      }
-                    }}
-                  >
-                    <Save className="mr-2 h-4 w-4" />
-                    {saving ? "Salvando…" : "Salvar"}
-                  </Button>
+                      }}
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      {saving ? "Salvando…" : "Salvar"}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </Card>
@@ -708,158 +722,166 @@ export default function Profile() {
                 </div>
 
                 <div className="mt-4 grid gap-3">
-                  <div className="grid gap-2">
-                    <Label>Título</Label>
-                    <Input
-                      className="h-11 rounded-xl"
-                      value={contractTitle}
-                      onChange={(e) => setContractTitle(e.target.value)}
-                      placeholder="Ex.: Aditivo 01 — Ajuste de escopo"
-                    />
-                  </div>
-
-                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-2">
-                    <Tabs
-                      value={contractAttachmentMode}
-                      onValueChange={(v) => setContractAttachmentMode(v as "FILE" | "LINK")}
-                    >
-                      <TabsList className="w-full justify-start rounded-xl bg-white p-1">
-                        <TabsTrigger value="FILE" className="rounded-lg">
-                          Arquivo
-                        </TabsTrigger>
-                        <TabsTrigger value="LINK" className="rounded-lg">
-                          Link
-                        </TabsTrigger>
-                      </TabsList>
-
-                      <TabsContent value="FILE" className="mt-3">
-                        <input
-                          ref={contractFileRef}
-                          type="file"
-                          accept="application/pdf,image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            const reader = new FileReader();
-                            reader.onload = () => {
-                              const dataUrl = String(reader.result ?? "");
-                              setContractFileDataUrl(dataUrl);
-                              setContractTitle((t) => (t.trim() ? t : file.name));
-                              toast({ title: "Arquivo anexado", description: "Agora é só enviar." });
-                            };
-                            reader.readAsDataURL(file);
-                          }}
+                  {canEditContracts ? (
+                    <>
+                      <div className="grid gap-2">
+                        <Label>Título</Label>
+                        <Input
+                          className="h-11 rounded-xl"
+                          value={contractTitle}
+                          onChange={(e) => setContractTitle(e.target.value)}
+                          placeholder="Ex.: Aditivo 01 — Ajuste de escopo"
                         />
+                      </div>
 
-                        <div className="grid gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="w-full rounded-xl"
-                            onClick={() => contractFileRef.current?.click()}
-                          >
-                            Selecionar arquivo
-                          </Button>
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-2">
+                        <Tabs
+                          value={contractAttachmentMode}
+                          onValueChange={(v) => setContractAttachmentMode(v as "FILE" | "LINK")}
+                        >
+                          <TabsList className="w-full justify-start rounded-xl bg-white p-1">
+                            <TabsTrigger value="FILE" className="rounded-lg">
+                              Arquivo
+                            </TabsTrigger>
+                            <TabsTrigger value="LINK" className="rounded-lg">
+                              Link
+                            </TabsTrigger>
+                          </TabsList>
 
-                          {contractFileDataUrl.startsWith("data:") ? (
-                            <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">
-                                  Arquivo pronto para envio
-                                </div>
-                                <div className="mt-1 text-xs text-muted-foreground">Fica armazenado no navegador.</div>
-                              </div>
-                              <Button asChild variant="outline" className="rounded-xl" size="sm">
-                                <a href={contractFileDataUrl} target="_blank" rel="noreferrer">
-                                  <ExternalLink className="mr-2 h-4 w-4" />
-                                  Abrir
-                                </a>
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
-                              Nenhum arquivo selecionado.
-                            </div>
-                          )}
-                        </div>
-                      </TabsContent>
-
-                      <TabsContent value="LINK" className="mt-3">
-                        <div className="grid gap-2">
-                          <Label>Link do documento</Label>
-                          <div className="flex flex-col gap-2 sm:flex-row">
-                            <Input
-                              className="h-11 rounded-xl"
-                              value={contractLinkUrl}
-                              onChange={(e) => setContractLinkUrl(e.target.value)}
-                              placeholder="https://app.clicksign.com/..."
+                          <TabsContent value="FILE" className="mt-3">
+                            <input
+                              ref={contractFileRef}
+                              type="file"
+                              accept="application/pdf,image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const reader = new FileReader();
+                                reader.onload = () => {
+                                  const dataUrl = String(reader.result ?? "");
+                                  setContractFileDataUrl(dataUrl);
+                                  setContractTitle((t) => (t.trim() ? t : file.name));
+                                  toast({ title: "Arquivo anexado", description: "Agora é só enviar." });
+                                };
+                                reader.readAsDataURL(file);
+                              }}
                             />
-                            <Button
-                              asChild
-                              variant="outline"
-                              className="rounded-xl"
-                              disabled={!isHttpUrl(contractLinkUrl)}
-                            >
-                              <a href={contractLinkUrl || "#"} target="_blank" rel="noreferrer">
-                                <ExternalLink className="mr-2 h-4 w-4" />
-                                Abrir
-                              </a>
-                            </Button>
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            Dica: cole o link do Clicksign (ou de onde o documento estiver hospedado).
-                          </div>
-                        </div>
-                      </TabsContent>
-                    </Tabs>
-                  </div>
 
-                  <Button
-                    className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                    disabled={
-                      savingContract ||
-                      (contractAttachmentMode === "FILE"
-                        ? !contractFileDataUrl.startsWith("data:")
-                        : !isHttpUrl(contractLinkUrl))
-                    }
-                    onClick={() => {
-                      try {
-                        setSavingContract(true);
-                        const url =
-                          contractAttachmentMode === "FILE" ? contractFileDataUrl.trim() : contractLinkUrl.trim();
+                            <div className="grid gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full rounded-xl"
+                                onClick={() => contractFileRef.current?.click()}
+                              >
+                                Selecionar arquivo
+                              </Button>
 
-                        mockDb.addContractAttachment({
-                          userId: user.id,
-                          title: contractTitle.trim() || "Contrato",
-                          url,
-                          kind: contractAttachmentMode,
-                        });
+                              {contractFileDataUrl.startsWith("data:") ? (
+                                <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">
+                                      Arquivo pronto para envio
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">Fica armazenado no navegador.</div>
+                                  </div>
+                                  <Button asChild variant="outline" className="rounded-xl" size="sm">
+                                    <a href={contractFileDataUrl} target="_blank" rel="noreferrer">
+                                      <ExternalLink className="mr-2 h-4 w-4" />
+                                      Abrir
+                                    </a>
+                                  </Button>
+                                </div>
+                              ) : (
+                                <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
+                                  Nenhum arquivo selecionado.
+                                </div>
+                              )}
+                            </div>
+                          </TabsContent>
 
-                        setContractTitle("");
-                        setContractFileDataUrl("");
-                        setContractLinkUrl("");
-                        if (contractFileRef.current) contractFileRef.current.value = "";
+                          <TabsContent value="LINK" className="mt-3">
+                            <div className="grid gap-2">
+                              <Label>Link do documento</Label>
+                              <div className="flex flex-col gap-2 sm:flex-row">
+                                <Input
+                                  className="h-11 rounded-xl"
+                                  value={contractLinkUrl}
+                                  onChange={(e) => setContractLinkUrl(e.target.value)}
+                                  placeholder="https://app.clicksign.com/..."
+                                />
+                                <Button
+                                  asChild
+                                  variant="outline"
+                                  className="rounded-xl"
+                                  disabled={!isHttpUrl(contractLinkUrl)}
+                                >
+                                  <a href={contractLinkUrl || "#"} target="_blank" rel="noreferrer">
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Abrir
+                                  </a>
+                                </Button>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                Dica: cole o link do Clicksign (ou de onde o documento estiver hospedado).
+                              </div>
+                            </div>
+                          </TabsContent>
+                        </Tabs>
+                      </div>
 
-                        setVersion((v) => v + 1);
-                        toast({
-                          title: "Documento salvo",
-                          description:
-                            contractAttachmentMode === "FILE" ? "Arquivo enviado." : "Link registrado.",
-                        });
-                      } catch (e) {
-                        toast({
-                          title: "Não foi possível salvar",
-                          description: e instanceof Error ? e.message : "Tente novamente.",
-                          variant: "destructive",
-                        });
-                      } finally {
-                        setSavingContract(false);
-                      }
-                    }}
-                  >
-                    Enviar
-                  </Button>
+                      <Button
+                        className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                        disabled={
+                          savingContract ||
+                          (contractAttachmentMode === "FILE"
+                            ? !contractFileDataUrl.startsWith("data:")
+                            : !isHttpUrl(contractLinkUrl))
+                        }
+                        onClick={() => {
+                          try {
+                            setSavingContract(true);
+                            const url =
+                              contractAttachmentMode === "FILE" ? contractFileDataUrl.trim() : contractLinkUrl.trim();
+
+                            mockDb.addContractAttachment({
+                              userId: user.id,
+                              title: contractTitle.trim() || "Contrato",
+                              url,
+                              kind: contractAttachmentMode,
+                            });
+
+                            setContractTitle("");
+                            setContractFileDataUrl("");
+                            setContractLinkUrl("");
+                            if (contractFileRef.current) contractFileRef.current.value = "";
+
+                            setVersion((v) => v + 1);
+                            toast({
+                              title: "Documento salvo",
+                              description:
+                                contractAttachmentMode === "FILE" ? "Arquivo enviado." : "Link registrado.",
+                            });
+                          } catch (e) {
+                            toast({
+                              title: "Não foi possível salvar",
+                              description: e instanceof Error ? e.message : "Tente novamente.",
+                              variant: "destructive",
+                            });
+                          } finally {
+                            setSavingContract(false);
+                          }
+                        }}
+                      >
+                        Enviar
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                      Somente o admin pode adicionar ou remover aditivos. Abaixo você pode visualizar o que já foi cadastrado.
+                    </div>
+                  )}
 
                   <Separator />
 
@@ -899,18 +921,20 @@ export default function Profile() {
                                     <ExternalLink className="h-4 w-4" />
                                   </a>
                                 </Button>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-9 w-9 rounded-xl"
-                                  aria-label="Remover"
-                                  onClick={() => {
-                                    mockDb.deleteContractAttachment({ userId: user.id, contractAttachmentId: c.id });
-                                    setVersion((v) => v + 1);
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                {canEditContracts ? (
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-xl"
+                                    aria-label="Remover"
+                                    onClick={() => {
+                                      mockDb.deleteContractAttachment({ userId: user.id, contractAttachmentId: c.id });
+                                      setVersion((v) => v + 1);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                ) : null}
                               </div>
                             </div>
                           </div>
