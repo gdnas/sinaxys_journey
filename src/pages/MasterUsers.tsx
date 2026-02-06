@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pencil, Search, Shield, UserPlus } from "lucide-react";
+import { KeyRound, Pencil, Search, Shield, UserPlus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -85,6 +85,13 @@ export default function MasterUsers() {
     if (editing.departmentId) setEditDeptId(editing.departmentId);
     else setEditDeptId(editDepartments[0]?.id ?? "");
   }, [editing?.id, editDepartments.length]);
+
+  // Reset password
+  const [resetUserId, setResetUserId] = useState<string | null>(null);
+  const resetting = resetUserId ? db.users.find((u) => u.id === resetUserId) ?? null : null;
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
+  const [resetMustChange, setResetMustChange] = useState(true);
 
   const companyLabel = (cid?: string) => companies.find((c) => c.id === cid)?.name ?? "—";
 
@@ -318,6 +325,26 @@ export default function MasterUsers() {
                             size="icon"
                             className="h-9 w-9 rounded-xl"
                             onClick={() => {
+                              setResetUserId(u.id);
+                              setResetPassword("");
+                              setResetPasswordConfirm("");
+                              setResetMustChange(true);
+                            }}
+                            aria-label="Resetar senha"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Resetar senha</TooltipContent>
+                      </Tooltip>
+
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 rounded-xl"
+                            onClick={() => {
                               setEditUserId(u.id);
                               setEditName(u.name);
                               setEditRole(u.role);
@@ -347,6 +374,91 @@ export default function MasterUsers() {
           </Table>
         </div>
       </Card>
+
+      <Dialog
+        open={!!resetUserId}
+        onOpenChange={(v) => {
+          if (!v) setResetUserId(null);
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Resetar senha</DialogTitle>
+          </DialogHeader>
+
+          {resetting ? (
+            <div className="grid gap-4">
+              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm">
+                <div className="font-semibold text-[color:var(--sinaxys-ink)]">{resetting.name}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{resetting.email} • {roleLabel(resetting.role)}</div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Nova senha temporária</Label>
+                <Input
+                  className="h-11 rounded-xl"
+                  type="password"
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Confirmar senha</Label>
+                <Input
+                  className="h-11 rounded-xl"
+                  type="password"
+                  value={resetPasswordConfirm}
+                  onChange={(e) => setResetPasswordConfirm(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Exigir troca no próximo login</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Recomendado para senhas temporárias.</div>
+                </div>
+                <Switch checked={resetMustChange} onCheckedChange={setResetMustChange} />
+              </div>
+
+              {resetPassword && resetPasswordConfirm && resetPassword !== resetPasswordConfirm ? (
+                <div className="text-xs text-red-600">As senhas não coincidem.</div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">Usuário não encontrado.</div>
+          )}
+
+          <DialogFooter>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={
+                !resetting ||
+                resetPassword.trim().length < 6 ||
+                resetPassword !== resetPasswordConfirm
+              }
+              onClick={() => {
+                if (!resetting) return;
+                try {
+                  mockDb.setUserPassword(resetting.id, resetPassword.trim(), { mustChangePassword: resetMustChange });
+                  toast({ title: "Senha resetada" });
+                  setResetUserId(null);
+                  setVersion((x) => x + 1);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível resetar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              Resetar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={!!editUserId}
