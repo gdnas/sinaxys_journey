@@ -28,6 +28,37 @@ import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 const STORAGE_KEY = "sinaxys-journey-db:v1";
 const DB_CHANGED_EVENT = "sinaxys-db-changed";
 
+// IMPORTANT:
+// - Some reads happen during React render (e.g. useMemo()). Those reads sometimes perform light migrations
+//   (loadDb) or consistency fixes (syncAssignmentProgress / ensureCompensationEvents).
+// - If we broadcast DB_CHANGED_EVENT synchronously during render, listeners may call setState and create an
+//   infinite re-render loop.
+//
+// Strategy:
+// 1) Coalesce broadcasts and always dispatch them asynchronously (microtask).
+// 2) Allow temporarily suppressing broadcasts during read-path migrations.
+let broadcastSuppressed = 0;
+let broadcastScheduled = false;
+
+function withBroadcastSuppressed<T>(fn: () => T): T {
+  broadcastSuppressed += 1;
+  try {
+    return fn();
+  } finally {
+    broadcastSuppressed -= 1;
+  }
+}
+
+function scheduleDbChangedBroadcast() {
+  if (broadcastSuppressed > 0) return;
+  if (broadcastScheduled) return;
+  broadcastScheduled = true;
+  queueMicrotask(() => {
+    broadcastScheduled = false;
+    window.dispatchEvent(new Event(DB_CHANGED_EVENT));
+  });
+}
+
 function uid(prefix: string) {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 }
@@ -215,7 +246,8 @@ function syncAssignmentProgress(db: Db, assignmentId: string) {
     }
   }
 
-  if (changed) saveDb(db);
+  // This can run during React render (read paths). Never broadcast UI events from here.
+  if (changed) saveDb(db, { broadcast: false });
 }
 
 function ensureMultiCompany(db: Db) {
@@ -245,7 +277,8 @@ function ensureMultiCompany(db: Db) {
   db.departments.forEach((d) => ((d as any).companyId = companyId));
   db.tracks.forEach((t) => ((t as any).companyId = companyId));
 
-  saveDb(db);
+  // Migration write: no broadcast.
+  saveDb(db, { broadcast: false });
 }
 
 function ensureNotifications(db: Db) {
@@ -289,7 +322,8 @@ function ensureCompensationEvents(db: Db) {
     changed = true;
   }
 
-  if (changed) saveDb(db);
+  // This can be called from read paths (e.g. profile rendering). Never broadcast from here.
+  if (changed) saveDb(db, { broadcast: false });
 }
 
 function ensureVacationRequests(db: Db) {
@@ -349,175 +383,182 @@ function ensureDefaultUsers(db: Db) {
 }
 
 export function loadDb(): Db {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    const seeded = seedDb();
-    saveDb(seeded);
-    return seeded;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Db;
-
-    ensureMultiCompany(parsed);
-
-    // Migration: add dueAt field (optional) for older assignments
-    if (Array.isArray((parsed as any).assignments)) {
-      let changed = false;
-      for (const a of (parsed as any).assignments) {
-        if (a && typeof a === "object" && !("dueAt" in a)) {
-          a.dueAt = undefined;
-          changed = true;
-        }
-      }
-      if (changed) saveDb(parsed);
+  // loadDb can run during React render; suppress broadcasts for its entire duration.
+  return withBroadcastSuppressed(() => {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      const seeded = seedDb();
+      saveDb(seeded, { broadcast: false });
+      return seeded;
     }
 
-    // Migration: reward tiers
-    if (!Array.isArray((parsed as any).rewardTiers)) {
-      (parsed as any).rewardTiers = [];
-      saveDb(parsed);
-    }
+    try {
+      const parsed = JSON.parse(raw) as Db;
 
-    // Migration: points rules/events
-    if (!Array.isArray((parsed as any).pointsRules) || !Array.isArray((parsed as any).pointsEvents)) {
-      ensurePointsSetup(parsed);
-      saveDb(parsed);
-    } else {
-      // Ensure every company has a baseline ruleset
-      const before = (parsed as any).pointsRules.length;
-      ensurePointsSetup(parsed);
-      const after = (parsed as any).pointsRules.length;
-      if (after !== before) saveDb(parsed);
-    }
+      ensureMultiCompany(parsed);
 
-    // Migration: invoices
-    if (!Array.isArray((parsed as any).invoices)) {
-      (parsed as any).invoices = [];
-      saveDb(parsed);
-    }
-
-    // Migration: notifications / contracts / compensation / vacations
-    if (!Array.isArray((parsed as any).notifications)) {
-      (parsed as any).notifications = [];
-      saveDb(parsed);
-    }
-    if (!Array.isArray((parsed as any).contractAttachments)) {
-      (parsed as any).contractAttachments = [];
-      saveDb(parsed);
-    } else {
-      // Migration: contractAttachments suportam FILE (data URL) e LINK (Clicksign).
-      // Normaliza registros antigos que só tinham `fileDataUrl`.
-      let changed = false;
-      for (const c of (parsed as any).contractAttachments as any[]) {
-        if (!c || typeof c !== "object") continue;
-
-        const url = typeof c.url === "string" ? c.url.trim() : "";
-        const legacy = typeof c.fileDataUrl === "string" ? c.fileDataUrl.trim() : "";
-
-        if (!url && legacy) {
-          c.url = legacy;
-          c.kind = c.kind ?? "FILE";
-          changed = true;
-        }
-
-        if (!c.kind) {
-          const nextUrl = (typeof c.url === "string" ? c.url : legacy) ?? "";
-          c.kind = String(nextUrl).startsWith("data:") ? "FILE" : "LINK";
-          changed = true;
-        }
-      }
-      if (changed) saveDb(parsed);
-    }
-    if (!Array.isArray((parsed as any).compensationEvents)) {
-      (parsed as any).compensationEvents = [];
-      saveDb(parsed);
-    }
-    // Ensure baseline records exist
-    ensureCompensationEvents(parsed);
-
-    if (!Array.isArray((parsed as any).vacationRequests)) {
-      (parsed as any).vacationRequests = [];
-      saveDb(parsed);
-    }
-
-    // Migration: password fields
-    if (Array.isArray((parsed as any).users)) {
-      let changed = false;
-      for (const u of (parsed as any).users) {
-        if (u && typeof u === "object") {
-          if (!("password" in u)) {
-            u.password = undefined;
-            changed = true;
-          }
-          if (!("mustChangePassword" in u)) {
-            u.mustChangePassword = false;
-            changed = true;
-          }
-          if (!("joinedAt" in u)) {
-            u.joinedAt = nowIso();
-            changed = true;
-          }
-          if (!("jobTitle" in u)) {
-            u.jobTitle = undefined;
+      // Migration: add dueAt field (optional) for older assignments
+      if (Array.isArray((parsed as any).assignments)) {
+        let changed = false;
+        for (const a of (parsed as any).assignments) {
+          if (a && typeof a === "object" && !("dueAt" in a)) {
+            a.dueAt = undefined;
             changed = true;
           }
         }
+        if (changed) saveDb(parsed, { broadcast: false });
       }
-      if (changed) saveDb(parsed);
-    }
 
-    // Migration: vacation decision note
-    if (Array.isArray((parsed as any).vacationRequests)) {
-      let changed = false;
-      for (const r of (parsed as any).vacationRequests) {
-        if (r && typeof r === "object" && !("decisionNote" in r)) {
-          r.decisionNote = undefined;
-          changed = true;
+      // Migration: reward tiers
+      if (!Array.isArray((parsed as any).rewardTiers)) {
+        (parsed as any).rewardTiers = [];
+        saveDb(parsed, { broadcast: false });
+      }
+
+      // Migration: points rules/events
+      if (!Array.isArray((parsed as any).pointsRules) || !Array.isArray((parsed as any).pointsEvents)) {
+        ensurePointsSetup(parsed);
+        saveDb(parsed, { broadcast: false });
+      } else {
+        // Ensure every company has a baseline ruleset
+        const before = (parsed as any).pointsRules.length;
+        ensurePointsSetup(parsed);
+        const after = (parsed as any).pointsRules.length;
+        if (after !== before) saveDb(parsed, { broadcast: false });
+      }
+
+      // Migration: invoices
+      if (!Array.isArray((parsed as any).invoices)) {
+        (parsed as any).invoices = [];
+        saveDb(parsed, { broadcast: false });
+      }
+
+      // Migration: notifications / contracts / compensation / vacations
+      if (!Array.isArray((parsed as any).notifications)) {
+        (parsed as any).notifications = [];
+        saveDb(parsed, { broadcast: false });
+      }
+      if (!Array.isArray((parsed as any).contractAttachments)) {
+        (parsed as any).contractAttachments = [];
+        saveDb(parsed, { broadcast: false });
+      } else {
+        // Migration: contractAttachments suportam FILE (data URL) e LINK (Clicksign).
+        // Normaliza registros antigos que só tinham `fileDataUrl`.
+        let changed = false;
+        for (const c of (parsed as any).contractAttachments as any[]) {
+          if (!c || typeof c !== "object") continue;
+
+          const url = typeof c.url === "string" ? c.url.trim() : "";
+          const legacy = typeof c.fileDataUrl === "string" ? c.fileDataUrl.trim() : "";
+
+          if (!url && legacy) {
+            c.url = legacy;
+            c.kind = c.kind ?? "FILE";
+            changed = true;
+          }
+
+          if (!c.kind) {
+            const nextUrl = (typeof c.url === "string" ? c.url : legacy) ?? "";
+            c.kind = String(nextUrl).startsWith("data:") ? "FILE" : "LINK";
+            changed = true;
+          }
         }
+        if (changed) saveDb(parsed, { broadcast: false });
       }
-      if (changed) saveDb(parsed);
-    }
+      if (!Array.isArray((parsed as any).compensationEvents)) {
+        (parsed as any).compensationEvents = [];
+        saveDb(parsed, { broadcast: false });
+      }
+      // Ensure baseline records exist
+      ensureCompensationEvents(parsed);
 
-    // Migration: ensure system users exist
-    {
-      const before = parsed.users.length;
-      ensureDefaultUsers(parsed);
-      if (parsed.users.length !== before) saveDb(parsed);
-    }
-
-    // Light migration: if organograma não existe, cria uma hierarquia padrão.
-    const needsOrg = Array.isArray(parsed.users) && parsed.users.length > 0 && parsed.users.every((u) => !u.managerId);
-    if (needsOrg) {
-      const admin = parsed.users.find((u) => u.role === "ADMIN" && u.active);
-      const heads = parsed.users.filter((u) => u.role === "HEAD" && u.active);
-      if (admin) {
-        for (const h of heads) h.managerId = admin.id;
+      if (!Array.isArray((parsed as any).vacationRequests)) {
+        (parsed as any).vacationRequests = [];
+        saveDb(parsed, { broadcast: false });
       }
 
-      // colaboradores reportam para o head do mesmo departamento (se existir)
-      for (const c of parsed.users.filter((u) => u.role === "COLABORADOR" && u.active)) {
-        const h = heads.find((x) => x.departmentId && x.departmentId === c.departmentId);
-        if (h) c.managerId = h.id;
+      // Migration: password fields
+      if (Array.isArray((parsed as any).users)) {
+        let changed = false;
+        for (const u of (parsed as any).users) {
+          if (u && typeof u === "object") {
+            if (!("password" in u)) {
+              u.password = undefined;
+              changed = true;
+            }
+            if (!("mustChangePassword" in u)) {
+              u.mustChangePassword = false;
+              changed = true;
+            }
+            if (!("joinedAt" in u)) {
+              u.joinedAt = nowIso();
+              changed = true;
+            }
+            if (!("jobTitle" in u)) {
+              u.jobTitle = undefined;
+              changed = true;
+            }
+          }
+        }
+        if (changed) saveDb(parsed, { broadcast: false });
       }
 
-      saveDb(parsed);
-    }
+      // Migration: vacation decision note
+      if (Array.isArray((parsed as any).vacationRequests)) {
+        let changed = false;
+        for (const r of (parsed as any).vacationRequests) {
+          if (r && typeof r === "object" && !("decisionNote" in r)) {
+            r.decisionNote = undefined;
+            changed = true;
+          }
+        }
+        if (changed) saveDb(parsed, { broadcast: false });
+      }
 
-    return parsed;
-  } catch {
-    const seeded = seedDb();
-    saveDb(seeded);
-    return seeded;
-  }
+      // Migration: ensure system users exist
+      {
+        const before = parsed.users.length;
+        ensureDefaultUsers(parsed);
+        if (parsed.users.length !== before) saveDb(parsed, { broadcast: false });
+      }
+
+      // Light migration: if organograma não existe, cria uma hierarquia padrão.
+      const needsOrg = Array.isArray(parsed.users) && parsed.users.length > 0 && parsed.users.every((u) => !u.managerId);
+      if (needsOrg) {
+        const admin = parsed.users.find((u) => u.role === "ADMIN" && u.active);
+        const heads = parsed.users.filter((u) => u.role === "HEAD" && u.active);
+        if (admin) {
+          for (const h of heads) h.managerId = admin.id;
+        }
+
+        // colaboradores reportam para o head do mesmo departamento (se existir)
+        for (const c of parsed.users.filter((u) => u.role === "COLABORADOR" && u.active)) {
+          const h = heads.find((x) => x.departmentId && x.departmentId === c.departmentId);
+          if (h) c.managerId = h.id;
+        }
+
+        saveDb(parsed, { broadcast: false });
+      }
+
+      return parsed;
+    } catch {
+      const seeded = seedDb();
+      saveDb(seeded, { broadcast: false });
+      return seeded;
+    }
+  });
 }
 
-export function saveDb(db: Db) {
+export function saveDb(db: Db, opts?: { broadcast?: boolean }) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
-    // Allow UI (header bell, etc.) to react to DB changes without prop-drilling.
-    window.dispatchEvent(new Event(DB_CHANGED_EVENT));
-  } catch (e) {
+
+    const shouldBroadcast = (opts?.broadcast ?? true) && broadcastSuppressed === 0;
+    if (shouldBroadcast) {
+      // Always async to prevent setState during render loops.
+      scheduleDbChangedBroadcast();
+    }
+  } catch {
     // Surface storage issues (e.g. quota exceeded) so UI can show an error toast.
     throw new Error(
       "Não foi possível salvar. O armazenamento do navegador pode estar cheio — tente remover itens antigos ou recarregar a página.",
@@ -527,7 +568,7 @@ export function saveDb(db: Db) {
 
 export function resetDb() {
   localStorage.removeItem(STORAGE_KEY);
-  window.dispatchEvent(new Event(DB_CHANGED_EVENT));
+  scheduleDbChangedBroadcast();
 }
 
 function seedDb(): Db {
