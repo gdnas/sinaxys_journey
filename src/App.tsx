@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Invite from "./pages/Invite";
+import ChangePassword from "./pages/ChangePassword";
 import AppDashboard from "./pages/AppDashboard";
 import TrackPlayer from "./pages/TrackPlayer";
 import AppCertificates from "./pages/AppCertificates";
@@ -46,6 +48,15 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/invite/:token" element={<Invite />} />
+                <Route
+                  path="/password"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <ChangePassword />
+                    </RequireAuth>
+                  }
+                />
 
                 {/* Master (plataforma) */}
                 <Route

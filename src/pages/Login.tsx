@@ -20,9 +20,11 @@ export default function Login() {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
 
-  const users = useMemo(() => mockDb.getUsers().filter((u) => u.active), []);
+  const isDev = import.meta.env.DEV;
+  const users = useMemo(() => (isDev ? mockDb.getUsers().filter((u) => u.active) : []), [isDev]);
 
   const [email, setEmail] = useState(user?.email ?? "");
+  const [password, setPassword] = useState("");
 
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
@@ -45,9 +47,9 @@ export default function Login() {
                 <KeyRound className="h-5 w-5 text-white" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Acesso simples</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Acesso seguro</div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Entre com um e-mail cadastrado (ou escolha um usuário de demonstração) para acessar a plataforma.
+                  Entre com seu e-mail e senha. Se você recebeu um convite, ative seu acesso pelo link e defina sua senha.
                 </p>
               </div>
             </div>
@@ -56,29 +58,32 @@ export default function Login() {
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6 shadow-sm">
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Entrar</div>
-          <p className="mt-1 text-sm text-muted-foreground">Selecione um usuário de demonstração ou informe um e-mail cadastrado.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Informe suas credenciais para acessar.</p>
 
           <div className="mt-5 grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="demo">Usuário de demonstração</Label>
-              <Select
-                value={email}
-                onValueChange={(v) => {
-                  setEmail(v);
-                }}
-              >
-                <SelectTrigger id="demo" className="rounded-xl">
-                  <SelectValue placeholder="Selecione…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((u) => (
-                    <SelectItem key={u.id} value={u.email}>
-                      {u.name} — {roleLabel(u.role)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {isDev ? (
+              <div className="grid gap-2">
+                <Label htmlFor="demo">Usuário de demonstração (somente DEV)</Label>
+                <Select
+                  value={email}
+                  onValueChange={(v) => {
+                    setEmail(v);
+                    setPassword("");
+                  }}
+                >
+                  <SelectTrigger id="demo" className="rounded-xl">
+                    <SelectValue placeholder="Selecione…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.email}>
+                        {u.name} — {roleLabel(u.role)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
 
             <div className="grid gap-2">
               <Label htmlFor="email">E-mail</Label>
@@ -87,14 +92,28 @@ export default function Login() {
                 placeholder="nome@empresa.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-xl"
+                className="h-11 rounded-xl"
+                autoComplete="email"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-11 rounded-xl"
+                type="password"
+                autoComplete="current-password"
               />
             </div>
 
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
               onClick={() => {
-                const result = login(email);
+                const result = login(email, password);
                 if (result.ok === false) {
                   toast({
                     title: "Não foi possível entrar",
@@ -103,6 +122,12 @@ export default function Login() {
                   });
                   return;
                 }
+
+                if (result.mustChangePassword) {
+                  navigate("/password", { replace: true });
+                  return;
+                }
+
                 navigate(from ?? "/");
               }}
             >
@@ -110,9 +135,11 @@ export default function Login() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
 
-            <div className="text-xs text-muted-foreground">
-              Dica: use <span className="font-medium text-[color:var(--sinaxys-ink)]">admin@sinaxys.com</span> para o perfil Admin.
-            </div>
+            {isDev ? (
+              <div className="text-xs text-muted-foreground">
+                Dica DEV: use <span className="font-medium text-[color:var(--sinaxys-ink)]">admin@sinaxys.com</span> para o perfil Admin.
+              </div>
+            ) : null}
           </div>
         </Card>
       </div>

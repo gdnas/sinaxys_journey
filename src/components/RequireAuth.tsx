@@ -10,6 +10,11 @@ export function RequireAuth({ roles, children }: { roles?: Role[]; children: Rea
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  // Force password update on first access
+  if (user.mustChangePassword && location.pathname !== "/password") {
+    return <Navigate to="/password" replace />;
+  }
+
   if (roles && !roles.includes(user.role)) {
     return <Navigate to="/" replace />;
   }
