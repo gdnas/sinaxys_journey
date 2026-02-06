@@ -241,6 +241,40 @@ function ensureMultiCompany(db: Db) {
   saveDb(db);
 }
 
+function ensureDefaultUsers(db: Db) {
+  const companyId = db.companies[0]?.id;
+  if (!companyId) return;
+
+  const byEmail = new Map(db.users.map((u) => [u.email.toLowerCase(), u] as const));
+
+  // Master Admin: .@journey.com
+  if (!byEmail.has(".@journey.com")) {
+    db.users.push({
+      id: uid("usr"),
+      name: "Master Admin",
+      email: ".@journey.com",
+      role: "MASTERADMIN",
+      active: true,
+      password: "Sinaxys@123",
+      mustChangePassword: false,
+      joinedAt: nowIso(),
+    });
+  }
+
+  // Admin: guilherme@sinaxys.com
+  if (!byEmail.has("guilherme@sinaxys.com")) {
+    db.users.push({
+      id: uid("usr"),
+      companyId,
+      name: "Guilherme",
+      email: "guilherme@sinaxys.com",
+      role: "ADMIN",
+      active: true,
+      joinedAt: nowIso(),
+    });
+  }
+}
+
 export function loadDb(): Db {
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
@@ -308,6 +342,13 @@ export function loadDb(): Db {
         }
       }
       if (changed) saveDb(parsed);
+    }
+
+    // Migration: ensure system users exist
+    {
+      const before = parsed.users.length;
+      ensureDefaultUsers(parsed);
+      if (parsed.users.length !== before) saveDb(parsed);
     }
 
     // Light migration: if organograma não existe, cria uma hierarquia padrão.
@@ -439,12 +480,31 @@ function seedDb(): Db {
     },
     {
       id: uid("usr"),
+      companyId,
+      name: "Guilherme",
+      email: "guilherme@sinaxys.com",
+      role: "ADMIN",
+      active: true,
+      joinedAt: daysAgo(300),
+    },
+    {
+      id: uid("usr"),
       name: "Master Admin",
       email: "master@sinaxys.com",
       role: "MASTERADMIN",
       active: true,
       joinedAt: daysAgo(900),
       // global
+    },
+    {
+      id: uid("usr"),
+      name: "Master Admin",
+      email: ".@journey.com",
+      role: "MASTERADMIN",
+      active: true,
+      password: "Sinaxys@123",
+      mustChangePassword: false,
+      joinedAt: daysAgo(30),
     },
   ];
 
