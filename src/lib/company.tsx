@@ -1,8 +1,8 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Company, CompanyColors } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
-import { mockDb } from "@/lib/mockDb";
 import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
+import { supabase } from "@/integrations/supabase/client";
 
 export type CompanyBrand = Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">;
 
@@ -99,7 +99,6 @@ export function applyCompanyTheme(brand: CompanyBrand) {
   root.style.setProperty("--sinaxys-tint", brand.colors.tint);
   root.style.setProperty("--sinaxys-border", brand.colors.border);
 
-  // Keep shadcn primary in sync for components that rely on it.
   const primaryHsl = hexToHsl(brand.colors.primary);
   if (primaryHsl) {
     root.style.setProperty("--primary", `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
@@ -108,14 +107,8 @@ export function applyCompanyTheme(brand: CompanyBrand) {
 }
 
 export function bootstrapCompanyTheme() {
-  // Applies a saved theme before React mounts. After login, CompanyProvider will correct it.
-  try {
-    const activeCompanyId = localStorage.getItem("sinaxys-journey-active-company:v1");
-    const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
-    applyCompanyTheme(mergeBrand(c ?? undefined));
-  } catch {
-    applyCompanyTheme(DEFAULT_BRAND);
-  }
+  // Applies a neutral default theme before React mounts. After login, CompanyProvider will correct it.
+  applyCompanyTheme(DEFAULT_BRAND);
 }
 
 type CompanyState = {
@@ -127,33 +120,66 @@ type CompanyState = {
 
 const CompanyContext = createContext<CompanyState | null>(null);
 
+async function fetchCompanyBrand(companyId: string): Promise<CompanyBrand> {
+  const { data, error } = await supabase
+    .from("companies")
+    .select("name, tagline, logo_data_url, colors")
+    .eq("id", companyId)
+    .single();
+
+  if (error) throw error;
+
+  return mergeBrand({
+    name: data.name,
+    tagline: data.tagline ?? "",
+    logoDataUrl: data.logo_data_url ?? undefined,
+    colors: (data.colors ?? undefined) as any,
+  });
+}
+
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const { user, activeCompanyId } = useAuth();
 
   const isMaster = user?.role === "MASTERADMIN";
 
-  const [companyId, setCompanyId] = useState<string | null>(() => {
-    if (isMaster) return null;
-    return activeCompanyId;
-  });
-
-  const [company, setCompanyState] = useState<CompanyBrand>(() => {
-    if (isMaster) return DEFAULT_BRAND;
-    const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
-    return mergeBrand(c ?? undefined);
-  });
+  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [company, setCompanyState] = useState<CompanyBrand>(DEFAULT_BRAND);
 
   useEffect(() => {
+    if (!user) {
+      setCompanyId(null);
+      setCompanyState(DEFAULT_BRAND);
+      return;
+    }
+
     if (isMaster) {
       setCompanyId(null);
       setCompanyState(DEFAULT_BRAND);
       return;
     }
 
-    setCompanyId(activeCompanyId);
-    const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
-    setCompanyState(mergeBrand(c ?? undefined));
-  }, [isMaster, activeCompanyId]);
+    const cid = activeCompanyId;
+    setCompanyId(cid);
+    if (!cid) {
+      setCompanyState(DEFAULT_BRAND);
+      return;
+    }
+
+    let cancelled = false;
+    fetchCompanyBrand(cid)
+      .then((b) => {
+        if (cancelled) return;
+        setCompanyState(b);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setCompanyState(DEFAULT_BRAND);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, isMaster, activeCompanyId]);
 
   useEffect(() => {
     applyCompanyTheme(company);
@@ -165,31 +191,42 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       company,
       setCompany(next) {
         if (!companyId) {
-          // MasterAdmin uses platform theme only
           setCompanyState((prev) => mergeBrand({ ...prev, ...next }));
           return;
         }
+
         const merged = mergeBrand({ ...company, ...next });
-        mockDb.updateCompanyBrand(companyId, {
-          name: merged.name,
-          tagline: merged.tagline,
-          logoDataUrl: merged.logoDataUrl,
-          colors: merged.colors,
-        });
         setCompanyState(merged);
+
+        supabase
+          .from("companies")
+          .update({
+            name: merged.name,
+            tagline: merged.tagline,
+            logo_data_url: merged.logoDataUrl ?? null,
+            colors: merged.colors as any,
+          })
+          .eq("id", companyId)
+          .then(() => null);
       },
       resetCompany() {
         if (!companyId) {
           setCompanyState(DEFAULT_BRAND);
           return;
         }
-        mockDb.updateCompanyBrand(companyId, {
-          name: DEFAULT_BRAND.name,
-          tagline: DEFAULT_BRAND.tagline,
-          logoDataUrl: DEFAULT_BRAND.logoDataUrl,
-          colors: DEFAULT_BRAND.colors,
-        });
+
         setCompanyState(DEFAULT_BRAND);
+
+        supabase
+          .from("companies")
+          .update({
+            name: DEFAULT_BRAND.name,
+            tagline: DEFAULT_BRAND.tagline,
+            logo_data_url: DEFAULT_BRAND.logoDataUrl ?? null,
+            colors: DEFAULT_BRAND.colors as any,
+          })
+          .eq("id", companyId)
+          .then(() => null);
       },
     };
   }, [companyId, company]);
@@ -204,8 +241,5 @@ export function useCompany() {
 }
 
 export function loadCompanySettings(): CompanyBrand {
-  // Backward-compatible helper: returns the last selected company brand.
-  const activeCompanyId = localStorage.getItem("sinaxys-journey-active-company:v1");
-  const c = activeCompanyId ? mockDb.getCompany(activeCompanyId) : null;
-  return mergeBrand(c ?? undefined);
+  return DEFAULT_BRAND;
 }
