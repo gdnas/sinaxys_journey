@@ -65,6 +65,7 @@ type TabKey = (typeof TAB_OPTIONS)[number];
 
 const POINTS_CATEGORIES: PointsRuleCategory[] = [
   "Trilhas",
+  "Performance",
   "Tempo de casa",
   "Contribuição",
   "Aprimoramento",
@@ -193,6 +194,8 @@ export default function Rankings() {
   }, [companyId, user?.id, version]);
 
   const isAdmin = user?.role === "ADMIN";
+  const isHead = user?.role === "HEAD";
+  const canAward = isAdmin || isHead;
 
   // --- Admin: tiers manager state
   const [tierOpen, setTierOpen] = useState(false);
@@ -244,7 +247,7 @@ export default function Rankings() {
     }
   };
 
-  // --- Admin: points award + rules manager state
+  // --- Admin/Head: points award + rules manager state
   const usersInCompany = useMemo(() => {
     if (!companyId) return [];
     return mockDb
@@ -253,6 +256,33 @@ export default function Rankings() {
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [companyId, version]);
+
+  const awardableUsers = useMemo(() => {
+    if (!user) return [];
+
+    if (isAdmin) {
+      return usersInCompany.filter((u) => u.role !== "MASTERADMIN");
+    }
+
+    // Head: only collaborators in their department
+    if (isHead) {
+      return usersInCompany.filter((u) => u.role === "COLABORADOR" && u.departmentId && u.departmentId === user.departmentId);
+    }
+
+    return [];
+  }, [usersInCompany, isAdmin, isHead, user?.departmentId, user?.id]);
+
+  // Head can only use specific rule categories
+  const awardableRules = useMemo(() => {
+    if (!pointsRules.length) return [];
+
+    if (isAdmin) return pointsRules.filter((r) => r.active);
+
+    // Head: Performance + Reconhecimento + Contribuição
+    return pointsRules
+      .filter((r) => r.active)
+      .filter((r) => r.category === "Performance" || r.category === "Reconhecimento" || r.category === "Contribuição");
+  }, [pointsRules, isAdmin]);
 
   const [awardUserId, setAwardUserId] = useState<string>("");
   const [awardRuleId, setAwardRuleId] = useState<string>("");
@@ -950,7 +980,7 @@ export default function Rankings() {
                 <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
                   <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — conceder pontos</div>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Registre ações como "subir vídeo", "gravação de aula", "curso de aprimoramento" ou bônus pontuais.
+                    Registre ações como cursos, contribuição e bônus/penalizações. Use justificativa para manter consistência.
                   </p>
 
                   <div className="mt-4 grid gap-3">
@@ -961,7 +991,7 @@ export default function Rankings() {
                           <SelectValue placeholder="Selecione…" />
                         </SelectTrigger>
                         <SelectContent>
-                          {usersInCompany.map((u) => (
+                          {awardableUsers.map((u) => (
                             <SelectItem key={u.id} value={u.id}>
                               {u.name} — {roleLabel(u.role)}
                             </SelectItem>
@@ -977,13 +1007,11 @@ export default function Rankings() {
                           <SelectValue placeholder="Selecione…" />
                         </SelectTrigger>
                         <SelectContent>
-                          {pointsRules
-                            .filter((r) => r.active)
-                            .map((r) => (
-                              <SelectItem key={r.id} value={r.id}>
-                                {r.category} — {r.label} ({r.points} XP)
-                              </SelectItem>
-                            ))}
+                          {awardableRules.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.category} — {r.label} ({r.points} XP)
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1207,6 +1235,92 @@ export default function Rankings() {
                         </DialogFooter>
                       </DialogContent>
                     </Dialog>
+                  </div>
+                </Card>
+              ) : canAward ? (
+                <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Head — atribuir pontos</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Use para OKRs/entregas e reconhecimento do time. Para penalizações, use valores negativos e descreva o motivo.
+                  </p>
+
+                  <div className="mt-4 grid gap-3">
+                    <div className="grid gap-2">
+                      <Label>Colaborador</Label>
+                      <Select value={awardUserId} onValueChange={setAwardUserId}>
+                        <SelectTrigger className="h-11 rounded-xl">
+                          <SelectValue placeholder="Selecione…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {awardableUsers.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>
+                              {u.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Regra</Label>
+                      <Select value={awardRuleId} onValueChange={setAwardRuleId}>
+                        <SelectTrigger className="h-11 rounded-xl">
+                          <SelectValue placeholder="Selecione…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {awardableRules.map((r) => (
+                            <SelectItem key={r.id} value={r.id}>
+                              {r.category} — {r.label} ({r.points} XP)
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Pontos</Label>
+                      <Input
+                        value={awardPoints}
+                        onChange={(e) => setAwardPoints(e.target.value.replace(/[^0-9-]/g, ""))}
+                        className="h-11 rounded-xl"
+                        inputMode="numeric"
+                      />
+                      <div className="text-xs text-muted-foreground">Dica: OKR usa valores sugeridos; reconhecimento/penalização é variável.</div>
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Justificativa</Label>
+                      <Textarea value={awardNote} onChange={(e) => setAwardNote(e.target.value)} className="min-h-24 rounded-2xl" />
+                    </div>
+
+                    <Button
+                      className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                      disabled={!awardUserId || !selectedRule || awardNote.trim().length < 8}
+                      onClick={() => {
+                        if (!companyId || !awardUserId || !selectedRule) return;
+                        try {
+                          mockDb.awardPoints({
+                            companyId,
+                            userId: awardUserId,
+                            ruleKey: selectedRule.key,
+                            points: Number(awardPoints) || 0,
+                            note: awardNote,
+                            createdByUserId: user.id,
+                          });
+                          toast({ title: "Pontos atribuídos" });
+                          setAwardNote("");
+                          setVersion((v) => v + 1);
+                        } catch (e) {
+                          toast({
+                            title: "Não foi possível atribuir",
+                            description: e instanceof Error ? e.message : "Tente novamente.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      Atribuir pontos
+                    </Button>
                   </div>
                 </Card>
               ) : null}

@@ -73,6 +73,8 @@ export type LearningTrack = {
   title: string;
   description: string;
   published: boolean;
+  strategic?: boolean; // trilha estratégica (peso maior)
+  onboarding?: boolean; // trilha de onboarding (marco simbólico)
   createdByUserId: string;
   createdAt: string;
 };
@@ -136,6 +138,7 @@ export type ModuleProgress = {
   score?: number;
   passed?: boolean;
   attemptsCount: number;
+  earnedXp?: number; // XP efetivamente ganho neste módulo (ex.: quiz por acerto)
   completedAt?: string;
   checkpointAnswerText?: string;
 };
@@ -162,18 +165,35 @@ export type RewardTier = {
   createdAt: string;
 };
 
-export type PointsRuleCategory = "Trilhas" | "Contribuição" | "Aprimoramento" | "Tempo de casa" | "Reconhecimento";
+export type PointsRuleCategory =
+  | "Trilhas"
+  | "Performance"
+  | "Contribuição"
+  | "Aprimoramento"
+  | "Tempo de casa"
+  | "Reconhecimento";
 
 export type PointsRuleKey =
-  | "VIDEO_ASSISTIDO"
+  | "VIDEO_CONCLUIDO"
+  | "QUIZ_VF_CORRETA"
+  | "QUIZ_MULTIPLA_CORRETA"
   | "CHECKPOINT_ENTREGUE"
-  | "QUIZ_APROVADO"
   | "MATERIAL_CONSUMIDO"
-  | "CURSO_APRIMORAMENTO"
-  | "GRAVACAO_AULA"
-  | "SUBIR_VIDEO"
+  | "TRILHA_CURTA_CONCLUIDA"
+  | "TRILHA_MEDIA_CONCLUIDA"
+  | "TRILHA_LONGA_CONCLUIDA"
+  | "TRILHA_ESTRATEGICA_CONCLUIDA"
+  | "OKR_70"
+  | "OKR_85"
+  | "OKR_100"
+  | "OKR_120"
+  | "TEMPO_3M"
   | "TEMPO_6M"
   | "TEMPO_12M"
+  | "TEMPO_24M"
+  | "RECONHECIMENTO_HEAD"
+  | "CONTRIBUICAO_CULTURAL"
+  | "PENALIDADE"
   | "BONUS_ADMIN";
 
 export type PointsRule = {
@@ -195,6 +215,8 @@ export type PointsEvent = {
   ruleKey: PointsRuleKey;
   points: number;
   note?: string;
+  refType?: "TRACK_COMPLETION"; // referência para evitar duplicidade
+  refId?: string;
   createdAt: string;
   createdByUserId?: string;
 };

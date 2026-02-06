@@ -108,7 +108,13 @@ function defaultCompanyBrand(): Pick<Company, "name" | "tagline" | "logoDataUrl"
 
 function defaultPointsRules(companyId: string): PointsRule[] {
   const createdAt = nowIso();
-  const base = (key: PointsRuleKey, category: PointsRule["category"], label: string, points: number, description?: string) =>
+  const base = (
+    key: PointsRuleKey,
+    category: PointsRule["category"],
+    label: string,
+    points: number,
+    description?: string,
+  ) =>
     ({
       id: uid("pr"),
       companyId,
@@ -122,69 +128,34 @@ function defaultPointsRules(companyId: string): PointsRule[] {
     }) satisfies PointsRule;
 
   return [
-    base(
-      "VIDEO_ASSISTIDO",
-      "Trilhas",
-      "Assistir vídeo (módulo)",
-      20,
-      "Padrão recomendado por módulo de vídeo. O valor real pode variar por trilha.",
-    ),
-    base(
-      "CHECKPOINT_ENTREGUE",
-      "Trilhas",
-      "Entregar checkpoint",
-      30,
-      "Padrão recomendado por checkpoint. O valor real pode variar por trilha.",
-    ),
-    base(
-      "QUIZ_APROVADO",
-      "Trilhas",
-      "Aprovar quiz",
-      40,
-      "Padrão recomendado por quiz aprovado. O valor real pode variar por trilha.",
-    ),
-    base(
-      "MATERIAL_CONSUMIDO",
-      "Trilhas",
-      "Consumir material (link)",
-      20,
-      "Padrão recomendado por material. O valor real pode variar por trilha.",
-    ),
-    base(
-      "CURSO_APRIMORAMENTO",
-      "Aprimoramento",
-      "Curso de aprimoramento concluído",
-      120,
-      "Ex.: certificações externas, cursos recomendados pela liderança.",
-    ),
-    base(
-      "GRAVACAO_AULA",
-      "Contribuição",
-      "Gravação de aula / sessão interna",
-      180,
-      "Valor sugerido para criação de conteúdo e compartilhamento de conhecimento.",
-    ),
-    base(
-      "SUBIR_VIDEO",
-      "Contribuição",
-      "Subir vídeo / recurso didático",
-      80,
-      "Valor sugerido para contribuição de conteúdo (vídeo, tutorial, demo).",
-    ),
-    base(
-      "TEMPO_6M",
-      "Tempo de casa",
-      "Tempo de casa: 6 meses",
-      150,
-      "Bônus por permanência (aplicado uma vez ao atingir o marco).",
-    ),
-    base(
-      "TEMPO_12M",
-      "Tempo de casa",
-      "Tempo de casa: 1 ano",
-      350,
-      "Bônus por permanência (aplicado uma vez ao atingir o marco).",
-    ),
+    // Aprendizado (Journey)
+    base("VIDEO_CONCLUIDO", "Trilhas", "Vídeo concluído na Journey", 10),
+    base("QUIZ_VF_CORRETA", "Trilhas", "Pergunta V/F correta", 15),
+    base("QUIZ_MULTIPLA_CORRETA", "Trilhas", "Pergunta múltipla correta", 25),
+    base("CHECKPOINT_ENTREGUE", "Trilhas", "Checkpoint de módulo", 80),
+    base("MATERIAL_CONSUMIDO", "Trilhas", "Material consumido (link)", 10),
+
+    base("TRILHA_CURTA_CONCLUIDA", "Trilhas", "Conclusão de trilha curta", 150),
+    base("TRILHA_MEDIA_CONCLUIDA", "Trilhas", "Conclusão de trilha média", 300),
+    base("TRILHA_LONGA_CONCLUIDA", "Trilhas", "Conclusão de trilha longa", 500),
+    base("TRILHA_ESTRATEGICA_CONCLUIDA", "Trilhas", "Conclusão de trilha estratégica", 800),
+
+    // Performance (OKRs)
+    base("OKR_70", "Performance", "Atingimento de OKR (70%)", 200),
+    base("OKR_85", "Performance", "Atingimento de OKR (85%)", 400),
+    base("OKR_100", "Performance", "Atingimento de OKR (100%)", 700),
+    base("OKR_120", "Performance", "Superação de OKR (120%+)", 1000),
+
+    // Tempo de casa
+    base("TEMPO_3M", "Tempo de casa", "Tempo de casa: 3 meses", 150),
+    base("TEMPO_6M", "Tempo de casa", "Tempo de casa: 6 meses", 300),
+    base("TEMPO_12M", "Tempo de casa", "Tempo de casa: 1 ano", 800),
+    base("TEMPO_24M", "Tempo de casa", "Tempo de casa: 2 anos", 2000),
+
+    // Reconhecimento / cultura / flex
+    base("RECONHECIMENTO_HEAD", "Reconhecimento", "Reconhecimento manual do head", 0, "Valor variável definido pela liderança."),
+    base("CONTRIBUICAO_CULTURAL", "Contribuição", "Contribuição cultural relevante", 0, "Valor variável definido pela liderança."),
+    base("PENALIDADE", "Reconhecimento", "Penalização", 0, "Use valores negativos quando necessário, sempre com justificativa."),
     base("BONUS_ADMIN", "Reconhecimento", "Bônus (admin)", 0, "Reconhecimento pontual definido pelo admin."),
   ];
 }
@@ -194,9 +165,13 @@ function ensurePointsSetup(db: Db) {
   if (!Array.isArray((db as any).pointsEvents)) (db as any).pointsEvents = [];
 
   for (const c of db.companies ?? []) {
-    const hasAny = (db.pointsRules ?? []).some((r) => r.companyId === c.id);
-    if (!hasAny) {
-      (db.pointsRules ?? []).push(...defaultPointsRules(c.id));
+    const defaults = defaultPointsRules(c.id);
+    const existingByKey = new Map((db.pointsRules ?? []).filter((r) => r.companyId === c.id).map((r) => [r.key, r] as const));
+
+    // Add missing keys (do not override custom edits)
+    for (const r of defaults) {
+      if (existingByKey.has(r.key)) continue;
+      (db.pointsRules ?? []).push(r);
     }
   }
 }
@@ -964,6 +939,9 @@ function issueCertificateIfCompleted(db: Db, assignmentId: string) {
   };
 
   db.certificates.push(cert);
+
+  // Grant track completion points (once)
+  awardTrackCompletionIfNeeded(db, assignmentId);
 }
 
 function computeNeedsAttention(db: Db, assignmentId: string) {
@@ -1024,9 +1002,16 @@ function wouldCreateCycle(db: Db, userId: string, nextManagerId: string) {
 
 function computeUserXpFromTracks(db: Db, userId: string) {
   const assignmentIds = db.assignments.filter((a) => a.userId === userId).map((a) => a.id);
-  const completedMp = db.moduleProgress.filter((p) => assignmentIds.includes(p.assignmentId) && p.status === "COMPLETED");
+  const completedMp = db.moduleProgress.filter(
+    (p) => assignmentIds.includes(p.assignmentId) && p.status === "COMPLETED",
+  );
   const byModuleId = new Map(db.modules.map((m) => [m.id, m] as const));
-  return completedMp.reduce((acc, p) => acc + (byModuleId.get(p.moduleId)?.xpReward ?? 0), 0);
+
+  return completedMp.reduce((acc, p) => {
+    const mod = byModuleId.get(p.moduleId);
+    const earned = typeof p.earnedXp === "number" ? p.earnedXp : mod?.xpReward ?? 0;
+    return acc + earned;
+  }, 0);
 }
 
 function computeTenureXp(db: Db, userId: string) {
@@ -1040,12 +1025,17 @@ function computeTenureXp(db: Db, userId: string) {
   const months = (Date.now() - joinedMs) / (1000 * 60 * 60 * 24 * 30);
 
   const rules = (db.pointsRules ?? []).filter((r) => r.companyId === u.companyId && r.active);
+
+  const r3 = rules.find((r) => r.key === "TEMPO_3M");
   const r6 = rules.find((r) => r.key === "TEMPO_6M");
   const r12 = rules.find((r) => r.key === "TEMPO_12M");
+  const r24 = rules.find((r) => r.key === "TEMPO_24M");
 
   let xp = 0;
+  if (months >= 3) xp += r3?.points ?? 0;
   if (months >= 6) xp += r6?.points ?? 0;
   if (months >= 12) xp += r12?.points ?? 0;
+  if (months >= 24) xp += r24?.points ?? 0;
   return xp;
 }
 
@@ -1069,6 +1059,47 @@ function computeUserTier(db: Db, companyId: string, xp: number) {
   return current;
 }
 
+function awardTrackCompletionIfNeeded(db: Db, assignmentId: string) {
+  ensurePointsSetup(db);
+
+  const asg = db.assignments.find((a) => a.id === assignmentId);
+  if (!asg) return;
+
+  const track = db.tracks.find((t) => t.id === asg.trackId);
+  const user = db.users.find((u) => u.id === asg.userId);
+  if (!track || !user || !user.companyId) return;
+
+  const already = (db.pointsEvents ?? []).some(
+    (e) => e.companyId === user.companyId && e.userId === user.id && e.refType === "TRACK_COMPLETION" && e.refId === assignmentId,
+  );
+  if (already) return;
+
+  const modulesCount = db.modules.filter((m) => m.trackId === track.id).length;
+  const key: PointsRuleKey = track.strategic
+    ? "TRILHA_ESTRATEGICA_CONCLUIDA"
+    : modulesCount <= 3
+      ? "TRILHA_CURTA_CONCLUIDA"
+      : modulesCount <= 6
+        ? "TRILHA_MEDIA_CONCLUIDA"
+        : "TRILHA_LONGA_CONCLUIDA";
+
+  const rule = (db.pointsRules ?? []).find((r) => r.companyId === user.companyId && r.key === key);
+  const points = rule?.points ?? 0;
+
+  (db.pointsEvents ?? []).push({
+    id: uid("pe"),
+    companyId: user.companyId,
+    userId: user.id,
+    ruleKey: key,
+    points,
+    note: `Conclusão da trilha: ${track.title}`,
+    refType: "TRACK_COMPLETION",
+    refId: assignmentId,
+    createdAt: nowIso(),
+    createdByUserId: undefined,
+  });
+}
+
 export const mockDb = {
   uid,
   nowIso,
@@ -1088,36 +1119,6 @@ export const mockDb = {
   },
   getCompany(companyId: string) {
     return loadDb().companies.find((c) => c.id === companyId) ?? null;
-  },
-  createCompany(params: { name: string; tagline?: string }) {
-    const db = loadDb();
-    const brand = defaultCompanyBrand();
-    const companyId = uid("cmp");
-
-    const c: Company = {
-      id: companyId,
-      ...brand,
-      name: params.name.trim(),
-      tagline: params.tagline?.trim() || brand.tagline,
-      createdAt: nowIso(),
-    };
-
-    db.companies.push(c);
-    saveDb(db);
-    return c;
-  },
-  updateCompanyBrand(companyId: string, data: Partial<Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">>) {
-    const db = loadDb();
-    const c = db.companies.find((x) => x.id === companyId);
-    if (!c) throw new Error("Empresa não encontrada.");
-
-    if (typeof data.name === "string") c.name = data.name.trim();
-    if (typeof data.tagline === "string") c.tagline = data.tagline.trim();
-    if (typeof data.logoDataUrl === "string") c.logoDataUrl = data.logoDataUrl;
-    if (data.colors) c.colors = data.colors;
-
-    saveDb(db);
-    return c;
   },
 
   // Sinaxys Points
@@ -1527,8 +1528,11 @@ export const mockDb = {
     const p = db.moduleProgress.find((x) => x.assignmentId === assignmentId && x.moduleId === moduleId);
     if (!p || p.status !== "AVAILABLE") return;
 
+    const mod = db.modules.find((m) => m.id === moduleId);
     p.status = "COMPLETED";
     p.completedAt = nowIso();
+    p.earnedXp = typeof mod?.xpReward === "number" ? mod.xpReward : p.earnedXp;
+
     unlockNextIfAny(db, assignmentId);
 
     const a = db.assignments.find((x) => x.id === assignmentId);
@@ -1546,9 +1550,13 @@ export const mockDb = {
     const p = db.moduleProgress.find((x) => x.assignmentId === assignmentId && x.moduleId === moduleId);
     if (!p || p.status !== "AVAILABLE") return;
 
+    const mod = db.modules.find((m) => m.id === moduleId);
+
     p.checkpointAnswerText = answer.trim();
     p.status = "COMPLETED";
     p.completedAt = nowIso();
+    p.earnedXp = typeof mod?.xpReward === "number" ? mod.xpReward : p.earnedXp;
+
     unlockNextIfAny(db, assignmentId);
 
     const a = db.assignments.find((x) => x.id === assignmentId);
@@ -1578,11 +1586,23 @@ export const mockDb = {
       .sort((a, b) => a.orderIndex - b.orderIndex);
 
     let correct = 0;
+    let earnedXp = 0;
+
+    // Use points rules as weights
+    const companyId = db.tracks.find((t) => t.id === mod.trackId)?.companyId;
+    const rVF = companyId ? (db.pointsRules ?? []).find((r) => r.companyId === companyId && r.key === "QUIZ_VF_CORRETA") : null;
+    const rMC = companyId ? (db.pointsRules ?? []).find((r) => r.companyId === companyId && r.key === "QUIZ_MULTIPLA_CORRETA") : null;
+    const vfPts = rVF?.points ?? 15;
+    const mcPts = rMC?.points ?? 25;
+
     for (const q of questions) {
       const pickedOptionId = answersByQuestionId[q.id];
       const opts = db.quizOptions.filter((o) => o.questionId === q.id);
       const chosen = opts.find((o) => o.id === pickedOptionId);
-      if (chosen?.isCorrect) correct += 1;
+      if (chosen?.isCorrect) {
+        correct += 1;
+        earnedXp += q.type === "TRUE_FALSE" ? vfPts : mcPts;
+      }
     }
 
     const score = questions.length ? Math.round((correct / questions.length) * 100) : 0;
@@ -1595,6 +1615,7 @@ export const mockDb = {
     if (passed) {
       p.status = "COMPLETED";
       p.completedAt = nowIso();
+      p.earnedXp = earnedXp;
       unlockNextIfAny(db, assignmentId);
       issueCertificateIfCompleted(db, assignmentId);
 
@@ -1687,6 +1708,8 @@ export const mockDb = {
       title: params.title.trim(),
       description: params.description.trim(),
       published: false,
+      strategic: false,
+      onboarding: false,
       createdByUserId: params.createdByUserId,
       createdAt: nowIso(),
     };
@@ -1713,81 +1736,14 @@ export const mockDb = {
     saveDb(db);
   },
 
-  upsertModule(module: TrackModule) {
+  setTrackFlags(trackId: string, data: { strategic?: boolean; onboarding?: boolean }) {
     const db = loadDb();
-    const idx = db.modules.findIndex((m) => m.id === module.id);
-    if (idx >= 0) db.modules[idx] = module;
-    else db.modules.push(module);
+    const t = db.tracks.find((x) => x.id === trackId);
+    if (!t) throw new Error("Trilha não encontrada.");
+    if (typeof data.strategic === "boolean") (t as any).strategic = data.strategic;
+    if (typeof data.onboarding === "boolean") (t as any).onboarding = data.onboarding;
     saveDb(db);
-  },
-
-  deleteModule(moduleId: string) {
-    const db = loadDb();
-
-    // Remove module
-    db.modules = db.modules.filter((m) => m.id !== moduleId);
-
-    // Remove quiz data for this module
-    const questionIds = db.quizQuestions.filter((q) => q.moduleId === moduleId).map((q) => q.id);
-    db.quizQuestions = db.quizQuestions.filter((q) => q.moduleId !== moduleId);
-    db.quizOptions = db.quizOptions.filter((o) => !questionIds.includes(o.questionId));
-
-    // IMPORTANT: remove progress rows that point to the deleted module
-    const affectedAssignmentIds = Array.from(
-      new Set(db.moduleProgress.filter((p) => p.moduleId === moduleId).map((p) => p.assignmentId)),
-    );
-    db.moduleProgress = db.moduleProgress.filter((p) => p.moduleId !== moduleId);
-
-    // Ensure each affected assignment still has a single AVAILABLE if needed
-    for (const asgId of affectedAssignmentIds) {
-      unlockNextIfAny(db, asgId);
-    }
-
-    saveDb(db);
-  },
-
-  getQuizForModule(moduleId: string) {
-    const db = loadDb();
-    const questions = db.quizQuestions
-      .filter((q) => q.moduleId === moduleId)
-      .sort((a, b) => a.orderIndex - b.orderIndex);
-    const optionsByQuestionId = Object.fromEntries(
-      questions.map((q) => [q.id, db.quizOptions.filter((o) => o.questionId === q.id)]),
-    ) as Record<string, QuizOption[]>;
-
-    return { questions, optionsByQuestionId };
-  },
-
-  replaceQuiz(
-    moduleId: string,
-    data: { questions: { prompt: string; type: "TRUE_FALSE" | "MULTIPLE_CHOICE"; options: { text: string; isCorrect: boolean }[] }[] },
-  ) {
-    const db = loadDb();
-
-    const oldQIds = db.quizQuestions.filter((q) => q.moduleId === moduleId).map((q) => q.id);
-    db.quizQuestions = db.quizQuestions.filter((q) => q.moduleId !== moduleId);
-    db.quizOptions = db.quizOptions.filter((o) => !oldQIds.includes(o.questionId));
-
-    data.questions.forEach((q, idx) => {
-      const qId = uid("qq");
-      db.quizQuestions.push({
-        id: qId,
-        moduleId,
-        type: q.type,
-        prompt: q.prompt,
-        orderIndex: idx + 1,
-      });
-      q.options.forEach((o) => {
-        db.quizOptions.push({
-          id: uid("qo"),
-          questionId: qId,
-          text: o.text,
-          isCorrect: o.isCorrect,
-        });
-      });
-    });
-
-    saveDb(db);
+    return t;
   },
 
   // Admin

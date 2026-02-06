@@ -1198,7 +1198,13 @@ export default function HeadTrackEdit() {
                           type: moduleType,
                           title: title.trim(),
                           description: description.trim() || undefined,
-                          xpReward: moduleType === "VIDEO" ? 20 : moduleType === "MATERIAL" ? 20 : moduleType === "CHECKPOINT" ? 30 : 40,
+                          // Padrão recomendado (Sinaxys Points)
+                          // - Vídeo: 10
+                          // - Material: 10
+                          // - Checkpoint: 80
+                          // - Quiz: variável (por acerto). Mantemos um valor-base para referência visual.
+                          xpReward: moduleType === "VIDEO" ? 10 : moduleType === "MATERIAL" ? 10 : moduleType === "CHECKPOINT" ? 80 : 0,
+
                           youtubeUrl: moduleType === "VIDEO" ? youtubeUrl.trim() : undefined,
                           materialUrl: moduleType === "MATERIAL" ? materialUrl.trim() : undefined,
                           checkpointPrompt: moduleType === "CHECKPOINT" ? checkpointPrompt.trim() : undefined,
