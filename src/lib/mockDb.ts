@@ -361,14 +361,16 @@ export function loadDb(): Db {
 
     ensureMultiCompany(parsed);
 
-    // Migration: add dueAt field (optional) for older assignments (no-op but keeps shape stable)
+    // Migration: add dueAt field (optional) for older assignments
     if (Array.isArray((parsed as any).assignments)) {
+      let changed = false;
       for (const a of (parsed as any).assignments) {
         if (a && typeof a === "object" && !("dueAt" in a)) {
           a.dueAt = undefined;
+          changed = true;
         }
       }
-      saveDb(parsed);
+      if (changed) saveDb(parsed);
     }
 
     // Migration: reward tiers
