@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,18 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Se já estiver autenticado, não faz sentido ficar preso na tela de login.
+  useEffect(() => {
+    if (!user) return;
+
+    if (user.mustChangePassword) {
+      navigate("/password", { replace: true });
+      return;
+    }
+
+    navigate(from ?? "/", { replace: true });
+  }, [user, from, navigate]);
 
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
@@ -135,7 +147,7 @@ export default function Login() {
                     return;
                   }
 
-                  navigate(from ?? "/");
+                  navigate(from ?? "/", { replace: true });
                 } finally {
                   setLoading(false);
                 }
