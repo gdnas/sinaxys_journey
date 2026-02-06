@@ -862,6 +862,36 @@ export const mockDb = {
   getCompany(companyId: string) {
     return loadDb().companies.find((c) => c.id === companyId) ?? null;
   },
+  createCompany(params: { name: string; tagline?: string }) {
+    const db = loadDb();
+    const brand = defaultCompanyBrand();
+    const companyId = uid("cmp");
+
+    const c: Company = {
+      id: companyId,
+      ...brand,
+      name: params.name.trim(),
+      tagline: params.tagline?.trim() || brand.tagline,
+      createdAt: nowIso(),
+    };
+
+    db.companies.push(c);
+    saveDb(db);
+    return c;
+  },
+  updateCompanyBrand(companyId: string, data: Partial<Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">>) {
+    const db = loadDb();
+    const c = db.companies.find((x) => x.id === companyId);
+    if (!c) throw new Error("Empresa não encontrada.");
+
+    if (typeof data.name === "string") c.name = data.name.trim();
+    if (typeof data.tagline === "string") c.tagline = data.tagline.trim();
+    if (typeof data.logoDataUrl === "string") c.logoDataUrl = data.logoDataUrl;
+    if (data.colors) c.colors = data.colors;
+
+    saveDb(db);
+    return c;
+  },
 
   // Sinaxys Points
   getPointsRules(companyId: string) {
