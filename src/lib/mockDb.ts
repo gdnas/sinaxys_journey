@@ -914,14 +914,24 @@ export const mockDb = {
     const db = loadDb();
     ensurePointsSetup(db);
 
+    const key = String(data.key ?? "").trim();
+    if (!key) throw new Error("Chave (key) é obrigatória.");
+
+    const label = data.label.trim();
+    if (label.length < 2) throw new Error("Nome da regra é obrigatório.");
+
+    // Uniqueness: one key per company
+    const clash = (db.pointsRules ?? []).find((r) => r.companyId === companyId && r.key === key && r.id !== data.id);
+    if (clash) throw new Error(`Já existe uma regra com a chave ${key}.`);
+
     const points = Math.floor(Number(data.points) || 0);
 
     if (data.id) {
       const existing = (db.pointsRules ?? []).find((r) => r.id === data.id);
       if (!existing) throw new Error("Regra não encontrada.");
-      existing.label = data.label.trim();
+      existing.label = label;
       existing.category = data.category;
-      existing.key = data.key;
+      existing.key = key;
       existing.points = points;
       existing.description = data.description?.trim() || undefined;
       existing.active = !!data.active;
@@ -932,9 +942,9 @@ export const mockDb = {
     const r: PointsRule = {
       id: uid("pr"),
       companyId,
-      key: data.key,
+      key: key as any,
       category: data.category,
-      label: data.label.trim(),
+      label,
       points,
       description: data.description?.trim() || undefined,
       active: !!data.active,
@@ -944,6 +954,13 @@ export const mockDb = {
     db.pointsRules.push(r);
     saveDb(db);
     return r;
+  },
+  deletePointsRule(ruleId: string) {
+    const db = loadDb();
+    ensurePointsSetup(db);
+    const before = (db.pointsRules ?? []).length;
+    db.pointsRules = (db.pointsRules ?? []).filter((r) => r.id !== ruleId);
+    if ((db.pointsRules ?? []).length !== before) saveDb(db);
   },
   getPointsEventsForUser(companyId: string, userId: string) {
     const db = loadDb();

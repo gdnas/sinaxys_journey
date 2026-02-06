@@ -38,8 +38,10 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
-import type { PointsRule, PointsRuleCategory, PointsRuleKey } from "@/lib/domain";
+import type { PointsRule, PointsRuleCategory } from "@/lib/domain";
 import { roleLabel } from "@/lib/sinaxys";
+
+const NEW_RULE_ID = "__new_rule__";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -268,25 +270,43 @@ export default function Rankings() {
   const [ruleOpen, setRuleOpen] = useState(false);
   const [editingRuleId, setEditingRuleId] = useState<string | null>(null);
 
+  const isNewRule = editingRuleId === NEW_RULE_ID;
+
   const editingRule = useMemo(
-    () => (editingRuleId ? pointsRules.find((r) => r.id === editingRuleId) ?? null : null),
-    [pointsRules, editingRuleId],
+    () => (editingRuleId && !isNewRule ? pointsRules.find((r) => r.id === editingRuleId) ?? null : null),
+    [pointsRules, editingRuleId, isNewRule],
   );
 
+  const [ruleKey, setRuleKey] = useState<string>("");
   const [ruleLabel, setRuleLabel] = useState("");
   const [ruleCategory, setRuleCategory] = useState<PointsRuleCategory>("Trilhas");
   const [rulePoints, setRulePoints] = useState("0");
   const [ruleDescription, setRuleDescription] = useState("");
   const [ruleActive, setRuleActive] = useState(true);
 
+  const resetRuleForm = () => {
+    setRuleKey("");
+    setRuleLabel("");
+    setRuleCategory("Trilhas");
+    setRulePoints("0");
+    setRuleDescription("");
+    setRuleActive(true);
+  };
+
   useEffect(() => {
     if (!editingRule) return;
+    setRuleKey(editingRule.key);
     setRuleLabel(editingRule.label);
     setRuleCategory(editingRule.category);
     setRulePoints(String(editingRule.points));
     setRuleDescription(editingRule.description ?? "");
     setRuleActive(editingRule.active);
   }, [editingRule?.id]);
+
+  const startNewRule = () => {
+    setEditingRuleId(NEW_RULE_ID);
+    resetRuleForm();
+  };
 
   if (!user || !companyId || user.role === "MASTERADMIN") return null;
 
@@ -1036,7 +1056,10 @@ export default function Rankings() {
                       open={ruleOpen}
                       onOpenChange={(v) => {
                         setRuleOpen(v);
-                        if (!v) setEditingRuleId(null);
+                        if (!v) {
+                          setEditingRuleId(null);
+                          resetRuleForm();
+                        }
                       }}
                     >
                       <DialogTrigger asChild>
@@ -1049,6 +1072,19 @@ export default function Rankings() {
                         <DialogHeader>
                           <DialogTitle>Sinaxys Points — regras</DialogTitle>
                         </DialogHeader>
+
+                        <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
+                          <div className="text-sm text-muted-foreground">
+                            Crie, edite ou remova critérios de pontuação.
+                          </div>
+                          <Button
+                            className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                            onClick={startNewRule}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Nova regra
+                          </Button>
+                        </div>
 
                         <div className="overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
                           <Table className="min-w-[980px]">
@@ -1071,24 +1107,72 @@ export default function Rankings() {
                                   </TableCell>
                                   <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{r.points}</TableCell>
                                   <TableCell>
-                                    <Badge className={"rounded-full " + (r.active ? "bg-emerald-100 text-emerald-900 hover:bg-emerald-100" : "bg-muted text-muted-foreground hover:bg-muted")}>
+                                    <Badge
+                                      className={
+                                        "rounded-full " +
+                                        (r.active
+                                          ? "bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
+                                          : "bg-muted text-muted-foreground hover:bg-muted")
+                                      }
+                                    >
                                       {r.active ? "Sim" : "Não"}
                                     </Badge>
                                   </TableCell>
                                   <TableCell className="text-right">
-                                    <Button
-                                      variant="outline"
-                                      className="h-9 rounded-xl"
-                                      onClick={() => {
-                                        setEditingRuleId(r.id);
-                                        setRuleOpen(false);
-                                        // abre o editor logo abaixo
-                                        setTimeout(() => setRuleOpen(true), 0);
-                                      }}
-                                    >
-                                      <Pencil className="mr-2 h-4 w-4" />
-                                      Ajustar
-                                    </Button>
+                                    <div className="inline-flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="outline"
+                                        className="h-9 rounded-xl"
+                                        onClick={() => {
+                                          setEditingRuleId(r.id);
+                                        }}
+                                      >
+                                        <Pencil className="mr-2 h-4 w-4" />
+                                        Ajustar
+                                      </Button>
+
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <Button variant="outline" className="h-9 rounded-xl">
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Remover
+                                          </Button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent className="rounded-3xl">
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Remover regra?</AlertDialogTitle>
+                                            <AlertDialogDescription>
+                                              Esta ação apaga o critério. Eventos antigos continuarão no extrato (apenas sem o nome amigável).
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+                                            <AlertDialogAction
+                                              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                                              onClick={() => {
+                                                try {
+                                                  mockDb.deletePointsRule(r.id);
+                                                  if (editingRuleId === r.id) {
+                                                    setEditingRuleId(null);
+                                                    resetRuleForm();
+                                                  }
+                                                  setVersion((v) => v + 1);
+                                                  toast({ title: "Regra removida" });
+                                                } catch (e) {
+                                                  toast({
+                                                    title: "Não foi possível remover",
+                                                    description: e instanceof Error ? e.message : "Tente novamente.",
+                                                    variant: "destructive",
+                                                  });
+                                                }
+                                              }}
+                                            >
+                                              Remover
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
                                   </TableCell>
                                 </TableRow>
                               ))}
@@ -1104,19 +1188,33 @@ export default function Rankings() {
                           </Table>
                         </div>
 
-                        {editingRule ? (
+                        {editingRule || isNewRule ? (
                           <div className="mt-5 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div>
-                                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Editar</div>
-                                <div className="mt-1 text-xs text-muted-foreground">{editingRule.key}</div>
+                                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{isNewRule ? "Nova regra" : "Editar"}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">{isNewRule ? "Defina uma chave única" : editingRule?.key}</div>
                               </div>
                               <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                                {editingRule.category}
+                                {ruleCategory}
                               </Badge>
                             </div>
 
                             <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                              <div className="grid gap-2 sm:col-span-2">
+                                <Label>Chave (key)</Label>
+                                <Input
+                                  value={ruleKey}
+                                  onChange={(e) => setRuleKey(e.target.value.toUpperCase())}
+                                  className="h-11 rounded-xl"
+                                  placeholder="EX: BONUS_TIME, CERTIFICACAO_EXTERNA..."
+                                  disabled={!isNewRule}
+                                />
+                                <div className="text-xs text-muted-foreground">
+                                  Use letras, números e underscore. Ex.: <span className="font-medium">BONUS_TIME</span>.
+                                </div>
+                              </div>
+
                               <div className="grid gap-2 sm:col-span-2">
                                 <Label>Nome</Label>
                                 <Input value={ruleLabel} onChange={(e) => setRuleLabel(e.target.value)} className="h-11 rounded-xl" />
@@ -1163,25 +1261,44 @@ export default function Rankings() {
                             </div>
 
                             <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-                              <Button variant="outline" className="rounded-xl" onClick={() => setEditingRuleId(null)}>
+                              <Button
+                                variant="outline"
+                                className="rounded-xl"
+                                onClick={() => {
+                                  setEditingRuleId(null);
+                                  resetRuleForm();
+                                }}
+                              >
                                 Fechar
                               </Button>
                               <Button
                                 className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                                 onClick={() => {
-                                  if (!companyId || !editingRule) return;
+                                  if (!companyId) return;
+
+                                  const key = ruleKey.trim().toUpperCase().replace(/[^A-Z0-9_]/g, "_");
+                                  if (!key) {
+                                    toast({
+                                      title: "Chave obrigatória",
+                                      description: "Informe uma chave (key) para a regra.",
+                                      variant: "destructive",
+                                    });
+                                    return;
+                                  }
+
                                   try {
                                     mockDb.upsertPointsRule(companyId, {
-                                      id: editingRule.id,
-                                      key: editingRule.key,
+                                      id: editingRule?.id,
+                                      key: (editingRule?.key ?? key) as any,
                                       category: ruleCategory,
                                       label: ruleLabel,
                                       points: Number(rulePoints) || 0,
                                       description: ruleDescription,
                                       active: ruleActive,
                                     });
-                                    toast({ title: "Regra atualizada" });
+                                    toast({ title: isNewRule ? "Regra criada" : "Regra atualizada" });
                                     setEditingRuleId(null);
+                                    resetRuleForm();
                                     setVersion((v) => v + 1);
                                   } catch (e) {
                                     toast({

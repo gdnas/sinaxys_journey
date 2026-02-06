@@ -173,7 +173,9 @@ export type PointsRuleKey =
   | "SUBIR_VIDEO"
   | "TEMPO_6M"
   | "TEMPO_12M"
-  | "BONUS_ADMIN";
+  | "BONUS_ADMIN"
+  // Permite criar critérios personalizados (mantém autocomplete para os padrões acima)
+  | (string & {});
 
 export type PointsRule = {
   id: string;
