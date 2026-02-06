@@ -1,22 +1,31 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, { createContext, useContext, useMemo, useState } from "react";
 import type { Role, User } from "@/lib/domain";
-import { supabase } from "@/integrations/supabase/client";
+import { mockDb } from "@/lib/mockDb";
 
-const ACTIVE_COMPANY_KEY = "sinaxys-journey-active-company:v2";
+const AUTH_KEY = "sinaxys-journey-auth:v1";
+const ACTIVE_COMPANY_KEY = "sinaxys-journey-active-company:v1";
 
 type AuthState = {
   user: User | null;
   activeCompanyId: string | null;
   setActiveCompanyId: (companyId: string | null) => void;
-  login: (email: string, password: string) => Promise<
+  login: (email: string, password?: string) =>
     | { ok: true; mustChangePassword: boolean }
-    | { ok: false; message: string }
-  >;
-  logout: () => Promise<void>;
+    | { ok: false; message: string };
+  logout: () => void;
   refresh?: () => void;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
+
+function loadUserId() {
+  return localStorage.getItem(AUTH_KEY);
+}
+
+function saveUserId(id: string | null) {
+  if (!id) localStorage.removeItem(AUTH_KEY);
+  else localStorage.setItem(AUTH_KEY, id);
+}
 
 function loadActiveCompanyId() {
   return localStorage.getItem(ACTIVE_COMPANY_KEY);
@@ -27,138 +36,67 @@ function saveActiveCompanyId(id: string | null) {
   else localStorage.setItem(ACTIVE_COMPANY_KEY, id);
 }
 
-async function fetchProfile(userId: string) {
-  const { data, error } = await supabase
-    .from("profiles")
-    .select(
-      "id, email, name, role, company_id, department_id, active, must_change_password, avatar_url, phone, job_title, contract_url, monthly_cost_brl, joined_at, manager_id",
-    )
-    .eq("id", userId)
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data) return null;
-
-  const mapped: User = {
-    id: data.id,
-    email: data.email,
-    name: data.name ?? "",
-    role: data.role as Role,
-    companyId: data.company_id ?? undefined,
-    departmentId: data.department_id ?? undefined,
-    active: data.active ?? true,
-    mustChangePassword: !!data.must_change_password,
-    avatarUrl: data.avatar_url ?? undefined,
-    phone: data.phone ?? undefined,
-    jobTitle: data.job_title ?? undefined,
-    contractUrl: data.contract_url ?? undefined,
-    monthlyCostBRL: typeof data.monthly_cost_brl === "number" ? data.monthly_cost_brl : undefined,
-    joinedAt: data.joined_at ?? undefined,
-    managerId: data.manager_id ?? undefined,
-  };
-
-  return mapped;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
-  const [profile, setProfile] = useState<User | null>(null);
+  const [userId, setUserId] = useState<string | null>(() => loadUserId());
   const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(() => loadActiveCompanyId());
   const [version, setVersion] = useState(0);
 
-  // Initial session + auth changes
-  useEffect(() => {
-    let mounted = true;
+  const user = useMemo(() => {
+    if (!userId) return null;
+    const u = mockDb.get().users.find((x) => x.id === userId);
+    return u?.active ? u : null;
+  }, [userId, version]);
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      const uid = data.session?.user?.id ?? null;
-      setSessionUserId(uid);
-    });
-
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      const uid = session?.user?.id ?? null;
-      setSessionUserId(uid);
-      setVersion((v) => v + 1);
-    });
-
-    return () => {
-      mounted = false;
-      data.subscription.unsubscribe();
-    };
-  }, []);
-
-  // Fetch profile
-  useEffect(() => {
-    if (!sessionUserId) {
-      setProfile(null);
-      return;
-    }
-
-    let cancelled = false;
-    fetchProfile(sessionUserId)
-      .then((p) => {
-        if (cancelled) return;
-        setProfile(p);
-
-        // Keep company selection consistent
-        if (p?.role !== "MASTERADMIN") {
-          saveActiveCompanyId(p?.companyId ?? null);
-          setActiveCompanyIdState(p?.companyId ?? null);
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setProfile(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessionUserId, version]);
-
+  // Keep company selection consistent with the logged-in user.
   const effectiveCompanyId = useMemo(() => {
-    if (!profile) return null;
-    if (profile.role !== "MASTERADMIN") return profile.companyId ?? null;
-    return activeCompanyId;
-  }, [profile, activeCompanyId]);
+    if (!user) return null;
+    if (user.role !== "MASTERADMIN") return user.companyId ?? null;
+
+    const companies = mockDb.getCompanies();
+    if (activeCompanyId && companies.some((c) => c.id === activeCompanyId)) return activeCompanyId;
+    return companies[0]?.id ?? null;
+  }, [user, activeCompanyId, version]);
 
   const value: AuthState = {
-    user: profile?.active ? profile : null,
+    user,
     activeCompanyId: effectiveCompanyId,
     setActiveCompanyId(companyId) {
       saveActiveCompanyId(companyId);
       setActiveCompanyIdState(companyId);
       setVersion((v) => v + 1);
     },
-    async login(email: string, password: string) {
-      const e = email.trim().toLowerCase();
-      const p = password.trim();
-      if (!e.includes("@")) return { ok: false, message: "Informe um e-mail válido." };
-      if (!p) return { ok: false, message: "Informe a senha." };
+    login(email: string, password?: string) {
+      const u = mockDb.findUserByEmail(email);
+      if (!u) return { ok: false, message: "Não encontramos este usuário ativo. Verifique o e-mail." };
 
-      const { data, error } = await supabase.auth.signInWithPassword({ email: e, password: p });
-      if (error) return { ok: false, message: error.message };
-
-      const uid = data.user?.id;
-      if (!uid) return { ok: false, message: "Sessão inválida. Tente novamente." };
-
-      try {
-        const prof = await fetchProfile(uid);
-        setProfile(prof);
-        if (prof?.role !== "MASTERADMIN") {
-          saveActiveCompanyId(prof?.companyId ?? null);
-          setActiveCompanyIdState(prof?.companyId ?? null);
-        }
-        return { ok: true, mustChangePassword: !!prof?.mustChangePassword };
-      } catch (e: any) {
-        return { ok: false, message: e?.message ?? "Não foi possível carregar seu perfil." };
+      // If the user has a password set, require it.
+      if (u.password) {
+        const p = (password ?? "").trim();
+        if (!p) return { ok: false, message: "Informe a senha." };
+        const verified = mockDb.verifyPassword(email, p);
+        if (!verified.ok) return { ok: false, message: verified.message };
       }
+
+      saveUserId(u.id);
+      setUserId(u.id);
+
+      // Auto-select company
+      if (u.role !== "MASTERADMIN") {
+        saveActiveCompanyId(u.companyId ?? null);
+        setActiveCompanyIdState(u.companyId ?? null);
+      } else {
+        const companies = mockDb.getCompanies();
+        const next = loadActiveCompanyId() ?? companies[0]?.id ?? null;
+        saveActiveCompanyId(next);
+        setActiveCompanyIdState(next);
+      }
+
+      setVersion((v) => v + 1);
+      return { ok: true, mustChangePassword: !!u.mustChangePassword };
     },
-    async logout() {
-      await supabase.auth.signOut();
-      setProfile(null);
-      setSessionUserId(null);
+    logout() {
+      saveUserId(null);
+      setUserId(null);
       setVersion((v) => v + 1);
     },
     refresh() {

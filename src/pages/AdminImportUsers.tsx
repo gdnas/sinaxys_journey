@@ -8,7 +8,6 @@ import {
   Upload,
   Wand2,
   AlertTriangle,
-  Copy,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { supabase } from "@/integrations/supabase/client";
+import { mockDb } from "@/lib/mockDb";
 
 type ParsedRow = {
   email: string;
@@ -411,7 +410,6 @@ export default function AdminImportUsers() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [issues, setIssues] = useState<RowIssue[]>([]);
   const [importing, setImporting] = useState(false);
-  const [generatedPasswords, setGeneratedPasswords] = useState<Array<{ email: string; password: string }>>([]);
 
   const companyId = user?.companyId ?? null;
 
@@ -461,7 +459,6 @@ export default function AdminImportUsers() {
     setFileName(file.name);
     setRows([]);
     setIssues([]);
-    setGeneratedPasswords([]);
     setStage("idle");
 
     const buf = await file.arrayBuffer();
@@ -861,34 +858,20 @@ export default function AdminImportUsers() {
               <Button
                 className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                 disabled={importing || !rows.length || hasErrors}
-                onClick={async () => {
+                onClick={() => {
                   try {
                     setImporting(true);
-                    const { data, error } = await supabase.functions.invoke("import-users-bulk", {
-                      body: { companyId, rows },
-                    });
-
-                    if (error) throw error;
-
-                    const result = data as {
-                      created: number;
-                      updated: number;
-                      managersLinked: number;
-                      generatedPasswords?: Array<{ email: string; password: string }>;
-                    };
-
-                    setGeneratedPasswords(result.generatedPasswords ?? []);
-
+                    const result = mockDb.importUsersBulk({ companyId, rows });
                     toast({
                       title: "Importação concluída",
                       description: `Criados: ${result.created} • Atualizados: ${result.updated} • Vínculos de liderança: ${result.managersLinked}`,
                     });
-
-                    // Mantém o preview na tela (para conferência), mas limpa o arquivo selecionado
+                    setRows([]);
+                    setIssues([]);
                     setFileName("");
                     setHeaders([]);
                     setDataRows([]);
-                    setStage("preview");
+                    setStage("idle");
                   } catch (e) {
                     toast({
                       title: "Não foi possível importar",
@@ -930,50 +913,6 @@ export default function AdminImportUsers() {
           </div>
         ) : null}
       </div>
-
-      {generatedPasswords.length ? (
-        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Senhas geradas automaticamente</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                Alguns usuários foram criados sem senha_inicial. Guarde estas senhas e oriente a troca no primeiro acesso.
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              className="rounded-xl"
-              onClick={() => {
-                const text = generatedPasswords.map((x) => `${x.email},${x.password}`).join("\n");
-                navigator.clipboard?.writeText(text).catch(() => null);
-                toast({ title: "Copiado", description: "Lista (email,senha) copiada para a área de transferência." });
-              }}
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              Copiar lista
-            </Button>
-          </div>
-
-          <div className="mt-4 overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>E-mail</TableHead>
-                  <TableHead>Senha</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {generatedPasswords.map((x) => (
-                  <TableRow key={x.email}>
-                    <TableCell className="text-muted-foreground">{x.email}</TableCell>
-                    <TableCell className="font-mono text-[color:var(--sinaxys-ink)]">{x.password}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </Card>
-      ) : null}
 
       {stage === "preview" && rows.length ? (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">

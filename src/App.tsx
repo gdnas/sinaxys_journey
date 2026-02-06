@@ -8,7 +8,6 @@ import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Invite from "./pages/Invite";
 import ChangePassword from "./pages/ChangePassword";
-import Setup from "./pages/Setup";
 import AppDashboard from "./pages/AppDashboard";
 import TrackPlayer from "./pages/TrackPlayer";
 import AppCertificates from "./pages/AppCertificates";
@@ -49,7 +48,6 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/setup" element={<Setup />} />
                 <Route path="/invite/:token" element={<Invite />} />
                 <Route
                   path="/password"

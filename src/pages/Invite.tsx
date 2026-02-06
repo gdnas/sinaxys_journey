@@ -141,7 +141,7 @@ export default function Invite() {
               <Button
                 className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                 disabled={!canSubmit || submitting}
-                onClick={async () => {
+                onClick={() => {
                   if (!token || !invite) return;
                   try {
                     setSubmitting(true);
@@ -149,7 +149,7 @@ export default function Invite() {
                     const created = mockDb.acceptInvite(token, { name });
                     mockDb.setUserPassword(created.id, password, { mustChangePassword: false });
 
-                    const result = await login(created.email, password);
+                    const result = login(created.email, password);
                     if (result.ok === false) {
                       toast({
                         title: "Não foi possível entrar",

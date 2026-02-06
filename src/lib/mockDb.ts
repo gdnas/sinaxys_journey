@@ -25,9 +25,7 @@ import {
 } from "@/lib/domain";
 import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 
-const IS_DEV = ((import.meta as any).env?.DEV ?? false) as boolean;
-
-const STORAGE_KEY = IS_DEV ? "sinaxys-journey-db:dev:v1" : "sinaxys-journey-db:prod:v2";
+const STORAGE_KEY = "sinaxys-journey-db:v2";
 const DB_CHANGED_EVENT = "sinaxys-db-changed";
 
 // IMPORTANT:
@@ -356,65 +354,7 @@ function ensureDefaultUsers(db: Db) {
 
   const byEmail = new Map(db.users.map((u) => [u.email.toLowerCase(), u] as const));
 
-  if (IS_DEV) {
-    // DEV (demonstração)
-    const ensure = (u: User) => {
-      if (!byEmail.has(u.email.toLowerCase())) db.users.push(u);
-    };
-
-    ensure({
-      id: uid("usr"),
-      name: "Master Admin",
-      email: "master@sinaxys.com",
-      role: "MASTERADMIN",
-      active: true,
-      password: "Sinaxys@123",
-      mustChangePassword: false,
-      joinedAt: nowIso(),
-    });
-
-    ensure({
-      id: uid("usr"),
-      companyId,
-      name: "Guilherme",
-      email: "guilherme@sinaxys.com",
-      role: "ADMIN",
-      active: true,
-      password: "Sinaxys@123",
-      mustChangePassword: false,
-      joinedAt: nowIso(),
-    });
-
-    ensure({
-      id: uid("usr"),
-      companyId,
-      name: "Camila Souza",
-      email: "camila@sinaxys.com",
-      role: "HEAD",
-      departmentId: db.departments.find((d) => d.companyId === companyId && d.name === "Produto")?.id,
-      active: true,
-      password: "Sinaxys@123",
-      mustChangePassword: false,
-      joinedAt: nowIso(),
-    });
-
-    ensure({
-      id: uid("usr"),
-      companyId,
-      name: "Aline Ramos",
-      email: "aline@sinaxys.com",
-      role: "COLABORADOR",
-      departmentId: db.departments.find((d) => d.companyId === companyId && d.name === "Produto")?.id,
-      active: true,
-      password: "Sinaxys@123",
-      mustChangePassword: false,
-      joinedAt: nowIso(),
-    });
-
-    return;
-  }
-
-  // PRODUÇÃO
+  // Master Admin (produção)
   if (!byEmail.has("guilhermenastrini@gmail.com")) {
     db.users.push({
       id: uid("usr"),
@@ -428,6 +368,7 @@ function ensureDefaultUsers(db: Db) {
     });
   }
 
+  // Admin (produção)
   if (!byEmail.has("guilherme@sinaxys.com")) {
     db.users.push({
       id: uid("usr"),
@@ -640,6 +581,7 @@ function seedDb(): Db {
     createdAt: nowIso(),
   };
 
+  // Mantemos departamentos-base para facilitar criação de trilhas/usuários.
   const departments: Department[] = [
     { id: uid("dept"), companyId, name: "Financeiro" },
     { id: uid("dept"), companyId, name: "Suporte" },
@@ -649,69 +591,15 @@ function seedDb(): Db {
     { id: uid("dept"), companyId, name: "Produto" },
   ];
 
-  const deptByName = (name: Department["name"]) => departments.find((d) => d.name === name)!.id;
-
-  if (!IS_DEV) {
-    // Produção: começa limpo (somente 1 Master Admin + 1 Admin)
-    const users: User[] = [
-      {
-        id: uid("usr"),
-        name: "Guilherme Nastrini",
-        email: "guilhermenastrini@gmail.com",
-        role: "MASTERADMIN",
-        active: true,
-        password: "Med1-01875",
-        mustChangePassword: false,
-        joinedAt: nowIso(),
-      },
-      {
-        id: uid("usr"),
-        companyId,
-        name: "Guilherme",
-        email: "guilherme@sinaxys.com",
-        role: "ADMIN",
-        active: true,
-        password: "Sinaxys@123",
-        mustChangePassword: false,
-        joinedAt: nowIso(),
-      },
-    ];
-
-    const pointsRules = defaultPointsRules(companyId);
-    const pointsEvents: PointsEvent[] = [];
-
-    return {
-      companies: [company],
-      invites: [],
-      departments,
-      users,
-      tracks: [],
-      modules: [],
-      quizQuestions: [],
-      quizOptions: [],
-      assignments: [],
-      moduleProgress: [],
-      certificates: [],
-      rewardTiers: [],
-      pointsRules,
-      pointsEvents,
-      invoices: [],
-      notifications: [],
-      contractAttachments: [],
-      compensationEvents: [],
-      vacationRequests: [],
-    };
-  }
-
-  // DEV: seed leve para demonstração
+  // Produção: começa limpo (somente 1 Master Admin + 1 Admin)
   const users: User[] = [
     {
       id: uid("usr"),
-      name: "Master Admin",
-      email: "master@sinaxys.com",
+      name: "Guilherme Nastrini",
+      email: "guilhermenastrini@gmail.com",
       role: "MASTERADMIN",
       active: true,
-      password: "Sinaxys@123",
+      password: "Med1-01875",
       mustChangePassword: false,
       joinedAt: nowIso(),
     },
@@ -726,136 +614,21 @@ function seedDb(): Db {
       mustChangePassword: false,
       joinedAt: nowIso(),
     },
-    {
-      id: uid("usr"),
-      companyId,
-      name: "Camila Souza",
-      email: "camila@sinaxys.com",
-      role: "HEAD",
-      departmentId: deptByName("Produto"),
-      active: true,
-      password: "Sinaxys@123",
-      mustChangePassword: false,
-      joinedAt: nowIso(),
-      managerId: undefined,
-    },
-    {
-      id: uid("usr"),
-      companyId,
-      name: "Aline Ramos",
-      email: "aline@sinaxys.com",
-      role: "COLABORADOR",
-      departmentId: deptByName("Produto"),
-      active: true,
-      password: "Sinaxys@123",
-      mustChangePassword: false,
-      joinedAt: nowIso(),
-      managerId: undefined,
-    },
   ];
-
-  // organograma: admin -> head -> colaborador
-  const admin = users.find((u) => u.role === "ADMIN")!;
-  const head = users.find((u) => u.role === "HEAD")!;
-  const colab = users.find((u) => u.role === "COLABORADOR")!;
-  head.managerId = admin.id;
-  colab.managerId = head.id;
 
   const tracks: LearningTrack[] = [];
   const modules: TrackModule[] = [];
   const quizQuestions: QuizQuestion[] = [];
   const quizOptions: QuizOption[] = [];
-
-  const trackId = uid("trk");
-  tracks.push({
-    id: trackId,
-    companyId,
-    departmentId: deptByName("Produto"),
-    title: "Onboarding — Produto (demo)",
-    description: "Trilha curta de demonstração para apresentar o fluxo sequencial (vídeo → quiz → checkpoint).",
-    published: true,
-    createdByUserId: head.id,
-    createdAt: nowIso(),
-  });
-
-  const modVideoId = uid("mod");
-  modules.push({
-    id: modVideoId,
-    trackId,
-    orderIndex: 1,
-    type: "VIDEO",
-    title: "Boas-vindas (demo)",
-    description: "Visão geral da plataforma.",
-    xpReward: 20,
-    youtubeUrl: "https://www.youtube.com/watch?v=jNQXAC9IVRw",
-  });
-
-  const modQuizId = uid("mod");
-  modules.push({
-    id: modQuizId,
-    trackId,
-    orderIndex: 2,
-    type: "QUIZ",
-    title: "Quiz rápido (demo)",
-    description: "Só para demonstrar a aprovação e o desbloqueio do próximo módulo.",
-    xpReward: 40,
-    minScore: 70,
-  });
-
-  const qId = uid("qq");
-  quizQuestions.push({
-    id: qId,
-    moduleId: modQuizId,
-    type: "TRUE_FALSE",
-    prompt: "A Journey libera o próximo módulo após concluir o anterior.",
-    orderIndex: 1,
-  });
-  quizOptions.push(
-    { id: uid("qo"), questionId: qId, text: "Verdadeiro", isCorrect: true },
-    { id: uid("qo"), questionId: qId, text: "Falso", isCorrect: false },
-  );
-
-  const modCheckpointId = uid("mod");
-  modules.push({
-    id: modCheckpointId,
-    trackId,
-    orderIndex: 3,
-    type: "CHECKPOINT",
-    title: "Checkpoint (demo)",
-    description: "Entrega simples para completar a trilha.",
-    xpReward: 30,
-    checkpointPrompt: "Em 2–3 linhas, descreva o que você achou do fluxo.",
-  });
-
-  const assignments: TrackAssignment[] = [
-    {
-      id: uid("asg"),
-      trackId,
-      userId: colab.id,
-      status: "IN_PROGRESS",
-      assignedByUserId: head.id,
-      assignedAt: nowIso(),
-    },
-  ];
-
-  const moduleProgress: ModuleProgress[] = [
-    { id: uid("mpr"), assignmentId: assignments[0].id, moduleId: modVideoId, status: "AVAILABLE", attemptsCount: 0 },
-    { id: uid("mpr"), assignmentId: assignments[0].id, moduleId: modQuizId, status: "LOCKED", attemptsCount: 0 },
-    { id: uid("mpr"), assignmentId: assignments[0].id, moduleId: modCheckpointId, status: "LOCKED", attemptsCount: 0 },
-  ];
-
-  const rewardTiers: RewardTier[] = [
-    {
-      id: uid("tier"),
-      companyId,
-      name: "Bronze",
-      minXp: 200,
-      prize: "Kit Sinaxys",
-      description: "Primeiro marco de consistência.",
-      active: true,
-      createdAt: nowIso(),
-    },
-  ];
+  const assignments: TrackAssignment[] = [];
+  const moduleProgress: ModuleProgress[] = [];
+  const certificates: Certificate[] = [];
+  const invoices: Invoice[] = [];
+  const notifications: Notification[] = [];
+  const contractAttachments: ContractAttachment[] = [];
+  const compensationEvents: CompensationEvent[] = [];
+  const vacationRequests: VacationRequest[] = [];
+  const rewardTiers: RewardTier[] = [];
 
   const pointsRules = defaultPointsRules(companyId);
   const pointsEvents: PointsEvent[] = [];
@@ -871,15 +644,15 @@ function seedDb(): Db {
     quizOptions,
     assignments,
     moduleProgress,
-    certificates: [],
+    certificates,
     rewardTiers,
     pointsRules,
     pointsEvents,
-    invoices: [],
-    notifications: [],
-    contractAttachments: [],
-    compensationEvents: [],
-    vacationRequests: [],
+    invoices,
+    notifications,
+    contractAttachments,
+    compensationEvents,
+    vacationRequests,
   };
 }
 
@@ -1088,36 +861,6 @@ export const mockDb = {
   },
   getCompany(companyId: string) {
     return loadDb().companies.find((c) => c.id === companyId) ?? null;
-  },
-  createCompany(params: { name: string; tagline?: string }) {
-    const db = loadDb();
-    const brand = defaultCompanyBrand();
-    const companyId = uid("cmp");
-
-    const c: Company = {
-      id: companyId,
-      ...brand,
-      name: params.name.trim(),
-      tagline: params.tagline?.trim() || brand.tagline,
-      createdAt: nowIso(),
-    };
-
-    db.companies.push(c);
-    saveDb(db);
-    return c;
-  },
-  updateCompanyBrand(companyId: string, data: Partial<Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">>) {
-    const db = loadDb();
-    const c = db.companies.find((x) => x.id === companyId);
-    if (!c) throw new Error("Empresa não encontrada.");
-
-    if (typeof data.name === "string") c.name = data.name.trim();
-    if (typeof data.tagline === "string") c.tagline = data.tagline.trim();
-    if (typeof data.logoDataUrl === "string") c.logoDataUrl = data.logoDataUrl;
-    if (data.colors) c.colors = data.colors;
-
-    saveDb(db);
-    return c;
   },
 
   // Sinaxys Points
@@ -1901,40 +1644,6 @@ export const mockDb = {
     }
 
     u.managerId = nextManagerId;
-
-    // If the new manager is also listed as an additional leader, remove it to avoid duplicates.
-    if (u.leaderIds?.length && nextManagerId) {
-      u.leaderIds = u.leaderIds.filter((id) => id !== nextManagerId);
-      if (!u.leaderIds.length) u.leaderIds = undefined;
-    }
-
-    saveDb(db);
-    return u;
-  },
-
-  setUserAdditionalLeaders(userId: string, leaderIds: string[]) {
-    const db = loadDb();
-    const u = db.users.find((x) => x.id === userId);
-    if (!u) return null;
-
-    const uniq = Array.from(new Set((leaderIds ?? []).filter(Boolean)));
-
-    // Validate
-    for (const lid of uniq) {
-      if (lid === u.id) throw new Error("Um usuário não pode ser líder dele mesmo.");
-      const leader = db.users.find((x) => x.id === lid);
-      if (!leader || !leader.active) throw new Error("Líder inválido.");
-      if (leader.role !== "ADMIN" && leader.role !== "HEAD") throw new Error("Apenas ADMIN ou HEAD podem ser líderes.");
-
-      // Prevent obvious cycles on the primary chain (keeps tree readable)
-      if (wouldCreateCycle(db, u.id, leader.id)) {
-        throw new Error("Vínculo inválido: criaria um ciclo no organograma.");
-      }
-    }
-
-    // Additional leaders are stored separately from the direct manager.
-    const filtered = uniq.filter((id) => id !== u.managerId);
-    u.leaderIds = filtered.length ? filtered : undefined;
     saveDb(db);
     return u;
   },
@@ -1994,7 +1703,7 @@ export const mockDb = {
           userId: r.id,
           type: "INVOICE_SUBMITTED",
           title: "Nova nota fiscal enviada",
-          message: `${u.name} enviou " ${inv.title} " ${amountLabel}.`,
+          message: `${u.name} enviou “${inv.title}”${amountLabel}.`,
           href: "/profile",
         });
       }
