@@ -14,6 +14,7 @@ type AuthState = {
   >;
   logout: () => Promise<void>;
   refresh?: () => void;
+  loading: boolean;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -62,7 +63,9 @@ async function fetchProfile(userId: string) {
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [profile, setProfile] = useState<User | null>(null);
+  const [profileStatus, setProfileStatus] = useState<"idle" | "loading" | "loaded" | "error">("idle");
   const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(() => loadActiveCompanyId());
   const [version, setVersion] = useState(0);
 
@@ -70,15 +73,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      const uid = data.session?.user?.id ?? null;
-      setSessionUserId(uid);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => {
+        if (!mounted) return;
+        const uid = data.session?.user?.id ?? null;
+        setSessionUserId(uid);
+        setSessionChecked(true);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setSessionUserId(null);
+        setSessionChecked(true);
+      });
 
     const { data } = supabase.auth.onAuthStateChange((_event, session) => {
       const uid = session?.user?.id ?? null;
       setSessionUserId(uid);
+      setSessionChecked(true);
       setVersion((v) => v + 1);
     });
 
@@ -92,14 +104,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!sessionUserId) {
       setProfile(null);
+      setProfileStatus("idle");
       return;
     }
 
     let cancelled = false;
+    setProfileStatus("loading");
+
     fetchProfile(sessionUserId)
       .then((p) => {
         if (cancelled) return;
         setProfile(p);
+        setProfileStatus("loaded");
 
         // Keep company selection consistent
         if (p?.role !== "MASTERADMIN") {
@@ -110,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .catch(() => {
         if (cancelled) return;
         setProfile(null);
+        setProfileStatus("error");
       });
 
     return () => {
@@ -123,9 +140,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return activeCompanyId;
   }, [profile, activeCompanyId]);
 
+  const loading = !sessionChecked || (sessionUserId && profileStatus === "loading");
+
   const value: AuthState = {
     user: profile?.active ? profile : null,
     activeCompanyId: effectiveCompanyId,
+    loading,
     setActiveCompanyId(companyId) {
       saveActiveCompanyId(companyId);
       setActiveCompanyIdState(companyId);
@@ -144,21 +164,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!uid) return { ok: false, message: "Sessão inválida. Tente novamente." };
 
       try {
+        setProfileStatus("loading");
         const prof = await fetchProfile(uid);
         setProfile(prof);
+        setProfileStatus("loaded");
         if (prof?.role !== "MASTERADMIN") {
           saveActiveCompanyId(prof?.companyId ?? null);
           setActiveCompanyIdState(prof?.companyId ?? null);
         }
         return { ok: true, mustChangePassword: !!prof?.mustChangePassword };
       } catch (e: any) {
+        setProfile(null);
+        setProfileStatus("error");
         return { ok: false, message: e?.message ?? "Não foi possível carregar seu perfil." };
       }
     },
     async logout() {
       await supabase.auth.signOut();
       setProfile(null);
+      setProfileStatus("idle");
       setSessionUserId(null);
+      setSessionChecked(true);
       setVersion((v) => v + 1);
     },
     refresh() {

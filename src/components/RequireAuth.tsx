@@ -3,8 +3,11 @@ import type { Role } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
 
 export function RequireAuth({ roles, children }: { roles?: Role[]; children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const location = useLocation();
+
+  // Evita loop/flicker enquanto a sessão/perfil ainda está carregando.
+  if (loading) return null;
 
   if (!user) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;

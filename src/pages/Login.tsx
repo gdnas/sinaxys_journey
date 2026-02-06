@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,19 +11,27 @@ import { useCompany } from "@/lib/company";
 
 export default function Login() {
   const { toast } = useToast();
-  const { user, login } = useAuth();
+  const { user, login, loading } = useAuth();
   const { company } = useCompany();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from;
+  const fromRaw = (location.state as { from?: string } | null)?.from;
+
+  const from = useMemo(() => {
+    const f = (fromRaw ?? "").trim();
+    // Evita redirecionar de volta para a própria tela de login (isso cria loop).
+    if (!f || f === "/login") return null;
+    return f;
+  }, [fromRaw]);
 
   const [email, setEmail] = useState(user?.email ?? "");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [btnLoading, setBtnLoading] = useState(false);
 
   // Se já estiver autenticado, não faz sentido ficar preso na tela de login.
   useEffect(() => {
+    if (loading) return;
     if (!user) return;
 
     if (user.mustChangePassword) {
@@ -32,7 +40,7 @@ export default function Login() {
     }
 
     navigate(from ?? "/", { replace: true });
-  }, [user, from, navigate]);
+  }, [user, from, navigate, loading]);
 
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
@@ -128,10 +136,10 @@ export default function Login() {
 
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={loading}
+              disabled={btnLoading || loading}
               onClick={async () => {
                 try {
-                  setLoading(true);
+                  setBtnLoading(true);
                   const result = await login(email, password);
                   if (result.ok === false) {
                     toast({
@@ -149,11 +157,11 @@ export default function Login() {
 
                   navigate(from ?? "/", { replace: true });
                 } finally {
-                  setLoading(false);
+                  setBtnLoading(false);
                 }
               }}
             >
-              {loading ? "Entrando…" : "Continuar"}
+              {btnLoading ? "Entrando…" : "Continuar"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
