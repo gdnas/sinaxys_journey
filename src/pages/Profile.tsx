@@ -575,7 +575,7 @@ export default function Profile() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notas fiscais</div>
-                    <p className="mt-1 text-sm text-muted-foreground">Suba os links das NFs emitidas para controle financeiro.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Envie suas NFs (PDF ou imagem) para mantermos o controle financeiro.</p>
                   </div>
                   <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
                     <ReceiptText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -594,16 +594,7 @@ export default function Profile() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label>Link da nota fiscal (opcional)</Label>
-                    <Input
-                      className="h-11 rounded-xl"
-                      value={invoiceUrl}
-                      onChange={(e) => setInvoiceUrl(e.target.value)}
-                      placeholder="https://..."
-                    />
-                    <div className="text-xs text-muted-foreground">
-                      Você pode colar um link <span className="font-medium">ou</span> enviar um arquivo (PDF/imagem).
-                    </div>
+                    <Label>Arquivo da nota fiscal</Label>
 
                     <input
                       ref={invoiceFileRef}
@@ -635,14 +626,27 @@ export default function Profile() {
                       onClick={() => invoiceFileRef.current?.click()}
                     >
                       <FileText className="mr-2 h-4 w-4" />
-                      Enviar arquivo da nota
+                      Selecionar arquivo
                     </Button>
 
                     {invoiceUrl.startsWith("data:") ? (
-                      <div className="text-xs text-muted-foreground">
-                        Arquivo selecionado (armazenado no navegador).
+                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">Arquivo pronto para envio</div>
+                          <div className="mt-1 text-xs text-muted-foreground">O arquivo ficará armazenado no navegador.</div>
+                        </div>
+                        <Button asChild variant="outline" className="rounded-xl" size="sm">
+                          <a href={invoiceUrl} target="_blank" rel="noreferrer">
+                            <ExternalLink className="mr-2 h-4 w-4" />
+                            Abrir
+                          </a>
+                        </Button>
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                        Nenhum arquivo selecionado.
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid gap-2">
@@ -668,7 +672,7 @@ export default function Profile() {
 
                   <Button
                     className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                    disabled={savingInvoice || invoiceUrl.trim().length < 10}
+                    disabled={savingInvoice || !invoiceUrl.startsWith("data:")}
                     onClick={() => {
                       try {
                         setSavingInvoice(true);
@@ -706,80 +710,84 @@ export default function Profile() {
 
                   <Separator />
 
-                  <div className="grid gap-3">
-                    {invoices.length ? (
-                      invoices.map((inv) => (
-                        <div
-                          key={inv.id}
-                          className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                                  {inv.title}
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minhas notas enviadas</div>
+                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                        {invoices.length}
+                      </Badge>
+                    </div>
+
+                    <div className="mt-3 grid gap-3">
+                      {invoices.length ? (
+                        invoices.map((inv) => (
+                          <div
+                            key={inv.id}
+                            className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                                    {inv.title}
+                                  </div>
+                                  {inv.status === "PAID" ? (
+                                    <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                      Pago
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
+                                      Pendente
+                                    </Badge>
+                                  )}
                                 </div>
-                                {inv.invoiceUrl.startsWith("data:") ? (
-                                  <Badge className="rounded-full bg-sky-100 text-sky-900 hover:bg-sky-100">Arquivo</Badge>
-                                ) : (
-                                  <Badge className="rounded-full bg-sky-100 text-sky-900 hover:bg-sky-100">Link</Badge>
-                                )}
-                                {inv.status === "PAID" ? (
-                                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
-                                    Pago
-                                  </Badge>
-                                ) : (
-                                  <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
-                                    Pendente
-                                  </Badge>
-                                )}
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  Criada em {formatDate(inv.createdAt)}
+                                  {inv.issuedAt ? ` • Emitida em ${formatDate(inv.issuedAt)}` : ""}
+                                  {typeof inv.amountBRL === "number" ? ` • ${brl(inv.amountBRL)}` : ""}
+                                </div>
                               </div>
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                Criada em {formatDate(inv.createdAt)}
-                                {inv.issuedAt ? ` • Emitida em ${formatDate(inv.issuedAt)}` : ""}
-                                {typeof inv.amountBRL === "number" ? ` • ${brl(inv.amountBRL)}` : ""}
-                              </div>
-                            </div>
 
-                            <div className="flex items-center gap-2">
-                              <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl">
-                                <a href={inv.invoiceUrl} target="_blank" rel="noreferrer" aria-label="Abrir nota">
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              </Button>
-
-                              {inv.status !== "PAID" ? (
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  className="h-9 w-9 rounded-xl"
-                                  aria-label="Remover nota"
-                                  onClick={() => {
-                                    try {
-                                      mockDb.deleteInvoice(inv.id, user.id);
-                                      setVersion((v) => v + 1);
-                                      toast({ title: "Nota removida" });
-                                    } catch (e) {
-                                      toast({
-                                        title: "Não foi possível remover",
-                                        description: e instanceof Error ? e.message : "Tente novamente.",
-                                        variant: "destructive",
-                                      });
-                                    }
-                                  }}
-                                >
-                                  <Trash2 className="h-4 w-4" />
+                              <div className="flex items-center gap-2">
+                                <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl">
+                                  <a href={inv.invoiceUrl} target="_blank" rel="noreferrer" aria-label="Abrir nota">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
                                 </Button>
-                              ) : null}
+
+                                {inv.status !== "PAID" ? (
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-xl"
+                                    aria-label="Remover nota"
+                                    onClick={() => {
+                                      try {
+                                        mockDb.deleteInvoice(inv.id, user.id);
+                                        setVersion((v) => v + 1);
+                                        toast({ title: "Nota removida" });
+                                      } catch (e) {
+                                        toast({
+                                          title: "Não foi possível remover",
+                                          description: e instanceof Error ? e.message : "Tente novamente.",
+                                          variant: "destructive",
+                                        });
+                                      }
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                          Você ainda não enviou nenhuma nota fiscal.
                         </div>
-                      ))
-                    ) : (
-                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                        Você ainda não registrou nenhuma nota fiscal.
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
               </Card>
