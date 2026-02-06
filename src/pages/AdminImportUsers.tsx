@@ -3,15 +3,11 @@ import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
 import {
   ArrowLeft,
-  ChevronDown,
   Download,
   FileSpreadsheet,
   Upload,
   Wand2,
   AlertTriangle,
-  ArrowRightLeft,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Select,
@@ -28,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
@@ -413,7 +410,6 @@ export default function AdminImportUsers() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [issues, setIssues] = useState<RowIssue[]>([]);
   const [importing, setImporting] = useState(false);
-  const [showRawTable, setShowRawTable] = useState(false);
 
   const companyId = user?.companyId ?? null;
 
@@ -464,7 +460,6 @@ export default function AdminImportUsers() {
     setRows([]);
     setIssues([]);
     setStage("idle");
-    setShowRawTable(false);
 
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
@@ -622,7 +617,7 @@ export default function AdminImportUsers() {
                     Confirme o mapeamento das colunas
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    Se algo ficar com baixa confiança, escolha manualmente a coluna correta.
+                    Ajuste os campos abaixo (rolagem fica contida para sempre caber na tela).
                   </div>
                 </div>
 
@@ -641,173 +636,190 @@ export default function AdminImportUsers() {
 
               <Separator className="my-4" />
 
-              <div className="grid gap-3 md:grid-cols-2">
-                {FIELDS.map((f) => {
-                  const analysis = mappingAnalysis?.[f.key];
-                  const confidence = analysis?.confidence ?? 1;
-                  const requiredNow = isRequiredNow(f.key);
-                  const isLow = requiredNow ? confidence < 0.55 : confidence < 0.45;
-                  const value = mapping[f.key] ?? "";
+              <div className="flex h-[min(560px,calc(100dvh-320px))] flex-col overflow-hidden">
+                <Tabs defaultValue="campos" className="flex min-h-0 flex-1 flex-col">
+                  <TabsList className="h-11 w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+                    <TabsTrigger value="campos" className="rounded-xl px-4">
+                      Campos importados
+                    </TabsTrigger>
+                    <TabsTrigger value="tabela" className="rounded-xl px-4">
+                      Tabela original
+                    </TabsTrigger>
+                  </TabsList>
 
-                  return (
-                    <div
-                      key={f.key}
-                      className={
-                        "rounded-2xl border p-3 " +
-                        (requiredNow && !value
-                          ? "border-rose-200 bg-rose-50"
-                          : requiredNow && isLow
-                            ? "border-amber-200 bg-amber-50"
-                            : "border-[color:var(--sinaxys-border)] bg-white")
-                      }
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                            {f.label}{" "}
-                            {requiredNow ? <span className="text-rose-600">*</span> : null}
-                          </div>
-                          {f.hint ? <div className="mt-0.5 text-xs text-muted-foreground">{f.hint}</div> : null}
+                  <TabsContent value="campos" className="mt-3 min-h-0 flex-1">
+                    <div className="h-full overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+                      <ScrollArea className="h-full">
+                        <div className="overflow-x-auto">
+                          <Table>
+                            <TableHeader className="sticky top-0 bg-white">
+                              <TableRow>
+                                <TableHead className="w-[260px]">Campo</TableHead>
+                                <TableHead className="min-w-[260px]">Coluna</TableHead>
+                                <TableHead className="w-[200px]">Confiança</TableHead>
+                                <TableHead className="min-w-[240px]">Exemplos</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {FIELDS.map((f) => {
+                                const analysis = mappingAnalysis?.[f.key];
+                                const confidence = analysis?.confidence ?? 1;
+                                const requiredNow = isRequiredNow(f.key);
+                                const value = mapping[f.key] ?? "";
+                                const missingRequired = requiredNow && !value;
+                                const lowConfidence = requiredNow ? confidence < 0.55 : confidence < 0.45;
+
+                                const confTone = missingRequired
+                                  ? "text-rose-700"
+                                  : lowConfidence
+                                    ? "text-amber-900"
+                                    : "text-[color:var(--sinaxys-ink)]";
+
+                                const confBarTone = missingRequired
+                                  ? "bg-rose-200"
+                                  : lowConfidence
+                                    ? "bg-amber-200"
+                                    : "bg-[color:var(--sinaxys-tint)]";
+
+                                return (
+                                  <TableRow
+                                    key={f.key}
+                                    className={
+                                      missingRequired
+                                        ? "bg-rose-50"
+                                        : lowConfidence
+                                          ? "bg-amber-50"
+                                          : ""
+                                    }
+                                  >
+                                    <TableCell className="align-top">
+                                      <div className="flex items-start gap-2">
+                                        <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-[color:var(--sinaxys-primary)]/50" />
+                                        <div>
+                                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                                            {f.label}
+                                            {requiredNow ? <span className="ml-1 text-rose-600">*</span> : null}
+                                          </div>
+                                          {f.hint ? (
+                                            <div className="mt-0.5 text-xs text-muted-foreground">{f.hint}</div>
+                                          ) : null}
+                                          {analysis?.message && (requiredNow || lowConfidence) ? (
+                                            <div className="mt-1 text-xs font-medium text-amber-900">{analysis.message}</div>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    </TableCell>
+
+                                    <TableCell className="align-top">
+                                      <Select
+                                        value={mapping[f.key] ?? "__none__"}
+                                        onValueChange={(v) =>
+                                          setMapping((m) => ({
+                                            ...m,
+                                            [f.key]: v === "__none__" ? null : v,
+                                          }))
+                                        }
+                                      >
+                                        <SelectTrigger className="h-10 w-full rounded-xl">
+                                          <SelectValue placeholder={requiredNow ? "Selecione a coluna" : "—"} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {!requiredNow ? <SelectItem value="__none__">—</SelectItem> : null}
+                                          {headers.map((h) => (
+                                            <SelectItem key={h} value={h}>
+                                              {h}
+                                            </SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+
+                                      {missingRequired ? (
+                                        <div className="mt-2 text-xs font-medium text-rose-700">Campo obrigatório.</div>
+                                      ) : null}
+                                    </TableCell>
+
+                                    <TableCell className="align-top">
+                                      <div className="flex items-center gap-3">
+                                        <div className={"w-full max-w-[140px] rounded-full " + confBarTone}>
+                                          <Progress value={Math.round(confidence * 100)} className="h-2 rounded-full bg-transparent" />
+                                        </div>
+                                        <div className={"text-xs font-semibold " + confTone}>
+                                          {Math.round(confidence * 100)}%
+                                        </div>
+                                      </div>
+                                    </TableCell>
+
+                                    <TableCell className="align-top text-xs text-muted-foreground">
+                                      {(sampleByField[f.key] ?? []).length ? (
+                                        <div className="flex flex-wrap gap-1">
+                                          {(sampleByField[f.key] ?? []).slice(0, 3).map((v, i) => (
+                                            <span
+                                              key={i}
+                                              className="max-w-[240px] truncate rounded-full bg-[color:var(--sinaxys-tint)] px-2 py-0.5 text-[color:var(--sinaxys-ink)]"
+                                              title={v}
+                                            >
+                                              {v}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        "—"
+                                      )}
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })}
+                            </TableBody>
+                          </Table>
                         </div>
-                        {analysis?.message && (requiredNow || isLow) ? (
-                          <div className="text-xs font-medium text-amber-900">{analysis.message}</div>
-                        ) : null}
-                      </div>
-
-                      <div className="mt-2">
-                        <Select
-                          value={mapping[f.key] ?? "__none__"}
-                          onValueChange={(v) =>
-                            setMapping((m) => ({
-                              ...m,
-                              [f.key]: v === "__none__" ? null : v,
-                            }))
-                          }
-                        >
-                          <SelectTrigger className="h-11 rounded-xl">
-                            <SelectValue placeholder={requiredNow ? "Selecione a coluna" : "—"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {!requiredNow ? <SelectItem value="__none__">—</SelectItem> : null}
-                            {headers.map((h) => (
-                              <SelectItem key={h} value={h}>
-                                {h}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-
-                        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
-                          <div>
-                            Confiança: <span className="font-medium text-[color:var(--sinaxys-ink)]">{Math.round(confidence * 100)}%</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <Separator className="my-4" />
-
-              <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-3">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                    <ArrowRightLeft className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                    Amostra (por campo)
-                  </div>
-                  <div className="mt-2 overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[160px]">Campo</TableHead>
-                          <TableHead className="w-[220px]">Coluna</TableHead>
-                          <TableHead>Exemplos</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {FIELDS.filter((f) => isRequiredNow(f.key) || mapping[f.key]).map((f) => (
-                          <TableRow key={f.key}>
-                            <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
-                              {f.label}
-                              {isRequiredNow(f.key) ? <span className="ml-1 text-rose-600">*</span> : null}
-                            </TableCell>
-                            <TableCell className="text-muted-foreground">{mapping[f.key] ?? "—"}</TableCell>
-                            <TableCell className="text-muted-foreground">
-                              {(sampleByField[f.key] ?? []).length
-                                ? (sampleByField[f.key] ?? []).join(" • ")
-                                : "—"}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  <div className="mt-3 text-xs text-muted-foreground">
-                    Dica: se algo estiver estranho aqui, ajuste o mapeamento antes de gerar o preview.
-                  </div>
-                </div>
-
-                <div className="grid gap-3">
-                  <Collapsible open={showRawTable} onOpenChange={setShowRawTable}>
-                    <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
-                      <div>
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Tabela original</div>
-                        <div className="text-xs text-muted-foreground">(opcional) para conferir tudo</div>
-                      </div>
-                      <CollapsibleTrigger asChild>
-                        <Button variant="outline" className="rounded-xl">
-                          {showRawTable ? (
-                            <>
-                              <EyeOff className="mr-2 h-4 w-4" />
-                              Ocultar
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="mr-2 h-4 w-4" />
-                              Ver
-                            </>
-                          )}
-                          <ChevronDown className={"ml-2 h-4 w-4 transition " + (showRawTable ? "rotate-180" : "")} />
-                        </Button>
-                      </CollapsibleTrigger>
+                      </ScrollArea>
                     </div>
 
-                    <CollapsibleContent>
-                      <div className="mt-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
-                        <ScrollArea className="h-[260px] w-full">
-                          <div className="min-w-[880px]">
-                            <table className="w-full text-xs">
-                              <thead className="sticky top-0 bg-white">
-                                <tr className="border-b border-[color:var(--sinaxys-border)]">
-                                  {headers.map((h) => (
-                                    <th key={h} className="px-2 py-2 text-left font-semibold text-[color:var(--sinaxys-ink)]">
-                                      {h}
-                                    </th>
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      * Campos obrigatórios variam: <span className="font-medium text-[color:var(--sinaxys-ink)]">Departamento</span> só é obrigatório se houver HEAD/COLABORADOR na planilha.
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="tabela" className="mt-3 min-h-0 flex-1">
+                    <div className="h-full overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+                      <ScrollArea className="h-full w-full">
+                        <div className="min-w-[880px]">
+                          <table className="w-full text-xs">
+                            <thead className="sticky top-0 bg-white">
+                              <tr className="border-b border-[color:var(--sinaxys-border)]">
+                                {headers.map((h) => (
+                                  <th key={h} className="px-2 py-2 text-left font-semibold text-[color:var(--sinaxys-ink)]">
+                                    {h}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {dataRows.slice(0, 12).map((r, ridx) => (
+                                <tr key={ridx} className="border-b border-[color:var(--sinaxys-border)] last:border-b-0">
+                                  {headers.map((_, cidx) => (
+                                    <td key={cidx} className="px-2 py-2 text-muted-foreground">
+                                      {norm(r[cidx]).slice(0, 60) || "—"}
+                                    </td>
                                   ))}
                                 </tr>
-                              </thead>
-                              <tbody>
-                                {dataRows.slice(0, 10).map((r, ridx) => (
-                                  <tr key={ridx} className="border-b border-[color:var(--sinaxys-border)] last:border-b-0">
-                                    {headers.map((_, cidx) => (
-                                      <td key={cidx} className="px-2 py-2 text-muted-foreground">
-                                        {norm(r[cidx]).slice(0, 60) || "—"}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </ScrollArea>
-                        <div className="border-t border-[color:var(--sinaxys-border)] p-3 text-xs text-muted-foreground">
-                          Mostrando 10 primeiras linhas. A rolagem fica contida para não "estourar" a tela.
+                              ))}
+                            </tbody>
+                          </table>
                         </div>
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
+                      </ScrollArea>
+                    </div>
+
+                    <div className="mt-3 text-xs text-muted-foreground">
+                      Mostrando 12 primeiras linhas. A rolagem fica contida para a tabela não "estourar" a tela.
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-xs text-muted-foreground">
+                    Dica: se os exemplos não fazem sentido, ajuste a coluna e confira a tabela original.
+                  </div>
 
                   <Button
                     className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -827,10 +839,6 @@ export default function AdminImportUsers() {
                   >
                     Validar e gerar preview
                   </Button>
-
-                  <div className="text-xs text-muted-foreground">
-                    * Campos obrigatórios variam: <span className="font-medium text-[color:var(--sinaxys-ink)]">Departamento</span> só é obrigatório se houver HEAD/COLABORADOR na planilha.
-                  </div>
                 </div>
               </div>
             </div>
