@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ArrowRight, Eye, EyeOff, KeyRound } from "lucide-react";
+import { ArrowRight, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,36 +11,15 @@ import { useCompany } from "@/lib/company";
 
 export default function Login() {
   const { toast } = useToast();
-  const { user, login, loading, authError } = useAuth();
+  const { user, login } = useAuth();
   const { company } = useCompany();
   const navigate = useNavigate();
   const location = useLocation();
-  const fromRaw = (location.state as { from?: string } | null)?.from;
-
-  const from = useMemo(() => {
-    const f = (fromRaw ?? "").trim();
-    // Evita redirecionar de volta para a própria tela de login (isso cria loop).
-    if (!f || f === "/login") return null;
-    return f;
-  }, [fromRaw]);
+  const from = (location.state as { from?: string } | null)?.from;
 
   const [email, setEmail] = useState(user?.email ?? "");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [btnLoading, setBtnLoading] = useState(false);
-
-  // Se já estiver autenticado, não faz sentido ficar preso na tela de login.
-  useEffect(() => {
-    if (loading) return;
-    if (!user) return;
-
-    if (user.mustChangePassword) {
-      navigate("/password", { replace: true });
-      return;
-    }
-
-    navigate(from ?? "/", { replace: true });
-  }, [user, from, navigate, loading]);
+  const [loading, setLoading] = useState(false);
 
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
@@ -74,12 +53,6 @@ export default function Login() {
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Entrar</div>
           <p className="mt-1 text-sm text-muted-foreground">Informe suas credenciais para acessar.</p>
 
-          {authError ? (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              {authError}
-            </div>
-          ) : null}
-
           <div className="mt-5 grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">E-mail</Label>
@@ -94,58 +67,24 @@ export default function Login() {
             </div>
 
             <div className="grid gap-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Senha</Label>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="h-8 rounded-xl px-2 text-xs text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                >
-                  {showPassword ? (
-                    <>
-                      <EyeOff className="mr-1.5 h-4 w-4" />
-                      Ocultar
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="mr-1.5 h-4 w-4" />
-                      Mostrar
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              <div className="relative">
-                <Input
-                  id="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="h-11 rounded-xl pr-12"
-                  type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 h-9 w-9 -translate-y-1/2 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="h-11 rounded-xl"
+                type="password"
+                autoComplete="current-password"
+              />
             </div>
 
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={btnLoading || loading}
+              disabled={loading}
               onClick={async () => {
                 try {
-                  setBtnLoading(true);
+                  setLoading(true);
                   const result = await login(email, password);
                   if (result.ok === false) {
                     toast({
@@ -153,14 +92,21 @@ export default function Login() {
                       description: result.message,
                       variant: "destructive",
                     });
+                    return;
                   }
-                  // Se ok, o redirecionamento acontece quando o profile carregar (useEffect acima).
+
+                  if (result.mustChangePassword) {
+                    navigate("/password", { replace: true });
+                    return;
+                  }
+
+                  navigate(from ?? "/");
                 } finally {
-                  setBtnLoading(false);
+                  setLoading(false);
                 }
               }}
             >
-              {btnLoading || loading ? "Entrando…" : "Continuar"}
+              {loading ? "Entrando…" : "Continuar"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>

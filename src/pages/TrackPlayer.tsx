@@ -43,15 +43,9 @@ export default function TrackPlayer() {
     const done = progress.filter((p) => p.status === "COMPLETED").length;
     const total = progress.length;
     const pct = computeProgress(done, total);
-
     const xp = detail.modules
       .filter((m) => detail.progressByModuleId[m.id]?.status === "COMPLETED")
-      .reduce((acc, m) => {
-        const p = detail.progressByModuleId[m.id];
-        const earned = typeof p?.earnedXp === "number" ? p.earnedXp : m.xpReward;
-        return acc + earned;
-      }, 0);
-
+      .reduce((acc, m) => acc + m.xpReward, 0);
     return { done, total, pct, xp };
   }, [detail]);
 
@@ -93,8 +87,6 @@ export default function TrackPlayer() {
   const locked = mp.status === "LOCKED";
   const completed = mp.status === "COMPLETED";
   const available = mp.status === "AVAILABLE";
-
-  const moduleReward = completed ? (typeof mp.earnedXp === "number" ? mp.earnedXp : module.xpReward) : module.xpReward;
 
   const refresh = () => setVersion((v) => v + 1);
 
@@ -154,10 +146,7 @@ export default function TrackPlayer() {
             </div>
             <div className="text-right">
               <div className="text-xs text-muted-foreground">Recompensa</div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">+{moduleReward} XP</div>
-              {module.type === "QUIZ" ? (
-                <div className="mt-0.5 text-[11px] text-muted-foreground">(calculado por acerto)</div>
-              ) : null}
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">+{module.xpReward} XP</div>
             </div>
           </div>
 
@@ -168,7 +157,9 @@ export default function TrackPlayer() {
               </div>
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulo bloqueado</div>
-                <p className="mt-1 text-sm text-muted-foreground">Conclua o módulo anterior para liberar este conteúdo.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Conclua o módulo anterior para liberar este conteúdo.
+                </p>
               </div>
             </div>
           ) : null}
@@ -187,7 +178,9 @@ export default function TrackPlayer() {
               </div>
 
               <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
-                <div className="text-sm text-muted-foreground">Ao concluir, o próximo módulo é liberado automaticamente.</div>
+                <div className="text-sm text-muted-foreground">
+                  Ao concluir, o próximo módulo é liberado automaticamente.
+                </div>
                 <Button
                   disabled={!available}
                   className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
@@ -218,7 +211,9 @@ export default function TrackPlayer() {
               <ResourceEmbed url={module.materialUrl ?? ""} title={module.title} />
 
               <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
-                <div className="text-sm text-muted-foreground">Ao concluir, o próximo módulo é liberado automaticamente.</div>
+                <div className="text-sm text-muted-foreground">
+                  Ao concluir, o próximo módulo é liberado automaticamente.
+                </div>
                 <Button
                   disabled={!available}
                   className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"

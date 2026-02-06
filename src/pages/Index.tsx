@@ -2,10 +2,7 @@ import { Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
 
 export default function Index() {
-  const { user, loading } = useAuth();
-
-  // Evita loop/flicker enquanto a sessão/perfil ainda está carregando.
-  if (loading) return null;
+  const { user } = useAuth();
 
   if (!user) return <Navigate to="/login" replace />;
 
