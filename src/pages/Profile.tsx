@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, ImagePlus, LayoutDashboard, Save, ShieldCheck, UserRound } from "lucide-react";
+import { FileText, ImagePlus, KeyRound, LayoutDashboard, Save, ShieldCheck, UserRound } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,11 @@ export default function Profile() {
   const [contractUrl, setContractUrl] = useState("");
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -135,11 +140,7 @@ export default function Profile() {
                     }}
                   />
 
-                  <Button
-                    variant="outline"
-                    className="rounded-xl"
-                    onClick={() => fileRef.current?.click()}
-                  >
+                  <Button variant="outline" className="rounded-xl" onClick={() => fileRef.current?.click()}>
                     <ImagePlus className="mr-2 h-4 w-4" />
                     Enviar foto
                   </Button>
@@ -169,9 +170,7 @@ export default function Profile() {
                   className="rounded-xl"
                   placeholder="https://..."
                 />
-                <div className="text-xs text-muted-foreground">
-                  Você pode colar um link de imagem ou enviar uma foto acima.
-                </div>
+                <div className="text-xs text-muted-foreground">Você pode colar um link de imagem ou enviar uma foto acima.</div>
               </div>
 
               <div className="grid gap-2">
@@ -183,12 +182,7 @@ export default function Profile() {
                     className="rounded-xl"
                     placeholder="https://app.clicksign.com/..."
                   />
-                  <Button
-                    asChild
-                    variant="outline"
-                    className="rounded-xl"
-                    disabled={!contractUrl.trim()}
-                  >
+                  <Button asChild variant="outline" className="rounded-xl" disabled={!contractUrl.trim()}>
                     <a href={contractUrl || "#"} target="_blank" rel="noreferrer">
                       <FileText className="mr-2 h-4 w-4" />
                       Abrir
@@ -243,8 +237,12 @@ export default function Profile() {
             <div className="mt-4">
               <Tabs defaultValue="tracks" className="w-full">
                 <TabsList className="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-                  <TabsTrigger value="tracks" className="rounded-xl">Trilhas</TabsTrigger>
-                  <TabsTrigger value="stats" className="rounded-xl">Resumo</TabsTrigger>
+                  <TabsTrigger value="tracks" className="rounded-xl">
+                    Trilhas
+                  </TabsTrigger>
+                  <TabsTrigger value="stats" className="rounded-xl">
+                    Resumo
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="tracks" className="mt-4">
@@ -308,6 +306,127 @@ export default function Profile() {
         </div>
 
         <div className="grid gap-6">
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Segurança</div>
+                <p className="mt-1 text-sm text-muted-foreground">Altere sua senha de acesso.</p>
+              </div>
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                <KeyRound className="h-5 w-5" />
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4">
+              {user.password ? (
+                <div className="grid gap-2">
+                  <Label>Senha atual</Label>
+                  <Input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="Digite sua senha atual"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                  Você ainda não tem uma senha definida. Defina uma agora para usar no próximo login.
+                </div>
+              )}
+
+              <div className="grid gap-2">
+                <Label>Nova senha</Label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Confirmar nova senha</Label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="rounded-xl"
+                />
+              </div>
+
+              <Button
+                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={
+                  savingPassword ||
+                  (user.password ? !currentPassword.trim() : false) ||
+                  newPassword.trim().length < 6 ||
+                  newPassword !== confirmPassword
+                }
+                onClick={() => {
+                  try {
+                    setSavingPassword(true);
+
+                    if (user.password && currentPassword.trim() !== user.password) {
+                      toast({
+                        title: "Senha atual incorreta",
+                        description: "Verifique a senha digitada e tente novamente.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    const p = newPassword.trim();
+                    if (p.length < 6) {
+                      toast({
+                        title: "Senha fraca",
+                        description: "Use pelo menos 6 caracteres.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    if (p !== confirmPassword) {
+                      toast({
+                        title: "As senhas não conferem",
+                        description: "Digite a mesma senha nos dois campos.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    mockDb.setUserPassword(user.id, p, { mustChangePassword: false });
+                    refresh?.();
+
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+
+                    toast({
+                      title: "Senha atualizada",
+                      description: "Na próxima vez que você fizer login, use a nova senha.",
+                    });
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível atualizar",
+                      description: e instanceof Error ? e.message : "Tente novamente.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setSavingPassword(false);
+                  }
+                }}
+              >
+                {user.password ? "Alterar senha" : "Definir senha"}
+              </Button>
+
+              {newPassword && confirmPassword && newPassword !== confirmPassword ? (
+                <div className="text-xs text-red-600">As senhas não coincidem.</div>
+              ) : null}
+            </div>
+          </Card>
+
           {user.role === "COLABORADOR" ? (
             <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Seu líder direto</div>
@@ -351,7 +470,10 @@ export default function Profile() {
 
             <div className="mt-4 grid gap-2">
               {user.contractUrl ? (
-                <Button asChild className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+                <Button
+                  asChild
+                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                >
                   <a href={user.contractUrl} target="_blank" rel="noreferrer">
                     <FileText className="mr-2 h-4 w-4" />
                     Abrir contrato
