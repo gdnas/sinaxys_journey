@@ -1173,55 +1173,6 @@ export const mockDb = {
   getCompany(companyId: string) {
     return loadDb().companies.find((c) => c.id === companyId) ?? null;
   },
-  createCompany(params: { name: string; tagline?: string }) {
-    const db = loadDb();
-    const base = defaultCompanyBrand();
-    const c: Company = {
-      id: uid("cmp"),
-      name: params.name.trim(),
-      tagline: params.tagline?.trim() || base.tagline,
-      logoDataUrl: base.logoDataUrl,
-      colors: base.colors,
-      createdAt: nowIso(),
-    };
-    db.companies.push(c);
-
-    // Seed departments for the new company
-    const names: Department["name"][] = ["Financeiro", "Suporte", "Customer Success", "Comercial", "Marketing", "Produto"];
-    for (const n of names) {
-      db.departments.push({ id: uid("dept"), companyId: c.id, name: n });
-    }
-
-    // Seed Sinaxys Points rules
-    db.pointsRules = db.pointsRules ?? [];
-    db.pointsRules.push(...defaultPointsRules(c.id));
-
-    saveDb(db);
-    return c;
-  },
-
-  updateCompanyBrand(
-    companyId: string,
-    data: Partial<Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">>,
-  ) {
-    const db = loadDb();
-    const c = db.companies.find((x) => x.id === companyId);
-    if (!c) throw new Error("Empresa não encontrada.");
-
-    if (typeof data.name === "string" && data.name.trim()) c.name = data.name.trim();
-    if (typeof data.tagline === "string" && data.tagline.trim()) c.tagline = data.tagline.trim();
-
-    if (typeof data.logoDataUrl === "string") {
-      c.logoDataUrl = data.logoDataUrl.trim() || undefined;
-    }
-
-    if (data.colors) {
-      c.colors = data.colors;
-    }
-
-    saveDb(db);
-    return c;
-  },
 
   // Sinaxys Points
   getPointsRules(companyId: string) {
@@ -2099,8 +2050,9 @@ export const mockDb = {
     rows: Array<{
       email: string;
       name: string;
-      role: "HEAD" | "COLABORADOR";
-      department: string;
+      role: "ADMIN" | "HEAD" | "COLABORADOR";
+      // Departamento é obrigatório apenas para HEAD/COLABORADOR.
+      department?: string;
       managerEmail?: string;
       phone?: string;
       monthlyCostBRL?: number;
@@ -2114,7 +2066,11 @@ export const mockDb = {
     const db = loadDb();
 
     // Ensure departments exist for company
-    const deptIds = new Map(db.departments.filter((d) => d.companyId === params.companyId).map((d) => [normalizeText(d.name), d.id] as const));
+    const deptIds = new Map(
+      db.departments
+        .filter((d) => d.companyId === params.companyId)
+        .map((d) => [normalizeText(d.name), d.id] as const),
+    );
 
     const byEmail = new Map(
       db.users
@@ -2130,12 +2086,20 @@ export const mockDb = {
       const email = r.email.trim().toLowerCase();
       if (!email.includes("@")) throw new Error(`E-mail inválido: ${r.email}`);
       if (!r.name.trim()) throw new Error(`Nome ausente para ${email}`);
-      if (r.role !== "HEAD" && r.role !== "COLABORADOR") throw new Error(`Role inválido para ${email}`);
+      if (r.role !== "ADMIN" && r.role !== "HEAD" && r.role !== "COLABORADOR") {
+        throw new Error(`Role inválido para ${email}`);
+      }
 
-      const deptId = findDepartmentIdByName(db, params.companyId, r.department);
-      if (!deptId) {
-        const known = Array.from(deptIds.keys()).join(", ");
-        throw new Error(`Departamento não encontrado para ${email}: “${r.department}”.`);
+      let deptId: string | null = null;
+      if (r.role === "HEAD" || r.role === "COLABORADOR") {
+        const depName = String(r.department ?? "").trim();
+        if (!depName) throw new Error(`Departamento é obrigatório para ${email}.`);
+
+        deptId = findDepartmentIdByName(db, params.companyId, depName);
+        if (!deptId) {
+          const known = Array.from(deptIds.keys()).join(", ");
+          throw new Error(`Departamento não encontrado para ${email}: “${depName}”.`);
+        }
       }
 
       const password = r.initialPassword?.trim();
@@ -2152,7 +2116,7 @@ export const mockDb = {
           name: r.name.trim(),
           email,
           role: r.role,
-          departmentId: deptId,
+          departmentId: r.role === "ADMIN" ? undefined : (deptId ?? undefined),
           active: typeof r.active === "boolean" ? r.active : true,
           avatarUrl: r.avatarUrl?.trim() || undefined,
           contractUrl: r.contractUrl?.trim() || undefined,
@@ -2170,7 +2134,14 @@ export const mockDb = {
       } else {
         existing.name = r.name.trim();
         existing.role = r.role;
-        existing.departmentId = deptId;
+
+        if (r.role === "ADMIN") {
+          existing.departmentId = undefined;
+          existing.managerId = undefined;
+        } else {
+          existing.departmentId = deptId ?? undefined;
+        }
+
         if (typeof r.active === "boolean") existing.active = r.active;
         if (typeof r.monthlyCostBRL === "number") existing.monthlyCostBRL = Math.max(0, r.monthlyCostBRL);
         if (typeof r.phone === "string") existing.phone = r.phone.trim() || undefined;
@@ -2192,15 +2163,20 @@ export const mockDb = {
       const email = r.email.trim().toLowerCase();
       const u = byEmail.get(email);
       if (!u) continue;
+      if (u.role === "ADMIN") continue;
 
       const mEmail = r.managerEmail?.trim().toLowerCase();
       if (!mEmail) continue;
       const manager = byEmail.get(mEmail);
       if (!manager) {
-        throw new Error(`Gestor não encontrado para ${email}: ${mEmail}. Garanta que ele exista na planilha ou já esteja cadastrado.`);
+        throw new Error(
+          `Gestor não encontrado para ${email}: ${mEmail}. Garanta que ele exista na planilha ou já esteja cadastrado.`,
+        );
       }
       if (manager.id === u.id) throw new Error(`Gestor inválido para ${email}: não pode ser ele mesmo.`);
-      if (wouldCreateCycle(db, u.id, manager.id)) throw new Error(`Vínculo inválido para ${email}: criaria um ciclo no organograma.`);
+      if (wouldCreateCycle(db, u.id, manager.id)) {
+        throw new Error(`Vínculo inválido para ${email}: criaria um ciclo no organograma.`);
+      }
 
       u.managerId = manager.id;
       managersLinked += 1;

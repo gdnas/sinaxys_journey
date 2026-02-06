@@ -1,12 +1,25 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
-import { ArrowLeft, Download, FileSpreadsheet, Upload, Wand2, AlertTriangle, ArrowRightLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronDown,
+  Download,
+  FileSpreadsheet,
+  Upload,
+  Wand2,
+  AlertTriangle,
+  ArrowRightLeft,
+  Eye,
+  EyeOff,
+} from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Select,
@@ -22,8 +35,8 @@ import { mockDb } from "@/lib/mockDb";
 type ParsedRow = {
   email: string;
   name: string;
-  role: "HEAD" | "COLABORADOR";
-  department: string;
+  role: "ADMIN" | "HEAD" | "COLABORADOR";
+  department?: string;
   managerEmail?: string;
   phone?: string;
   monthlyCostBRL?: number;
@@ -55,15 +68,14 @@ type FieldKey =
 type FieldSpec = {
   key: FieldKey;
   label: string;
-  required?: boolean;
   hint?: string;
 };
 
 const FIELDS: FieldSpec[] = [
-  { key: "email", label: "E-mail", required: true, hint: "Precisa conter @" },
-  { key: "name", label: "Nome", required: true },
-  { key: "role", label: "Role", required: true, hint: "HEAD ou COLABORADOR" },
-  { key: "department", label: "Departamento", required: true },
+  { key: "email", label: "E-mail", hint: "Precisa conter @" },
+  { key: "name", label: "Nome" },
+  { key: "role", label: "Role", hint: "ADMIN, HEAD ou COLABORADOR" },
+  { key: "department", label: "Departamento", hint: "Obrigatório para HEAD/COLABORADOR" },
   { key: "managerEmail", label: "Gestor (e-mail)", hint: "Opcional" },
   { key: "phone", label: "Telefone", hint: "Opcional" },
   { key: "monthlyCostBRL", label: "Custo mensal (R$)", hint: "Opcional" },
@@ -91,11 +103,12 @@ function normHeader(s: string) {
 function parseRole(raw: string): ParsedRow["role"] | null {
   const v = raw.trim().toLowerCase();
   if (!v) return null;
+  if (["admin", "administrador", "administradora"].includes(v)) return "ADMIN";
   if (["head", "gestor", "lider", "lideranca", "liderança"].includes(v)) return "HEAD";
   if (["colaborador", "colab", "colaboradora", "funcionario", "funcionaria"].includes(v)) return "COLABORADOR";
   if (v === "head_de_departamento") return "HEAD";
   if (v === "colaborador" || v === "colaborador(a)") return "COLABORADOR";
-  if (v === "head" || v === "colaborador") return v.toUpperCase() as any;
+  if (["admin", "head", "colaborador"].includes(v)) return v.toUpperCase() as any;
   return null;
 }
 
@@ -219,7 +232,7 @@ function analyzeMapping(headers: string[], dataRows: any[][], mapping: Record<Fi
   for (const f of FIELDS) {
     const header = mapping[f.key];
     if (!header) {
-      result[f.key] = { confidence: f.required ? 0 : 1, message: f.required ? "Campo obrigatório não mapeado." : "—" };
+      result[f.key] = { confidence: 1, message: "—" };
       continue;
     }
 
@@ -242,8 +255,7 @@ function analyzeMapping(headers: string[], dataRows: any[][], mapping: Record<Fi
     const confidence = Math.max(0, Math.min(1, (avg + 1) / 2)); // map [-1..1] => [0..1]
 
     let message: string | undefined;
-    if (f.required && confidence < 0.55) message = "Parece não bater com o tipo de dado esperado.";
-    else if (!f.required && header && confidence < 0.45) message = "Coluna possivelmente incorreta (opcional).";
+    if (confidence < 0.45) message = "Parece não bater com o tipo de dado esperado.";
 
     result[f.key] = { confidence, message };
   }
@@ -273,6 +285,8 @@ function mapRowsFromMapping(headers: string[], dataRows: any[][], mapping: Recor
     const roleRaw = read(row, "role");
     const department = read(row, "department");
 
+    const role = parseRole(roleRaw);
+
     const managerEmail = read(row, "managerEmail").toLowerCase() || undefined;
     const phone = read(row, "phone") || undefined;
     const contractUrl = read(row, "contractUrl") || undefined;
@@ -287,10 +301,11 @@ function mapRowsFromMapping(headers: string[], dataRows: any[][], mapping: Recor
     if (!email || !email.includes("@")) rowErrs.push("E-mail inválido.");
     if (!name) rowErrs.push("Nome é obrigatório.");
 
-    const role = parseRole(roleRaw);
-    if (!role) rowErrs.push("Role inválido. Use HEAD ou COLABORADOR.");
+    if (!role) rowErrs.push("Role inválido. Use ADMIN, HEAD ou COLABORADOR.");
 
-    if (!department) rowErrs.push("Departamento é obrigatório.");
+    if (role && role !== "ADMIN") {
+      if (!department) rowErrs.push("Departamento é obrigatório para HEAD/COLABORADOR.");
+    }
 
     const monthlyCostBRL = monthlyCostRaw ? parseMoneyBRL(monthlyCostRaw) : undefined;
     const active = activeRaw ? parseBool(activeRaw) : undefined;
@@ -310,8 +325,8 @@ function mapRowsFromMapping(headers: string[], dataRows: any[][], mapping: Recor
       email,
       name,
       role: role!,
-      department,
-      managerEmail: managerEmail && managerEmail.includes("@") ? managerEmail : undefined,
+      department: role === "ADMIN" ? undefined : department,
+      managerEmail: role === "ADMIN" ? undefined : (managerEmail && managerEmail.includes("@") ? managerEmail : undefined),
       phone,
       monthlyCostBRL,
       contractUrl,
@@ -335,6 +350,20 @@ function mapRowsFromMapping(headers: string[], dataRows: any[][], mapping: Recor
 
 function downloadTemplate() {
   const rows = [
+    {
+      email: "admin@empresa.com",
+      nome: "Admin da Empresa",
+      role: "ADMIN",
+      departamento: "", // opcional para ADMIN
+      gestor_email: "",
+      telefone: "+55 11 90000-0000",
+      custo_mensal: "",
+      contrato: "",
+      avatar_url: "",
+      ativo: "sim",
+      senha_inicial: "",
+      admissao: "2024-01-15",
+    },
     {
       email: "joao@empresa.com",
       nome: "João da Silva",
@@ -384,30 +413,58 @@ export default function AdminImportUsers() {
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [issues, setIssues] = useState<RowIssue[]>([]);
   const [importing, setImporting] = useState(false);
+  const [showRawTable, setShowRawTable] = useState(false);
 
   const companyId = user?.companyId ?? null;
 
   const preview = useMemo(() => rows.slice(0, 15), [rows]);
+
+  const idxByHeader = useMemo(() => new Map(headers.map((h, i) => [h, i] as const)), [headers]);
 
   const mappingAnalysis = useMemo(() => {
     if (!headers.length || !dataRows.length) return null;
     return analyzeMapping(headers, dataRows, mapping);
   }, [headers, dataRows, mapping]);
 
+  const needsDepartment = useMemo(() => {
+    if (!headers.length || !dataRows.length) return true;
+    if (!mapping.role) return true;
+    const idx = idxByHeader.get(mapping.role);
+    if (idx === undefined) return true;
+
+    for (const r of dataRows.slice(0, 80)) {
+      const role = parseRole(norm(r[idx]));
+      if (role && role !== "ADMIN") return true;
+    }
+    return false;
+  }, [headers, dataRows, mapping.role, idxByHeader]);
+
+  const isRequiredNow = (key: FieldKey) => {
+    if (key === "email" || key === "name" || key === "role") return true;
+    if (key === "department") return needsDepartment;
+    return false;
+  };
+
   const hasErrors = issues.length > 0;
 
   if (!user || user.role !== "ADMIN" || !companyId) return null;
 
-  const mappingMissingRequired = FIELDS.some((f) => f.required && !mapping[f.key]);
+  const mappingMissingRequired = (Object.keys(mapping) as FieldKey[]).some((k) => isRequiredNow(k) && !mapping[k]);
+
   const mappingHasLowConfidenceRequired =
     !!mappingAnalysis &&
-    FIELDS.some((f) => f.required && (mappingAnalysis[f.key]?.confidence ?? 1) < 0.55);
+    (Object.keys(mapping) as FieldKey[]).some((k) => {
+      if (!isRequiredNow(k)) return false;
+      const conf = mappingAnalysis[k]?.confidence ?? 1;
+      return conf < 0.55;
+    });
 
   const parseFile = async (file: File) => {
     setFileName(file.name);
     setRows([]);
     setIssues([]);
     setStage("idle");
+    setShowRawTable(false);
 
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
@@ -449,26 +506,57 @@ export default function AdminImportUsers() {
     setStage("preview");
   };
 
-  const topGridPreview = useMemo(() => {
-    const r = dataRows.slice(0, 5);
-    return r;
-  }, [dataRows]);
+  const sampleByField = useMemo(() => {
+    const sampleRows = dataRows.slice(0, 12);
+    const out: Record<FieldKey, string[]> = {
+      email: [],
+      name: [],
+      role: [],
+      department: [],
+      managerEmail: [],
+      phone: [],
+      monthlyCostBRL: [],
+      contractUrl: [],
+      avatarUrl: [],
+      active: [],
+      initialPassword: [],
+      joinedAt: [],
+    };
+
+    for (const f of FIELDS) {
+      const h = mapping[f.key];
+      if (!h) continue;
+      const idx = idxByHeader.get(h);
+      if (idx === undefined) continue;
+
+      const values: string[] = [];
+      for (const r of sampleRows) {
+        const v = norm(r[idx]);
+        if (!v) continue;
+        values.push(v);
+        if (values.length >= 3) break;
+      }
+      out[f.key] = values;
+    }
+
+    return out;
+  }, [dataRows, mapping, idxByHeader]);
 
   return (
     <div className="grid gap-6">
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Importar colaboradores e heads</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Importar usuários (admins, heads e colaboradores)</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Faça upload de uma planilha (.xlsx/.csv) para criar/atualizar usuários em massa — com validação e confirmação de colunas para evitar conflito de dados.
+              Faça upload de uma planilha (.xlsx/.csv) para criar/atualizar usuários em massa — com confirmação de colunas para evitar conflito de dados.
             </p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                Colunas mínimas: email, nome, role, departamento
+                Obrigatório: email, nome, role
               </Badge>
               <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                Opcional: gestor_email, telefone, custo_mensal, contrato, avatar_url, ativo, senha_inicial, admissao
+                Departamento: obrigatório para HEAD/COLABORADOR
               </Badge>
             </div>
           </div>
@@ -534,18 +622,18 @@ export default function AdminImportUsers() {
                     Confirme o mapeamento das colunas
                   </div>
                   <div className="mt-1 text-sm text-muted-foreground">
-                    Para evitar conflito de dados, confirme qual coluna representa cada campo.
+                    Se algo ficar com baixa confiança, escolha manualmente a coluna correta.
                   </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
                   <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                    {headers.length} colunas detectadas
+                    {headers.length} colunas
                   </Badge>
                   {mappingHasLowConfidenceRequired ? (
                     <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
                       <AlertTriangle className="mr-1 h-3.5 w-3.5" />
-                      Verifique: dados não parecem bater
+                      Revisar campos obrigatórios
                     </Badge>
                   ) : null}
                 </div>
@@ -557,7 +645,8 @@ export default function AdminImportUsers() {
                 {FIELDS.map((f) => {
                   const analysis = mappingAnalysis?.[f.key];
                   const confidence = analysis?.confidence ?? 1;
-                  const isLow = f.required ? confidence < 0.55 : confidence < 0.45;
+                  const requiredNow = isRequiredNow(f.key);
+                  const isLow = requiredNow ? confidence < 0.55 : confidence < 0.45;
                   const value = mapping[f.key] ?? "";
 
                   return (
@@ -565,9 +654,9 @@ export default function AdminImportUsers() {
                       key={f.key}
                       className={
                         "rounded-2xl border p-3 " +
-                        (f.required && !value
+                        (requiredNow && !value
                           ? "border-rose-200 bg-rose-50"
-                          : isLow
+                          : requiredNow && isLow
                             ? "border-amber-200 bg-amber-50"
                             : "border-[color:var(--sinaxys-border)] bg-white")
                       }
@@ -576,15 +665,11 @@ export default function AdminImportUsers() {
                         <div>
                           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
                             {f.label}{" "}
-                            {f.required ? (
-                              <span className="text-rose-600">*</span>
-                            ) : (
-                              <span className="text-xs font-medium text-muted-foreground">(opcional)</span>
-                            )}
+                            {requiredNow ? <span className="text-rose-600">*</span> : null}
                           </div>
                           {f.hint ? <div className="mt-0.5 text-xs text-muted-foreground">{f.hint}</div> : null}
                         </div>
-                        {analysis?.message && (f.required || isLow) ? (
+                        {analysis?.message && (requiredNow || isLow) ? (
                           <div className="text-xs font-medium text-amber-900">{analysis.message}</div>
                         ) : null}
                       </div>
@@ -600,10 +685,10 @@ export default function AdminImportUsers() {
                           }
                         >
                           <SelectTrigger className="h-11 rounded-xl">
-                            <SelectValue placeholder={f.required ? "Selecione a coluna" : "—"} />
+                            <SelectValue placeholder={requiredNow ? "Selecione a coluna" : "—"} />
                           </SelectTrigger>
                           <SelectContent>
-                            {!f.required ? <SelectItem value="__none__">—</SelectItem> : null}
+                            {!requiredNow ? <SelectItem value="__none__">—</SelectItem> : null}
                             {headers.map((h) => (
                               <SelectItem key={h} value={h}>
                                 {h}
@@ -625,39 +710,105 @@ export default function AdminImportUsers() {
 
               <Separator className="my-4" />
 
-              <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-3 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2 font-medium text-[color:var(--sinaxys-ink)]">
+              <div className="grid gap-4 lg:grid-cols-[1fr_360px]">
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
                     <ArrowRightLeft className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                    Preview rápido das colunas (primeiras linhas)
+                    Amostra (por campo)
                   </div>
-                  <div className="mt-2 max-w-full overflow-x-auto">
-                    <table className="min-w-[720px] text-xs">
-                      <thead>
-                        <tr>
-                          {headers.map((h) => (
-                            <th key={h} className="px-2 py-1 text-left font-semibold text-[color:var(--sinaxys-ink)]">
-                              {h}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {topGridPreview.map((r, ridx) => (
-                          <tr key={ridx} className="border-t border-[color:var(--sinaxys-border)]">
-                            {headers.map((_, cidx) => (
-                              <td key={cidx} className="px-2 py-1 text-muted-foreground">
-                                {norm(r[cidx]).slice(0, 42) || "—"}
-                              </td>
-                            ))}
-                          </tr>
+                  <div className="mt-2 overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-[160px]">Campo</TableHead>
+                          <TableHead className="w-[220px]">Coluna</TableHead>
+                          <TableHead>Exemplos</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {FIELDS.filter((f) => isRequiredNow(f.key) || mapping[f.key]).map((f) => (
+                          <TableRow key={f.key}>
+                            <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
+                              {f.label}
+                              {isRequiredNow(f.key) ? <span className="ml-1 text-rose-600">*</span> : null}
+                            </TableCell>
+                            <TableCell className="text-muted-foreground">{mapping[f.key] ?? "—"}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {(sampleByField[f.key] ?? []).length
+                                ? (sampleByField[f.key] ?? []).join(" • ")
+                                : "—"}
+                            </TableCell>
+                          </TableRow>
                         ))}
-                      </tbody>
-                    </table>
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  <div className="mt-3 text-xs text-muted-foreground">
+                    Dica: se algo estiver estranho aqui, ajuste o mapeamento antes de gerar o preview.
                   </div>
                 </div>
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <div className="grid gap-3">
+                  <Collapsible open={showRawTable} onOpenChange={setShowRawTable}>
+                    <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+                      <div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Tabela original</div>
+                        <div className="text-xs text-muted-foreground">(opcional) para conferir tudo</div>
+                      </div>
+                      <CollapsibleTrigger asChild>
+                        <Button variant="outline" className="rounded-xl">
+                          {showRawTable ? (
+                            <>
+                              <EyeOff className="mr-2 h-4 w-4" />
+                              Ocultar
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="mr-2 h-4 w-4" />
+                              Ver
+                            </>
+                          )}
+                          <ChevronDown className={"ml-2 h-4 w-4 transition " + (showRawTable ? "rotate-180" : "")} />
+                        </Button>
+                      </CollapsibleTrigger>
+                    </div>
+
+                    <CollapsibleContent>
+                      <div className="mt-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+                        <ScrollArea className="h-[260px] w-full">
+                          <div className="min-w-[880px]">
+                            <table className="w-full text-xs">
+                              <thead className="sticky top-0 bg-white">
+                                <tr className="border-b border-[color:var(--sinaxys-border)]">
+                                  {headers.map((h) => (
+                                    <th key={h} className="px-2 py-2 text-left font-semibold text-[color:var(--sinaxys-ink)]">
+                                      {h}
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {dataRows.slice(0, 10).map((r, ridx) => (
+                                  <tr key={ridx} className="border-b border-[color:var(--sinaxys-border)] last:border-b-0">
+                                    {headers.map((_, cidx) => (
+                                      <td key={cidx} className="px-2 py-2 text-muted-foreground">
+                                        {norm(r[cidx]).slice(0, 60) || "—"}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </ScrollArea>
+                        <div className="border-t border-[color:var(--sinaxys-border)] p-3 text-xs text-muted-foreground">
+                          Mostrando 10 primeiras linhas. A rolagem fica contida para não "estourar" a tela.
+                        </div>
+                      </div>
+                    </CollapsibleContent>
+                  </Collapsible>
+
                   <Button
                     className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                     disabled={mappingMissingRequired}
@@ -676,6 +827,10 @@ export default function AdminImportUsers() {
                   >
                     Validar e gerar preview
                   </Button>
+
+                  <div className="text-xs text-muted-foreground">
+                    * Campos obrigatórios variam: <span className="font-medium text-[color:var(--sinaxys-ink)]">Departamento</span> só é obrigatório se houver HEAD/COLABORADOR na planilha.
+                  </div>
                 </div>
               </div>
             </div>
@@ -688,13 +843,7 @@ export default function AdminImportUsers() {
               {rows.length ? `${rows.length} linhas válidas` : "Nenhuma linha válida"} • {issues.length} avisos
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button
-                variant="outline"
-                className="h-11 rounded-xl"
-                onClick={() => {
-                  setStage("mapping");
-                }}
-              >
+              <Button variant="outline" className="h-11 rounded-xl" onClick={() => setStage("mapping")}>
                 Ajustar mapeamento
               </Button>
 
@@ -752,7 +901,7 @@ export default function AdminImportUsers() {
 
         {stage === "idle" ? (
           <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-            Baixe o modelo, preencha e selecione a planilha. Em seguida você confirma as colunas para evitar conflito de dados.
+            Baixe o modelo, preencha e selecione a planilha. Depois confirme o mapeamento para evitar conflito de dados.
           </div>
         ) : null}
       </div>
@@ -795,8 +944,8 @@ export default function AdminImportUsers() {
                         {r.role}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{r.department}</TableCell>
-                    <TableCell className="text-muted-foreground">{r.managerEmail ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.role === "ADMIN" ? "—" : (r.department ?? "—")}</TableCell>
+                    <TableCell className="text-muted-foreground">{r.role === "ADMIN" ? "—" : (r.managerEmail ?? "—")}</TableCell>
                     <TableCell className="text-muted-foreground">
                       {r.joinedAt ? new Date(r.joinedAt).toLocaleDateString("pt-BR") : "—"}
                     </TableCell>
