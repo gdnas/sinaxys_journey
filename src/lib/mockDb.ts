@@ -1,6 +1,7 @@
 import {
   type Certificate,
   type Company,
+  type CompanyDocument,
   type CompensationEvent,
   type ContractAttachment,
   type Db,
@@ -295,6 +296,10 @@ function ensureUserDocuments(db: Db) {
   if (!Array.isArray((db as any).userDocuments)) (db as any).userDocuments = [];
 }
 
+function ensureCompanyDocuments(db: Db) {
+  if (!Array.isArray((db as any).companyDocuments)) (db as any).companyDocuments = [];
+}
+
 function ensureCompensationEvents(db: Db) {
   if (!Array.isArray((db as any).compensationEvents)) (db as any).compensationEvents = [];
 
@@ -502,6 +507,30 @@ export function loadDb(): Db {
         if (changed) saveDb(parsed, { broadcast: false });
       }
 
+      if (!Array.isArray((parsed as any).companyDocuments)) {
+        (parsed as any).companyDocuments = [];
+        saveDb(parsed, { broadcast: false });
+      } else {
+        // Migration: companyDocuments suportam FILE (data URL) e LINK.
+        let changed = false;
+        for (const d of (parsed as any).companyDocuments as any[]) {
+          if (!d || typeof d !== "object") continue;
+          const url = typeof d.url === "string" ? d.url.trim() : "";
+          const legacy = typeof d.fileDataUrl === "string" ? d.fileDataUrl.trim() : "";
+          if (!url && legacy) {
+            d.url = legacy;
+            d.kind = d.kind ?? "FILE";
+            changed = true;
+          }
+          if (!d.kind) {
+            const nextUrl = (typeof d.url === "string" ? d.url : legacy) ?? "";
+            d.kind = String(nextUrl).startsWith("data:") ? "FILE" : "LINK";
+            changed = true;
+          }
+        }
+        if (changed) saveDb(parsed, { broadcast: false });
+      }
+
       if (!Array.isArray((parsed as any).compensationEvents)) {
         (parsed as any).compensationEvents = [];
         saveDb(parsed, { broadcast: false });
@@ -555,6 +584,18 @@ export function loadDb(): Db {
               u.instagramUrl = undefined;
               changed = true;
             }
+          }
+        }
+        if (changed) saveDb(parsed, { broadcast: false });
+      }
+
+      // Migration: company payout account
+      if (Array.isArray((parsed as any).companies)) {
+        let changed = false;
+        for (const c of (parsed as any).companies) {
+          if (c && typeof c === "object" && !("payoutBankAccount" in c)) {
+            c.payoutBankAccount = undefined;
+            changed = true;
           }
         }
         if (changed) saveDb(parsed, { broadcast: false });
@@ -633,6 +674,7 @@ function seedDb(): Db {
   const company: Company = {
     id: companyId,
     ...defaultCompanyBrand(),
+    payoutBankAccount: undefined,
     createdAt: nowIso(),
   };
 
@@ -682,6 +724,7 @@ function seedDb(): Db {
   const notifications: Notification[] = [];
   const contractAttachments: ContractAttachment[] = [];
   const userDocuments: UserDocument[] = [];
+  const companyDocuments: CompanyDocument[] = [];
   const compensationEvents: CompensationEvent[] = [];
   const vacationRequests: VacationRequest[] = [];
   const rewardTiers: RewardTier[] = [];
@@ -708,6 +751,7 @@ function seedDb(): Db {
     notifications,
     contractAttachments,
     userDocuments,
+    companyDocuments,
     compensationEvents,
     vacationRequests,
   };
@@ -1007,6 +1051,93 @@ export const mockDb = {
 
     saveDb(db);
     return company;
+  },
+
+  updateCompanyPayoutBankAccount(companyId: string, payoutBankAccount: Company["payoutBankAccount"] | null) {
+    const db = loadDb();
+    const c = db.companies.find((x) => x.id === companyId);
+    if (!c) throw new Error("Empresa não encontrada.");
+
+    if (payoutBankAccount === null) {
+      c.payoutBankAccount = undefined;
+      saveDb(db);
+      return c;
+    }
+
+    const raw = payoutBankAccount ?? {};
+    const clean = {
+      holderName: raw.holderName?.trim() || undefined,
+      holderTaxId: raw.holderTaxId?.trim() || undefined,
+      bankName: raw.bankName?.trim() || undefined,
+      pixKey: raw.pixKey?.trim() || undefined,
+      agency: raw.agency?.trim() || undefined,
+      accountNumber: raw.accountNumber?.trim() || undefined,
+      accountType: raw.accountType?.trim() || undefined,
+      notes: raw.notes?.trim() || undefined,
+    } satisfies Company["payoutBankAccount"];
+
+    const hasAny = Object.values(clean).some((v) => typeof v === "string" && v.trim().length > 0);
+    c.payoutBankAccount = hasAny ? clean : undefined;
+    saveDb(db);
+    return c;
+  },
+
+  // Company documents
+  getCompanyDocuments(companyId: string) {
+    const db = loadDb();
+    ensureCompanyDocuments(db);
+    return (db.companyDocuments ?? [])
+      .filter((d) => d.companyId === companyId)
+      .map((d) => {
+        const url = (d.url ?? d.fileDataUrl ?? "").trim();
+        const kind = d.kind ?? (url.startsWith("data:") ? "FILE" : "LINK");
+        return { ...d, url, kind };
+      })
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+
+  addCompanyDocument(params: { companyId: string; title: string; url: string; kind?: "FILE" | "LINK"; createdByUserId?: string }) {
+    const db = loadDb();
+    ensureCompanyDocuments(db);
+
+    const c = db.companies.find((x) => x.id === params.companyId);
+    if (!c) throw new Error("Empresa não encontrada.");
+
+    const title = params.title.trim() || "Documento";
+    const rawUrl = params.url.trim();
+    if (!rawUrl) throw new Error("Informe um arquivo ou um link.");
+
+    const inferredKind = params.kind ?? (rawUrl.startsWith("data:") ? "FILE" : "LINK");
+
+    if (inferredKind === "FILE") {
+      if (!rawUrl.startsWith("data:")) throw new Error("Arquivo inválido.");
+    } else {
+      if (!/^https?:\/\//i.test(rawUrl)) throw new Error("Link inválido. Use um URL completo (https://...).");
+    }
+
+    const doc: CompanyDocument = {
+      id: uid("cdoc"),
+      companyId: c.id,
+      title,
+      kind: inferredKind,
+      url: rawUrl,
+      fileDataUrl: inferredKind === "FILE" ? rawUrl : undefined,
+      createdAt: nowIso(),
+      createdByUserId: params.createdByUserId,
+    };
+
+    db.companyDocuments.push(doc);
+    saveDb(db);
+    return doc;
+  },
+
+  deleteCompanyDocument(params: { companyId: string; documentId: string }) {
+    const db = loadDb();
+    ensureCompanyDocuments(db);
+    const before = db.companyDocuments.length;
+    db.companyDocuments = db.companyDocuments.filter((d) => !(d.id === params.documentId && d.companyId === params.companyId));
+    if (db.companyDocuments.length !== before) saveDb(db);
   },
 
   // Sinaxys Points

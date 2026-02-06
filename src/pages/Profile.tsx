@@ -78,6 +78,8 @@ export default function Profile() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const invoiceFileRef = useRef<HTMLInputElement | null>(null);
   const contractFileRef = useRef<HTMLInputElement | null>(null);
+  const idDocFileRef = useRef<HTMLInputElement | null>(null);
+  const companyDocFileRef = useRef<HTMLInputElement | null>(null);
 
   const [version, setVersion] = useState(0);
 
@@ -86,6 +88,9 @@ export default function Profile() {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [contractUrl, setContractUrl] = useState("");
   const [phone, setPhone] = useState("");
+  const [linkedinUrl, setLinkedinUrl] = useState("");
+  const [facebookUrl, setFacebookUrl] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
@@ -105,6 +110,18 @@ export default function Profile() {
   const [contractLinkUrl, setContractLinkUrl] = useState("");
   const [savingContract, setSavingContract] = useState(false);
 
+  const [idDocTitle, setIdDocTitle] = useState("");
+  const [idDocMode, setIdDocMode] = useState<"FILE" | "LINK">("FILE");
+  const [idDocFileDataUrl, setIdDocFileDataUrl] = useState("");
+  const [idDocLinkUrl, setIdDocLinkUrl] = useState("");
+  const [savingIdDoc, setSavingIdDoc] = useState(false);
+
+  const [companyDocTitle, setCompanyDocTitle] = useState("");
+  const [companyDocMode, setCompanyDocMode] = useState<"FILE" | "LINK">("FILE");
+  const [companyDocFileDataUrl, setCompanyDocFileDataUrl] = useState("");
+  const [companyDocLinkUrl, setCompanyDocLinkUrl] = useState("");
+  const [savingCompanyDoc, setSavingCompanyDoc] = useState(false);
+
   const [vacationStartDate, setVacationStartDate] = useState<string>("");
   const [savingVacation, setSavingVacation] = useState(false);
 
@@ -116,7 +133,10 @@ export default function Profile() {
     (name.trim() !== user.name.trim() ||
       (jobTitle.trim() || "") !== (canEditJobTitle ? (user.jobTitle ?? "") : (jobTitle.trim() || "")) ||
       (avatarUrl.trim() || "") !== (user.avatarUrl ?? "") ||
-      (phone.trim() || "") !== (user.phone ?? ""));
+      (phone.trim() || "") !== (user.phone ?? "") ||
+      (linkedinUrl.trim() || "") !== (user.linkedinUrl ?? "") ||
+      (facebookUrl.trim() || "") !== (user.facebookUrl ?? "") ||
+      (instagramUrl.trim() || "") !== (user.instagramUrl ?? ""));
 
   const contractUrlDirty = !!user && canEditContracts && (contractUrl.trim() || "") !== (user.contractUrl ?? "");
 
@@ -127,6 +147,9 @@ export default function Profile() {
     setAvatarUrl(user.avatarUrl ?? "");
     setContractUrl(user.contractUrl ?? "");
     setPhone(user.phone ?? "");
+    setLinkedinUrl(user.linkedinUrl ?? "");
+    setFacebookUrl(user.facebookUrl ?? "");
+    setInstagramUrl(user.instagramUrl ?? "");
   }, [user?.id]);
 
   const tabFromQuery = (searchParams.get("tab") || "").toLowerCase();
@@ -189,6 +212,16 @@ export default function Profile() {
     if (!user) return [];
     return mockDb.getContractAttachmentsForUser(user.id);
   }, [user?.id, version]);
+
+  const idDocuments = useMemo(() => {
+    if (!user || !user.companyId) return [];
+    return mockDb.getUserDocuments(user.id, "IDENTIFICACAO");
+  }, [user?.id, user?.companyId, version]);
+
+  const companyDocuments = useMemo(() => {
+    if (!user?.companyId) return [];
+    return mockDb.getCompanyDocuments(user.companyId);
+  }, [user?.companyId, version]);
 
   const compensationHistory = useMemo(() => {
     if (!user) return [];
@@ -436,6 +469,43 @@ export default function Profile() {
                 <div className="text-xs text-muted-foreground">Você pode colar um link de imagem ou enviar uma foto acima.</div>
               </div>
 
+              <Separator />
+
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Redes</div>
+                <p className="mt-1 text-sm text-muted-foreground">Links opcionais para seu perfil público interno.</p>
+
+                <div className="mt-4 grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label>LinkedIn</Label>
+                    <Input
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                      className="h-11 rounded-xl"
+                      placeholder="https://linkedin.com/in/..."
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Instagram</Label>
+                    <Input
+                      value={instagramUrl}
+                      onChange={(e) => setInstagramUrl(e.target.value)}
+                      className="h-11 rounded-xl"
+                      placeholder="https://instagram.com/..."
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Facebook</Label>
+                    <Input
+                      value={facebookUrl}
+                      onChange={(e) => setFacebookUrl(e.target.value)}
+                      className="h-11 rounded-xl"
+                      placeholder="https://facebook.com/..."
+                    />
+                  </div>
+                </div>
+              </div>
+
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs text-muted-foreground">As mudanças são aplicadas no seu perfil imediatamente.</div>
                 <Button
@@ -449,6 +519,9 @@ export default function Profile() {
                         jobTitle: canEditJobTitle ? jobTitle : undefined,
                         avatarUrl,
                         phone,
+                        linkedinUrl,
+                        instagramUrl,
+                        facebookUrl,
                       });
                       if (!updated) {
                         toast({
@@ -785,6 +858,404 @@ export default function Profile() {
             </Card>
 
             <div className="grid gap-6 lg:grid-cols-2">
+              {/* Documentos de identificação */}
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Documentos de identificação</div>
+                    <p className="mt-1 text-sm text-muted-foreground">Guarde RG/CPF, passaporte ou equivalentes (arquivo ou link).</p>
+                  </div>
+                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                    <FileText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                  </div>
+                </div>
+
+                {!user.companyId ? (
+                  <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                    Disponível para usuários vinculados a uma empresa.
+                  </div>
+                ) : (
+                  <div className="mt-4 grid gap-3">
+                    <div className="grid gap-2">
+                      <Label>Título</Label>
+                      <Input
+                        className="h-11 rounded-xl"
+                        value={idDocTitle}
+                        onChange={(e) => setIdDocTitle(e.target.value)}
+                        placeholder="Ex.: RG (frente e verso)"
+                      />
+                    </div>
+
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-2">
+                      <Tabs value={idDocMode} onValueChange={(v) => setIdDocMode(v as "FILE" | "LINK")}>
+                        <TabsList className="w-full justify-start rounded-xl bg-white p-1">
+                          <TabsTrigger value="FILE" className="rounded-lg">Arquivo</TabsTrigger>
+                          <TabsTrigger value="LINK" className="rounded-lg">Link</TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent value="FILE" className="mt-3">
+                          <input
+                            ref={idDocFileRef}
+                            type="file"
+                            accept="application/pdf,image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onload = () => {
+                                const dataUrl = String(reader.result ?? "");
+                                setIdDocFileDataUrl(dataUrl);
+                                setIdDocTitle((t) => (t.trim() ? t : file.name));
+                                toast({ title: "Arquivo anexado", description: "Agora é só enviar." });
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+
+                          <div className="grid gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="w-full rounded-xl"
+                              onClick={() => idDocFileRef.current?.click()}
+                            >
+                              Selecionar arquivo
+                            </Button>
+
+                            {idDocFileDataUrl.startsWith("data:") ? (
+                              <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+                                <div className="min-w-0">
+                                  <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">Arquivo pronto</div>
+                                  <div className="mt-1 text-xs text-muted-foreground">Fica armazenado no navegador.</div>
+                                </div>
+                                <Button asChild variant="outline" size="sm" className="rounded-xl">
+                                  <a href={idDocFileDataUrl} target="_blank" rel="noreferrer">
+                                    <ExternalLink className="mr-2 h-4 w-4" />
+                                    Abrir
+                                  </a>
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="LINK" className="mt-3">
+                          <div className="grid gap-2">
+                            <Label>Link do documento</Label>
+                            <div className="flex flex-col gap-2 sm:flex-row">
+                              <Input
+                                className="h-11 rounded-xl"
+                                value={idDocLinkUrl}
+                                onChange={(e) => setIdDocLinkUrl(e.target.value)}
+                                placeholder="https://..."
+                              />
+                              <Button asChild variant="outline" className="h-11 rounded-xl" disabled={!isHttpUrl(idDocLinkUrl)}>
+                                <a href={idDocLinkUrl || "#"} target="_blank" rel="noreferrer">
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Abrir
+                                </a>
+                              </Button>
+                            </div>
+                          </div>
+                        </TabsContent>
+                      </Tabs>
+                    </div>
+
+                    <Button
+                      className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                      disabled={
+                        savingIdDoc ||
+                        (idDocMode === "FILE" ? !idDocFileDataUrl.startsWith("data:") : !isHttpUrl(idDocLinkUrl))
+                      }
+                      onClick={() => {
+                        try {
+                          setSavingIdDoc(true);
+                          const url = idDocMode === "FILE" ? idDocFileDataUrl.trim() : idDocLinkUrl.trim();
+                          mockDb.addUserDocument({
+                            userId: user.id,
+                            category: "IDENTIFICACAO",
+                            title: idDocTitle.trim() || "Documento",
+                            url,
+                            kind: idDocMode,
+                          });
+                          setIdDocTitle("");
+                          setIdDocFileDataUrl("");
+                          setIdDocLinkUrl("");
+                          if (idDocFileRef.current) idDocFileRef.current.value = "";
+                          setVersion((v) => v + 1);
+                          toast({ title: "Documento salvo" });
+                        } catch (e) {
+                          toast({
+                            title: "Não foi possível salvar",
+                            description: e instanceof Error ? e.message : "Tente novamente.",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setSavingIdDoc(false);
+                        }
+                      }}
+                    >
+                      Enviar
+                    </Button>
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus documentos</div>
+                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                        {idDocuments.length}
+                      </Badge>
+                    </div>
+
+                    <div className="grid gap-2">
+                      {idDocuments.length ? (
+                        idDocuments.map((d) => (
+                          <div key={d.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">Salvo em {formatDate(d.createdAt)}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl" disabled={!d.url}>
+                                  <a href={d.url || "#"} target="_blank" rel="noreferrer" aria-label="Abrir">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-9 w-9 rounded-xl"
+                                  aria-label="Remover"
+                                  onClick={() => {
+                                    mockDb.deleteUserDocument({ userId: user.id, documentId: d.id });
+                                    setVersion((v) => v + 1);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                          Você ainda não enviou documentos.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+
+              {/* Documentação da empresa */}
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Documentação da empresa</div>
+                    <p className="mt-1 text-sm text-muted-foreground">Documentos internos: políticas, comprovantes, contratos, etc.</p>
+                  </div>
+                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                    <FileText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                  </div>
+                </div>
+
+                {!user.companyId ? (
+                  <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                    Disponível para usuários vinculados a uma empresa.
+                  </div>
+                ) : (
+                  <div className="mt-4 grid gap-3">
+                    {user.role === "ADMIN" ? (
+                      <>
+                        <div className="grid gap-2">
+                          <Label>Título</Label>
+                          <Input
+                            className="h-11 rounded-xl"
+                            value={companyDocTitle}
+                            onChange={(e) => setCompanyDocTitle(e.target.value)}
+                            placeholder="Ex.: Política de reembolso"
+                          />
+                        </div>
+
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-2">
+                          <Tabs value={companyDocMode} onValueChange={(v) => setCompanyDocMode(v as "FILE" | "LINK")}>
+                            <TabsList className="w-full justify-start rounded-xl bg-white p-1">
+                              <TabsTrigger value="FILE" className="rounded-lg">Arquivo</TabsTrigger>
+                              <TabsTrigger value="LINK" className="rounded-lg">Link</TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="FILE" className="mt-3">
+                              <input
+                                ref={companyDocFileRef}
+                                type="file"
+                                accept="application/pdf,image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const reader = new FileReader();
+                                  reader.onload = () => {
+                                    const dataUrl = String(reader.result ?? "");
+                                    setCompanyDocFileDataUrl(dataUrl);
+                                    setCompanyDocTitle((t) => (t.trim() ? t : file.name));
+                                    toast({ title: "Arquivo anexado", description: "Agora é só enviar." });
+                                  };
+                                  reader.readAsDataURL(file);
+                                }}
+                              />
+
+                              <div className="grid gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full rounded-xl"
+                                  onClick={() => companyDocFileRef.current?.click()}
+                                >
+                                  Selecionar arquivo
+                                </Button>
+
+                                {companyDocFileDataUrl.startsWith("data:") ? (
+                                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+                                    <div className="min-w-0">
+                                      <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">Arquivo pronto</div>
+                                      <div className="mt-1 text-xs text-muted-foreground">Fica armazenado no navegador.</div>
+                                    </div>
+                                    <Button asChild variant="outline" size="sm" className="rounded-xl">
+                                      <a href={companyDocFileDataUrl} target="_blank" rel="noreferrer">
+                                        <ExternalLink className="mr-2 h-4 w-4" />
+                                        Abrir
+                                      </a>
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </TabsContent>
+
+                            <TabsContent value="LINK" className="mt-3">
+                              <div className="grid gap-2">
+                                <Label>Link do documento</Label>
+                                <div className="flex flex-col gap-2 sm:flex-row">
+                                  <Input
+                                    className="h-11 rounded-xl"
+                                    value={companyDocLinkUrl}
+                                    onChange={(e) => setCompanyDocLinkUrl(e.target.value)}
+                                    placeholder="https://..."
+                                  />
+                                  <Button asChild variant="outline" className="h-11 rounded-xl" disabled={!isHttpUrl(companyDocLinkUrl)}>
+                                    <a href={companyDocLinkUrl || "#"} target="_blank" rel="noreferrer">
+                                      <ExternalLink className="mr-2 h-4 w-4" />
+                                      Abrir
+                                    </a>
+                                  </Button>
+                                </div>
+                              </div>
+                            </TabsContent>
+                          </Tabs>
+                        </div>
+
+                        <Button
+                          className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                          disabled={
+                            savingCompanyDoc ||
+                            (companyDocMode === "FILE"
+                              ? !companyDocFileDataUrl.startsWith("data:")
+                              : !isHttpUrl(companyDocLinkUrl))
+                          }
+                          onClick={() => {
+                            if (!user.companyId) return;
+                            try {
+                              setSavingCompanyDoc(true);
+                              const url = companyDocMode === "FILE" ? companyDocFileDataUrl.trim() : companyDocLinkUrl.trim();
+                              mockDb.addCompanyDocument({
+                                companyId: user.companyId,
+                                title: companyDocTitle.trim() || "Documento",
+                                url,
+                                kind: companyDocMode,
+                                createdByUserId: user.id,
+                              });
+                              setCompanyDocTitle("");
+                              setCompanyDocFileDataUrl("");
+                              setCompanyDocLinkUrl("");
+                              if (companyDocFileRef.current) companyDocFileRef.current.value = "";
+                              setVersion((v) => v + 1);
+                              toast({ title: "Documento salvo" });
+                            } catch (e) {
+                              toast({
+                                title: "Não foi possível salvar",
+                                description: e instanceof Error ? e.message : "Tente novamente.",
+                                variant: "destructive",
+                              });
+                            } finally {
+                              setSavingCompanyDoc(false);
+                            }
+                          }}
+                        >
+                          Enviar
+                        </Button>
+
+                        <Separator />
+                      </>
+                    ) : (
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                        Apenas admins gerenciam os documentos da empresa. Você pode visualizar os itens abaixo.
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Itens da empresa</div>
+                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                        {companyDocuments.length}
+                      </Badge>
+                    </div>
+
+                    <div className="grid gap-2">
+                      {companyDocuments.length ? (
+                        companyDocuments.map((d) => (
+                          <div key={d.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                                <div className="mt-1 text-xs text-muted-foreground">Salvo em {formatDate(d.createdAt)}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl" disabled={!d.url}>
+                                  <a href={d.url || "#"} target="_blank" rel="noreferrer" aria-label="Abrir">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                                {user.role === "ADMIN" ? (
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-xl"
+                                    aria-label="Remover"
+                                    onClick={() => {
+                                      if (!user.companyId) return;
+                                      mockDb.deleteCompanyDocument({ companyId: user.companyId, documentId: d.id });
+                                      setVersion((v) => v + 1);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                ) : null}
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                          Nenhum documento da empresa cadastrado.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </Card>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
               <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -863,7 +1334,7 @@ export default function Profile() {
                                     </div>
                                     <div className="mt-1 text-xs text-muted-foreground">Fica armazenado no navegador.</div>
                                   </div>
-                                  <Button asChild variant="outline" className="rounded-xl" size="sm">
+                                  <Button asChild variant="outline" size="sm" className="rounded-xl">
                                     <a href={contractFileDataUrl} target="_blank" rel="noreferrer">
                                       <ExternalLink className="mr-2 h-4 w-4" />
                                       Abrir

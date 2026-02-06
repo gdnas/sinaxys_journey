@@ -24,6 +24,8 @@ export type Company = {
   tagline: string;
   logoDataUrl?: string;
   colors: CompanyColors;
+  /** Conta bancária empresarial para recebimento de depósitos (Sinaxys → empresa). */
+  payoutBankAccount?: PayoutBankAccount;
   createdAt: string;
 };
 
@@ -295,6 +297,18 @@ export type UserDocument = {
   createdAt: string;
 };
 
+export type CompanyDocument = {
+  id: string;
+  companyId: string;
+  title: string;
+  kind?: ContractAttachmentKind;
+  url?: string;
+  /** @deprecated Use `url` + `kind`. Mantido para retrocompatibilidade. */
+  fileDataUrl?: string;
+  createdAt: string;
+  createdByUserId?: string;
+};
+
 export type CompensationEvent = {
   id: string;
   companyId: string;
@@ -340,6 +354,7 @@ export type Db = {
   notifications: Notification[];
   contractAttachments: ContractAttachment[];
   userDocuments: UserDocument[];
+  companyDocuments: CompanyDocument[];
   compensationEvents: CompensationEvent[];
   vacationRequests: VacationRequest[];
 };
