@@ -314,9 +314,10 @@ export default function Profile() {
 
       {/* Main sections */}
       <Tabs
-        defaultValue={defaultTab}
+        value={defaultTab}
         className="w-full"
         onValueChange={(v) => {
+          if (v === defaultTab) return;
           const next = new URLSearchParams(searchParams);
           next.set("tab", v);
           setSearchParams(next, { replace: true });
