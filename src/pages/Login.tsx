@@ -1,16 +1,13 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { mockDb } from "@/lib/mockDb";
-import { roleLabel } from "@/lib/sinaxys";
 
 export default function Login() {
   const { toast } = useToast();
@@ -20,11 +17,9 @@ export default function Login() {
   const location = useLocation();
   const from = (location.state as { from?: string } | null)?.from;
 
-  const isDev = import.meta.env.DEV;
-  const users = useMemo(() => (isDev ? mockDb.getUsers().filter((u) => u.active) : []), [isDev]);
-
   const [email, setEmail] = useState(user?.email ?? "");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
@@ -48,9 +43,7 @@ export default function Login() {
               </div>
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Acesso seguro</div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Entre com seu e-mail e senha. Se você recebeu um convite, ative seu acesso pelo link e defina sua senha.
-                </p>
+                <p className="mt-1 text-xs text-muted-foreground">Entre com seu e-mail e senha para acessar a plataforma.</p>
               </div>
             </div>
           </div>
@@ -61,30 +54,6 @@ export default function Login() {
           <p className="mt-1 text-sm text-muted-foreground">Informe suas credenciais para acessar.</p>
 
           <div className="mt-5 grid gap-4">
-            {isDev ? (
-              <div className="grid gap-2">
-                <Label htmlFor="demo">Usuário de demonstração (somente DEV)</Label>
-                <Select
-                  value={email}
-                  onValueChange={(v) => {
-                    setEmail(v);
-                    setPassword("");
-                  }}
-                >
-                  <SelectTrigger id="demo" className="rounded-xl">
-                    <SelectValue placeholder="Selecione…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {users.map((u) => (
-                      <SelectItem key={u.id} value={u.email}>
-                        {u.name} — {roleLabel(u.role)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-
             <div className="grid gap-2">
               <Label htmlFor="email">E-mail</Label>
               <Input
@@ -112,34 +81,34 @@ export default function Login() {
 
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              onClick={() => {
-                const result = login(email, password);
-                if (result.ok === false) {
-                  toast({
-                    title: "Não foi possível entrar",
-                    description: result.message,
-                    variant: "destructive",
-                  });
-                  return;
-                }
+              disabled={loading}
+              onClick={async () => {
+                try {
+                  setLoading(true);
+                  const result = await login(email, password);
+                  if (result.ok === false) {
+                    toast({
+                      title: "Não foi possível entrar",
+                      description: result.message,
+                      variant: "destructive",
+                    });
+                    return;
+                  }
 
-                if (result.mustChangePassword) {
-                  navigate("/password", { replace: true });
-                  return;
-                }
+                  if (result.mustChangePassword) {
+                    navigate("/password", { replace: true });
+                    return;
+                  }
 
-                navigate(from ?? "/");
+                  navigate(from ?? "/");
+                } finally {
+                  setLoading(false);
+                }
               }}
             >
-              Continuar
+              {loading ? "Entrando…" : "Continuar"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-
-            {isDev ? (
-              <div className="text-xs text-muted-foreground">
-                Dica DEV: use <span className="font-medium text-[color:var(--sinaxys-ink)]">admin@sinaxys.com</span> para o perfil Admin.
-              </div>
-            ) : null}
           </div>
         </Card>
       </div>

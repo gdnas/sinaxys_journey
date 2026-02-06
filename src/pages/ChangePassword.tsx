@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { mockDb } from "@/lib/mockDb";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function ChangePassword() {
   const { toast } = useToast();
@@ -36,9 +36,7 @@ export default function ChangePassword() {
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Segurança</div>
             <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)]">Definir nova senha</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {needsChange
-                ? "Primeiro acesso: escolha uma senha nova para continuar."
-                : "Atualize sua senha de acesso."}
+              {needsChange ? "Primeiro acesso: escolha uma senha nova para continuar." : "Atualize sua senha de acesso."}
             </p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
@@ -76,10 +74,16 @@ export default function ChangePassword() {
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
               disabled={!canSave || saving}
-              onClick={() => {
+              onClick={async () => {
                 try {
                   setSaving(true);
-                  mockDb.setUserPassword(user.id, password, { mustChangePassword: false });
+
+                  const { error } = await supabase.auth.updateUser({ password: password.trim() });
+                  if (error) throw error;
+
+                  // Best-effort: clear must_change_password flag
+                  await supabase.from("profiles").update({ must_change_password: false }).eq("id", user.id);
+
                   refresh?.();
                   toast({ title: "Senha atualizada" });
                   navigate("/");
