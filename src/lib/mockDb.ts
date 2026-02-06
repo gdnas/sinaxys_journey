@@ -7,6 +7,9 @@ import {
   type Invoice,
   type LearningTrack,
   type ModuleProgress,
+  type PointsEvent,
+  type PointsRule,
+  type PointsRuleKey,
   type QuizOption,
   type QuizQuestion,
   type RewardTier,
@@ -61,6 +64,101 @@ function defaultCompanyBrand(): Pick<Company, "name" | "tagline" | "logoDataUrl"
       border: "#E6E1FF",
     },
   };
+}
+
+function defaultPointsRules(companyId: string): PointsRule[] {
+  const createdAt = nowIso();
+  const base = (key: PointsRuleKey, category: PointsRule["category"], label: string, points: number, description?: string) =>
+    ({
+      id: uid("pr"),
+      companyId,
+      key,
+      category,
+      label,
+      points,
+      description,
+      active: true,
+      createdAt,
+    }) satisfies PointsRule;
+
+  return [
+    base(
+      "VIDEO_ASSISTIDO",
+      "Trilhas",
+      "Assistir vídeo (módulo)",
+      20,
+      "Padrão recomendado por módulo de vídeo. O valor real pode variar por trilha.",
+    ),
+    base(
+      "CHECKPOINT_ENTREGUE",
+      "Trilhas",
+      "Entregar checkpoint",
+      30,
+      "Padrão recomendado por checkpoint. O valor real pode variar por trilha.",
+    ),
+    base(
+      "QUIZ_APROVADO",
+      "Trilhas",
+      "Aprovar quiz",
+      40,
+      "Padrão recomendado por quiz aprovado. O valor real pode variar por trilha.",
+    ),
+    base(
+      "MATERIAL_CONSUMIDO",
+      "Trilhas",
+      "Consumir material (link)",
+      20,
+      "Padrão recomendado por material. O valor real pode variar por trilha.",
+    ),
+    base(
+      "CURSO_APRIMORAMENTO",
+      "Aprimoramento",
+      "Curso de aprimoramento concluído",
+      120,
+      "Ex.: certificações externas, cursos recomendados pela liderança.",
+    ),
+    base(
+      "GRAVACAO_AULA",
+      "Contribuição",
+      "Gravação de aula / sessão interna",
+      180,
+      "Valor sugerido para criação de conteúdo e compartilhamento de conhecimento.",
+    ),
+    base(
+      "SUBIR_VIDEO",
+      "Contribuição",
+      "Subir vídeo / recurso didático",
+      80,
+      "Valor sugerido para contribuição de conteúdo (vídeo, tutorial, demo).",
+    ),
+    base(
+      "TEMPO_6M",
+      "Tempo de casa",
+      "Tempo de casa: 6 meses",
+      150,
+      "Bônus por permanência (aplicado uma vez ao atingir o marco).",
+    ),
+    base(
+      "TEMPO_12M",
+      "Tempo de casa",
+      "Tempo de casa: 1 ano",
+      350,
+      "Bônus por permanência (aplicado uma vez ao atingir o marco).",
+    ),
+    base("BONUS_ADMIN", "Reconhecimento", "Bônus (admin)", 0, "Reconhecimento pontual definido pelo admin."),
+  ];
+}
+
+function ensurePointsSetup(db: Db) {
+  if (!Array.isArray((db as any).pointsRules)) (db as any).pointsRules = [];
+  if (!Array.isArray((db as any).pointsEvents)) (db as any).pointsEvents = [];
+
+  for (const c of db.companies ?? []) {
+    const hasAny = (db.pointsRules ?? []).some((r) => r.companyId === c.id);
+    if (!hasAny) {
+      (db.pointsRules ?? []).push(...defaultPointsRules(c.id));
+    }
+  }
 }
 
 // NEW: keep assignment progress in sync when modules are added after an assignment already exists.
@@ -172,6 +270,18 @@ export function loadDb(): Db {
       saveDb(parsed);
     }
 
+    // Migration: points rules/events
+    if (!Array.isArray((parsed as any).pointsRules) || !Array.isArray((parsed as any).pointsEvents)) {
+      ensurePointsSetup(parsed);
+      saveDb(parsed);
+    } else {
+      // Ensure every company has a baseline ruleset
+      const before = (parsed as any).pointsRules.length;
+      ensurePointsSetup(parsed);
+      const after = (parsed as any).pointsRules.length;
+      if (after !== before) saveDb(parsed);
+    }
+
     // Migration: invoices
     if (!Array.isArray((parsed as any).invoices)) {
       (parsed as any).invoices = [];
@@ -189,6 +299,10 @@ export function loadDb(): Db {
           }
           if (!("mustChangePassword" in u)) {
             u.mustChangePassword = false;
+            changed = true;
+          }
+          if (!("joinedAt" in u)) {
+            u.joinedAt = nowIso();
             changed = true;
           }
         }
@@ -245,6 +359,8 @@ function seedDb(): Db {
     createdAt: nowIso(),
   };
 
+  const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000).toISOString();
+
   const departments: Department[] = [
     { id: uid("dept"), companyId, name: "Financeiro" },
     { id: uid("dept"), companyId, name: "Suporte" },
@@ -268,6 +384,7 @@ function seedDb(): Db {
       active: true,
       monthlyCostBRL: 9500,
       phone: "+55 11 98888-1111",
+      joinedAt: daysAgo(220),
       // managerId set after we create the heads
     },
     {
@@ -280,6 +397,7 @@ function seedDb(): Db {
       active: true,
       monthlyCostBRL: 6500,
       phone: "+55 21 97777-2222",
+      joinedAt: daysAgo(420),
       // managerId set after we create the heads
     },
     {
@@ -292,6 +410,7 @@ function seedDb(): Db {
       active: true,
       monthlyCostBRL: 16500,
       phone: "+55 11 96666-3333",
+      joinedAt: daysAgo(540),
       // managerId set after we create the admin
     },
     {
@@ -304,6 +423,7 @@ function seedDb(): Db {
       active: true,
       monthlyCostBRL: 14500,
       phone: "+55 21 95555-4444",
+      joinedAt: daysAgo(610),
       // managerId set after we create the admin
     },
     {
@@ -314,6 +434,7 @@ function seedDb(): Db {
       role: "ADMIN",
       active: true,
       phone: "+55 11 90000-0000",
+      joinedAt: daysAgo(800),
       // topo do organograma (sem gestor)
     },
     {
@@ -322,6 +443,7 @@ function seedDb(): Db {
       email: "master@sinaxys.com",
       role: "MASTERADMIN",
       active: true,
+      joinedAt: daysAgo(900),
       // global
     },
   ];
@@ -559,6 +681,9 @@ function seedDb(): Db {
     },
   ];
 
+  const pointsRules = defaultPointsRules(companyId);
+  const pointsEvents: PointsEvent[] = [];
+
   return {
     companies: [company],
     invites: [],
@@ -572,6 +697,8 @@ function seedDb(): Db {
     moduleProgress,
     certificates,
     rewardTiers,
+    pointsRules,
+    pointsEvents,
     invoices,
   };
 }
@@ -715,11 +842,39 @@ function wouldCreateCycle(db: Db, userId: string, nextManagerId: string) {
   return false;
 }
 
-function computeUserXp(db: Db, userId: string) {
+function computeUserXpFromTracks(db: Db, userId: string) {
   const assignmentIds = db.assignments.filter((a) => a.userId === userId).map((a) => a.id);
   const completedMp = db.moduleProgress.filter((p) => assignmentIds.includes(p.assignmentId) && p.status === "COMPLETED");
   const byModuleId = new Map(db.modules.map((m) => [m.id, m] as const));
   return completedMp.reduce((acc, p) => acc + (byModuleId.get(p.moduleId)?.xpReward ?? 0), 0);
+}
+
+function computeTenureXp(db: Db, userId: string) {
+  const u = db.users.find((x) => x.id === userId);
+  if (!u || !u.joinedAt) return 0;
+  if (!u.companyId) return 0;
+
+  const joinedMs = new Date(u.joinedAt).getTime();
+  if (!Number.isFinite(joinedMs)) return 0;
+
+  const months = (Date.now() - joinedMs) / (1000 * 60 * 60 * 24 * 30);
+
+  const rules = (db.pointsRules ?? []).filter((r) => r.companyId === u.companyId && r.active);
+  const r6 = rules.find((r) => r.key === "TEMPO_6M");
+  const r12 = rules.find((r) => r.key === "TEMPO_12M");
+
+  let xp = 0;
+  if (months >= 6) xp += r6?.points ?? 0;
+  if (months >= 12) xp += r12?.points ?? 0;
+  return xp;
+}
+
+function computeUserXpFromEvents(db: Db, userId: string) {
+  return (db.pointsEvents ?? []).filter((e) => e.userId === userId).reduce((acc, e) => acc + (e.points ?? 0), 0);
+}
+
+function computeUserXp(db: Db, userId: string) {
+  return computeUserXpFromTracks(db, userId) + computeUserXpFromEvents(db, userId) + computeTenureXp(db, userId);
 }
 
 function computeUserTier(db: Db, companyId: string, xp: number) {
@@ -773,21 +928,97 @@ export const mockDb = {
       db.departments.push({ id: uid("dept"), companyId: c.id, name: n });
     }
 
+    // Seed Sinaxys Points rules
+    db.pointsRules = db.pointsRules ?? [];
+    db.pointsRules.push(...defaultPointsRules(c.id));
+
     saveDb(db);
     return c;
   },
-  updateCompanyBrand(companyId: string, data: Partial<Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">>) {
+
+  // Sinaxys Points
+  getPointsRules(companyId: string) {
     const db = loadDb();
-    const c = db.companies.find((x) => x.id === companyId);
-    if (!c) return null;
+    ensurePointsSetup(db);
+    return (db.pointsRules ?? []).filter((r) => r.companyId === companyId).slice().sort((a, b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label));
+  },
+  upsertPointsRule(companyId: string, data: Omit<PointsRule, "id" | "companyId" | "createdAt"> & { id?: string }) {
+    const db = loadDb();
+    ensurePointsSetup(db);
 
-    if (typeof data.name === "string" && data.name.trim()) c.name = data.name.trim();
-    if (typeof data.tagline === "string" && data.tagline.trim()) c.tagline = data.tagline.trim();
-    if (typeof data.logoDataUrl === "string") c.logoDataUrl = data.logoDataUrl || undefined;
-    if (data.colors && typeof data.colors === "object") c.colors = data.colors as any;
+    const points = Math.floor(Number(data.points) || 0);
 
+    if (data.id) {
+      const existing = (db.pointsRules ?? []).find((r) => r.id === data.id);
+      if (!existing) throw new Error("Regra não encontrada.");
+      existing.label = data.label.trim();
+      existing.category = data.category;
+      existing.key = data.key;
+      existing.points = points;
+      existing.description = data.description?.trim() || undefined;
+      existing.active = !!data.active;
+      saveDb(db);
+      return existing;
+    }
+
+    const r: PointsRule = {
+      id: uid("pr"),
+      companyId,
+      key: data.key,
+      category: data.category,
+      label: data.label.trim(),
+      points,
+      description: data.description?.trim() || undefined,
+      active: !!data.active,
+      createdAt: nowIso(),
+    };
+    db.pointsRules = db.pointsRules ?? [];
+    db.pointsRules.push(r);
     saveDb(db);
-    return c;
+    return r;
+  },
+  getPointsEventsForUser(companyId: string, userId: string) {
+    const db = loadDb();
+    ensurePointsSetup(db);
+    return (db.pointsEvents ?? [])
+      .filter((e) => e.companyId === companyId && e.userId === userId)
+      .slice()
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  },
+  awardPoints(params: { companyId: string; userId: string; ruleKey: PointsRuleKey; points: number; note?: string; createdByUserId?: string }) {
+    const db = loadDb();
+    ensurePointsSetup(db);
+
+    const points = Math.floor(Number(params.points) || 0);
+    if (!Number.isFinite(points)) throw new Error("Pontos inválidos.");
+
+    const e: PointsEvent = {
+      id: uid("pe"),
+      companyId: params.companyId,
+      userId: params.userId,
+      ruleKey: params.ruleKey,
+      points,
+      note: params.note?.trim() || undefined,
+      createdAt: nowIso(),
+      createdByUserId: params.createdByUserId,
+    };
+
+    db.pointsEvents = db.pointsEvents ?? [];
+    db.pointsEvents.push(e);
+    saveDb(db);
+    return e;
+  },
+  getUserXpBreakdown(userId: string) {
+    const db = loadDb();
+    const u = db.users.find((x) => x.id === userId);
+    const companyId = u?.companyId;
+    return {
+      tracksXp: computeUserXpFromTracks(db, userId),
+      eventsXp: computeUserXpFromEvents(db, userId),
+      tenureXp: computeTenureXp(db, userId),
+      totalXp: computeUserXp(db, userId),
+      companyId: companyId ?? null,
+    };
   },
 
   createInvite(params: { companyId: string; email: string; role: User["role"]; name?: string }) {
@@ -826,6 +1057,7 @@ export const mockDb = {
       existing.role = inv.role;
       existing.name = (params?.name ?? inv.name ?? existing.name).trim();
       existing.active = true;
+      existing.joinedAt = existing.joinedAt ?? nowIso();
       saveDb(db);
       return existing;
     }
@@ -837,6 +1069,7 @@ export const mockDb = {
       email: inv.email,
       role: inv.role,
       active: true,
+      joinedAt: nowIso(),
     };
 
     db.users.push(u);
@@ -1372,6 +1605,7 @@ export const mockDb = {
       departmentId: params.role === "ADMIN" || params.role === "MASTERADMIN" ? undefined : params.departmentId,
       active: true,
       monthlyCostBRL: undefined,
+      joinedAt: nowIso(),
     };
 
     db.users.push(u);
@@ -1557,6 +1791,7 @@ export const mockDb = {
       avatarUrl?: string;
       active?: boolean;
       initialPassword?: string;
+      joinedAt?: string;
     }>;
   }) {
     const db = loadDb();
@@ -1609,6 +1844,7 @@ export const mockDb = {
           managerId: undefined,
           password: password || undefined,
           mustChangePassword: !!password,
+          joinedAt: r.joinedAt ?? nowIso(),
         };
 
         db.users.push(u);
@@ -1623,6 +1859,7 @@ export const mockDb = {
         if (typeof r.phone === "string") existing.phone = r.phone.trim() || undefined;
         if (typeof r.contractUrl === "string") existing.contractUrl = r.contractUrl.trim() || undefined;
         if (typeof r.avatarUrl === "string") existing.avatarUrl = r.avatarUrl.trim() || undefined;
+        if (typeof r.joinedAt === "string") existing.joinedAt = r.joinedAt;
         if (password) {
           existing.password = password;
           existing.mustChangePassword = true;

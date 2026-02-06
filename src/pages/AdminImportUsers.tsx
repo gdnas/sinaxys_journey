@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
-import { ArrowLeft, FileSpreadsheet, Upload } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, Upload } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,8 @@ type ParsedRow = {
   contractUrl?: string;
   avatarUrl?: string;
   active?: boolean;
+  initialPassword?: string;
+  joinedAt?: string;
 };
 
 type RowIssue = { rowIndex: number; message: string };
@@ -68,6 +70,15 @@ function parseMoneyBRL(raw: string): number | undefined {
   return n;
 }
 
+function parseDateISO(raw: string): string | undefined {
+  const v = raw.trim();
+  if (!v) return undefined;
+  // Accept YYYY-MM-DD or ISO; store full ISO.
+  const d = new Date(v);
+  if (!Number.isFinite(d.getTime())) return undefined;
+  return d.toISOString();
+}
+
 function mapRow(obj: Record<string, any>): { row: Partial<ParsedRow>; issues: string[] } {
   const issues: string[] = [];
   const byKey = new Map<string, any>();
@@ -92,6 +103,8 @@ function mapRow(obj: Record<string, any>): { row: Partial<ParsedRow>; issues: st
   const avatarUrl = get("avatar_url", "foto", "avatar") || undefined;
   const monthlyCostRaw = get("monthlycostbrl", "monthly_cost_brl", "custo_mensal", "salario", "salario_brl", "custo_brl");
   const activeRaw = get("active", "ativo", "status");
+  const initialPassword = get("initial_password", "senha_inicial", "senha") || undefined;
+  const joinedAtRaw = get("joined_at", "admissao", "admissao_em", "data_admissao", "entrada") || undefined;
 
   if (!email || !email.includes("@")) issues.push("E-mail inválido.");
   if (!name) issues.push("Nome é obrigatório.");
@@ -103,6 +116,12 @@ function mapRow(obj: Record<string, any>): { row: Partial<ParsedRow>; issues: st
 
   const monthlyCostBRL = monthlyCostRaw ? parseMoneyBRL(monthlyCostRaw) : undefined;
   const active = activeRaw ? parseBool(activeRaw) : undefined;
+
+  const joinedAt = joinedAtRaw ? parseDateISO(joinedAtRaw) : undefined;
+  if (joinedAtRaw && !joinedAt) issues.push("Data de admissão inválida. Use YYYY-MM-DD.");
+
+  const password = initialPassword?.trim();
+  if (password && password.length < 6) issues.push("Senha inicial muito curta (mínimo 6 caracteres).");
 
   return {
     row: {
@@ -116,9 +135,35 @@ function mapRow(obj: Record<string, any>): { row: Partial<ParsedRow>; issues: st
       contractUrl,
       avatarUrl,
       active,
+      initialPassword: password || undefined,
+      joinedAt,
     },
     issues,
   };
+}
+
+function downloadTemplate() {
+  const rows = [
+    {
+      email: "joao@empresa.com",
+      nome: "João da Silva",
+      role: "COLABORADOR",
+      departamento: "Produto",
+      gestor_email: "camila@empresa.com",
+      telefone: "+55 11 98888-1111",
+      custo_mensal: 6500,
+      contrato: "https://app.clicksign.com/...",
+      avatar_url: "https://...",
+      ativo: "sim",
+      senha_inicial: "",
+      admissao: "2024-01-15",
+    },
+  ];
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "modelo");
+  XLSX.writeFile(wb, "modelo_importacao_usuarios_sinaxys.xlsx");
 }
 
 export default function AdminImportUsers() {
@@ -190,12 +235,16 @@ export default function AdminImportUsers() {
                 Colunas mínimas: email, nome, role, departamento
               </Badge>
               <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                Opcional: gestor_email, telefone, custo_mensal, contrato, avatar_url, ativo
+                Opcional: gestor_email, telefone, custo_mensal, contrato, avatar_url, ativo, senha_inicial, admissao
               </Badge>
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="rounded-xl" onClick={downloadTemplate}>
+              <Download className="mr-2 h-4 w-4" />
+              Baixar modelo
+            </Button>
             <Button asChild variant="outline" className="rounded-xl">
               <Link to="/admin/users">
                 <ArrowLeft className="mr-2 h-4 w-4" />
@@ -290,7 +339,7 @@ export default function AdminImportUsers() {
 
         {!rows.length && !hasErrors ? (
           <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-            Selecione uma planilha para validar e visualizar um preview antes de importar.
+            Baixe o modelo para preencher e depois selecione a planilha para validar e visualizar um preview antes de importar.
           </div>
         ) : null}
       </div>
@@ -319,6 +368,7 @@ export default function AdminImportUsers() {
                   <TableHead>Role</TableHead>
                   <TableHead>Departamento</TableHead>
                   <TableHead>Gestor (email)</TableHead>
+                  <TableHead>Admissão</TableHead>
                   <TableHead>Ativo</TableHead>
                 </TableRow>
               </TableHeader>
@@ -334,6 +384,9 @@ export default function AdminImportUsers() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">{r.department}</TableCell>
                     <TableCell className="text-muted-foreground">{r.managerEmail ?? "—"}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {r.joinedAt ? new Date(r.joinedAt).toLocaleDateString("pt-BR") : "—"}
+                    </TableCell>
                     <TableCell>
                       <Badge className={"rounded-full " + ((r.active ?? true) ? "bg-emerald-100 text-emerald-900 hover:bg-emerald-100" : "bg-amber-100 text-amber-900 hover:bg-amber-100")}>
                         {(r.active ?? true) ? "Sim" : "Não"}
@@ -346,7 +399,7 @@ export default function AdminImportUsers() {
           </div>
 
           <div className="mt-3 text-xs text-muted-foreground">
-            Dica: use <span className="font-medium text-[color:var(--sinaxys-ink)]">gestor_email</span> para definir o líder direto.
+            Dica: use <span className="font-medium text-[color:var(--sinaxys-ink)]">senha_inicial</span> para forçar troca no primeiro acesso.
           </div>
         </Card>
       ) : null}

@@ -57,6 +57,7 @@ export type User = {
   phone?: string; // celular para contato (E.164 ou texto livre)
   password?: string; // senha inicial (definida pelo admin) / senha atual
   mustChangePassword?: boolean; // exige troca no primeiro acesso
+  joinedAt?: string; // data de entrada na empresa (ISO)
 };
 
 export type TrackStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "LOCKED";
@@ -157,6 +158,43 @@ export type RewardTier = {
   createdAt: string;
 };
 
+export type PointsRuleCategory = "Trilhas" | "Contribuição" | "Aprimoramento" | "Tempo de casa" | "Reconhecimento";
+
+export type PointsRuleKey =
+  | "VIDEO_ASSISTIDO"
+  | "CHECKPOINT_ENTREGUE"
+  | "QUIZ_APROVADO"
+  | "MATERIAL_CONSUMIDO"
+  | "CURSO_APRIMORAMENTO"
+  | "GRAVACAO_AULA"
+  | "SUBIR_VIDEO"
+  | "TEMPO_6M"
+  | "TEMPO_12M"
+  | "BONUS_ADMIN";
+
+export type PointsRule = {
+  id: string;
+  companyId: string;
+  key: PointsRuleKey;
+  category: PointsRuleCategory;
+  label: string;
+  points: number;
+  description?: string;
+  active: boolean;
+  createdAt: string;
+};
+
+export type PointsEvent = {
+  id: string;
+  companyId: string;
+  userId: string;
+  ruleKey: PointsRuleKey;
+  points: number;
+  note?: string;
+  createdAt: string;
+  createdByUserId?: string;
+};
+
 export type InvoiceStatus = "PENDING" | "PAID";
 
 export type Invoice = {
@@ -185,5 +223,7 @@ export type Db = {
   moduleProgress: ModuleProgress[];
   certificates: Certificate[];
   rewardTiers: RewardTier[];
+  pointsRules: PointsRule[];
+  pointsEvents: PointsEvent[];
   invoices: Invoice[];
 };

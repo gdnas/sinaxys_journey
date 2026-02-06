@@ -57,20 +57,12 @@ export default function Profile() {
     return mockDb.getAssignmentsForUser(user.id);
   }, [user?.id]);
 
-  const totalXp = useMemo(() => {
-    if (!user) return 0;
-    const db = mockDb.get();
-    const assignmentsForUser = db.assignments.filter((a) => a.userId === user.id);
-    let xp = 0;
-    for (const a of assignmentsForUser) {
-      const detail = mockDb.getAssignmentDetail(a.id);
-      if (!detail) continue;
-      xp += detail.modules
-        .filter((m) => detail.progressByModuleId[m.id]?.status === "COMPLETED")
-        .reduce((acc, m) => acc + m.xpReward, 0);
-    }
-    return xp;
+  const points = useMemo(() => {
+    if (!user) return null;
+    return mockDb.getUserXpBreakdown(user.id);
   }, [user?.id]);
+
+  const totalXp = points?.totalXp ?? 0;
 
   const completedTracks = assignments.filter((a) => a.assignment.status === "COMPLETED").length;
 
@@ -296,8 +288,9 @@ export default function Profile() {
                 <TabsContent value="stats" className="mt-4">
                   <div className="grid gap-3 md:grid-cols-3">
                     <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">XP</div>
+                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sinaxys Points</div>
                       <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{totalXp}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">Trilhas + tempo de casa + eventos.</div>
                     </div>
                     <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
                       <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilhas</div>

@@ -1,9 +1,7 @@
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import {
   BarChart3,
-  BookOpenText,
   Building2,
-  Gift,
   GraduationCap,
   LogOut,
   Medal,
@@ -77,7 +75,7 @@ const nav: NavItem[] = [
   },
   {
     to: "/rankings",
-    label: "Ranking",
+    label: "Sinaxys Points",
     icon: <Medal className="h-4 w-4" />,
     roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
@@ -103,12 +101,6 @@ const nav: NavItem[] = [
     to: "/admin/users/import",
     label: "Importar planilha",
     icon: <Upload className="h-4 w-4" />,
-    roles: ["ADMIN"],
-  },
-  {
-    to: "/admin/rewards",
-    label: "Tiers & premiações",
-    icon: <Gift className="h-4 w-4" />,
     roles: ["ADMIN"],
   },
   {
