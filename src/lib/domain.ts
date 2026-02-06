@@ -224,12 +224,25 @@ export type Notification = {
   createdAt: string;
 };
 
+export type ContractAttachmentKind = "FILE" | "LINK";
+
 export type ContractAttachment = {
   id: string;
   companyId: string;
   userId: string;
   title: string;
-  fileDataUrl: string; // PDF/image data URL
+  /**
+   * Tipo do anexo.
+   * - FILE: PDF/imagem (data URL)
+   * - LINK: URL externo (ex.: Clicksign)
+   */
+  kind?: ContractAttachmentKind;
+  /**
+   * URL do recurso. Para retrocompatibilidade, alguns registros antigos podem ter apenas fileDataUrl.
+   */
+  url?: string;
+  /** @deprecated Use `url` + `kind`. Mantido para retrocompatibilidade. */
+  fileDataUrl?: string; // PDF/image data URL
   createdAt: string;
 };
 

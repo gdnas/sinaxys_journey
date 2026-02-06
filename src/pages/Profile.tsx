@@ -12,6 +12,7 @@ import {
   Save,
   ShieldCheck,
   Trash2,
+  TrendingUp,
   UserRound,
   Wallet,
 } from "lucide-react";
@@ -51,10 +52,15 @@ function formatDateUtc(iso?: string) {
   return d.toLocaleDateString("pt-BR", { timeZone: "UTC" });
 }
 
+function isHttpUrl(s: string) {
+  return /^https?:\/\//i.test(s.trim());
+}
+
 export default function Profile() {
   const { toast } = useToast();
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
+
   const fileRef = useRef<HTMLInputElement | null>(null);
   const invoiceFileRef = useRef<HTMLInputElement | null>(null);
   const contractFileRef = useRef<HTMLInputElement | null>(null);
@@ -79,7 +85,9 @@ export default function Profile() {
   const [savingInvoice, setSavingInvoice] = useState(false);
 
   const [contractTitle, setContractTitle] = useState("");
+  const [contractAttachmentMode, setContractAttachmentMode] = useState<"FILE" | "LINK">("FILE");
   const [contractFileDataUrl, setContractFileDataUrl] = useState("");
+  const [contractLinkUrl, setContractLinkUrl] = useState("");
   const [savingContract, setSavingContract] = useState(false);
 
   const [vacationStartDate, setVacationStartDate] = useState<string>("");
@@ -180,12 +188,15 @@ export default function Profile() {
 
   return (
     <div className="grid gap-6">
+      {/* Header */}
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Minha área</div>
             <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)]">{user.name}</div>
-            <div className="mt-1 text-sm text-muted-foreground">{roleLabel(user.role)} • {user.email}</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              {roleLabel(user.role)} • {user.email}
+            </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
               {company ? (
@@ -226,8 +237,35 @@ export default function Profile() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
-        <div className="grid gap-6">
+      {/* Main sections */}
+      <Tabs defaultValue="perfil" className="w-full">
+        <div className="-mx-4 px-4 sm:mx-0 sm:px-0">
+          <TabsList className="w-full justify-start gap-1 rounded-2xl bg-[color:var(--sinaxys-tint)] p-1 overflow-x-auto">
+            <TabsTrigger value="perfil" className="rounded-xl whitespace-nowrap">
+              <UserRound className="mr-2 h-4 w-4" />
+              Perfil
+            </TabsTrigger>
+            <TabsTrigger value="progresso" className="rounded-xl whitespace-nowrap">
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Progresso
+            </TabsTrigger>
+            <TabsTrigger value="documentos" className="rounded-xl whitespace-nowrap">
+              <FileText className="mr-2 h-4 w-4" />
+              Documentos
+            </TabsTrigger>
+            <TabsTrigger value="gestao" className="rounded-xl whitespace-nowrap">
+              <CalendarDays className="mr-2 h-4 w-4" />
+              Gestão
+            </TabsTrigger>
+            <TabsTrigger value="seguranca" className="rounded-xl whitespace-nowrap">
+              <KeyRound className="mr-2 h-4 w-4" />
+              Segurança
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* Perfil */}
+        <TabsContent value="perfil" className="mt-6">
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Perfil</div>
             <p className="mt-1 text-sm text-muted-foreground">Atualize sua foto e mantenha seus dados em dia.</p>
@@ -312,9 +350,7 @@ export default function Profile() {
                     </a>
                   </Button>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  Para aditivos/versões em PDF, use "Contratos & aditivos" no painel ao lado.
-                </div>
+                <div className="text-xs text-muted-foreground">Para versões/aditivos, use a aba “Documentos”.</div>
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -356,602 +392,480 @@ export default function Profile() {
               </div>
             </div>
           </Card>
+        </TabsContent>
 
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Avanços</div>
-            <p className="mt-1 text-sm text-muted-foreground">Uma visão clara do seu progresso (por trilha).</p>
+        {/* Progresso */}
+        <TabsContent value="progresso" className="mt-6">
+          <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+            <div className="grid gap-6">
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Avanços</div>
+                <p className="mt-1 text-sm text-muted-foreground">Uma visão clara do seu progresso (por trilha).</p>
 
-            <div className="mt-4">
-              <Tabs defaultValue="tracks" className="w-full">
-                <TabsList className="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-                  <TabsTrigger value="tracks" className="rounded-xl">
-                    Trilhas
-                  </TabsTrigger>
-                  <TabsTrigger value="stats" className="rounded-xl">
-                    Resumo
-                  </TabsTrigger>
-                </TabsList>
+                <div className="mt-4">
+                  <Tabs defaultValue="tracks" className="w-full">
+                    <TabsList className="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+                      <TabsTrigger value="tracks" className="rounded-xl">
+                        Trilhas
+                      </TabsTrigger>
+                      <TabsTrigger value="stats" className="rounded-xl">
+                        Resumo
+                      </TabsTrigger>
+                    </TabsList>
 
-                <TabsContent value="tracks" className="mt-4">
-                  <div className="grid gap-3">
-                    {assignments.length ? (
-                      assignments.map((a) => {
-                        const done = a.assignment.status === "COMPLETED";
-                        return (
-                          <div
-                            key={a.assignment.id}
-                            className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4"
-                          >
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                                    {a.track.title}
+                    <TabsContent value="tracks" className="mt-4">
+                      <div className="grid gap-3">
+                        {assignments.length ? (
+                          assignments.map((a) => {
+                            const done = a.assignment.status === "COMPLETED";
+                            return (
+                              <div key={a.assignment.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                                        {a.track.title}
+                                      </div>
+                                      {done ? (
+                                        <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                          Concluída
+                                        </Badge>
+                                      ) : (
+                                        <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
+                                          Em andamento
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                      {a.completedModules} de {a.totalModules} módulos
+                                      {done && a.assignment.completedAt
+                                        ? ` • Concluída em ${formatDate(a.assignment.completedAt)}`
+                                        : ""}
+                                    </div>
                                   </div>
-                                  {done ? (
-                                    <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
-                                      Concluída
-                                    </Badge>
-                                  ) : (
-                                    <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
-                                      Em andamento
-                                    </Badge>
-                                  )}
+                                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{a.progressPct}%</div>
                                 </div>
-                                <div className="mt-1 text-xs text-muted-foreground">
-                                  {a.completedModules} de {a.totalModules} módulos
-                                  {done && a.assignment.completedAt ? ` • Concluída em ${formatDate(a.assignment.completedAt)}` : ""}
+                                <div className="mt-3">
+                                  <Progress value={a.progressPct} className="h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
                                 </div>
-                              </div>
-                              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{a.progressPct}%</div>
-                            </div>
-                            <div className="mt-3">
-                              <Progress value={a.progressPct} className="h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
-                            </div>
 
-                            {user.role === "COLABORADOR" ? (
-                              <div className="mt-4">
-                                <Button
-                                  asChild
-                                  className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
+                                {user.role === "COLABORADOR" ? (
+                                  <div className="mt-4">
+                                    <Button
+                                      asChild
+                                      className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
+                                    >
+                                      <Link to={`/app/tracks/${a.assignment.id}`}>Abrir</Link>
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </div>
+                            );
+                          })
+                        ) : (
+                          <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                            Nenhuma trilha atribuída para você ainda.
+                          </div>
+                        )}
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="stats" className="mt-4">
+                      <div className="grid gap-3 md:grid-cols-3">
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sinaxys Points</div>
+                          <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{totalXp}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">Trilhas + tempo de casa + eventos.</div>
+                        </div>
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilhas</div>
+                          <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{assignments.length}</div>
+                        </div>
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Concluídas</div>
+                          <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{completedTracks}</div>
+                        </div>
+                      </div>
+
+                      {completedTrackTitles.length ? (
+                        <>
+                          <Separator className="my-4" />
+                          <div>
+                            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilhas concluídas</div>
+                            <ul className="mt-2 grid gap-2">
+                              {completedTrackTitles.map((t) => (
+                                <li
+                                  key={t}
+                                  className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-sm text-[color:var(--sinaxys-ink)]"
                                 >
-                                  <Link to={`/app/tracks/${a.assignment.id}`}>Abrir</Link>
-                                </Button>
-                              </div>
-                            ) : null}
+                                  {t}
+                                </li>
+                              ))}
+                            </ul>
                           </div>
-                        );
-                      })
-                    ) : (
-                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                        Nenhuma trilha atribuída para você ainda.
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="stats" className="mt-4">
-                  <div className="grid gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sinaxys Points</div>
-                      <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{totalXp}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">Trilhas + tempo de casa + eventos.</div>
-                    </div>
-                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilhas</div>
-                      <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{assignments.length}</div>
-                    </div>
-                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Concluídas</div>
-                      <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{completedTracks}</div>
-                    </div>
-                  </div>
-
-                  {completedTrackTitles.length ? (
-                    <>
-                      <Separator className="my-4" />
-                      <div>
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilhas concluídas</div>
-                        <ul className="mt-2 grid gap-2">
-                          {completedTrackTitles.map((t) => (
-                            <li
-                              key={t}
-                              className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-sm text-[color:var(--sinaxys-ink)]"
-                            >
-                              {t}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    </>
-                  ) : null}
-                </TabsContent>
-              </Tabs>
-            </div>
-          </Card>
-        </div>
-
-        <div className="grid gap-6">
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notificações</div>
-                <p className="mt-1 text-sm text-muted-foreground">Atualizações importantes para você.</p>
-              </div>
-              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                <Bell className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-              </div>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                {unreadCount} não lidas
-              </Badge>
-              <Button
-                variant="outline"
-                className="rounded-xl"
-                disabled={!unreadCount}
-                onClick={() => {
-                  mockDb.markAllNotificationsRead(user.id);
-                  setVersion((v) => v + 1);
-                }}
-              >
-                Marcar todas como lidas
-              </Button>
-            </div>
-
-            <div className="mt-4 grid gap-3">
-              {notifications.length ? (
-                notifications.slice(0, 8).map((n) => (
-                  <button
-                    key={n.id}
-                    type="button"
-                    className={
-                      "w-full rounded-2xl border border-[color:var(--sinaxys-border)] p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/40"
-                    }
-                    onClick={() => {
-                      mockDb.markNotificationRead(user.id, n.id);
-                      setVersion((v) => v + 1);
-                      if (n.href) navigate(n.href);
-                    }}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{n.title}</div>
-                          {!n.readAt ? (
-                            <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Novo</Badge>
-                          ) : null}
-                        </div>
-                        {n.message ? (
-                          <div className="mt-1 text-sm text-muted-foreground">{n.message}</div>
-                        ) : null}
-                        <div className="mt-2 text-xs text-muted-foreground">{formatDate(n.createdAt)}</div>
-                      </div>
-                      {n.href ? (
-                        <div className="mt-1 flex shrink-0 items-center text-xs font-medium text-[color:var(--sinaxys-primary)]">
-                          Ver
-                        </div>
+                        </>
                       ) : null}
-                    </div>
-                  </button>
-                ))
-              ) : (
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                  Nenhuma notificação por enquanto.
+                    </TabsContent>
+                  </Tabs>
                 </div>
-              )}
-            </div>
-          </Card>
-
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Contratos & aditivos</div>
-                <p className="mt-1 text-sm text-muted-foreground">Envie PDFs/arquivos de aditivos e versões do contrato.</p>
-              </div>
-              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                <FileText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-              </div>
+              </Card>
             </div>
 
-            <div className="mt-4 grid gap-3">
-              <div className="grid gap-2">
-                <Label>Título</Label>
-                <Input
-                  className="h-11 rounded-xl"
-                  value={contractTitle}
-                  onChange={(e) => setContractTitle(e.target.value)}
-                  placeholder="Ex.: Aditivo 01 — Ajuste de escopo"
-                />
-              </div>
-
-              <input
-                ref={contractFileRef}
-                type="file"
-                accept="application/pdf,image/*"
-                className="hidden"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    const dataUrl = String(reader.result ?? "");
-                    setContractFileDataUrl(dataUrl);
-                    setContractTitle((t) => (t.trim() ? t : file.name));
-                    toast({ title: "Arquivo anexado", description: "Agora é só enviar." });
-                  };
-                  reader.readAsDataURL(file);
-                }}
-              />
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full rounded-xl"
-                onClick={() => contractFileRef.current?.click()}
-              >
-                Selecionar arquivo
-              </Button>
-
-              <Button
-                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                disabled={savingContract || !contractFileDataUrl.startsWith("data:")}
-                onClick={() => {
-                  try {
-                    setSavingContract(true);
-                    mockDb.addContractAttachment({
-                      userId: user.id,
-                      title: contractTitle.trim() || "Contrato",
-                      fileDataUrl: contractFileDataUrl,
-                    });
-                    setContractTitle("");
-                    setContractFileDataUrl("");
-                    if (contractFileRef.current) contractFileRef.current.value = "";
-                    setVersion((v) => v + 1);
-                    toast({ title: "Contrato enviado" });
-                  } catch (e) {
-                    toast({
-                      title: "Não foi possível enviar",
-                      description: e instanceof Error ? e.message : "Tente novamente.",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setSavingContract(false);
-                  }
-                }}
-              >
-                Enviar
-              </Button>
-
-              <Separator />
-
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus arquivos</div>
-                <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                  {contractAttachments.length}
-                </Badge>
-              </div>
-
-              <div className="grid gap-2">
-                {contractAttachments.length ? (
-                  contractAttachments.map((c) => (
-                    <div key={c.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.title}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">Enviado em {formatDate(c.createdAt)}</div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl">
-                            <a href={c.fileDataUrl} target="_blank" rel="noreferrer" aria-label="Abrir contrato">
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 rounded-xl"
-                            aria-label="Remover contrato"
-                            onClick={() => {
-                              mockDb.deleteContractAttachment({ userId: user.id, contractAttachmentId: c.id });
-                              setVersion((v) => v + 1);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                    Você ainda não enviou nenhum aditivo.
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Férias remuneradas</div>
-                <p className="mt-1 text-sm text-muted-foreground">20 dias/ano em 2 períodos de 10 dias.</p>
-              </div>
-              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                <CalendarDays className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-3">
-              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                Ano {vacationInfo.year}: {vacationInfo.used}/2 períodos usados • restantes: {vacationInfo.remainingPeriods}
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Data de início (10 dias)</Label>
-                <Input
-                  type="date"
-                  className="h-11 rounded-xl"
-                  value={vacationStartDate}
-                  onChange={(e) => setVacationStartDate(e.target.value)}
-                />
-              </div>
-
-              <Button
-                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                disabled={
-                  savingVacation ||
-                  !vacationStartDate ||
-                  vacationInfo.remainingPeriods <= 0 ||
-                  user.role === "MASTERADMIN" ||
-                  !user.companyId
-                }
-                onClick={() => {
-                  try {
-                    setSavingVacation(true);
-                    mockDb.requestPaidVacation({ userId: user.id, startDate: vacationStartDate });
-                    setVacationStartDate("");
-                    setVersion((v) => v + 1);
-                    toast({
-                      title: "Pedido enviado",
-                      description: "Seu gestor recebeu uma notificação.",
-                    });
-                  } catch (e) {
-                    toast({
-                      title: "Não foi possível solicitar",
-                      description: e instanceof Error ? e.message : "Tente novamente.",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setSavingVacation(false);
-                  }
-                }}
-              >
-                Solicitar férias
-              </Button>
-
-              <Separator />
-
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus pedidos</div>
-              <div className="grid gap-2">
-                {vacationRequests.length ? (
-                  vacationRequests.map((r) => (
-                    <div key={r.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                            {formatDateUtc(r.startDate)} • {r.days} dias
-                          </div>
-                          <div className="mt-1 text-xs text-muted-foreground">Solicitado em {formatDate(r.createdAt)}</div>
-                        </div>
-                        <Badge
-                          className={
-                            r.status === "APPROVED"
-                              ? "rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
-                              : r.status === "REJECTED"
-                                ? "rounded-full bg-rose-100 text-rose-900 hover:bg-rose-100"
-                                : "rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100"
-                          }
-                        >
-                          {r.status === "APPROVED" ? "Aprovado" : r.status === "REJECTED" ? "Recusado" : "Pendente"}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                    Você ainda não solicitou férias.
-                  </div>
-                )}
-              </div>
-            </div>
-          </Card>
-
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Segurança</div>
-                <p className="mt-1 text-sm text-muted-foreground">Altere sua senha de acesso.</p>
-              </div>
-              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                <KeyRound className="h-5 w-5" />
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-4">
-              {user.password ? (
-                <div className="grid gap-2">
-                  <Label>Senha atual</Label>
-                  <Input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="rounded-xl"
-                    placeholder="Digite sua senha atual"
-                  />
-                </div>
-              ) : (
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                  Você ainda não tem uma senha definida. Defina uma agora para usar no próximo login.
-                </div>
-              )}
-
-              <div className="grid gap-2">
-                <Label>Nova senha</Label>
-                <Input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="rounded-xl"
-                  placeholder="Mínimo 6 caracteres"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Confirmar nova senha</Label>
-                <Input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="rounded-xl"
-                />
-              </div>
-
-              <Button
-                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                disabled={
-                  savingPassword ||
-                  (user.password ? !currentPassword.trim() : false) ||
-                  newPassword.trim().length < 6 ||
-                  newPassword !== confirmPassword
-                }
-                onClick={() => {
-                  try {
-                    setSavingPassword(true);
-
-                    if (user.password && currentPassword.trim() !== user.password) {
-                      toast({
-                        title: "Senha atual incorreta",
-                        description: "Verifique a senha digitada e tente novamente.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-
-                    const p = newPassword.trim();
-                    if (p.length < 6) {
-                      toast({
-                        title: "Senha fraca",
-                        description: "Use pelo menos 6 caracteres.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-
-                    if (p !== confirmPassword) {
-                      toast({
-                        title: "As senhas não conferem",
-                        description: "Digite a mesma senha nos dois campos.",
-                        variant: "destructive",
-                      });
-                      return;
-                    }
-
-                    mockDb.setUserPassword(user.id, p, { mustChangePassword: false });
-                    refresh?.();
-                    setVersion((v) => v + 1);
-
-                    setCurrentPassword("");
-                    setNewPassword("");
-                    setConfirmPassword("");
-
-                    toast({
-                      title: "Senha atualizada",
-                      description: "Na próxima vez que você fizer login, use a nova senha.",
-                    });
-                  } catch (e) {
-                    toast({
-                      title: "Não foi possível atualizar",
-                      description: e instanceof Error ? e.message : "Tente novamente.",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setSavingPassword(false);
-                  }
-                }}
-              >
-                {user.password ? "Alterar senha" : "Definir senha"}
-              </Button>
-
-              {newPassword && confirmPassword && newPassword !== confirmPassword ? (
-                <div className="text-xs text-red-600">As senhas não coincidem.</div>
-              ) : null}
-            </div>
-          </Card>
-
-          {canUseFinance ? (
-            <>
+            <div className="grid gap-6">
               <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minha remuneração</div>
-                    <p className="mt-1 text-sm text-muted-foreground">Valor atual e histórico.</p>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notificações</div>
+                    <p className="mt-1 text-sm text-muted-foreground">Atualizações importantes para você.</p>
                   </div>
                   <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                    <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                    <Bell className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
                   </div>
                 </div>
 
-                <div className="mt-4 grid gap-2">
-                  <div className="text-xs text-muted-foreground">Valor mensal atual</div>
-                  <div className="text-2xl font-semibold text-[color:var(--sinaxys-ink)]">
-                    {typeof user.monthlyCostBRL === "number" ? brl(user.monthlyCostBRL) : "—"}
-                  </div>
-                  <div className="text-xs text-muted-foreground">Referência por hora</div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                    {typeof user.monthlyCostBRL === "number" ? brlPerHourFromMonthly(user.monthlyCostBRL) : "—"}
-                  </div>
+                <div className="mt-4 flex items-center justify-between gap-3">
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                    {unreadCount} não lidas
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    className="rounded-xl"
+                    disabled={!unreadCount}
+                    onClick={() => {
+                      mockDb.markAllNotificationsRead(user.id);
+                      setVersion((v) => v + 1);
+                    }}
+                  >
+                    Marcar todas como lidas
+                  </Button>
+                </div>
 
-                  {typeof user.monthlyCostBRL !== "number" ? (
-                    <div className="mt-2 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                      Ainda não existe um valor cadastrado para você. Fale com o admin da empresa.
-                    </div>
-                  ) : null}
-
-                  <Separator className="my-2" />
-
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Histórico</div>
-                  <div className="grid gap-2">
-                    {compensationHistory.length ? (
-                      compensationHistory.slice(0, 8).map((e) => (
-                        <div key={e.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{brl(e.monthlyCostBRL)}</div>
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                Vigência: {formatDate(e.effectiveAt)}
-                                {e.note ? ` • ${e.note}` : ""}
-                              </div>
+                <div className="mt-4 grid gap-3">
+                  {notifications.length ? (
+                    notifications.slice(0, 8).map((n) => (
+                      <button
+                        key={n.id}
+                        type="button"
+                        className={
+                          "w-full rounded-2xl border border-[color:var(--sinaxys-border)] p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/40"
+                        }
+                        onClick={() => {
+                          mockDb.markNotificationRead(user.id, n.id);
+                          setVersion((v) => v + 1);
+                          if (n.href) navigate(n.href);
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{n.title}</div>
+                              {!n.readAt ? (
+                                <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Novo</Badge>
+                              ) : null}
                             </div>
+                            {n.message ? <div className="mt-1 text-sm text-muted-foreground">{n.message}</div> : null}
+                            <div className="mt-2 text-xs text-muted-foreground">{formatDate(n.createdAt)}</div>
                           </div>
+                          {n.href ? (
+                            <div className="mt-1 flex shrink-0 items-center text-xs font-medium text-[color:var(--sinaxys-primary)]">
+                              Ver
+                            </div>
+                          ) : null}
                         </div>
-                      ))
-                    ) : (
-                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                        Sem histórico registrado ainda.
-                      </div>
-                    )}
-                  </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                      Nenhuma notificação por enquanto.
+                    </div>
+                  )}
                 </div>
               </Card>
 
+              {user.role === "COLABORADOR" ? (
+                <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Seu líder direto</div>
+                  <p className="mt-1 text-sm text-muted-foreground">Para alinhamentos e desbloqueios, aqui está o seu ponto focal.</p>
+
+                  <div className="mt-4">
+                    {leader ? (
+                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Avatar className="h-10 w-10 ring-2 ring-[color:var(--sinaxys-border)]">
+                            <AvatarImage src={leader.avatarUrl} alt={leader.name} />
+                            <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                              {initials(leader.name)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{leader.name}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {roleLabel(leader.role)} • {leader.email}
+                            </div>
+                          </div>
+                        </div>
+
+                        <Button asChild variant="outline" className="rounded-xl">
+                          <Link to={`/people/${leader.id}`}>
+                            <UserRound className="mr-2 h-4 w-4" />
+                            Ver perfil
+                          </Link>
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                        Nenhum líder definido ainda.
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              ) : null}
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* Documentos */}
+        <TabsContent value="documentos" className="mt-6">
+          <div className="grid gap-6 lg:grid-cols-2">
+            <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Contratos & aditivos</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Salve versões/aditivos como arquivo (PDF) ou apenas o link (ex.: Clicksign).
+                  </p>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                  <FileText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-3">
+                <div className="grid gap-2">
+                  <Label>Título</Label>
+                  <Input
+                    className="h-11 rounded-xl"
+                    value={contractTitle}
+                    onChange={(e) => setContractTitle(e.target.value)}
+                    placeholder="Ex.: Aditivo 01 — Ajuste de escopo"
+                  />
+                </div>
+
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-2">
+                  <Tabs
+                    value={contractAttachmentMode}
+                    onValueChange={(v) => setContractAttachmentMode(v as "FILE" | "LINK")}
+                  >
+                    <TabsList className="w-full justify-start rounded-xl bg-white p-1">
+                      <TabsTrigger value="FILE" className="rounded-lg">
+                        Arquivo
+                      </TabsTrigger>
+                      <TabsTrigger value="LINK" className="rounded-lg">
+                        Link
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="FILE" className="mt-3">
+                      <input
+                        ref={contractFileRef}
+                        type="file"
+                        accept="application/pdf,image/*"
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const dataUrl = String(reader.result ?? "");
+                            setContractFileDataUrl(dataUrl);
+                            setContractTitle((t) => (t.trim() ? t : file.name));
+                            toast({ title: "Arquivo anexado", description: "Agora é só enviar." });
+                          };
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+
+                      <div className="grid gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full rounded-xl"
+                          onClick={() => contractFileRef.current?.click()}
+                        >
+                          Selecionar arquivo
+                        </Button>
+
+                        {contractFileDataUrl.startsWith("data:") ? (
+                          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">
+                                Arquivo pronto para envio
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">Fica armazenado no navegador.</div>
+                            </div>
+                            <Button asChild variant="outline" className="rounded-xl" size="sm">
+                              <a href={contractFileDataUrl} target="_blank" rel="noreferrer">
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                Abrir
+                              </a>
+                            </Button>
+                          </div>
+                        ) : (
+                          <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
+                            Nenhum arquivo selecionado.
+                          </div>
+                        )}
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="LINK" className="mt-3">
+                      <div className="grid gap-2">
+                        <Label>Link do documento</Label>
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                          <Input
+                            className="h-11 rounded-xl"
+                            value={contractLinkUrl}
+                            onChange={(e) => setContractLinkUrl(e.target.value)}
+                            placeholder="https://app.clicksign.com/..."
+                          />
+                          <Button
+                            asChild
+                            variant="outline"
+                            className="rounded-xl"
+                            disabled={!isHttpUrl(contractLinkUrl)}
+                          >
+                            <a href={contractLinkUrl || "#"} target="_blank" rel="noreferrer">
+                              <ExternalLink className="mr-2 h-4 w-4" />
+                              Abrir
+                            </a>
+                          </Button>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Dica: cole o link do Clicksign (ou de onde o documento estiver hospedado).
+                        </div>
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </div>
+
+                <Button
+                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={
+                    savingContract ||
+                    (contractAttachmentMode === "FILE"
+                      ? !contractFileDataUrl.startsWith("data:")
+                      : !isHttpUrl(contractLinkUrl))
+                  }
+                  onClick={() => {
+                    try {
+                      setSavingContract(true);
+                      const url =
+                        contractAttachmentMode === "FILE" ? contractFileDataUrl.trim() : contractLinkUrl.trim();
+
+                      mockDb.addContractAttachment({
+                        userId: user.id,
+                        title: contractTitle.trim() || "Contrato",
+                        url,
+                        kind: contractAttachmentMode,
+                      });
+
+                      setContractTitle("");
+                      setContractFileDataUrl("");
+                      setContractLinkUrl("");
+                      if (contractFileRef.current) contractFileRef.current.value = "";
+
+                      setVersion((v) => v + 1);
+                      toast({
+                        title: "Documento salvo",
+                        description:
+                          contractAttachmentMode === "FILE" ? "Arquivo enviado." : "Link registrado.",
+                      });
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível salvar",
+                        description: e instanceof Error ? e.message : "Tente novamente.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setSavingContract(false);
+                    }
+                  }}
+                >
+                  Enviar
+                </Button>
+
+                <Separator />
+
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus itens</div>
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                    {contractAttachments.length}
+                  </Badge>
+                </div>
+
+                <div className="grid gap-2">
+                  {contractAttachments.length ? (
+                    contractAttachments.map((c) => {
+                      const href = (c.url ?? c.fileDataUrl ?? "").trim();
+                      const kind = c.kind ?? (href.startsWith("data:") ? "FILE" : "LINK");
+                      return (
+                        <div key={c.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.title}</div>
+                                <Badge
+                                  className={
+                                    kind === "LINK"
+                                      ? "rounded-full bg-blue-100 text-blue-900 hover:bg-blue-100"
+                                      : "rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
+                                  }
+                                >
+                                  {kind === "LINK" ? "Link" : "Arquivo"}
+                                </Badge>
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">Salvo em {formatDate(c.createdAt)}</div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl" disabled={!href}>
+                                <a href={href || "#"} target="_blank" rel="noreferrer" aria-label="Abrir">
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9 rounded-xl"
+                                aria-label="Remover"
+                                onClick={() => {
+                                  mockDb.deleteContractAttachment({ userId: user.id, contractAttachmentId: c.id });
+                                  setVersion((v) => v + 1);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  ) : (
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                      Você ainda não salvou nenhum aditivo.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </Card>
+
+            {canUseFinance ? (
               <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notas fiscais</div>
-                    <p className="mt-1 text-sm text-muted-foreground">Envie suas NFs (PDF ou imagem) para mantermos o controle financeiro.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Envie suas NFs (PDF ou imagem) para mantermos o controle financeiro.
+                    </p>
                   </div>
                   <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
                     <ReceiptText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -995,12 +909,7 @@ export default function Profile() {
                       }}
                     />
 
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full rounded-xl"
-                      onClick={() => invoiceFileRef.current?.click()}
-                    >
+                    <Button type="button" variant="outline" className="w-full rounded-xl" onClick={() => invoiceFileRef.current?.click()}>
                       Selecionar arquivo
                     </Button>
 
@@ -1018,9 +927,7 @@ export default function Profile() {
                         </Button>
                       </div>
                     ) : (
-                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                        Nenhum arquivo selecionado.
-                      </div>
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum arquivo selecionado.</div>
                     )}
                   </div>
 
@@ -1096,24 +1003,15 @@ export default function Profile() {
                     <div className="mt-3 grid gap-3">
                       {invoices.length ? (
                         invoices.map((inv) => (
-                          <div
-                            key={inv.id}
-                            className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4"
-                          >
+                          <div key={inv.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
                             <div className="flex items-start justify-between gap-3">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                                    {inv.title}
-                                  </div>
+                                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{inv.title}</div>
                                   {inv.status === "PAID" ? (
-                                    <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
-                                      Pago
-                                    </Badge>
+                                    <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Pago</Badge>
                                   ) : (
-                                    <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
-                                      Pendente
-                                    </Badge>
+                                    <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Pendente</Badge>
                                   )}
                                 </div>
                                 <div className="mt-1 text-xs text-muted-foreground">
@@ -1166,47 +1064,303 @@ export default function Profile() {
                   </div>
                 </div>
               </Card>
-            </>
-          ) : null}
+            ) : (
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notas fiscais</div>
+                <p className="mt-1 text-sm text-muted-foreground">Disponível para usuários com empresa (não master).</p>
+                <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                  Se você precisa enviar NFs, fale com um admin para ajustar seu acesso.
+                </div>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
 
-          {user.role === "COLABORADOR" ? (
+        {/* Gestão */}
+        <TabsContent value="gestao" className="mt-6">
+          <div className="grid gap-6 lg:grid-cols-2">
             <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Seu líder direto</div>
-              <p className="mt-1 text-sm text-muted-foreground">Para alinhamentos e desbloqueios, aqui está o seu ponto focal.</p>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Férias remuneradas</div>
+                  <p className="mt-1 text-sm text-muted-foreground">20 dias/ano em 2 períodos de 10 dias.</p>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                  <CalendarDays className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                </div>
+              </div>
 
-              <div className="mt-4">
-                {leader ? (
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Avatar className="h-10 w-10 ring-2 ring-[color:var(--sinaxys-border)]">
-                        <AvatarImage src={leader.avatarUrl} alt={leader.name} />
-                        <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                          {initials(leader.name)}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{leader.name}</div>
-                        <div className="mt-1 text-xs text-muted-foreground">{roleLabel(leader.role)} • {leader.email}</div>
+              <div className="mt-4 grid gap-3">
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                  Ano {vacationInfo.year}: {vacationInfo.used}/2 períodos usados • restantes: {vacationInfo.remainingPeriods}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Data de início (10 dias)</Label>
+                  <Input
+                    type="date"
+                    className="h-11 rounded-xl"
+                    value={vacationStartDate}
+                    onChange={(e) => setVacationStartDate(e.target.value)}
+                  />
+                </div>
+
+                <Button
+                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={
+                    savingVacation ||
+                    !vacationStartDate ||
+                    vacationInfo.remainingPeriods <= 0 ||
+                    user.role === "MASTERADMIN" ||
+                    !user.companyId
+                  }
+                  onClick={() => {
+                    try {
+                      setSavingVacation(true);
+                      mockDb.requestPaidVacation({ userId: user.id, startDate: vacationStartDate });
+                      setVacationStartDate("");
+                      setVersion((v) => v + 1);
+                      toast({
+                        title: "Pedido enviado",
+                        description: "Seu gestor recebeu uma notificação.",
+                      });
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível solicitar",
+                        description: e instanceof Error ? e.message : "Tente novamente.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setSavingVacation(false);
+                    }
+                  }}
+                >
+                  Solicitar férias
+                </Button>
+
+                <Separator />
+
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus pedidos</div>
+                <div className="grid gap-2">
+                  {vacationRequests.length ? (
+                    vacationRequests.map((r) => (
+                      <div key={r.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                              {formatDateUtc(r.startDate)} • {r.days} dias
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">Solicitado em {formatDate(r.createdAt)}</div>
+                          </div>
+                          <Badge
+                            className={
+                              r.status === "APPROVED"
+                                ? "rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
+                                : r.status === "REJECTED"
+                                  ? "rounded-full bg-rose-100 text-rose-900 hover:bg-rose-100"
+                                  : "rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100"
+                            }
+                          >
+                            {r.status === "APPROVED" ? "Aprovado" : r.status === "REJECTED" ? "Recusado" : "Pendente"}
+                          </Badge>
+                        </div>
                       </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                      Você ainda não solicitou férias.
                     </div>
-
-                    <Button asChild variant="outline" className="rounded-xl">
-                      <Link to={`/people/${leader.id}`}>
-                        <UserRound className="mr-2 h-4 w-4" />
-                        Ver perfil
-                      </Link>
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                    Nenhum líder definido ainda.
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </Card>
-          ) : null}
-        </div>
-      </div>
+
+            {canUseFinance ? (
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minha remuneração</div>
+                    <p className="mt-1 text-sm text-muted-foreground">Valor atual e histórico.</p>
+                  </div>
+                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                    <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-2">
+                  <div className="text-xs text-muted-foreground">Valor mensal atual</div>
+                  <div className="text-2xl font-semibold text-[color:var(--sinaxys-ink)]">
+                    {typeof user.monthlyCostBRL === "number" ? brl(user.monthlyCostBRL) : "—"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Referência por hora</div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                    {typeof user.monthlyCostBRL === "number" ? brlPerHourFromMonthly(user.monthlyCostBRL) : "—"}
+                  </div>
+
+                  {typeof user.monthlyCostBRL !== "number" ? (
+                    <div className="mt-2 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                      Ainda não existe um valor cadastrado para você. Fale com o admin da empresa.
+                    </div>
+                  ) : null}
+
+                  <Separator className="my-2" />
+
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Histórico</div>
+                  <div className="grid gap-2">
+                    {compensationHistory.length ? (
+                      compensationHistory.slice(0, 8).map((e) => (
+                        <div key={e.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{brl(e.monthlyCostBRL)}</div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Vigência: {formatDate(e.effectiveAt)}
+                                {e.note ? ` • ${e.note}` : ""}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                        Sem histórico registrado ainda.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            ) : (
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minha remuneração</div>
+                <p className="mt-1 text-sm text-muted-foreground">Disponível para usuários com empresa (não master).</p>
+                <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                  Se você precisa acessar essa área, fale com um admin.
+                </div>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Segurança */}
+        <TabsContent value="seguranca" className="mt-6">
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Segurança</div>
+                <p className="mt-1 text-sm text-muted-foreground">Altere sua senha de acesso.</p>
+              </div>
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                <KeyRound className="h-5 w-5" />
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4">
+              {user.password ? (
+                <div className="grid gap-2">
+                  <Label>Senha atual</Label>
+                  <Input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="rounded-xl"
+                    placeholder="Digite sua senha atual"
+                  />
+                </div>
+              ) : (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                  Você ainda não tem uma senha definida. Defina uma agora para usar no próximo login.
+                </div>
+              )}
+
+              <div className="grid gap-2">
+                <Label>Nova senha</Label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="rounded-xl"
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Confirmar nova senha</Label>
+                <Input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} className="rounded-xl" />
+              </div>
+
+              <Button
+                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={
+                  savingPassword ||
+                  (user.password ? !currentPassword.trim() : false) ||
+                  newPassword.trim().length < 6 ||
+                  newPassword !== confirmPassword
+                }
+                onClick={() => {
+                  try {
+                    setSavingPassword(true);
+
+                    if (user.password && currentPassword.trim() !== user.password) {
+                      toast({
+                        title: "Senha atual incorreta",
+                        description: "Verifique a senha digitada e tente novamente.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    const p = newPassword.trim();
+                    if (p.length < 6) {
+                      toast({
+                        title: "Senha fraca",
+                        description: "Use pelo menos 6 caracteres.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    if (p !== confirmPassword) {
+                      toast({
+                        title: "As senhas não conferem",
+                        description: "Digite a mesma senha nos dois campos.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+
+                    mockDb.setUserPassword(user.id, p, { mustChangePassword: false });
+                    refresh?.();
+                    setVersion((v) => v + 1);
+
+                    setCurrentPassword("");
+                    setNewPassword("");
+                    setConfirmPassword("");
+
+                    toast({
+                      title: "Senha atualizada",
+                      description: "Na próxima vez que você fizer login, use a nova senha.",
+                    });
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível atualizar",
+                      description: e instanceof Error ? e.message : "Tente novamente.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setSavingPassword(false);
+                  }
+                }}
+              >
+                {user.password ? "Alterar senha" : "Definir senha"}
+              </Button>
+
+              {newPassword && confirmPassword && newPassword !== confirmPassword ? (
+                <div className="text-xs text-red-600">As senhas não coincidem.</div>
+              ) : null}
+            </div>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

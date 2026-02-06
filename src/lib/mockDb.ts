@@ -402,6 +402,29 @@ export function loadDb(): Db {
     if (!Array.isArray((parsed as any).contractAttachments)) {
       (parsed as any).contractAttachments = [];
       saveDb(parsed);
+    } else {
+      // Migration: contractAttachments suportam FILE (data URL) e LINK (Clicksign).
+      // Normaliza registros antigos que só tinham `fileDataUrl`.
+      let changed = false;
+      for (const c of (parsed as any).contractAttachments as any[]) {
+        if (!c || typeof c !== "object") continue;
+
+        const url = typeof c.url === "string" ? c.url.trim() : "";
+        const legacy = typeof c.fileDataUrl === "string" ? c.fileDataUrl.trim() : "";
+
+        if (!url && legacy) {
+          c.url = legacy;
+          c.kind = c.kind ?? "FILE";
+          changed = true;
+        }
+
+        if (!c.kind) {
+          const nextUrl = (typeof c.url === "string" ? c.url : legacy) ?? "";
+          c.kind = String(nextUrl).startsWith("data:") ? "FILE" : "LINK";
+          changed = true;
+        }
+      }
+      if (changed) saveDb(parsed);
     }
     if (!Array.isArray((parsed as any).compensationEvents)) {
       (parsed as any).compensationEvents = [];
@@ -2136,10 +2159,15 @@ export const mockDb = {
     ensureContractAttachments(db);
     return (db.contractAttachments ?? [])
       .filter((c) => c.userId === userId)
+      .map((c) => {
+        const url = (c.url ?? c.fileDataUrl ?? "").trim();
+        const kind = c.kind ?? (url.startsWith("data:") ? "FILE" : "LINK");
+        return { ...c, url, kind };
+      })
       .slice()
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   },
-  addContractAttachment(params: { userId: string; title: string; fileDataUrl: string }) {
+  addContractAttachment(params: { userId: string; title: string; url: string; kind?: "FILE" | "LINK"; fileDataUrl?: string }) {
     const db = loadDb();
     ensureContractAttachments(db);
 
@@ -2148,15 +2176,27 @@ export const mockDb = {
     if (!u.companyId) throw new Error("Usuário sem empresa.");
 
     const title = params.title.trim() || "Contrato";
-    const fileDataUrl = params.fileDataUrl.trim();
-    if (!fileDataUrl.startsWith("data:")) throw new Error("Arquivo inválido.");
+
+    const rawUrl = (params.url ?? params.fileDataUrl ?? "").trim();
+    if (!rawUrl) throw new Error("Informe um arquivo ou um link.");
+
+    const inferredKind = params.kind ?? (rawUrl.startsWith("data:") ? "FILE" : "LINK");
+
+    if (inferredKind === "FILE") {
+      if (!rawUrl.startsWith("data:")) throw new Error("Arquivo inválido.");
+    } else {
+      if (!/^https?:\/\//i.test(rawUrl)) throw new Error("Link inválido. Use um URL completo (https://...).");
+    }
 
     const c: ContractAttachment = {
       id: uid("ctrt"),
       companyId: u.companyId,
       userId: u.id,
       title,
-      fileDataUrl,
+      kind: inferredKind,
+      url: rawUrl,
+      // retrocompat (para registros antigos/preview)
+      fileDataUrl: inferredKind === "FILE" ? rawUrl : undefined,
       createdAt: nowIso(),
     };
 
