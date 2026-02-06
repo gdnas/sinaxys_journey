@@ -1,6 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { FileText, ImagePlus, KeyRound, LayoutDashboard, Save, ShieldCheck, UserRound } from "lucide-react";
+import {
+  ExternalLink,
+  FileText,
+  ImagePlus,
+  KeyRound,
+  LayoutDashboard,
+  ReceiptText,
+  Save,
+  ShieldCheck,
+  Trash2,
+  UserRound,
+  Wallet,
+} from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,8 +21,10 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { brl, brlPerHourFromMonthly } from "@/lib/costs";
 import { mockDb } from "@/lib/mockDb";
 import { roleLabel } from "@/lib/sinaxys";
 
@@ -20,10 +35,19 @@ function initials(name: string) {
   return (a + b).toUpperCase();
 }
 
+function formatDate(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "—";
+  return d.toLocaleDateString("pt-BR");
+}
+
 export default function Profile() {
   const { toast } = useToast();
   const { user, refresh } = useAuth();
   const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const [version, setVersion] = useState(0);
 
   const [name, setName] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -35,6 +59,12 @@ export default function Profile() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+
+  const [invoiceTitle, setInvoiceTitle] = useState("");
+  const [invoiceUrl, setInvoiceUrl] = useState("");
+  const [invoiceAmount, setInvoiceAmount] = useState<string>("");
+  const [invoiceIssuedDate, setInvoiceIssuedDate] = useState<string>("");
+  const [savingInvoice, setSavingInvoice] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -51,25 +81,48 @@ export default function Profile() {
       (contractUrl.trim() || "") !== (user.contractUrl ?? "") ||
       (phone.trim() || "") !== (user.phone ?? ""));
 
+  const company = useMemo(() => {
+    if (!user?.companyId) return null;
+    return mockDb.getCompany(user.companyId);
+  }, [user?.companyId, version]);
+
+  const department = useMemo(() => {
+    if (!user?.companyId || !user.departmentId) return null;
+    const db = mockDb.get();
+    return db.departments.find((d) => d.id === user.departmentId && d.companyId === user.companyId) ?? null;
+  }, [user?.companyId, user?.departmentId, version]);
+
   const leader = useMemo(() => {
     if (!user?.managerId) return null;
     const db = mockDb.get();
     return db.users.find((u) => u.id === user.managerId && u.active) ?? null;
-  }, [user?.id, user?.managerId]);
+  }, [user?.id, user?.managerId, version]);
 
   const assignments = useMemo(() => {
     if (!user) return [];
     return mockDb.getAssignmentsForUser(user.id);
-  }, [user?.id]);
+  }, [user?.id, version]);
 
   const points = useMemo(() => {
     if (!user) return null;
     return mockDb.getUserXpBreakdown(user.id);
-  }, [user?.id]);
+  }, [user?.id, version]);
+
+  const invoices = useMemo(() => {
+    if (!user) return [];
+    return mockDb.getInvoicesForUser(user.id);
+  }, [user?.id, version]);
 
   const totalXp = points?.totalXp ?? 0;
 
   const completedTracks = assignments.filter((a) => a.assignment.status === "COMPLETED").length;
+  const completedTrackTitles = assignments
+    .filter((a) => a.assignment.status === "COMPLETED")
+    .map((a) => a.track.title)
+    .slice()
+    .sort((a, b) => a.localeCompare(b));
+
+  const canUseFinance = user.role !== "MASTERADMIN" && !!user.companyId;
 
   if (!user) return null;
 
@@ -78,9 +131,27 @@ export default function Profile() {
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Perfil</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Minha área</div>
             <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)]">{user.name}</div>
             <div className="mt-1 text-sm text-muted-foreground">{roleLabel(user.role)} • {user.email}</div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {company ? (
+                <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                  {company.name}
+                </Badge>
+              ) : null}
+              {department ? (
+                <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                  {department.name}
+                </Badge>
+              ) : null}
+              {user.joinedAt ? (
+                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] border border-[color:var(--sinaxys-border)] hover:bg-white">
+                  Entrada: {formatDate(user.joinedAt)}
+                </Badge>
+              ) : null}
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -103,10 +174,10 @@ export default function Profile() {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="grid gap-6">
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Seus dados</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Perfil</div>
             <p className="mt-1 text-sm text-muted-foreground">Atualize sua foto e mantenha seus links importantes em um só lugar.</p>
 
             <div className="mt-5 grid gap-5">
@@ -214,6 +285,7 @@ export default function Profile() {
                         return;
                       }
                       refresh?.();
+                      setVersion((v) => v + 1);
                       toast({
                         title: "Perfil atualizado",
                         description: "Dados salvos com sucesso.",
@@ -231,7 +303,7 @@ export default function Profile() {
           </Card>
 
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Evolução</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Avanços</div>
             <p className="mt-1 text-sm text-muted-foreground">Uma visão clara do seu progresso (por trilha).</p>
 
             <div className="mt-4">
@@ -248,33 +320,53 @@ export default function Profile() {
                 <TabsContent value="tracks" className="mt-4">
                   <div className="grid gap-3">
                     {assignments.length ? (
-                      assignments.map((a) => (
-                        <div key={a.assignment.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{a.track.title}</div>
-                              <div className="mt-1 text-xs text-muted-foreground">
-                                {a.completedModules} de {a.totalModules} módulos
+                      assignments.map((a) => {
+                        const done = a.assignment.status === "COMPLETED";
+                        return (
+                          <div
+                            key={a.assignment.id}
+                            className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                                    {a.track.title}
+                                  </div>
+                                  {done ? (
+                                    <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                      Concluída
+                                    </Badge>
+                                  ) : (
+                                    <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
+                                      Em andamento
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">
+                                  {a.completedModules} de {a.totalModules} módulos
+                                  {done && a.assignment.completedAt ? ` • Concluída em ${formatDate(a.assignment.completedAt)}` : ""}
+                                </div>
                               </div>
+                              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{a.progressPct}%</div>
                             </div>
-                            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{a.progressPct}%</div>
-                          </div>
-                          <div className="mt-3">
-                            <Progress value={a.progressPct} className="h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
-                          </div>
+                            <div className="mt-3">
+                              <Progress value={a.progressPct} className="h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
+                            </div>
 
-                          {user.role === "COLABORADOR" ? (
-                            <div className="mt-4">
-                              <Button
-                                asChild
-                                className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                              >
-                                <Link to={`/app/tracks/${a.assignment.id}`}>Abrir</Link>
-                              </Button>
-                            </div>
-                          ) : null}
-                        </div>
-                      ))
+                            {user.role === "COLABORADOR" ? (
+                              <div className="mt-4">
+                                <Button
+                                  asChild
+                                  className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
+                                >
+                                  <Link to={`/app/tracks/${a.assignment.id}`}>Abrir</Link>
+                                </Button>
+                              </div>
+                            ) : null}
+                          </div>
+                        );
+                      })
                     ) : (
                       <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
                         Nenhuma trilha atribuída para você ainda.
@@ -299,6 +391,25 @@ export default function Profile() {
                       <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{completedTracks}</div>
                     </div>
                   </div>
+
+                  {completedTrackTitles.length ? (
+                    <>
+                      <Separator className="my-4" />
+                      <div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilhas concluídas</div>
+                        <ul className="mt-2 grid gap-2">
+                          {completedTrackTitles.map((t) => (
+                            <li
+                              key={t}
+                              className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-sm text-[color:var(--sinaxys-ink)]"
+                            >
+                              {t}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  ) : null}
                 </TabsContent>
               </Tabs>
             </div>
@@ -398,6 +509,7 @@ export default function Profile() {
 
                     mockDb.setUserPassword(user.id, p, { mustChangePassword: false });
                     refresh?.();
+                    setVersion((v) => v + 1);
 
                     setCurrentPassword("");
                     setNewPassword("");
@@ -426,6 +538,204 @@ export default function Profile() {
               ) : null}
             </div>
           </Card>
+
+          {canUseFinance ? (
+            <>
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minha remuneração</div>
+                    <p className="mt-1 text-sm text-muted-foreground">Acompanhe o valor cadastrado para você.</p>
+                  </div>
+                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                    <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-2">
+                  <div className="text-xs text-muted-foreground">Valor mensal</div>
+                  <div className="text-2xl font-semibold text-[color:var(--sinaxys-ink)]">
+                    {typeof user.monthlyCostBRL === "number" ? brl(user.monthlyCostBRL) : "—"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Referência por hora</div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                    {typeof user.monthlyCostBRL === "number" ? brlPerHourFromMonthly(user.monthlyCostBRL) : "—"}
+                  </div>
+
+                  {typeof user.monthlyCostBRL !== "number" ? (
+                    <div className="mt-2 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                      Ainda não existe um valor cadastrado para você. Fale com o admin da empresa.
+                    </div>
+                  ) : null}
+                </div>
+              </Card>
+
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notas fiscais</div>
+                    <p className="mt-1 text-sm text-muted-foreground">Suba os links das NFs emitidas para controle financeiro.</p>
+                  </div>
+                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                    <ReceiptText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-4">
+                  <div className="grid gap-2">
+                    <Label>Título</Label>
+                    <Input
+                      className="h-11 rounded-xl"
+                      value={invoiceTitle}
+                      onChange={(e) => setInvoiceTitle(e.target.value)}
+                      placeholder="Ex.: NF Janeiro/2026"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Link da nota fiscal</Label>
+                    <Input
+                      className="h-11 rounded-xl"
+                      value={invoiceUrl}
+                      onChange={(e) => setInvoiceUrl(e.target.value)}
+                      placeholder="https://..."
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Valor (opcional)</Label>
+                    <Input
+                      className="h-11 rounded-xl"
+                      value={invoiceAmount}
+                      onChange={(e) => setInvoiceAmount(e.target.value)}
+                      placeholder="Ex.: 3500"
+                      inputMode="decimal"
+                    />
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Data de emissão (opcional)</Label>
+                    <Input
+                      className="h-11 rounded-xl"
+                      type="date"
+                      value={invoiceIssuedDate}
+                      onChange={(e) => setInvoiceIssuedDate(e.target.value)}
+                    />
+                  </div>
+
+                  <Button
+                    className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                    disabled={savingInvoice || invoiceUrl.trim().length < 10}
+                    onClick={() => {
+                      try {
+                        setSavingInvoice(true);
+                        const amount = invoiceAmount.trim() ? Number(invoiceAmount.replace(",", ".")) : undefined;
+                        const issuedAt = invoiceIssuedDate ? new Date(invoiceIssuedDate).toISOString() : undefined;
+                        mockDb.createInvoice({
+                          userId: user.id,
+                          title: invoiceTitle.trim() || "Nota fiscal",
+                          invoiceUrl: invoiceUrl.trim(),
+                          amountBRL: typeof amount === "number" && Number.isFinite(amount) ? amount : undefined,
+                          issuedAt,
+                        });
+
+                        setInvoiceTitle("");
+                        setInvoiceUrl("");
+                        setInvoiceAmount("");
+                        setInvoiceIssuedDate("");
+
+                        setVersion((v) => v + 1);
+                        toast({ title: "Nota registrada" });
+                      } catch (e) {
+                        toast({
+                          title: "Não foi possível registrar",
+                          description: e instanceof Error ? e.message : "Tente novamente.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setSavingInvoice(false);
+                      }
+                    }}
+                  >
+                    Registrar nota
+                  </Button>
+
+                  <Separator />
+
+                  <div className="grid gap-3">
+                    {invoices.length ? (
+                      invoices.map((inv) => (
+                        <div
+                          key={inv.id}
+                          className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                                  {inv.title}
+                                </div>
+                                {inv.status === "PAID" ? (
+                                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                                    Pago
+                                  </Badge>
+                                ) : (
+                                  <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
+                                    Pendente
+                                  </Badge>
+                                )}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Criada em {formatDate(inv.createdAt)}
+                                {inv.issuedAt ? ` • Emitida em ${formatDate(inv.issuedAt)}` : ""}
+                                {typeof inv.amountBRL === "number" ? ` • ${brl(inv.amountBRL)}` : ""}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl">
+                                <a href={inv.invoiceUrl} target="_blank" rel="noreferrer" aria-label="Abrir nota">
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </Button>
+
+                              {inv.status !== "PAID" ? (
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-9 w-9 rounded-xl"
+                                  aria-label="Remover nota"
+                                  onClick={() => {
+                                    try {
+                                      mockDb.deleteInvoice(inv.id, user.id);
+                                      setVersion((v) => v + 1);
+                                      toast({ title: "Nota removida" });
+                                    } catch (e) {
+                                      toast({
+                                        title: "Não foi possível remover",
+                                        description: e instanceof Error ? e.message : "Tente novamente.",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                        Você ainda não registrou nenhuma nota fiscal.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+            </>
+          ) : null}
 
           {user.role === "COLABORADOR" ? (
             <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
@@ -463,36 +773,6 @@ export default function Profile() {
               </div>
             </Card>
           ) : null}
-
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Contrato</div>
-            <p className="mt-1 text-sm text-muted-foreground">Acesso rápido ao documento assinado.</p>
-
-            <div className="mt-4 grid gap-2">
-              {user.contractUrl ? (
-                <Button
-                  asChild
-                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                >
-                  <a href={user.contractUrl} target="_blank" rel="noreferrer">
-                    <FileText className="mr-2 h-4 w-4" />
-                    Abrir contrato
-                  </a>
-                </Button>
-              ) : (
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                  Nenhum link de contrato cadastrado ainda.
-                </div>
-              )}
-            </div>
-          </Card>
-
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Dica</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Se quiser, eu adiciono também um perfil público do colaborador para o gestor ver (com foto, progresso e contrato) — mantendo permissões.
-            </p>
-          </Card>
         </div>
       </div>
     </div>

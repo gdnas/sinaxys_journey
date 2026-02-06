@@ -123,7 +123,7 @@ const nav: NavItem[] = [
   },
   {
     to: "/profile",
-    label: "Meu perfil",
+    label: "Minha área",
     icon: <UserIcon className="h-4 w-4" />,
     roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
   },
