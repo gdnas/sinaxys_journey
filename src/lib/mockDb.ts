@@ -1120,12 +1120,53 @@ export const mockDb = {
   getCompany(companyId: string) {
     return loadDb().companies.find((c) => c.id === companyId) ?? null;
   },
+  createCompany(params: { name: string; tagline?: string }) {
+    const db = loadDb();
+
+    const name = params.name.trim();
+    if (name.length < 3) throw new Error("Nome da empresa inválido.");
+
+    const id = uid("cmp");
+    const brand = defaultCompanyBrand();
+
+    const c: Company = {
+      id,
+      ...brand,
+      name,
+      tagline: params.tagline?.trim() || brand.tagline,
+      createdAt: nowIso(),
+    };
+
+    db.companies.push(c);
+
+    // Seed baseline departments for the new company
+    const deptNames: Department["name"][] = [
+      "Financeiro",
+      "Suporte",
+      "Customer Success",
+      "Comercial",
+      "Marketing",
+      "Produto",
+    ];
+    for (const depName of deptNames) {
+      db.departments.push({ id: uid("dept"), companyId: id, name: depName });
+    }
+
+    // Ensure baseline points rules exist for this company.
+    ensurePointsSetup(db);
+
+    saveDb(db);
+    return c;
+  },
 
   // Sinaxys Points
   getPointsRules(companyId: string) {
     const db = loadDb();
     ensurePointsSetup(db);
-    return (db.pointsRules ?? []).filter((r) => r.companyId === companyId).slice().sort((a, b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label));
+    return (db.pointsRules ?? [])
+      .filter((r) => r.companyId === companyId)
+      .slice()
+      .sort((a, b) => a.category.localeCompare(b.category) || a.label.localeCompare(b.label));
   },
   upsertPointsRule(companyId: string, data: Omit<PointsRule, "id" | "companyId" | "createdAt"> & { id?: string }) {
     const db = loadDb();
@@ -1313,6 +1354,144 @@ export const mockDb = {
     return loadDb()
       .modules.filter((m) => m.trackId === trackId)
       .sort((a, b) => a.orderIndex - b.orderIndex);
+  },
+  upsertModule(next: TrackModule) {
+    const db = loadDb();
+    const track = db.tracks.find((t) => t.id === next.trackId);
+    if (!track) throw new Error("Trilha não encontrada.");
+
+    const normalized: TrackModule = {
+      ...next,
+      orderIndex: Math.max(1, Math.floor(Number(next.orderIndex) || 1)),
+      title: next.title.trim(),
+      description: next.description?.trim() || undefined,
+      xpReward: Math.max(0, Math.floor(Number(next.xpReward) || 0)),
+      youtubeUrl: next.type === "VIDEO" ? next.youtubeUrl?.trim() || undefined : undefined,
+      materialUrl: next.type === "MATERIAL" ? next.materialUrl?.trim() || undefined : undefined,
+      checkpointPrompt:
+        next.type === "CHECKPOINT" ? next.checkpointPrompt?.trim() || undefined : undefined,
+      minScore:
+        next.type === "QUIZ"
+          ? Math.max(0, Math.min(100, Math.floor(Number(next.minScore) || 70)))
+          : undefined,
+    };
+
+    const idx = db.modules.findIndex((m) => m.id === normalized.id);
+    if (idx >= 0) db.modules[idx] = { ...db.modules[idx], ...normalized };
+    else db.modules.push(normalized);
+
+    // Keep all assignments consistent with the new module list/order.
+    for (const a of db.assignments.filter((x) => x.trackId === normalized.trackId)) {
+      syncAssignmentProgress(db, a.id);
+    }
+
+    saveDb(db);
+    return normalized;
+  },
+  deleteModule(moduleId: string) {
+    const db = loadDb();
+    const mod = db.modules.find((m) => m.id === moduleId);
+    if (!mod) throw new Error("Módulo não encontrado.");
+
+    // Remove module
+    db.modules = db.modules.filter((m) => m.id !== moduleId);
+
+    // Remove quiz payload
+    const removedQuestionIds = db.quizQuestions.filter((q) => q.moduleId === moduleId).map((q) => q.id);
+    db.quizQuestions = db.quizQuestions.filter((q) => q.moduleId !== moduleId);
+    db.quizOptions = db.quizOptions.filter((o) => !removedQuestionIds.includes(o.questionId));
+
+    // Remove progress rows
+    db.moduleProgress = db.moduleProgress.filter((p) => p.moduleId !== moduleId);
+
+    // Reindex track module order to avoid gaps
+    const ordered = db.modules
+      .filter((m) => m.trackId === mod.trackId)
+      .slice()
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+    ordered.forEach((m, i) => (m.orderIndex = i + 1));
+
+    // Keep assignments consistent after deletion.
+    for (const a of db.assignments.filter((x) => x.trackId === mod.trackId)) {
+      syncAssignmentProgress(db, a.id);
+    }
+
+    saveDb(db);
+  },
+  getQuizForModule(moduleId: string) {
+    const db = loadDb();
+    const questions = db.quizQuestions
+      .filter((q) => q.moduleId === moduleId)
+      .slice()
+      .sort((a, b) => a.orderIndex - b.orderIndex);
+
+    const qids = new Set(questions.map((q) => q.id));
+    const options = db.quizOptions.filter((o) => qids.has(o.questionId));
+
+    const optionsByQuestionId: Record<string, QuizOption[]> = {};
+    for (const q of questions) optionsByQuestionId[q.id] = [];
+    for (const o of options) {
+      (optionsByQuestionId[o.questionId] ??= []).push(o);
+    }
+
+    return { questions, optionsByQuestionId };
+  },
+  replaceQuiz(
+    moduleId: string,
+    payload: {
+      questions: Array<{
+        type: QuizQuestion["type"];
+        prompt: string;
+        options: Array<{ text: string; isCorrect: boolean }>;
+      }>;
+    },
+  ) {
+    const db = loadDb();
+
+    const mod = db.modules.find((m) => m.id === moduleId);
+    if (!mod) throw new Error("Módulo não encontrado.");
+    if (mod.type !== "QUIZ") throw new Error("Este módulo não é do tipo quiz.");
+
+    const questionsIn = payload.questions ?? [];
+    if (!questionsIn.length) throw new Error("O quiz precisa ter ao menos 1 pergunta.");
+
+    for (const q of questionsIn) {
+      const prompt = q.prompt.trim();
+      if (prompt.length < 3) throw new Error("Enunciado inválido em uma das perguntas.");
+      if (!q.options?.length || q.options.length < 2) throw new Error("Cada pergunta precisa ter alternativas.");
+      const correctCount = q.options.filter((o) => !!o.isCorrect).length;
+      if (correctCount !== 1) throw new Error("Cada pergunta precisa ter exatamente 1 alternativa correta.");
+    }
+
+    // Remove old quiz content
+    const oldQids = db.quizQuestions.filter((q) => q.moduleId === moduleId).map((q) => q.id);
+    db.quizQuestions = db.quizQuestions.filter((q) => q.moduleId !== moduleId);
+    db.quizOptions = db.quizOptions.filter((o) => !oldQids.includes(o.questionId));
+
+    // Insert new quiz content
+    questionsIn.forEach((q, idx) => {
+      const qid = uid("qq");
+      const qq: QuizQuestion = {
+        id: qid,
+        moduleId,
+        type: q.type,
+        prompt: q.prompt.trim(),
+        orderIndex: idx + 1,
+      };
+      db.quizQuestions.push(qq);
+
+      q.options.forEach((o) => {
+        const opt: QuizOption = {
+          id: uid("qo"),
+          questionId: qid,
+          text: o.text.trim(),
+          isCorrect: !!o.isCorrect,
+        };
+        db.quizOptions.push(opt);
+      });
+    });
+
+    saveDb(db);
   },
   getAssignmentDetail(assignmentId: string): AssignmentDetail | null {
     const db = loadDb();
