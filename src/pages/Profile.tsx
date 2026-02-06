@@ -46,6 +46,7 @@ export default function Profile() {
   const { toast } = useToast();
   const { user, refresh } = useAuth();
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const invoiceFileRef = useRef<HTMLInputElement | null>(null);
 
   const [version, setVersion] = useState(0);
 
@@ -593,13 +594,55 @@ export default function Profile() {
                   </div>
 
                   <div className="grid gap-2">
-                    <Label>Link da nota fiscal</Label>
+                    <Label>Link da nota fiscal (opcional)</Label>
                     <Input
                       className="h-11 rounded-xl"
                       value={invoiceUrl}
                       onChange={(e) => setInvoiceUrl(e.target.value)}
                       placeholder="https://..."
                     />
+                    <div className="text-xs text-muted-foreground">
+                      Você pode colar um link <span className="font-medium">ou</span> enviar um arquivo (PDF/imagem).
+                    </div>
+
+                    <input
+                      ref={invoiceFileRef}
+                      type="file"
+                      accept="application/pdf,image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          const dataUrl = String(reader.result ?? "");
+                          setInvoiceUrl(dataUrl);
+                          setInvoiceTitle((t) => (t.trim() ? t : file.name));
+                          toast({
+                            title: "Arquivo anexado",
+                            description: "Agora é só registrar a nota.",
+                          });
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                    />
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full rounded-xl"
+                      onClick={() => invoiceFileRef.current?.click()}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Enviar arquivo da nota
+                    </Button>
+
+                    {invoiceUrl.startsWith("data:") ? (
+                      <div className="text-xs text-muted-foreground">
+                        Arquivo selecionado (armazenado no navegador).
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="grid gap-2">
@@ -643,6 +686,7 @@ export default function Profile() {
                         setInvoiceUrl("");
                         setInvoiceAmount("");
                         setInvoiceIssuedDate("");
+                        if (invoiceFileRef.current) invoiceFileRef.current.value = "";
 
                         setVersion((v) => v + 1);
                         toast({ title: "Nota registrada" });
@@ -675,6 +719,11 @@ export default function Profile() {
                                 <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
                                   {inv.title}
                                 </div>
+                                {inv.invoiceUrl.startsWith("data:") ? (
+                                  <Badge className="rounded-full bg-sky-100 text-sky-900 hover:bg-sky-100">Arquivo</Badge>
+                                ) : (
+                                  <Badge className="rounded-full bg-sky-100 text-sky-900 hover:bg-sky-100">Link</Badge>
+                                )}
                                 {inv.status === "PAID" ? (
                                   <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
                                     Pago
