@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   Bell,
   CalendarDays,
@@ -73,6 +73,7 @@ export default function Profile() {
   const { toast } = useToast();
   const { user, refresh } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const fileRef = useRef<HTMLInputElement | null>(null);
   const invoiceFileRef = useRef<HTMLInputElement | null>(null);
@@ -115,7 +116,6 @@ export default function Profile() {
     (name.trim() !== user.name.trim() ||
       (jobTitle.trim() || "") !== (canEditJobTitle ? (user.jobTitle ?? "") : (jobTitle.trim() || "")) ||
       (avatarUrl.trim() || "") !== (user.avatarUrl ?? "") ||
-      (canEditContracts ? (contractUrl.trim() || "") !== (user.contractUrl ?? "") : false) ||
       (phone.trim() || "") !== (user.phone ?? ""));
 
   const contractUrlDirty = !!user && canEditContracts && (contractUrl.trim() || "") !== (user.contractUrl ?? "");
@@ -128,6 +128,20 @@ export default function Profile() {
     setContractUrl(user.contractUrl ?? "");
     setPhone(user.phone ?? "");
   }, [user?.id]);
+
+  const tabFromQuery = (searchParams.get("tab") || "").toLowerCase();
+  const defaultTab =
+    tabFromQuery === "notificacoes"
+      ? "notificacoes"
+      : tabFromQuery === "documentos"
+        ? "documentos"
+        : tabFromQuery === "seguranca"
+          ? "seguranca"
+          : tabFromQuery === "gestao"
+            ? "gestao"
+            : tabFromQuery === "progresso"
+              ? "progresso"
+              : "perfil";
 
   const company = useMemo(() => {
     if (!user?.companyId) return null;
@@ -243,6 +257,8 @@ export default function Profile() {
 
   if (!user) return null;
 
+  const headerJobTitle = user.jobTitle?.trim() || "Sem cargo";
+
   return (
     <div className="grid gap-6">
       {/* Header */}
@@ -250,9 +266,11 @@ export default function Profile() {
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div className="min-w-0">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Minha área</div>
-            <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)]">{user.name}</div>
+            <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)]">
+              {user.name} <span className="font-medium text-muted-foreground">— {headerJobTitle}</span>
+            </div>
             <div className="mt-1 text-sm text-muted-foreground">
-              {user.jobTitle ? `${user.jobTitle} • ` : ""}{roleLabel(user.role)} • {user.email}
+              {roleLabel(user.role)} • {user.email}
             </div>
 
             <div className="mt-3 flex flex-wrap gap-2">
@@ -295,12 +313,24 @@ export default function Profile() {
       </div>
 
       {/* Main sections */}
-      <Tabs defaultValue="perfil" className="w-full">
+      <Tabs
+        defaultValue={defaultTab}
+        className="w-full"
+        onValueChange={(v) => {
+          const next = new URLSearchParams(searchParams);
+          next.set("tab", v);
+          setSearchParams(next, { replace: true });
+        }}
+      >
         <div className="-mx-4 px-4 sm:mx-0 sm:px-0">
           <TabsList className="w-full justify-start gap-1 rounded-2xl bg-[color:var(--sinaxys-tint)] p-1 overflow-x-auto">
             <TabsTrigger value="perfil" className="rounded-xl whitespace-nowrap">
               <UserRound className="mr-2 h-4 w-4" />
               Perfil
+            </TabsTrigger>
+            <TabsTrigger value="notificacoes" className="rounded-xl whitespace-nowrap">
+              <Bell className="mr-2 h-4 w-4" />
+              Notificações
             </TabsTrigger>
             <TabsTrigger value="progresso" className="rounded-xl whitespace-nowrap">
               <TrendingUp className="mr-2 h-4 w-4" />
@@ -405,30 +435,6 @@ export default function Profile() {
                 <div className="text-xs text-muted-foreground">Você pode colar um link de imagem ou enviar uma foto acima.</div>
               </div>
 
-              <div className="grid gap-2">
-                <Label>Contrato principal (Clicksign)</Label>
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    value={contractUrl}
-                    onChange={(e) => setContractUrl(e.target.value)}
-                    className="rounded-xl"
-                    placeholder="https://app.clicksign.com/..."
-                    disabled={!canEditContracts}
-                  />
-                  <Button asChild variant="outline" className="rounded-xl" disabled={!isHttpUrl(contractUrl)}>
-                    <a href={contractUrl || "#"} target="_blank" rel="noreferrer">
-                      <FileText className="mr-2 h-4 w-4" />
-                      Abrir
-                    </a>
-                  </Button>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  {canEditContracts
-                    ? "Para versões/aditivos, use a aba \"Documentos\"."
-                    : "Somente o admin pode alterar o contrato. Você pode apenas visualizar."}
-                </div>
-              </div>
-
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs text-muted-foreground">As mudanças são aplicadas no seu perfil imediatamente.</div>
                 <Button
@@ -441,7 +447,6 @@ export default function Profile() {
                         name,
                         jobTitle: canEditJobTitle ? jobTitle : undefined,
                         avatarUrl,
-                        contractUrl: canEditContracts ? contractUrl : undefined,
                         phone,
                       });
                       if (!updated) {
@@ -467,6 +472,79 @@ export default function Profile() {
                   {saving ? "Salvando…" : "Salvar"}
                 </Button>
               </div>
+            </div>
+          </Card>
+        </TabsContent>
+
+        {/* Notificações */}
+        <TabsContent value="notificacoes" className="mt-6">
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notificações</div>
+                <p className="mt-1 text-sm text-muted-foreground">Atualizações importantes para você.</p>
+              </div>
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                <Bell className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                {unreadCount} não lidas
+              </Badge>
+              <Button
+                variant="outline"
+                className="rounded-xl"
+                disabled={!unreadCount}
+                onClick={() => {
+                  mockDb.markAllNotificationsRead(user.id);
+                  setVersion((v) => v + 1);
+                }}
+              >
+                Marcar todas como lidas
+              </Button>
+            </div>
+
+            <div className="mt-4 grid gap-3">
+              {notifications.length ? (
+                notifications.map((n) => (
+                  <button
+                    key={n.id}
+                    type="button"
+                    className={
+                      "w-full rounded-2xl border border-[color:var(--sinaxys-border)] p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/40"
+                    }
+                    onClick={() => {
+                      mockDb.markNotificationRead(user.id, n.id);
+                      setVersion((v) => v + 1);
+                      if (n.href) navigate(n.href);
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{n.title}</div>
+                          {!n.readAt ? (
+                            <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Novo</Badge>
+                          ) : null}
+                        </div>
+                        {n.message ? <div className="mt-1 text-sm text-muted-foreground">{n.message}</div> : null}
+                        <div className="mt-2 text-xs text-muted-foreground">{formatDate(n.createdAt)}</div>
+                      </div>
+                      {n.href ? (
+                        <div className="mt-1 flex shrink-0 items-center text-xs font-medium text-[color:var(--sinaxys-primary)]">
+                          Ver
+                        </div>
+                      ) : null}
+                    </div>
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                  Nenhuma notificação por enquanto.
+                </div>
+              )}
             </div>
           </Card>
         </TabsContent>
@@ -589,76 +667,6 @@ export default function Profile() {
             </div>
 
             <div className="grid gap-6">
-              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notificações</div>
-                    <p className="mt-1 text-sm text-muted-foreground">Atualizações importantes para você.</p>
-                  </div>
-                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                    <Bell className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-                  </div>
-                </div>
-
-                <div className="mt-4 flex items-center justify-between gap-3">
-                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                    {unreadCount} não lidas
-                  </Badge>
-                  <Button
-                    variant="outline"
-                    className="rounded-xl"
-                    disabled={!unreadCount}
-                    onClick={() => {
-                      mockDb.markAllNotificationsRead(user.id);
-                      setVersion((v) => v + 1);
-                    }}
-                  >
-                    Marcar todas como lidas
-                  </Button>
-                </div>
-
-                <div className="mt-4 grid gap-3">
-                  {notifications.length ? (
-                    notifications.slice(0, 8).map((n) => (
-                      <button
-                        key={n.id}
-                        type="button"
-                        className={
-                          "w-full rounded-2xl border border-[color:var(--sinaxys-border)] p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/40"
-                        }
-                        onClick={() => {
-                          mockDb.markNotificationRead(user.id, n.id);
-                          setVersion((v) => v + 1);
-                          if (n.href) navigate(n.href);
-                        }}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{n.title}</div>
-                              {!n.readAt ? (
-                                <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Novo</Badge>
-                              ) : null}
-                            </div>
-                            {n.message ? <div className="mt-1 text-sm text-muted-foreground">{n.message}</div> : null}
-                            <div className="mt-2 text-xs text-muted-foreground">{formatDate(n.createdAt)}</div>
-                          </div>
-                          {n.href ? (
-                            <div className="mt-1 flex shrink-0 items-center text-xs font-medium text-[color:var(--sinaxys-primary)]">
-                              Ver
-                            </div>
-                          ) : null}
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                      Nenhuma notificação por enquanto.
-                    </div>
-                  )}
-                </div>
-              </Card>
-
               {user.role === "COLABORADOR" ? (
                 <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
                   <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Seu líder direto</div>
@@ -677,7 +685,7 @@ export default function Profile() {
                           <div className="min-w-0">
                             <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{leader.name}</div>
                             <div className="mt-1 text-xs text-muted-foreground">
-                              {roleLabel(leader.role)} • {leader.email}
+                              {leader.jobTitle ? `${leader.jobTitle} • ` : ""}{roleLabel(leader.role)} • {leader.email}
                             </div>
                           </div>
                         </div>

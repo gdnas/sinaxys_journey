@@ -211,7 +211,11 @@ export type Invoice = {
   createdAt: string;
 };
 
-export type NotificationType = "TRACK_ASSIGNED" | "VACATION_REQUEST" | "VACATION_DECISION";
+export type NotificationType =
+  | "TRACK_ASSIGNED"
+  | "VACATION_REQUEST"
+  | "VACATION_DECISION"
+  | "INVOICE_SUBMITTED";
 
 export type Notification = {
   id: string;

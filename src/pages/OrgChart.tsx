@@ -194,6 +194,8 @@ export default function OrgChart() {
     const mgr = node.managerId ? allUsers.find((u) => u.id === node.managerId && u.active) : undefined;
     const dept = node.departmentId ? departmentsById.get(node.departmentId) : undefined;
 
+    const jobTitleLabel = node.jobTitle?.trim() || "Sem cargo";
+
     const isMe = user.id === node.id;
     const canMove = canMoveNode({ viewer: user, node });
 
@@ -224,7 +226,7 @@ export default function OrgChart() {
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <div className={compact ? "truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]" : "truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] md:text-base"}>
-                  {node.name}
+                  {node.name} <span className="font-medium text-muted-foreground">— {jobTitleLabel}</span>
                 </div>
               </div>
 
@@ -534,7 +536,10 @@ export default function OrgChart() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{selectedPerson.name}</div>
+                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                        {selectedPerson.name}
+                        <span className="font-medium text-muted-foreground"> — {selectedPerson.jobTitle?.trim() || "Sem cargo"}</span>
+                      </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         {roleLabel(selectedPerson.role)}
                         {selectedPerson.departmentId ? <> • {departmentsById.get(selectedPerson.departmentId) ?? "—"}</> : null}
@@ -596,7 +601,7 @@ export default function OrgChart() {
                               ) : null}
                               {detailManagerOptions.map((m) => (
                                 <SelectItem key={m.id} value={m.id}>
-                                  {m.name} — {roleLabel(m.role)}
+                                  {m.name} — {m.jobTitle?.trim() || "Sem cargo"} ({roleLabel(m.role)})
                                 </SelectItem>
                               ))}
                             </SelectContent>

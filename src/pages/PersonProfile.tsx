@@ -120,7 +120,9 @@ export default function PersonProfile() {
 
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="truncate text-xl font-semibold text-[color:var(--sinaxys-ink)]">{person.name}</div>
+                <div className="truncate text-xl font-semibold text-[color:var(--sinaxys-ink)]">
+                  {person.name} <span className="font-medium text-muted-foreground">— {person.jobTitle?.trim() || "Sem cargo"}</span>
+                </div>
                 <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                   {roleLabel(person.role)}
                 </Badge>

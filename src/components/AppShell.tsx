@@ -21,6 +21,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { roleLabel } from "@/lib/sinaxys";
@@ -189,6 +190,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const visible = nav.filter((n) => n.roles.includes(user.role));
 
+  const jobTitleLabel = user.jobTitle?.trim() || "Sem cargo";
+
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
       <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur">
@@ -238,6 +241,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
+            <NotificationBell />
+
             <button
               type="button"
               className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)]"
@@ -250,8 +255,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {initials(user.name)}
                 </AvatarFallback>
               </Avatar>
-              <div className="hidden text-right md:block">
-                <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{user.name}</div>
+              <div className="hidden text-right sm:block">
+                <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">
+                  {user.name} <span className="text-muted-foreground">— {jobTitleLabel}</span>
+                </div>
                 <div className="text-xs text-muted-foreground">{roleLabel(user.role)}</div>
               </div>
             </button>

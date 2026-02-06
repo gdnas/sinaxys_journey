@@ -26,6 +26,7 @@ import {
 import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 
 const STORAGE_KEY = "sinaxys-journey-db:v1";
+const DB_CHANGED_EVENT = "sinaxys-db-changed";
 
 function uid(prefix: string) {
   return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
@@ -512,6 +513,8 @@ export function loadDb(): Db {
 export function saveDb(db: Db) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    // Allow UI (header bell, etc.) to react to DB changes without prop-drilling.
+    window.dispatchEvent(new Event(DB_CHANGED_EVENT));
   } catch (e) {
     // Surface storage issues (e.g. quota exceeded) so UI can show an error toast.
     throw new Error(
@@ -522,6 +525,7 @@ export function saveDb(db: Db) {
 
 export function resetDb() {
   localStorage.removeItem(STORAGE_KEY);
+  window.dispatchEvent(new Event(DB_CHANGED_EVENT));
 }
 
 function seedDb(): Db {
@@ -2000,6 +2004,28 @@ export const mockDb = {
 
     db.invoices = db.invoices ?? [];
     db.invoices.push(inv);
+
+    // Notify all people in Financeiro department
+    const financeDeptId = db.departments.find((d) => d.companyId === u.companyId && d.name === "Financeiro")?.id;
+    if (financeDeptId) {
+      const recipients = db.users
+        .filter((x) => x.active)
+        .filter((x) => x.companyId === u.companyId)
+        .filter((x) => x.departmentId === financeDeptId);
+
+      const amountLabel = typeof inv.amountBRL === "number" ? ` (R$ ${inv.amountBRL.toFixed(2).replace(".", ",")})` : "";
+      for (const r of recipients) {
+        pushNotification(db, {
+          companyId: u.companyId,
+          userId: r.id,
+          type: "INVOICE_SUBMITTED",
+          title: "Nova nota fiscal enviada",
+          message: `${u.name} enviou “${inv.title}”${amountLabel}.`,
+          href: "/profile",
+        });
+      }
+    }
+
     saveDb(db);
     return inv;
   },
