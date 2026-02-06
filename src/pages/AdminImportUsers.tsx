@@ -1,13 +1,20 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import * as XLSX from "xlsx";
-import { ArrowLeft, Download, FileSpreadsheet, Upload } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, Upload, Wand2, AlertTriangle, ArrowRightLeft } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { mockDb } from "@/lib/mockDb";
@@ -28,6 +35,44 @@ type ParsedRow = {
 };
 
 type RowIssue = { rowIndex: number; message: string };
+
+type ImportStage = "idle" | "mapping" | "preview";
+
+type FieldKey =
+  | "email"
+  | "name"
+  | "role"
+  | "department"
+  | "managerEmail"
+  | "phone"
+  | "monthlyCostBRL"
+  | "contractUrl"
+  | "avatarUrl"
+  | "active"
+  | "initialPassword"
+  | "joinedAt";
+
+type FieldSpec = {
+  key: FieldKey;
+  label: string;
+  required?: boolean;
+  hint?: string;
+};
+
+const FIELDS: FieldSpec[] = [
+  { key: "email", label: "E-mail", required: true, hint: "Precisa conter @" },
+  { key: "name", label: "Nome", required: true },
+  { key: "role", label: "Role", required: true, hint: "HEAD ou COLABORADOR" },
+  { key: "department", label: "Departamento", required: true },
+  { key: "managerEmail", label: "Gestor (e-mail)", hint: "Opcional" },
+  { key: "phone", label: "Telefone", hint: "Opcional" },
+  { key: "monthlyCostBRL", label: "Custo mensal (R$)", hint: "Opcional" },
+  { key: "contractUrl", label: "Contrato (link)", hint: "Opcional" },
+  { key: "avatarUrl", label: "Avatar (URL)", hint: "Opcional" },
+  { key: "active", label: "Ativo", hint: "sim/não" },
+  { key: "initialPassword", label: "Senha inicial", hint: "mín. 6 (se preenchida)" },
+  { key: "joinedAt", label: "Admissão", hint: "YYYY-MM-DD" },
+];
 
 function norm(s: unknown) {
   return String(s ?? "").trim();
@@ -79,57 +124,194 @@ function parseDateISO(raw: string): string | undefined {
   return d.toISOString();
 }
 
-function mapRow(obj: Record<string, any>): { row: Partial<ParsedRow>; issues: string[] } {
-  const issues: string[] = [];
-  const byKey = new Map<string, any>();
-  for (const [k, v] of Object.entries(obj)) byKey.set(normHeader(k), v);
+function headerAliases(): Record<FieldKey, string[]> {
+  return {
+    email: ["email", "e_mail", "mail"],
+    name: ["nome", "name", "colaborador", "pessoa"],
+    role: ["role", "papel", "perfil", "funcao", "funcao", "cargo"],
+    department: ["department", "departamento", "area", "setor"],
+    managerEmail: ["manager_email", "gestor_email", "lider_email", "leader_email", "email_gestor", "email_lider"],
+    phone: ["phone", "telefone", "celular"],
+    monthlyCostBRL: ["monthly_cost_brl", "custo_mensal", "salario", "salario_brl", "custo_brl", "monthlycostbrl"],
+    contractUrl: ["contract_url", "contrato", "contract", "link_contrato"],
+    avatarUrl: ["avatar_url", "foto", "avatar"],
+    active: ["active", "ativo", "status"],
+    initialPassword: ["initial_password", "senha_inicial", "senha"],
+    joinedAt: ["joined_at", "admissao", "admissao_em", "data_admissao", "entrada"],
+  };
+}
 
-  const get = (...keys: string[]) => {
-    for (const k of keys) {
-      const v = byKey.get(k);
-      if (v !== undefined) return norm(v);
-    }
-    return "";
+function fieldValueScore(field: FieldKey, v: string): number {
+  const value = v.trim();
+  if (!value) return 0;
+
+  if (field === "email" || field === "managerEmail") return value.includes("@") ? 1 : -1;
+  if (field === "role") return parseRole(value) ? 1 : -0.5;
+  if (field === "active") return parseBool(value) !== undefined ? 1 : -0.5;
+  if (field === "joinedAt") return parseDateISO(value) ? 1 : -0.5;
+  if (field === "monthlyCostBRL") return parseMoneyBRL(value) !== undefined ? 1 : -0.5;
+  if (field === "contractUrl" || field === "avatarUrl") {
+    const looksUrl = /^https?:\/\//i.test(value) || value.startsWith("data:");
+    return looksUrl ? 0.7 : 0;
+  }
+
+  // name, department, phone, initialPassword
+  if (field === "initialPassword") return value.length >= 6 ? 0.6 : 0.2;
+  return 0.2;
+}
+
+function suggestMapping(headers: string[], dataRows: any[][]): Record<FieldKey, string | null> {
+  const aliases = headerAliases();
+  const normHeaders = headers.map((h) => normHeader(h));
+
+  const sampleRows = dataRows.slice(0, 20);
+
+  const pickBest = (field: FieldKey): string | null => {
+    let best: { header: string; score: number } | null = null;
+
+    headers.forEach((h, idx) => {
+      const nk = normHeaders[idx];
+      const aliasHit = aliases[field].includes(nk) ? 2 : 0;
+
+      let sampleScore = 0;
+      let count = 0;
+      for (const r of sampleRows) {
+        const val = norm(r[idx]);
+        if (!val) continue;
+        sampleScore += fieldValueScore(field, val);
+        count += 1;
+      }
+
+      const avgSample = count ? sampleScore / count : 0;
+      const score = aliasHit + avgSample;
+
+      if (!best || score > best.score) best = { header: h, score };
+    });
+
+    // If nothing looks even remotely plausible, return null.
+    if (!best) return null;
+    if (best.score <= 0.2) return null;
+    return best.header;
   };
 
-  const email = get("email", "e_mail", "e_mail", "e_mail", "e_mail", "e_mail");
-  const name = get("name", "nome", "colaborador", "pessoa");
-  const roleRaw = get("role", "papel", "perfil", "cargo", "funcao", "funcao");
-  const department = get("department", "departamento", "area", "setor");
-
-  const managerEmail = get("manager_email", "gestor_email", "lider_email", "leader_email", "email_gestor", "email_lider") || undefined;
-  const phone = get("phone", "telefone", "celular") || undefined;
-  const contractUrl = get("contract_url", "contrato", "contract", "link_contrato") || undefined;
-  const avatarUrl = get("avatar_url", "foto", "avatar") || undefined;
-  const monthlyCostRaw = get("monthlycostbrl", "monthly_cost_brl", "custo_mensal", "salario", "salario_brl", "custo_brl");
-  const activeRaw = get("active", "ativo", "status");
-  const initialPassword = get("initial_password", "senha_inicial", "senha") || undefined;
-  const joinedAtRaw = get("joined_at", "admissao", "admissao_em", "data_admissao", "entrada") || undefined;
-
-  if (!email || !email.includes("@")) issues.push("E-mail inválido.");
-  if (!name) issues.push("Nome é obrigatório.");
-
-  const role = parseRole(roleRaw);
-  if (!role) issues.push("Role inválido. Use HEAD ou COLABORADOR.");
-
-  if (!department) issues.push("Departamento é obrigatório.");
-
-  const monthlyCostBRL = monthlyCostRaw ? parseMoneyBRL(monthlyCostRaw) : undefined;
-  const active = activeRaw ? parseBool(activeRaw) : undefined;
-
-  const joinedAt = joinedAtRaw ? parseDateISO(joinedAtRaw) : undefined;
-  if (joinedAtRaw && !joinedAt) issues.push("Data de admissão inválida. Use YYYY-MM-DD.");
-
-  const password = initialPassword?.trim();
-  if (password && password.length < 6) issues.push("Senha inicial muito curta (mínimo 6 caracteres).");
-
   return {
-    row: {
-      email: email.toLowerCase(),
+    email: pickBest("email"),
+    name: pickBest("name"),
+    role: pickBest("role"),
+    department: pickBest("department"),
+    managerEmail: pickBest("managerEmail"),
+    phone: pickBest("phone"),
+    monthlyCostBRL: pickBest("monthlyCostBRL"),
+    contractUrl: pickBest("contractUrl"),
+    avatarUrl: pickBest("avatarUrl"),
+    active: pickBest("active"),
+    initialPassword: pickBest("initialPassword"),
+    joinedAt: pickBest("joinedAt"),
+  };
+}
+
+function analyzeMapping(headers: string[], dataRows: any[][], mapping: Record<FieldKey, string | null>) {
+  const idxByHeader = new Map(headers.map((h, i) => [h, i] as const));
+  const sampleRows = dataRows.slice(0, 30);
+
+  const result: Record<FieldKey, { confidence: number; message?: string }> = {} as any;
+
+  for (const f of FIELDS) {
+    const header = mapping[f.key];
+    if (!header) {
+      result[f.key] = { confidence: f.required ? 0 : 1, message: f.required ? "Campo obrigatório não mapeado." : "—" };
+      continue;
+    }
+
+    const idx = idxByHeader.get(header);
+    if (idx === undefined) {
+      result[f.key] = { confidence: 0, message: "Coluna inválida." };
+      continue;
+    }
+
+    let score = 0;
+    let count = 0;
+    for (const r of sampleRows) {
+      const val = norm(r[idx]);
+      if (!val) continue;
+      score += Math.max(-1, Math.min(1, fieldValueScore(f.key, val)));
+      count += 1;
+    }
+
+    const avg = count ? score / count : 0;
+    const confidence = Math.max(0, Math.min(1, (avg + 1) / 2)); // map [-1..1] => [0..1]
+
+    let message: string | undefined;
+    if (f.required && confidence < 0.55) message = "Parece não bater com o tipo de dado esperado.";
+    else if (!f.required && header && confidence < 0.45) message = "Coluna possivelmente incorreta (opcional).";
+
+    result[f.key] = { confidence, message };
+  }
+
+  return result;
+}
+
+function mapRowsFromMapping(headers: string[], dataRows: any[][], mapping: Record<FieldKey, string | null>) {
+  const idxByHeader = new Map(headers.map((h, i) => [h, i] as const));
+
+  const read = (row: any[], key: FieldKey) => {
+    const h = mapping[key];
+    if (!h) return "";
+    const idx = idxByHeader.get(h);
+    if (idx === undefined) return "";
+    return norm(row[idx]);
+  };
+
+  const out: ParsedRow[] = [];
+  const issues: RowIssue[] = [];
+
+  dataRows.forEach((row, idx) => {
+    const rowIndex = idx + 2; // assumes header on line 1
+
+    const email = read(row, "email").toLowerCase();
+    const name = read(row, "name");
+    const roleRaw = read(row, "role");
+    const department = read(row, "department");
+
+    const managerEmail = read(row, "managerEmail").toLowerCase() || undefined;
+    const phone = read(row, "phone") || undefined;
+    const contractUrl = read(row, "contractUrl") || undefined;
+    const avatarUrl = read(row, "avatarUrl") || undefined;
+    const monthlyCostRaw = read(row, "monthlyCostBRL");
+    const activeRaw = read(row, "active");
+    const initialPassword = read(row, "initialPassword") || undefined;
+    const joinedAtRaw = read(row, "joinedAt") || undefined;
+
+    const rowErrs: string[] = [];
+
+    if (!email || !email.includes("@")) rowErrs.push("E-mail inválido.");
+    if (!name) rowErrs.push("Nome é obrigatório.");
+
+    const role = parseRole(roleRaw);
+    if (!role) rowErrs.push("Role inválido. Use HEAD ou COLABORADOR.");
+
+    if (!department) rowErrs.push("Departamento é obrigatório.");
+
+    const monthlyCostBRL = monthlyCostRaw ? parseMoneyBRL(monthlyCostRaw) : undefined;
+    const active = activeRaw ? parseBool(activeRaw) : undefined;
+
+    const joinedAt = joinedAtRaw ? parseDateISO(joinedAtRaw) : undefined;
+    if (joinedAtRaw && !joinedAt) rowErrs.push("Data de admissão inválida. Use YYYY-MM-DD.");
+
+    const password = initialPassword?.trim();
+    if (password && password.length < 6) rowErrs.push("Senha inicial muito curta (mínimo 6 caracteres).");
+
+    if (rowErrs.length) {
+      rowErrs.forEach((m) => issues.push({ rowIndex, message: m }));
+      return;
+    }
+
+    out.push({
+      email,
       name,
-      role: role ?? undefined,
+      role: role!,
       department,
-      managerEmail: managerEmail ? managerEmail.toLowerCase() : undefined,
+      managerEmail: managerEmail && managerEmail.includes("@") ? managerEmail : undefined,
       phone,
       monthlyCostBRL,
       contractUrl,
@@ -137,9 +319,18 @@ function mapRow(obj: Record<string, any>): { row: Partial<ParsedRow>; issues: st
       active,
       initialPassword: password || undefined,
       joinedAt,
-    },
-    issues,
-  };
+    });
+  });
+
+  // Basic duplicates check
+  const seen = new Set<string>();
+  for (const r of out) {
+    const key = r.email.toLowerCase();
+    if (seen.has(key)) issues.push({ rowIndex: -1, message: `E-mail duplicado na planilha: ${r.email}` });
+    seen.add(key);
+  }
+
+  return { rows: out, issues };
 }
 
 function downloadTemplate() {
@@ -170,7 +361,26 @@ export default function AdminImportUsers() {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  const [stage, setStage] = useState<ImportStage>("idle");
   const [fileName, setFileName] = useState<string>("");
+
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [dataRows, setDataRows] = useState<any[][]>([]);
+  const [mapping, setMapping] = useState<Record<FieldKey, string | null>>({
+    email: null,
+    name: null,
+    role: null,
+    department: null,
+    managerEmail: null,
+    phone: null,
+    monthlyCostBRL: null,
+    contractUrl: null,
+    avatarUrl: null,
+    active: null,
+    initialPassword: null,
+    joinedAt: null,
+  });
+
   const [rows, setRows] = useState<ParsedRow[]>([]);
   const [issues, setIssues] = useState<RowIssue[]>([]);
   const [importing, setImporting] = useState(false);
@@ -179,47 +389,70 @@ export default function AdminImportUsers() {
 
   const preview = useMemo(() => rows.slice(0, 15), [rows]);
 
-  if (!user || user.role !== "ADMIN" || !companyId) return null;
+  const mappingAnalysis = useMemo(() => {
+    if (!headers.length || !dataRows.length) return null;
+    return analyzeMapping(headers, dataRows, mapping);
+  }, [headers, dataRows, mapping]);
 
   const hasErrors = issues.length > 0;
+
+  if (!user || user.role !== "ADMIN" || !companyId) return null;
+
+  const mappingMissingRequired = FIELDS.some((f) => f.required && !mapping[f.key]);
+  const mappingHasLowConfidenceRequired =
+    !!mappingAnalysis &&
+    FIELDS.some((f) => f.required && (mappingAnalysis[f.key]?.confidence ?? 1) < 0.55);
 
   const parseFile = async (file: File) => {
     setFileName(file.name);
     setRows([]);
     setIssues([]);
+    setStage("idle");
 
     const buf = await file.arrayBuffer();
     const wb = XLSX.read(buf, { type: "array" });
     const sheetName = wb.SheetNames[0];
     const ws = wb.Sheets[sheetName];
 
-    const raw = XLSX.utils.sheet_to_json(ws, { defval: "" }) as Record<string, any>[];
+    // Read as matrix so we can control headers + mapping safely.
+    const grid = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" }) as any[][];
+    const headerRow = (grid[0] ?? []).map((h) => norm(h));
+    const body = (grid.slice(1) ?? []).filter((r) => r.some((x) => norm(x)));
 
-    const nextRows: ParsedRow[] = [];
-    const nextIssues: RowIssue[] = [];
-
-    raw.forEach((obj, idx) => {
-      const mapped = mapRow(obj);
-      if (mapped.issues.length) {
-        mapped.issues.forEach((m) => nextIssues.push({ rowIndex: idx + 2, message: m }));
-        return;
-      }
-
-      const r = mapped.row as ParsedRow;
-      nextRows.push(r);
-    });
-
-    // Basic duplicates check
-    const seen = new Set<string>();
-    for (const r of nextRows) {
-      const key = r.email.toLowerCase();
-      if (seen.has(key)) nextIssues.push({ rowIndex: -1, message: `E-mail duplicado na planilha: ${r.email}` });
-      seen.add(key);
+    if (!headerRow.length || headerRow.every((h) => !h)) {
+      throw new Error("Não foi possível identificar a linha de cabeçalho. Use a 1ª linha como nomes das colunas.");
     }
 
-    setRows(nextRows);
-    setIssues(nextIssues);
+    // Ensure unique and readable header labels
+    const used = new Map<string, number>();
+    const safeHeaders = headerRow.map((h, idx) => {
+      const base = h.trim() || `col_${idx + 1}`;
+      const n = used.get(base) ?? 0;
+      used.set(base, n + 1);
+      return n ? `${base} (${n + 1})` : base;
+    });
+
+    setHeaders(safeHeaders);
+    setDataRows(body);
+
+    const suggested = suggestMapping(safeHeaders, body);
+    setMapping(suggested);
+    setStage("mapping");
   };
+
+  const generatePreview = () => {
+    if (!headers.length) return;
+
+    const { rows: parsed, issues: nextIssues } = mapRowsFromMapping(headers, dataRows, mapping);
+    setRows(parsed);
+    setIssues(nextIssues);
+    setStage("preview");
+  };
+
+  const topGridPreview = useMemo(() => {
+    const r = dataRows.slice(0, 5);
+    return r;
+  }, [dataRows]);
 
   return (
     <div className="grid gap-6">
@@ -228,7 +461,7 @@ export default function AdminImportUsers() {
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Importar colaboradores e heads</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Faça upload de uma planilha (.xlsx) para criar/atualizar usuários em massa — incluindo departamento e líder direto.
+              Faça upload de uma planilha (.xlsx/.csv) para criar/atualizar usuários em massa — com validação e confirmação de colunas para evitar conflito de dados.
             </p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
@@ -288,39 +521,219 @@ export default function AdminImportUsers() {
                 });
               }}
             />
-
-            <Button
-              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={importing || !rows.length || hasErrors}
-              onClick={() => {
-                try {
-                  setImporting(true);
-                  const result = mockDb.importUsersBulk({ companyId, rows });
-                  toast({
-                    title: "Importação concluída",
-                    description: `Criados: ${result.created} • Atualizados: ${result.updated} • Vínculos de liderança: ${result.managersLinked}`,
-                  });
-                  setRows([]);
-                  setIssues([]);
-                  setFileName("");
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível importar",
-                    description: e instanceof Error ? e.message : "Tente novamente.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setImporting(false);
-                }
-              }}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              {importing ? "Importando…" : "Importar"}
-            </Button>
           </div>
         </div>
 
-        {hasErrors ? (
+        {stage === "mapping" && headers.length ? (
+          <div className="mt-5 grid gap-4">
+            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                    <Wand2 className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                    Confirme o mapeamento das colunas
+                  </div>
+                  <div className="mt-1 text-sm text-muted-foreground">
+                    Para evitar conflito de dados, confirme qual coluna representa cada campo.
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                    {headers.length} colunas detectadas
+                  </Badge>
+                  {mappingHasLowConfidenceRequired ? (
+                    <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">
+                      <AlertTriangle className="mr-1 h-3.5 w-3.5" />
+                      Verifique: dados não parecem bater
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="grid gap-3 md:grid-cols-2">
+                {FIELDS.map((f) => {
+                  const analysis = mappingAnalysis?.[f.key];
+                  const confidence = analysis?.confidence ?? 1;
+                  const isLow = f.required ? confidence < 0.55 : confidence < 0.45;
+                  const value = mapping[f.key] ?? "";
+
+                  return (
+                    <div
+                      key={f.key}
+                      className={
+                        "rounded-2xl border p-3 " +
+                        (f.required && !value
+                          ? "border-rose-200 bg-rose-50"
+                          : isLow
+                            ? "border-amber-200 bg-amber-50"
+                            : "border-[color:var(--sinaxys-border)] bg-white")
+                      }
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                            {f.label}{" "}
+                            {f.required ? (
+                              <span className="text-rose-600">*</span>
+                            ) : (
+                              <span className="text-xs font-medium text-muted-foreground">(opcional)</span>
+                            )}
+                          </div>
+                          {f.hint ? <div className="mt-0.5 text-xs text-muted-foreground">{f.hint}</div> : null}
+                        </div>
+                        {analysis?.message && (f.required || isLow) ? (
+                          <div className="text-xs font-medium text-amber-900">{analysis.message}</div>
+                        ) : null}
+                      </div>
+
+                      <div className="mt-2">
+                        <Select
+                          value={mapping[f.key] ?? "__none__"}
+                          onValueChange={(v) =>
+                            setMapping((m) => ({
+                              ...m,
+                              [f.key]: v === "__none__" ? null : v,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue placeholder={f.required ? "Selecione a coluna" : "—"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {!f.required ? <SelectItem value="__none__">—</SelectItem> : null}
+                            {headers.map((h) => (
+                              <SelectItem key={h} value={h}>
+                                {h}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
+                          <div>
+                            Confiança: <span className="font-medium text-[color:var(--sinaxys-ink)]">{Math.round(confidence * 100)}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <Separator className="my-4" />
+
+              <div className="grid gap-3 md:grid-cols-[1fr_auto] md:items-center">
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-3 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2 font-medium text-[color:var(--sinaxys-ink)]">
+                    <ArrowRightLeft className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                    Preview rápido das colunas (primeiras linhas)
+                  </div>
+                  <div className="mt-2 max-w-full overflow-x-auto">
+                    <table className="min-w-[720px] text-xs">
+                      <thead>
+                        <tr>
+                          {headers.map((h) => (
+                            <th key={h} className="px-2 py-1 text-left font-semibold text-[color:var(--sinaxys-ink)]">
+                              {h}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {topGridPreview.map((r, ridx) => (
+                          <tr key={ridx} className="border-t border-[color:var(--sinaxys-border)]">
+                            {headers.map((_, cidx) => (
+                              <td key={cidx} className="px-2 py-1 text-muted-foreground">
+                                {norm(r[cidx]).slice(0, 42) || "—"}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <Button
+                    className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                    disabled={mappingMissingRequired}
+                    onClick={() => {
+                      if (mappingHasLowConfidenceRequired) {
+                        toast({
+                          title: "Atenção",
+                          description:
+                            "Alguns campos obrigatórios não parecem bater com o tipo de dado. Revise o mapeamento antes de gerar o preview.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      generatePreview();
+                    }}
+                  >
+                    Validar e gerar preview
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {stage === "preview" ? (
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm text-muted-foreground">
+              {rows.length ? `${rows.length} linhas válidas` : "Nenhuma linha válida"} • {issues.length} avisos
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl"
+                onClick={() => {
+                  setStage("mapping");
+                }}
+              >
+                Ajustar mapeamento
+              </Button>
+
+              <Button
+                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={importing || !rows.length || hasErrors}
+                onClick={() => {
+                  try {
+                    setImporting(true);
+                    const result = mockDb.importUsersBulk({ companyId, rows });
+                    toast({
+                      title: "Importação concluída",
+                      description: `Criados: ${result.created} • Atualizados: ${result.updated} • Vínculos de liderança: ${result.managersLinked}`,
+                    });
+                    setRows([]);
+                    setIssues([]);
+                    setFileName("");
+                    setHeaders([]);
+                    setDataRows([]);
+                    setStage("idle");
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível importar",
+                      description: e instanceof Error ? e.message : "Tente novamente.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setImporting(false);
+                  }
+                }}
+              >
+                <Upload className="mr-2 h-4 w-4" />
+                {importing ? "Importando…" : "Importar"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        {stage === "preview" && hasErrors ? (
           <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900">
             <div className="font-semibold">Ajustes necessários</div>
             <ul className="mt-2 grid gap-1 text-xs">
@@ -337,14 +750,14 @@ export default function AdminImportUsers() {
           </div>
         ) : null}
 
-        {!rows.length && !hasErrors ? (
+        {stage === "idle" ? (
           <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-            Baixe o modelo para preencher e depois selecione a planilha para validar e visualizar um preview antes de importar.
+            Baixe o modelo, preencha e selecione a planilha. Em seguida você confirma as colunas para evitar conflito de dados.
           </div>
         ) : null}
       </div>
 
-      {rows.length ? (
+      {stage === "preview" && rows.length ? (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
