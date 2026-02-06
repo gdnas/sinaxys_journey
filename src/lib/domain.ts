@@ -1,12 +1,14 @@
 export type Role = "MASTERADMIN" | "ADMIN" | "HEAD" | "COLABORADOR";
 
+// Allow custom departments created via import, while keeping autocomplete for the standard ones.
 export type DepartmentName =
   | "Financeiro"
   | "Suporte"
   | "Customer Success"
   | "Comercial"
   | "Marketing"
-  | "Produto";
+  | "Produto"
+  | (string & {});
 
 export type CompanyColors = {
   ink: string;

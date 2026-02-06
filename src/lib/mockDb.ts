@@ -2072,6 +2072,25 @@ export const mockDb = {
         .map((d) => [normalizeText(d.name), d.id] as const),
     );
 
+    const ensureDepartmentId = (depName: string) => {
+      const name = depName.trim();
+      if (!name) throw new Error("Departamento vazio.");
+
+      const key = normalizeText(name);
+      const existing = deptIds.get(key);
+      if (existing) return existing;
+
+      // Create department on-the-fly if it doesn't exist.
+      const d: Department = {
+        id: uid("dept"),
+        companyId: params.companyId,
+        name,
+      };
+      db.departments.push(d);
+      deptIds.set(key, d.id);
+      return d.id;
+    };
+
     const byEmail = new Map(
       db.users
         .filter((u) => u.companyId === params.companyId)
@@ -2095,11 +2114,8 @@ export const mockDb = {
         const depName = String(r.department ?? "").trim();
         if (!depName) throw new Error(`Departamento é obrigatório para ${email}.`);
 
-        deptId = findDepartmentIdByName(db, params.companyId, depName);
-        if (!deptId) {
-          const known = Array.from(deptIds.keys()).join(", ");
-          throw new Error(`Departamento não encontrado para ${email}: “${depName}”.`);
-        }
+        // NEW: create the department if it doesn't exist.
+        deptId = ensureDepartmentId(depName);
       }
 
       const password = r.initialPassword?.trim();
