@@ -93,6 +93,15 @@ export default function Profile() {
   const [vacationStartDate, setVacationStartDate] = useState<string>("");
   const [savingVacation, setSavingVacation] = useState(false);
 
+  const dirty =
+    !!user &&
+    (name.trim() !== user.name.trim() ||
+      (avatarUrl.trim() || "") !== (user.avatarUrl ?? "") ||
+      (contractUrl.trim() || "") !== (user.contractUrl ?? "") ||
+      (phone.trim() || "") !== (user.phone ?? ""));
+
+  const contractUrlDirty = !!user && (contractUrl.trim() || "") !== (user.contractUrl ?? "");
+
   useEffect(() => {
     if (!user) return;
     setName(user.name);
@@ -100,13 +109,6 @@ export default function Profile() {
     setContractUrl(user.contractUrl ?? "");
     setPhone(user.phone ?? "");
   }, [user?.id]);
-
-  const dirty =
-    !!user &&
-    (name.trim() !== user.name.trim() ||
-      (avatarUrl.trim() || "") !== (user.avatarUrl ?? "") ||
-      (contractUrl.trim() || "") !== (user.contractUrl ?? "") ||
-      (phone.trim() || "") !== (user.phone ?? ""));
 
   const company = useMemo(() => {
     if (!user?.companyId) return null;
@@ -350,7 +352,7 @@ export default function Profile() {
                     </a>
                   </Button>
                 </div>
-                <div className="text-xs text-muted-foreground">Para versões/aditivos, use a aba “Documentos”.</div>
+                <div className="text-xs text-muted-foreground">Para versões/aditivos, use a aba "Documentos".</div>
               </div>
 
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -626,14 +628,12 @@ export default function Profile() {
 
         {/* Documentos */}
         <TabsContent value="documentos" className="mt-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+          <div className="grid gap-6">
             <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Contratos & aditivos</div>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Salve versões/aditivos como arquivo (PDF) ou apenas o link (ex.: Clicksign).
-                  </p>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Contrato principal (Clicksign)</div>
+                  <p className="mt-1 text-sm text-muted-foreground">Cole o link do documento assinado para acesso rápido.</p>
                 </div>
                 <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
                   <FileText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -641,438 +641,506 @@ export default function Profile() {
               </div>
 
               <div className="mt-4 grid gap-3">
-                <div className="grid gap-2">
-                  <Label>Título</Label>
+                <div className="flex flex-col gap-2 sm:flex-row">
                   <Input
+                    value={contractUrl}
+                    onChange={(e) => setContractUrl(e.target.value)}
                     className="h-11 rounded-xl"
-                    value={contractTitle}
-                    onChange={(e) => setContractTitle(e.target.value)}
-                    placeholder="Ex.: Aditivo 01 — Ajuste de escopo"
+                    placeholder="https://app.clicksign.com/..."
                   />
+                  <Button asChild variant="outline" className="h-11 rounded-xl" disabled={!isHttpUrl(contractUrl)}>
+                    <a href={contractUrl || "#"} target="_blank" rel="noreferrer">
+                      <ExternalLink className="mr-2 h-4 w-4" />
+                      Abrir
+                    </a>
+                  </Button>
                 </div>
 
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-2">
-                  <Tabs
-                    value={contractAttachmentMode}
-                    onValueChange={(v) => setContractAttachmentMode(v as "FILE" | "LINK")}
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="text-xs text-muted-foreground">Esse campo é separado dos aditivos/versões abaixo.</div>
+                  <Button
+                    className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                    disabled={saving || !contractUrlDirty}
+                    onClick={() => {
+                      try {
+                        setSaving(true);
+                        const updated = mockDb.updateUserProfile(user.id, {
+                          contractUrl,
+                        });
+                        if (!updated) {
+                          toast({
+                            title: "Não foi possível salvar",
+                            description: "Tente novamente.",
+                            variant: "destructive",
+                          });
+                          return;
+                        }
+                        refresh?.();
+                        setVersion((v) => v + 1);
+                        toast({
+                          title: "Contrato principal atualizado",
+                          description: "Link salvo com sucesso.",
+                        });
+                      } finally {
+                        setSaving(false);
+                      }
+                    }}
                   >
-                    <TabsList className="w-full justify-start rounded-xl bg-white p-1">
-                      <TabsTrigger value="FILE" className="rounded-lg">
-                        Arquivo
-                      </TabsTrigger>
-                      <TabsTrigger value="LINK" className="rounded-lg">
-                        Link
-                      </TabsTrigger>
-                    </TabsList>
+                    <Save className="mr-2 h-4 w-4" />
+                    {saving ? "Salvando…" : "Salvar"}
+                  </Button>
+                </div>
+              </div>
+            </Card>
 
-                    <TabsContent value="FILE" className="mt-3">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Contratos & aditivos</div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Salve versões/aditivos como arquivo (PDF) ou apenas o link (ex.: Clicksign).
+                    </p>
+                  </div>
+                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                    <FileText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3">
+                  <div className="grid gap-2">
+                    <Label>Título</Label>
+                    <Input
+                      className="h-11 rounded-xl"
+                      value={contractTitle}
+                      onChange={(e) => setContractTitle(e.target.value)}
+                      placeholder="Ex.: Aditivo 01 — Ajuste de escopo"
+                    />
+                  </div>
+
+                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-2">
+                    <Tabs
+                      value={contractAttachmentMode}
+                      onValueChange={(v) => setContractAttachmentMode(v as "FILE" | "LINK")}
+                    >
+                      <TabsList className="w-full justify-start rounded-xl bg-white p-1">
+                        <TabsTrigger value="FILE" className="rounded-lg">
+                          Arquivo
+                        </TabsTrigger>
+                        <TabsTrigger value="LINK" className="rounded-lg">
+                          Link
+                        </TabsTrigger>
+                      </TabsList>
+
+                      <TabsContent value="FILE" className="mt-3">
+                        <input
+                          ref={contractFileRef}
+                          type="file"
+                          accept="application/pdf,image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              const dataUrl = String(reader.result ?? "");
+                              setContractFileDataUrl(dataUrl);
+                              setContractTitle((t) => (t.trim() ? t : file.name));
+                              toast({ title: "Arquivo anexado", description: "Agora é só enviar." });
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+
+                        <div className="grid gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full rounded-xl"
+                            onClick={() => contractFileRef.current?.click()}
+                          >
+                            Selecionar arquivo
+                          </Button>
+
+                          {contractFileDataUrl.startsWith("data:") ? (
+                            <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+                              <div className="min-w-0">
+                                <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">
+                                  Arquivo pronto para envio
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">Fica armazenado no navegador.</div>
+                              </div>
+                              <Button asChild variant="outline" className="rounded-xl" size="sm">
+                                <a href={contractFileDataUrl} target="_blank" rel="noreferrer">
+                                  <ExternalLink className="mr-2 h-4 w-4" />
+                                  Abrir
+                                </a>
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
+                              Nenhum arquivo selecionado.
+                            </div>
+                          )}
+                        </div>
+                      </TabsContent>
+
+                      <TabsContent value="LINK" className="mt-3">
+                        <div className="grid gap-2">
+                          <Label>Link do documento</Label>
+                          <div className="flex flex-col gap-2 sm:flex-row">
+                            <Input
+                              className="h-11 rounded-xl"
+                              value={contractLinkUrl}
+                              onChange={(e) => setContractLinkUrl(e.target.value)}
+                              placeholder="https://app.clicksign.com/..."
+                            />
+                            <Button
+                              asChild
+                              variant="outline"
+                              className="rounded-xl"
+                              disabled={!isHttpUrl(contractLinkUrl)}
+                            >
+                              <a href={contractLinkUrl || "#"} target="_blank" rel="noreferrer">
+                                <ExternalLink className="mr-2 h-4 w-4" />
+                                Abrir
+                              </a>
+                            </Button>
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            Dica: cole o link do Clicksign (ou de onde o documento estiver hospedado).
+                          </div>
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+                  </div>
+
+                  <Button
+                    className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                    disabled={
+                      savingContract ||
+                      (contractAttachmentMode === "FILE"
+                        ? !contractFileDataUrl.startsWith("data:")
+                        : !isHttpUrl(contractLinkUrl))
+                    }
+                    onClick={() => {
+                      try {
+                        setSavingContract(true);
+                        const url =
+                          contractAttachmentMode === "FILE" ? contractFileDataUrl.trim() : contractLinkUrl.trim();
+
+                        mockDb.addContractAttachment({
+                          userId: user.id,
+                          title: contractTitle.trim() || "Contrato",
+                          url,
+                          kind: contractAttachmentMode,
+                        });
+
+                        setContractTitle("");
+                        setContractFileDataUrl("");
+                        setContractLinkUrl("");
+                        if (contractFileRef.current) contractFileRef.current.value = "";
+
+                        setVersion((v) => v + 1);
+                        toast({
+                          title: "Documento salvo",
+                          description:
+                            contractAttachmentMode === "FILE" ? "Arquivo enviado." : "Link registrado.",
+                        });
+                      } catch (e) {
+                        toast({
+                          title: "Não foi possível salvar",
+                          description: e instanceof Error ? e.message : "Tente novamente.",
+                          variant: "destructive",
+                        });
+                      } finally {
+                        setSavingContract(false);
+                      }
+                    }}
+                  >
+                    Enviar
+                  </Button>
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus itens</div>
+                    <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                      {contractAttachments.length}
+                    </Badge>
+                  </div>
+
+                  <div className="grid gap-2">
+                    {contractAttachments.length ? (
+                      contractAttachments.map((c) => {
+                        const href = (c.url ?? c.fileDataUrl ?? "").trim();
+                        const kind = c.kind ?? (href.startsWith("data:") ? "FILE" : "LINK");
+                        return (
+                          <div key={c.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.title}</div>
+                                  <Badge
+                                    className={
+                                      kind === "LINK"
+                                        ? "rounded-full bg-blue-100 text-blue-900 hover:bg-blue-100"
+                                        : "rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
+                                    }
+                                  >
+                                    {kind === "LINK" ? "Link" : "Arquivo"}
+                                  </Badge>
+                                </div>
+                                <div className="mt-1 text-xs text-muted-foreground">Salvo em {formatDate(c.createdAt)}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl" disabled={!href}>
+                                  <a href={href || "#"} target="_blank" rel="noreferrer" aria-label="Abrir">
+                                    <ExternalLink className="h-4 w-4" />
+                                  </a>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-9 w-9 rounded-xl"
+                                  aria-label="Remover"
+                                  onClick={() => {
+                                    mockDb.deleteContractAttachment({ userId: user.id, contractAttachmentId: c.id });
+                                    setVersion((v) => v + 1);
+                                  }}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                        Você ainda não salvou nenhum aditivo.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              {canUseFinance ? (
+                <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notas fiscais</div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Envie suas NFs (PDF ou imagem) para mantermos o controle financeiro.
+                      </p>
+                    </div>
+                    <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                      <ReceiptText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-4">
+                    <div className="grid gap-2">
+                      <Label>Título</Label>
+                      <Input
+                        className="h-11 rounded-xl"
+                        value={invoiceTitle}
+                        onChange={(e) => setInvoiceTitle(e.target.value)}
+                        placeholder="Ex.: NF Janeiro/2026"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Arquivo da nota fiscal</Label>
+
                       <input
-                        ref={contractFileRef}
+                        ref={invoiceFileRef}
                         type="file"
                         accept="application/pdf,image/*"
                         className="hidden"
                         onChange={(e) => {
                           const file = e.target.files?.[0];
                           if (!file) return;
+
                           const reader = new FileReader();
                           reader.onload = () => {
                             const dataUrl = String(reader.result ?? "");
-                            setContractFileDataUrl(dataUrl);
-                            setContractTitle((t) => (t.trim() ? t : file.name));
-                            toast({ title: "Arquivo anexado", description: "Agora é só enviar." });
+                            setInvoiceUrl(dataUrl);
+                            setInvoiceTitle((t) => (t.trim() ? t : file.name));
+                            toast({
+                              title: "Arquivo anexado",
+                              description: "Agora é só registrar a nota.",
+                            });
                           };
                           reader.readAsDataURL(file);
                         }}
                       />
 
-                      <div className="grid gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="w-full rounded-xl"
-                          onClick={() => contractFileRef.current?.click()}
-                        >
-                          Selecionar arquivo
-                        </Button>
+                      <Button type="button" variant="outline" className="w-full rounded-xl" onClick={() => invoiceFileRef.current?.click()}>
+                        Selecionar arquivo
+                      </Button>
 
-                        {contractFileDataUrl.startsWith("data:") ? (
-                          <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">
-                                Arquivo pronto para envio
-                              </div>
-                              <div className="mt-1 text-xs text-muted-foreground">Fica armazenado no navegador.</div>
-                            </div>
-                            <Button asChild variant="outline" className="rounded-xl" size="sm">
-                              <a href={contractFileDataUrl} target="_blank" rel="noreferrer">
-                                <ExternalLink className="mr-2 h-4 w-4" />
-                                Abrir
-                              </a>
-                            </Button>
+                      {invoiceUrl.startsWith("data:") ? (
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">Arquivo pronto para envio</div>
+                            <div className="mt-1 text-xs text-muted-foreground">O arquivo ficará armazenado no navegador.</div>
                           </div>
-                        ) : (
-                          <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
-                            Nenhum arquivo selecionado.
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="LINK" className="mt-3">
-                      <div className="grid gap-2">
-                        <Label>Link do documento</Label>
-                        <div className="flex flex-col gap-2 sm:flex-row">
-                          <Input
-                            className="h-11 rounded-xl"
-                            value={contractLinkUrl}
-                            onChange={(e) => setContractLinkUrl(e.target.value)}
-                            placeholder="https://app.clicksign.com/..."
-                          />
-                          <Button
-                            asChild
-                            variant="outline"
-                            className="rounded-xl"
-                            disabled={!isHttpUrl(contractLinkUrl)}
-                          >
-                            <a href={contractLinkUrl || "#"} target="_blank" rel="noreferrer">
+                          <Button asChild variant="outline" className="rounded-xl" size="sm">
+                            <a href={invoiceUrl} target="_blank" rel="noreferrer">
                               <ExternalLink className="mr-2 h-4 w-4" />
                               Abrir
                             </a>
                           </Button>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          Dica: cole o link do Clicksign (ou de onde o documento estiver hospedado).
-                        </div>
-                      </div>
-                    </TabsContent>
-                  </Tabs>
-                </div>
-
-                <Button
-                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                  disabled={
-                    savingContract ||
-                    (contractAttachmentMode === "FILE"
-                      ? !contractFileDataUrl.startsWith("data:")
-                      : !isHttpUrl(contractLinkUrl))
-                  }
-                  onClick={() => {
-                    try {
-                      setSavingContract(true);
-                      const url =
-                        contractAttachmentMode === "FILE" ? contractFileDataUrl.trim() : contractLinkUrl.trim();
-
-                      mockDb.addContractAttachment({
-                        userId: user.id,
-                        title: contractTitle.trim() || "Contrato",
-                        url,
-                        kind: contractAttachmentMode,
-                      });
-
-                      setContractTitle("");
-                      setContractFileDataUrl("");
-                      setContractLinkUrl("");
-                      if (contractFileRef.current) contractFileRef.current.value = "";
-
-                      setVersion((v) => v + 1);
-                      toast({
-                        title: "Documento salvo",
-                        description:
-                          contractAttachmentMode === "FILE" ? "Arquivo enviado." : "Link registrado.",
-                      });
-                    } catch (e) {
-                      toast({
-                        title: "Não foi possível salvar",
-                        description: e instanceof Error ? e.message : "Tente novamente.",
-                        variant: "destructive",
-                      });
-                    } finally {
-                      setSavingContract(false);
-                    }
-                  }}
-                >
-                  Enviar
-                </Button>
-
-                <Separator />
-
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus itens</div>
-                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                    {contractAttachments.length}
-                  </Badge>
-                </div>
-
-                <div className="grid gap-2">
-                  {contractAttachments.length ? (
-                    contractAttachments.map((c) => {
-                      const href = (c.url ?? c.fileDataUrl ?? "").trim();
-                      const kind = c.kind ?? (href.startsWith("data:") ? "FILE" : "LINK");
-                      return (
-                        <div key={c.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.title}</div>
-                                <Badge
-                                  className={
-                                    kind === "LINK"
-                                      ? "rounded-full bg-blue-100 text-blue-900 hover:bg-blue-100"
-                                      : "rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100"
-                                  }
-                                >
-                                  {kind === "LINK" ? "Link" : "Arquivo"}
-                                </Badge>
-                              </div>
-                              <div className="mt-1 text-xs text-muted-foreground">Salvo em {formatDate(c.createdAt)}</div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl" disabled={!href}>
-                                <a href={href || "#"} target="_blank" rel="noreferrer" aria-label="Abrir">
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-9 w-9 rounded-xl"
-                                aria-label="Remover"
-                                onClick={() => {
-                                  mockDb.deleteContractAttachment({ userId: user.id, contractAttachmentId: c.id });
-                                  setVersion((v) => v + 1);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })
-                  ) : (
-                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                      Você ainda não salvou nenhum aditivo.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-
-            {canUseFinance ? (
-              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notas fiscais</div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Envie suas NFs (PDF ou imagem) para mantermos o controle financeiro.
-                    </p>
-                  </div>
-                  <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                    <ReceiptText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-4">
-                  <div className="grid gap-2">
-                    <Label>Título</Label>
-                    <Input
-                      className="h-11 rounded-xl"
-                      value={invoiceTitle}
-                      onChange={(e) => setInvoiceTitle(e.target.value)}
-                      placeholder="Ex.: NF Janeiro/2026"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>Arquivo da nota fiscal</Label>
-
-                    <input
-                      ref={invoiceFileRef}
-                      type="file"
-                      accept="application/pdf,image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          const dataUrl = String(reader.result ?? "");
-                          setInvoiceUrl(dataUrl);
-                          setInvoiceTitle((t) => (t.trim() ? t : file.name));
-                          toast({
-                            title: "Arquivo anexado",
-                            description: "Agora é só registrar a nota.",
-                          });
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                    />
-
-                    <Button type="button" variant="outline" className="w-full rounded-xl" onClick={() => invoiceFileRef.current?.click()}>
-                      Selecionar arquivo
-                    </Button>
-
-                    {invoiceUrl.startsWith("data:") ? (
-                      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">Arquivo pronto para envio</div>
-                          <div className="mt-1 text-xs text-muted-foreground">O arquivo ficará armazenado no navegador.</div>
-                        </div>
-                        <Button asChild variant="outline" className="rounded-xl" size="sm">
-                          <a href={invoiceUrl} target="_blank" rel="noreferrer">
-                            <ExternalLink className="mr-2 h-4 w-4" />
-                            Abrir
-                          </a>
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum arquivo selecionado.</div>
-                    )}
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>Valor (opcional)</Label>
-                    <Input
-                      className="h-11 rounded-xl"
-                      value={invoiceAmount}
-                      onChange={(e) => setInvoiceAmount(e.target.value)}
-                      placeholder="Ex.: 3500"
-                      inputMode="decimal"
-                    />
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>Data de emissão (opcional)</Label>
-                    <Input
-                      className="h-11 rounded-xl"
-                      type="date"
-                      value={invoiceIssuedDate}
-                      onChange={(e) => setInvoiceIssuedDate(e.target.value)}
-                    />
-                  </div>
-
-                  <Button
-                    className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                    disabled={savingInvoice || !invoiceUrl.startsWith("data:")}
-                    onClick={() => {
-                      try {
-                        setSavingInvoice(true);
-                        const amount = invoiceAmount.trim() ? Number(invoiceAmount.replace(",", ".")) : undefined;
-                        const issuedAt = invoiceIssuedDate ? new Date(invoiceIssuedDate).toISOString() : undefined;
-                        mockDb.createInvoice({
-                          userId: user.id,
-                          title: invoiceTitle.trim() || "Nota fiscal",
-                          invoiceUrl: invoiceUrl.trim(),
-                          amountBRL: typeof amount === "number" && Number.isFinite(amount) ? amount : undefined,
-                          issuedAt,
-                        });
-
-                        setInvoiceTitle("");
-                        setInvoiceUrl("");
-                        setInvoiceAmount("");
-                        setInvoiceIssuedDate("");
-                        if (invoiceFileRef.current) invoiceFileRef.current.value = "";
-
-                        setVersion((v) => v + 1);
-                        toast({ title: "Nota registrada" });
-                      } catch (e) {
-                        toast({
-                          title: "Não foi possível registrar",
-                          description: e instanceof Error ? e.message : "Tente novamente.",
-                          variant: "destructive",
-                        });
-                      } finally {
-                        setSavingInvoice(false);
-                      }
-                    }}
-                  >
-                    Registrar nota
-                  </Button>
-
-                  <Separator />
-
-                  <div>
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minhas notas enviadas</div>
-                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                        {invoices.length}
-                      </Badge>
-                    </div>
-
-                    <div className="mt-3 grid gap-3">
-                      {invoices.length ? (
-                        invoices.map((inv) => (
-                          <div key={inv.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{inv.title}</div>
-                                  {inv.status === "PAID" ? (
-                                    <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Pago</Badge>
-                                  ) : (
-                                    <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Pendente</Badge>
-                                  )}
-                                </div>
-                                <div className="mt-1 text-xs text-muted-foreground">
-                                  Criada em {formatDate(inv.createdAt)}
-                                  {inv.issuedAt ? ` • Emitida em ${formatDate(inv.issuedAt)}` : ""}
-                                  {typeof inv.amountBRL === "number" ? ` • ${brl(inv.amountBRL)}` : ""}
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl">
-                                  <a href={inv.invoiceUrl} target="_blank" rel="noreferrer" aria-label="Abrir nota">
-                                    <ExternalLink className="h-4 w-4" />
-                                  </a>
-                                </Button>
-
-                                {inv.status !== "PAID" ? (
-                                  <Button
-                                    variant="outline"
-                                    size="icon"
-                                    className="h-9 w-9 rounded-xl"
-                                    aria-label="Remover nota"
-                                    onClick={() => {
-                                      try {
-                                        mockDb.deleteInvoice(inv.id, user.id);
-                                        setVersion((v) => v + 1);
-                                        toast({ title: "Nota removida" });
-                                      } catch (e) {
-                                        toast({
-                                          title: "Não foi possível remover",
-                                          description: e instanceof Error ? e.message : "Tente novamente.",
-                                          variant: "destructive",
-                                        });
-                                      }
-                                    }}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                ) : null}
-                              </div>
-                            </div>
-                          </div>
-                        ))
                       ) : (
-                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                          Você ainda não enviou nenhuma nota fiscal.
-                        </div>
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum arquivo selecionado.</div>
                       )}
                     </div>
+
+                    <div className="grid gap-2">
+                      <Label>Valor (opcional)</Label>
+                      <Input
+                        className="h-11 rounded-xl"
+                        value={invoiceAmount}
+                        onChange={(e) => setInvoiceAmount(e.target.value)}
+                        placeholder="Ex.: 3500"
+                        inputMode="decimal"
+                      />
+                    </div>
+
+                    <div className="grid gap-2">
+                      <Label>Data de emissão (opcional)</Label>
+                      <Input
+                        className="h-11 rounded-xl"
+                        type="date"
+                        value={invoiceIssuedDate}
+                        onChange={(e) => setInvoiceIssuedDate(e.target.value)}
+                      />
+                    </div>
+
+                    <Button
+                      className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                      disabled={savingInvoice || !invoiceUrl.startsWith("data:")}
+                      onClick={() => {
+                        try {
+                          setSavingInvoice(true);
+                          const amount = invoiceAmount.trim() ? Number(invoiceAmount.replace(",", ".")) : undefined;
+                          const issuedAt = invoiceIssuedDate ? new Date(invoiceIssuedDate).toISOString() : undefined;
+                          mockDb.createInvoice({
+                            userId: user.id,
+                            title: invoiceTitle.trim() || "Nota fiscal",
+                            invoiceUrl: invoiceUrl.trim(),
+                            amountBRL: typeof amount === "number" && Number.isFinite(amount) ? amount : undefined,
+                            issuedAt,
+                          });
+
+                          setInvoiceTitle("");
+                          setInvoiceUrl("");
+                          setInvoiceAmount("");
+                          setInvoiceIssuedDate("");
+                          if (invoiceFileRef.current) invoiceFileRef.current.value = "";
+
+                          setVersion((v) => v + 1);
+                          toast({ title: "Nota registrada" });
+                        } catch (e) {
+                          toast({
+                            title: "Não foi possível registrar",
+                            description: e instanceof Error ? e.message : "Tente novamente.",
+                            variant: "destructive",
+                          });
+                        } finally {
+                          setSavingInvoice(false);
+                        }
+                      }}
+                    >
+                      Registrar nota
+                    </Button>
+
+                    <Separator />
+
+                    <div>
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minhas notas enviadas</div>
+                        <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                          {invoices.length}
+                        </Badge>
+                      </div>
+
+                      <div className="mt-3 grid gap-3">
+                        {invoices.length ? (
+                          invoices.map((inv) => (
+                            <div key={inv.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{inv.title}</div>
+                                    {inv.status === "PAID" ? (
+                                      <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Pago</Badge>
+                                    ) : (
+                                      <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Pendente</Badge>
+                                    )}
+                                  </div>
+                                  <div className="mt-1 text-xs text-muted-foreground">
+                                    Criada em {formatDate(inv.createdAt)}
+                                    {inv.issuedAt ? ` • Emitida em ${formatDate(inv.issuedAt)}` : ""}
+                                    {typeof inv.amountBRL === "number" ? ` • ${brl(inv.amountBRL)}` : ""}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <Button asChild variant="outline" size="icon" className="h-9 w-9 rounded-xl">
+                                    <a href={inv.invoiceUrl} target="_blank" rel="noreferrer" aria-label="Abrir nota">
+                                      <ExternalLink className="h-4 w-4" />
+                                    </a>
+                                  </Button>
+
+                                  {inv.status !== "PAID" ? (
+                                    <Button
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-9 w-9 rounded-xl"
+                                      aria-label="Remover nota"
+                                      onClick={() => {
+                                        try {
+                                          mockDb.deleteInvoice(inv.id, user.id);
+                                          setVersion((v) => v + 1);
+                                          toast({ title: "Nota removida" });
+                                        } catch (e) {
+                                          toast({
+                                            title: "Não foi possível remover",
+                                            description: e instanceof Error ? e.message : "Tente novamente.",
+                                            variant: "destructive",
+                                          });
+                                        }
+                                      }}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                            Você ainda não enviou nenhuma nota fiscal.
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </Card>
-            ) : (
-              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notas fiscais</div>
-                <p className="mt-1 text-sm text-muted-foreground">Disponível para usuários com empresa (não master).</p>
-                <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                  Se você precisa enviar NFs, fale com um admin para ajustar seu acesso.
-                </div>
-              </Card>
-            )}
+                </Card>
+              ) : (
+                <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Notas fiscais</div>
+                  <p className="mt-1 text-sm text-muted-foreground">Disponível para usuários com empresa (não master).</p>
+                  <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                    Se você precisa enviar NFs, fale com um admin para ajustar seu acesso.
+                  </div>
+                </Card>
+              )}
+            </div>
           </div>
         </TabsContent>
 
