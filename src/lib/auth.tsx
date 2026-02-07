@@ -1,6 +1,6 @@
-import React, { createContext, useContext, useMemo, useState } from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Role, User } from "@/lib/domain";
-import { mockDb } from "@/lib/mockDb";
+import { DB_CHANGED_EVENT, mockDb } from "@/lib/mockDb";
 
 const AUTH_KEY = "sinaxys-journey-auth:v1";
 const ACTIVE_COMPANY_KEY = "sinaxys-journey-active-company:v1";
@@ -40,6 +40,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [userId, setUserId] = useState<string | null>(() => loadUserId());
   const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(() => loadActiveCompanyId());
   const [version, setVersion] = useState(0);
+
+  // React to DB changes (e.g. admin editing users) so profiles update without needing a full refresh.
+  useEffect(() => {
+    const onDbChanged = () => setVersion((v) => v + 1);
+    window.addEventListener(DB_CHANGED_EVENT, onDbChanged);
+    return () => window.removeEventListener(DB_CHANGED_EVENT, onDbChanged);
+  }, []);
 
   const user = useMemo(() => {
     if (!userId) return null;

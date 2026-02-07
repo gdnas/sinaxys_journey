@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { mockDb } from "@/lib/mockDb";
+import { DB_CHANGED_EVENT, mockDb } from "@/lib/mockDb";
 import { roleLabel } from "@/lib/sinaxys";
 
 function initials(name: string) {
@@ -47,6 +47,12 @@ export default function PersonProfile() {
   const { userId } = useParams();
 
   const [version, setVersion] = useState(0);
+
+  useEffect(() => {
+    const onDbChanged = () => setVersion((v) => v + 1);
+    window.addEventListener(DB_CHANGED_EVENT, onDbChanged);
+    return () => window.removeEventListener(DB_CHANGED_EVENT, onDbChanged);
+  }, []);
 
   const { person, deptName, manager, directReports } = useMemo(() => {
     const db = mockDb.get();

@@ -29,7 +29,7 @@ import {
 import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 
 const STORAGE_KEY = "sinaxys-journey-db:v2";
-const DB_CHANGED_EVENT = "sinaxys-db-changed";
+export const DB_CHANGED_EVENT = "sinaxys-db-changed";
 
 // IMPORTANT:
 // - Some reads happen during React render (e.g. useMemo()). Those reads sometimes perform light migrations
