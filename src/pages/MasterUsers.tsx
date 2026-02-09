@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pencil, Search, Shield } from "lucide-react";
+import { MailPlus, Pencil, Search, Shield } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,8 +12,10 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { listCompanies } from "@/lib/companiesDb";
+import { listDepartments } from "@/lib/departmentsDb";
 import { listAllProfiles, updateProfile, type DbProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
 
@@ -25,6 +27,23 @@ const ROLE_OPTIONS = [
 ] as const;
 
 type AnyRole = (typeof ROLE_OPTIONS)[number]["value"];
+
+async function describeFunctionError(e: unknown): Promise<string> {
+  const anyErr = e as any;
+  const ctx = anyErr?.context;
+  if (ctx && typeof ctx.json === "function") {
+    try {
+      const payload = await ctx.json();
+      const msg = payload?.message;
+      if (typeof msg === "string" && msg.trim()) return msg;
+    } catch {
+      // ignore
+    }
+  }
+  const msg = anyErr?.message;
+  if (typeof msg === "string" && msg.trim()) return msg;
+  return "Erro inesperado.";
+}
 
 export default function MasterUsers() {
   const { toast } = useToast();
@@ -70,6 +89,36 @@ export default function MasterUsers() {
     setEditOpen(true);
   };
 
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteCompanyId, setInviteCompanyId] = useState<string>("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<AnyRole>("COLABORADOR");
+  const [inviteDeptId, setInviteDeptId] = useState<string>("");
+  const [inviteJobTitle, setInviteJobTitle] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviteSetTempPassword, setInviteSetTempPassword] = useState(false);
+  const [inviteTempPassword, setInviteTempPassword] = useState("");
+  const [inviting, setInviting] = useState(false);
+
+  const resetInvite = () => {
+    setInviteCompanyId("");
+    setInviteEmail("");
+    setInviteName("");
+    setInviteRole("COLABORADOR");
+    setInviteDeptId("");
+    setInviteJobTitle("");
+    setInvitePhone("");
+    setInviteSetTempPassword(false);
+    setInviteTempPassword("");
+  };
+
+  const { data: inviteDepts = [] } = useQuery({
+    queryKey: ["departments", inviteCompanyId],
+    queryFn: () => listDepartments(inviteCompanyId),
+    enabled: !!inviteCompanyId,
+  });
+
   return (
     <div className="grid gap-6">
       <div className="rounded-3xl border bg-white p-6">
@@ -91,9 +140,22 @@ export default function MasterUsers() {
             <p className="mt-1 text-sm text-muted-foreground">{isLoading ? "Carregando…" : `${profiles.length} perfis`}</p>
           </div>
 
-          <div className="relative w-full md:w-[340px]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="h-11 rounded-xl pl-9" />
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+            <Button
+              className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:w-auto"
+              onClick={() => {
+                resetInvite();
+                setInviteOpen(true);
+              }}
+            >
+              <MailPlus className="mr-2 h-4 w-4" />
+              Adicionar usuário
+            </Button>
+
+            <div className="relative w-full md:w-[340px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="h-11 rounded-xl pl-9" />
+            </div>
           </div>
         </div>
 
@@ -161,6 +223,226 @@ export default function MasterUsers() {
           </Table>
         </div>
       </Card>
+
+      {/* Invite / Create */}
+      <Dialog
+        open={inviteOpen}
+        onOpenChange={(v) => {
+          setInviteOpen(v);
+          if (!v) resetInvite();
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Adicionar usuário</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Modo</div>
+              <p className="mt-1 text-xs text-muted-foreground">Ative "senha temporária" para criar o usuário agora. Desativado = envia convite por e-mail.</p>
+            </div>
+
+            <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Definir senha temporária</div>
+                <div className="mt-1 text-xs text-muted-foreground">O usuário entra com essa senha e é obrigado a trocar.</div>
+              </div>
+              <Switch
+                checked={inviteSetTempPassword}
+                onCheckedChange={(v) => {
+                  setInviteSetTempPassword(v);
+                  if (!v) setInviteTempPassword("");
+                }}
+              />
+            </div>
+
+            {inviteSetTempPassword ? (
+              <div className="grid gap-2">
+                <Label>Senha temporária (mín. 6)</Label>
+                <Input
+                  className="h-11 rounded-xl"
+                  value={inviteTempPassword}
+                  onChange={(e) => setInviteTempPassword(e.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Defina uma senha inicial"
+                />
+              </div>
+            ) : null}
+
+            <div className="grid gap-2">
+              <Label>Papel</Label>
+              <Select
+                value={inviteRole}
+                onValueChange={(v) => {
+                  const next = v as AnyRole;
+                  setInviteRole(next);
+                  if (next === "MASTERADMIN") {
+                    setInviteDeptId("");
+                  }
+                }}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLE_OPTIONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {inviteRole !== "MASTERADMIN" ? (
+              <div className="grid gap-2">
+                <Label>Empresa</Label>
+                <Select
+                  value={inviteCompanyId || "__none__"}
+                  onValueChange={(v) => {
+                    const next = v === "__none__" ? "" : v;
+                    setInviteCompanyId(next);
+                    setInviteDeptId("");
+                  }}
+                >
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Selecione…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Selecione…</SelectItem>
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label>Empresa (opcional para Master Admin)</Label>
+                <Select value={inviteCompanyId || "__none__"} onValueChange={(v) => setInviteCompanyId(v === "__none__" ? "" : v)}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Sem empresa" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sem empresa</SelectItem>
+                    {companies.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="grid gap-2">
+              <Label>E-mail</Label>
+              <Input className="h-11 rounded-xl" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="nome@empresa.com" inputMode="email" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Nome (opcional)</Label>
+              <Input className="h-11 rounded-xl" value={inviteName} onChange={(e) => setInviteName(e.target.value)} placeholder="Ex.: Maria Silva" />
+            </div>
+
+            {inviteRole !== "MASTERADMIN" ? (
+              <div className="grid gap-2">
+                <Label>Departamento</Label>
+                <Select value={inviteDeptId || "__none__"} onValueChange={(v) => setInviteDeptId(v === "__none__" ? "" : v)}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder={inviteCompanyId ? "Selecione…" : "Selecione uma empresa"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sem departamento</SelectItem>
+                    {inviteDepts.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+
+            <div className="grid gap-2">
+              <Label>Cargo (opcional)</Label>
+              <Input className="h-11 rounded-xl" value={inviteJobTitle} onChange={(e) => setInviteJobTitle(e.target.value)} placeholder="Ex.: Analista" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Celular (opcional)</Label>
+              <Input className="h-11 rounded-xl" value={invitePhone} onChange={(e) => setInvitePhone(e.target.value)} placeholder="(11) 99999-9999" />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setInviteOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={
+                inviting ||
+                inviteEmail.trim().length < 6 ||
+                (inviteSetTempPassword && inviteTempPassword.trim().length < 6) ||
+                (inviteRole !== "MASTERADMIN" && !inviteCompanyId)
+              }
+              onClick={async () => {
+                try {
+                  setInviting(true);
+                  const { data, error } = await supabase.functions.invoke("admin-invite-user", {
+                    body: {
+                      companyId: inviteCompanyId || null,
+                      email: inviteEmail,
+                      name: inviteName,
+                      role: inviteRole,
+                      departmentId: inviteRole === "MASTERADMIN" ? null : inviteDeptId || null,
+                      jobTitle: inviteJobTitle || null,
+                      phone: invitePhone || null,
+                      password: inviteSetTempPassword ? inviteTempPassword : null,
+                    },
+                  });
+
+                  if (error) throw error;
+
+                  if (data?.alreadyMember) {
+                    toast({ title: "Usuário já existe", description: data?.message ?? "Este e-mail já está na empresa." });
+                  } else if (data?.mode === "created") {
+                    toast({
+                      title: "Usuário criado",
+                      description: "Senha temporária definida. No primeiro acesso, o usuário será obrigado a trocar a senha.",
+                    });
+                  } else {
+                    toast({ title: "Convite enviado", description: `Enviamos um convite para ${inviteEmail.trim()}.` });
+                  }
+
+                  await qc.invalidateQueries({ queryKey: ["profiles-all"] });
+                  setInviteOpen(false);
+                } catch (e) {
+                  const msg = await describeFunctionError(e);
+                  const maybeEmailIssue = msg.toLowerCase().includes("email") || msg.toLowerCase().includes("smtp") || msg.toLowerCase().includes("mail");
+
+                  toast({
+                    title: "Não foi possível adicionar",
+                    description: maybeEmailIssue
+                      ? `${msg} (Dica: ative "senha temporária" para criar sem depender de e-mail.)`
+                      : msg,
+                    variant: "destructive",
+                  });
+                } finally {
+                  setInviting(false);
+                }
+              }}
+            >
+              {inviting ? "Salvando…" : inviteSetTempPassword ? "Criar usuário" : "Enviar convite"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={editOpen}

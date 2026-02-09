@@ -9,7 +9,9 @@ const corsHeaders = {
 type Body = {
   email: string;
   name?: string | null;
-  role?: "ADMIN" | "HEAD" | "COLABORADOR" | null;
+  /** When caller is MASTERADMIN, this is the company that will receive the user. */
+  companyId?: string | null;
+  role?: "MASTERADMIN" | "ADMIN" | "HEAD" | "COLABORADOR" | null;
   departmentId?: string | null;
   jobTitle?: string | null;
   phone?: string | null;
@@ -73,11 +75,20 @@ serve(async (req) => {
     }
 
     const callerRole = normalizeRole(callerProfile?.role);
-    if (!callerProfile || callerRole !== "ADMIN" || !callerProfile.company_id) {
+    if (!callerProfile || !(["ADMIN", "MASTERADMIN"] as const).includes(callerRole as any)) {
       return json(403, { ok: false, message: "Sem permissão." });
     }
 
     const body = (await req.json().catch(() => null)) as Body | null;
+
+    // Determine target company
+    const targetCompanyId =
+      callerRole === "MASTERADMIN" ? ((body?.companyId ?? null) || null) : (callerProfile.company_id ?? null);
+
+    if (callerRole !== "MASTERADMIN" && !targetCompanyId) {
+      return json(403, { ok: false, message: "Sem permissão." });
+    }
+
     const email = (body?.email ?? "").trim().toLowerCase();
     const name = (body?.name ?? "").trim() || null;
     const role = (body?.role ?? "COLABORADOR") ?? "COLABORADOR";
@@ -90,8 +101,12 @@ serve(async (req) => {
       return json(400, { ok: false, message: "Informe um e-mail válido." });
     }
 
-    if (!(["ADMIN", "HEAD", "COLABORADOR"] as const).includes(role)) {
+    if (!(["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"] as const).includes(role)) {
       return json(400, { ok: false, message: "Papel inválido." });
+    }
+
+    if (role !== "MASTERADMIN" && !targetCompanyId) {
+      return json(400, { ok: false, message: "Selecione uma empresa." });
     }
 
     if (password && password.length < 6) {
@@ -109,7 +124,7 @@ serve(async (req) => {
       return json(500, { ok: false, message: "Erro ao validar e-mail." });
     }
 
-    const sameCompany = (existingProfiles ?? []).find((p) => p.company_id === callerProfile.company_id);
+    const sameCompany = (existingProfiles ?? []).find((p) => p.company_id === targetCompanyId);
     if (sameCompany) {
       return json(200, {
         ok: true,
@@ -120,12 +135,14 @@ serve(async (req) => {
       });
     }
 
-    const otherCompany = (existingProfiles ?? []).find((p) => p.company_id && p.company_id !== callerProfile.company_id);
+    const otherCompany = (existingProfiles ?? []).find((p) => p.company_id && p.company_id !== targetCompanyId);
     if (otherCompany) {
       return json(409, {
         ok: false,
         message:
-          "Este e-mail já existe em outra empresa. Para evitar duplicidade de tenant, peça ao MASTERADMIN para transferir/unificar o usuário.",
+          callerRole === "MASTERADMIN"
+            ? "Este e-mail já existe em outra empresa. Use a edição de perfil (Master Admin → Usuários) para transferir o company_id."
+            : "Este e-mail já existe em outra empresa. Para evitar duplicidade de tenant, peça ao MASTERADMIN para transferir/unificar o usuário.",
       });
     }
 
@@ -164,13 +181,13 @@ serve(async (req) => {
           email,
           name,
           role,
-          company_id: callerProfile.company_id,
-          department_id: departmentId,
+          company_id: role === "MASTERADMIN" ? targetCompanyId : targetCompanyId,
+          department_id: role === "MASTERADMIN" ? null : departmentId,
           active: true,
           must_change_password: mode === "created",
           job_title: jobTitle,
           phone,
-          joined_at: new Date().toISOString(),
+          joined_at: role === "MASTERADMIN" ? null : new Date().toISOString(),
         },
         { onConflict: "id" },
       );
@@ -183,7 +200,7 @@ serve(async (req) => {
       });
     }
 
-    console.log("[admin-invite-user] provisioned", { email, userId, companyId: callerProfile.company_id, mode });
+    console.log("[admin-invite-user] provisioned", { email, userId, companyId: targetCompanyId, mode, role });
 
     return json(200, {
       ok: true,
