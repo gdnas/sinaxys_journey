@@ -100,11 +100,11 @@ const App = () => (
                   }
                 />
 
-                {/* Colaborador */}
+                {/* Jornada (colaborador + head) */}
                 <Route
                   path="/app"
                   element={
-                    <RequireAuth roles={["COLABORADOR"]}>
+                    <RequireAuth roles={["COLABORADOR", "HEAD"]}>
                       <AppDashboard />
                     </RequireAuth>
                   }
@@ -112,7 +112,7 @@ const App = () => (
                 <Route
                   path="/app/tracks/:assignmentId"
                   element={
-                    <RequireAuth roles={["COLABORADOR"]}>
+                    <RequireAuth roles={["COLABORADOR", "HEAD"]}>
                       <TrackPlayer />
                     </RequireAuth>
                   }
@@ -120,7 +120,7 @@ const App = () => (
                 <Route
                   path="/app/certificates"
                   element={
-                    <RequireAuth roles={["COLABORADOR"]}>
+                    <RequireAuth roles={["COLABORADOR", "HEAD"]}>
                       <AppCertificates />
                     </RequireAuth>
                   }
@@ -128,7 +128,7 @@ const App = () => (
                 <Route
                   path="/app/certificates/:certificateId"
                   element={
-                    <RequireAuth roles={["COLABORADOR"]}>
+                    <RequireAuth roles={["COLABORADOR", "HEAD"]}>
                       <CertificateView />
                     </RequireAuth>
                   }

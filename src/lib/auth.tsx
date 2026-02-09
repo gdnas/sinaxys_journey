@@ -39,12 +39,27 @@ type DbProfile = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+function normalizeRole(raw: unknown): Role {
+  const t = String(raw ?? "")
+    .trim()
+    .toUpperCase()
+    // common accent/typo normalization
+    .replace("COLABORADOR(A)", "COLABORADOR")
+    .replace("COLABORADORA", "COLABORADOR")
+    .replace("COLABORADOR/A", "COLABORADOR");
+
+  if (t === "MASTERADMIN" || t === "ADMIN" || t === "HEAD" || t === "COLABORADOR") return t as Role;
+
+  // Least-privilege fallback: treat unknown roles as collaborator.
+  return "COLABORADOR";
+}
+
 function mapProfileToUser(p: DbProfile): User {
   return {
     id: p.id,
     email: p.email,
     name: p.name ?? p.email.split("@")[0],
-    role: p.role as Role,
+    role: normalizeRole(p.role),
     companyId: p.company_id ?? undefined,
     departmentId: p.department_id ?? undefined,
     active: !!p.active,
