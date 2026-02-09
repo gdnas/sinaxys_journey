@@ -397,6 +397,13 @@ export default function AdminUsers() {
                       title: "Usuário criado",
                       description: "Senha temporária definida. No primeiro acesso, o usuário será obrigado a trocar a senha.",
                     });
+                  } else if (data?.mode === "linked") {
+                    toast({
+                      title: "Usuário vinculado",
+                      description: data?.passwordSet
+                        ? "O e-mail já existia no login. Vinculamos o perfil e definimos a senha temporária."
+                        : "O e-mail já existia no login. Vinculamos o perfil nesta empresa.",
+                    });
                   } else {
                     toast({ title: "Convite enviado", description: `Enviamos um convite para ${inviteEmail.trim()}.` });
                   }

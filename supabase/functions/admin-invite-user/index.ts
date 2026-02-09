@@ -36,6 +36,28 @@ function normalizeRole(raw: unknown) {
   return t;
 }
 
+function isAlreadyRegisteredErrorMessage(msg: unknown) {
+  const m = String(msg ?? "").toLowerCase();
+  return m.includes("already been registered") || m.includes("already registered") || m.includes("user already exists");
+}
+
+async function findAuthUserIdByEmail(service: any, email: string): Promise<string | null> {
+  // Supabase Auth Admin doesn't provide getUserByEmail, so we scan pages.
+  const perPage = 200;
+  for (let page = 1; page <= 25; page++) {
+    const { data, error } = await service.auth.admin.listUsers({ page, perPage });
+    if (error) {
+      console.error("[admin-invite-user] listUsers failed", { error: error.message });
+      return null;
+    }
+    const users = data?.users ?? [];
+    const match = users.find((u: any) => String(u.email ?? "").toLowerCase() === email);
+    if (match?.id) return match.id as string;
+    if (users.length < perPage) break;
+  }
+  return null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -147,7 +169,8 @@ serve(async (req) => {
     }
 
     let userId: string | null = null;
-    let mode: "created" | "invited" = "invited";
+    let mode: "created" | "invited" | "linked" = "invited";
+    let passwordSet = false;
 
     if (password) {
       const { data: created, error: createErr } = await service.auth.admin.createUser({
@@ -157,20 +180,49 @@ serve(async (req) => {
       });
 
       if (createErr || !created?.user) {
-        console.error("[admin-invite-user] createUser failed", { createErr: createErr?.message });
-        return json(400, { ok: false, message: createErr?.message ?? "Não foi possível criar o usuário." });
-      }
+        if (isAlreadyRegisteredErrorMessage(createErr?.message)) {
+          const existingId = await findAuthUserIdByEmail(service, email);
+          if (!existingId) {
+            console.error("[admin-invite-user] user exists but could not be located", { email });
+            return json(400, { ok: false, message: createErr?.message ?? "Não foi possível criar o usuário." });
+          }
+          userId = existingId;
+          mode = "linked";
 
-      userId = created.user.id;
-      mode = "created";
+          const { error: updErr } = await service.auth.admin.updateUserById(existingId, { password, email_confirm: true });
+          if (updErr) {
+            console.error("[admin-invite-user] updateUserById failed", { updErr: updErr.message });
+            return json(400, { ok: false, message: updErr.message });
+          }
+          passwordSet = true;
+        } else {
+          console.error("[admin-invite-user] createUser failed", { createErr: createErr?.message });
+          return json(400, { ok: false, message: createErr?.message ?? "Não foi possível criar o usuário." });
+        }
+      } else {
+        userId = created.user.id;
+        mode = "created";
+        passwordSet = true;
+      }
     } else {
       const { data: inviteData, error: inviteErr } = await service.auth.admin.inviteUserByEmail(email);
       if (inviteErr || !inviteData?.user) {
-        console.error("[admin-invite-user] invite failed", { inviteErr: inviteErr?.message });
-        return json(400, { ok: false, message: inviteErr?.message ?? "Não foi possível convidar." });
+        if (isAlreadyRegisteredErrorMessage(inviteErr?.message)) {
+          const existingId = await findAuthUserIdByEmail(service, email);
+          if (!existingId) {
+            console.error("[admin-invite-user] user exists but could not be located", { email });
+            return json(400, { ok: false, message: inviteErr?.message ?? "Não foi possível convidar." });
+          }
+          userId = existingId;
+          mode = "linked";
+        } else {
+          console.error("[admin-invite-user] invite failed", { inviteErr: inviteErr?.message });
+          return json(400, { ok: false, message: inviteErr?.message ?? "Não foi possível convidar." });
+        }
+      } else {
+        userId = inviteData.user.id;
+        mode = "invited";
       }
-      userId = inviteData.user.id;
-      mode = "invited";
     }
 
     const { error: upsertErr } = await service
@@ -184,7 +236,7 @@ serve(async (req) => {
           company_id: role === "MASTERADMIN" ? targetCompanyId : targetCompanyId,
           department_id: role === "MASTERADMIN" ? null : departmentId,
           active: true,
-          must_change_password: mode === "created",
+          must_change_password: !!passwordSet,
           job_title: jobTitle,
           phone,
           joined_at: role === "MASTERADMIN" ? null : new Date().toISOString(),
@@ -207,6 +259,7 @@ serve(async (req) => {
       mode,
       userId,
       email,
+      passwordSet,
     });
   } catch (e) {
     console.error("[admin-invite-user] unexpected error", { message: e instanceof Error ? e.message : String(e) });
