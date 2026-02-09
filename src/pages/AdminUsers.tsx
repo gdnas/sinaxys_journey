@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Pencil, Search, Shield, UserRound } from "lucide-react";
+import { MailPlus, Pencil, Search, Shield, UserRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany, updateProfile, type DbProfile } from "@/lib/profilesDb";
@@ -77,6 +78,24 @@ export default function AdminUsers() {
     setEditOpen(true);
   };
 
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteName, setInviteName] = useState("");
+  const [inviteRole, setInviteRole] = useState<CompanyRole>("COLABORADOR");
+  const [inviteDeptId, setInviteDeptId] = useState<string>("");
+  const [inviteJobTitle, setInviteJobTitle] = useState("");
+  const [invitePhone, setInvitePhone] = useState("");
+  const [inviting, setInviting] = useState(false);
+
+  const resetInvite = () => {
+    setInviteEmail("");
+    setInviteName("");
+    setInviteRole("COLABORADOR");
+    setInviteDeptId("");
+    setInviteJobTitle("");
+    setInvitePhone("");
+  };
+
   return (
     <div className="grid gap-6">
       <div className="rounded-3xl border bg-white p-6">
@@ -84,7 +103,7 @@ export default function AdminUsers() {
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Usuários</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Lista de usuários (profiles) da sua empresa. Este ambiente é 100% Supabase-driven: não há seed/local mock.
+              Gerencie usuários da sua empresa. Agora você também pode convidar novos usuários por e-mail (o Supabase envia o link de ativação).
             </p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
@@ -102,14 +121,27 @@ export default function AdminUsers() {
             </p>
           </div>
 
-          <div className="relative w-full md:w-[360px]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Buscar por nome ou e-mail…"
-              className="h-11 rounded-xl pl-9"
-            />
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+            <Button
+              className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:w-auto"
+              onClick={() => {
+                resetInvite();
+                setInviteOpen(true);
+              }}
+            >
+              <MailPlus className="mr-2 h-4 w-4" />
+              Convidar usuário
+            </Button>
+
+            <div className="relative w-full md:w-[360px]">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar por nome ou e-mail…"
+                className="h-11 rounded-xl pl-9"
+              />
+            </div>
           </div>
         </div>
 
@@ -180,10 +212,140 @@ export default function AdminUsers() {
         </div>
 
         <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-          Observação: criação de novos usuários/convites deve ser feita via provisioning (fora deste painel). Este painel é para gestão de perfis existentes.
+          Dica: o usuário convidado vai receber um e-mail do Supabase para definir a senha e entrar.
         </div>
       </Card>
 
+      {/* Invite */}
+      <Dialog
+        open={inviteOpen}
+        onOpenChange={(v) => {
+          setInviteOpen(v);
+          if (!v) resetInvite();
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Convidar usuário</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Convite por e-mail</div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Vamos criar o usuário no Supabase e gerar um convite. Você define papel/dep. agora, e ele ativa a conta pelo e-mail.
+              </p>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>E-mail</Label>
+              <Input
+                className="h-11 rounded-xl"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="nome@empresa.com"
+                inputMode="email"
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Nome (opcional)</Label>
+              <Input className="h-11 rounded-xl" value={inviteName} onChange={(e) => setInviteName(e.target.value)} placeholder="Ex.: Maria Silva" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Papel</Label>
+              <Select value={inviteRole} onValueChange={(v) => setInviteRole(v as CompanyRole)}>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ROLE_OPTIONS.map((r) => (
+                    <SelectItem key={r.value} value={r.value}>
+                      {r.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Departamento</Label>
+              <Select value={inviteDeptId || "__none__"} onValueChange={(v) => setInviteDeptId(v === "__none__" ? "" : v)}>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sem departamento</SelectItem>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Cargo (opcional)</Label>
+              <Input className="h-11 rounded-xl" value={inviteJobTitle} onChange={(e) => setInviteJobTitle(e.target.value)} placeholder="Ex.: Analista" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Celular (opcional)</Label>
+              <Input className="h-11 rounded-xl" value={invitePhone} onChange={(e) => setInvitePhone(e.target.value)} placeholder="(11) 99999-9999" />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setInviteOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={inviting || inviteEmail.trim().length < 6}
+              onClick={async () => {
+                try {
+                  setInviting(true);
+                  const { data, error } = await supabase.functions.invoke("admin-invite-user", {
+                    body: {
+                      email: inviteEmail,
+                      name: inviteName,
+                      role: inviteRole,
+                      departmentId: inviteDeptId || null,
+                      jobTitle: inviteJobTitle || null,
+                      phone: invitePhone || null,
+                    },
+                  });
+
+                  if (error) throw error;
+
+                  if (data?.alreadyMember) {
+                    toast({ title: "Usuário já existe", description: data?.message ?? "Este e-mail já está na sua empresa." });
+                  } else {
+                    toast({ title: "Convite enviado", description: `Enviamos um convite para ${inviteEmail.trim()}.` });
+                  }
+
+                  await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
+                  setInviteOpen(false);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível convidar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setInviting(false);
+                }
+              }}
+            >
+              {inviting ? "Enviando…" : "Enviar convite"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit */}
       <Dialog
         open={editOpen}
         onOpenChange={(v) => {
