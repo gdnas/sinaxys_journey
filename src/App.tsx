@@ -29,6 +29,7 @@ import MasterUsers from "./pages/MasterUsers";
 import Profile from "./pages/Profile";
 import HeadTracks from "./pages/HeadTracks";
 import HeadTrackEdit from "./pages/HeadTrackEdit";
+import HeadUsers from "./pages/HeadUsers";
 import { AuthProvider } from "@/lib/auth";
 import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
@@ -169,6 +170,14 @@ const App = () => (
                   element={
                     <RequireAuth roles={["HEAD"]}>
                       <HeadTrackEdit />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/head/users"
+                  element={
+                    <RequireAuth roles={["HEAD"]}>
+                      <HeadUsers />
                     </RequireAuth>
                   }
                 />

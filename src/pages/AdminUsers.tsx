@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
+import { listAccessStatsByCompany } from "@/lib/accessStatsDb";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany, updateProfile, type DbProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
@@ -32,6 +33,13 @@ function toMonthlyCostNumber(v: string) {
   const n = Number(t.replace(/\./g, "").replace(/,/g, "."));
   if (!Number.isFinite(n) || n <= 0) return null;
   return n;
+}
+
+function fmtDateTime(ts: string | null | undefined) {
+  if (!ts) return "—";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
 async function describeFunctionError(e: unknown): Promise<string> {
@@ -93,6 +101,13 @@ export default function AdminUsers() {
     queryKey: ["profiles", companyId],
     queryFn: () => listProfilesByCompany(companyId),
   });
+
+  const { data: accessStats = [] } = useQuery({
+    queryKey: ["access-stats", companyId],
+    queryFn: () => listAccessStatsByCompany(companyId),
+  });
+
+  const statsByUserId = useMemo(() => new Map(accessStats.map((s) => [s.user_id, s] as const)), [accessStats]);
 
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d] as const)), [departments]);
 
@@ -212,13 +227,15 @@ export default function AdminUsers() {
         ) : null}
 
         <div className="max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
-          <Table className="min-w-[980px]">
+          <Table className="min-w-[1220px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Nome</TableHead>
                 <TableHead>E-mail</TableHead>
                 <TableHead>Papel</TableHead>
                 <TableHead>Departamento</TableHead>
+                <TableHead className="text-right">Acessos</TableHead>
+                <TableHead className="text-right">Último acesso</TableHead>
                 <TableHead className="text-right">Ativo</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -226,6 +243,8 @@ export default function AdminUsers() {
             <TableBody>
               {filtered.map((p) => {
                 const dept = p.department_id ? deptById.get(p.department_id)?.name : "—";
+                const stat = statsByUserId.get(p.id);
+
                 return (
                   <TableRow key={p.id}>
                     <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{p.name ?? "—"}</TableCell>
@@ -236,6 +255,8 @@ export default function AdminUsers() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{dept ?? "—"}</TableCell>
+                    <TableCell className="text-right font-medium text-[color:var(--sinaxys-ink)]">{stat ? stat.access_count : "—"}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end">
                         <Switch
@@ -266,7 +287,7 @@ export default function AdminUsers() {
 
               {!isLoading && !filtered.length ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                     Nenhum usuário encontrado.
                   </TableCell>
                 </TableRow>
@@ -275,7 +296,9 @@ export default function AdminUsers() {
           </Table>
         </div>
 
-        <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Se você criar com senha temporária, o sistema força a troca no primeiro acesso.</div>
+        <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+          Acessos são registrados quando a pessoa entra no sistema (inclui recarregar a aplicação). Se alguém nunca entrou, os campos aparecem como "—".
+        </div>
       </Card>
 
       {/* Invite / Create */}

@@ -143,6 +143,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!mountedRef.current) return;
       setUser(nextUser);
       setActiveCompanyIdState(p.company_id ?? null);
+
+      // Best-effort: register an access event (count + last access).
+      // This is used on the Users pages for ADMIN/HEAD/MASTERADMIN visibility.
+      supabase.rpc("record_access").catch(() => {
+        // ignore
+      });
     } finally {
       if (mountedRef.current) setLoading(false);
     }
