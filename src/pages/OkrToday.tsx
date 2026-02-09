@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { CheckCircle2, Circle, Clock, Flame, ListChecks } from "lucide-react";
 import { format, endOfWeek, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
