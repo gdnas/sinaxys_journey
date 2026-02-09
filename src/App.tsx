@@ -12,6 +12,7 @@ import TrackPlayer from "./pages/TrackPlayer";
 import AppCertificates from "./pages/AppCertificates";
 import CertificateView from "./pages/CertificateView";
 import TrackLibrary from "./pages/TrackLibrary";
+import TrackDetail from "./pages/TrackDetail";
 import AdminUsers from "./pages/AdminUsers";
 import AdminDepartments from "./pages/AdminDepartments";
 import AdminBrand from "./pages/AdminBrand";
@@ -99,12 +100,20 @@ const App = () => (
                     </RequireAuth>
                   }
                 />
+                <Route
+                  path="/tracks/:trackId"
+                  element={
+                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                      <TrackDetail />
+                    </RequireAuth>
+                  }
+                />
 
-                {/* Jornada (colaborador + head) */}
+                {/* Jornada */}
                 <Route
                   path="/app"
                   element={
-                    <RequireAuth roles={["COLABORADOR", "HEAD"]}>
+                    <RequireAuth roles={["COLABORADOR", "HEAD", "ADMIN"]}>
                       <AppDashboard />
                     </RequireAuth>
                   }
@@ -112,7 +121,7 @@ const App = () => (
                 <Route
                   path="/app/tracks/:assignmentId"
                   element={
-                    <RequireAuth roles={["COLABORADOR", "HEAD"]}>
+                    <RequireAuth roles={["COLABORADOR", "HEAD", "ADMIN"]}>
                       <TrackPlayer />
                     </RequireAuth>
                   }
@@ -120,7 +129,7 @@ const App = () => (
                 <Route
                   path="/app/certificates"
                   element={
-                    <RequireAuth roles={["COLABORADOR", "HEAD"]}>
+                    <RequireAuth roles={["COLABORADOR", "HEAD", "ADMIN"]}>
                       <AppCertificates />
                     </RequireAuth>
                   }
@@ -128,7 +137,7 @@ const App = () => (
                 <Route
                   path="/app/certificates/:certificateId"
                   element={
-                    <RequireAuth roles={["COLABORADOR", "HEAD"]}>
+                    <RequireAuth roles={["COLABORADOR", "HEAD", "ADMIN"]}>
                       <CertificateView />
                     </RequireAuth>
                   }

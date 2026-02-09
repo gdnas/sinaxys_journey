@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { BookOpenText, CalendarClock, Search, Send, Users } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -110,11 +111,7 @@ export default function TrackLibrary() {
     if (!q) return collaborators;
     return collaborators.filter((u) => {
       const deptName = u.department_id ? deptById.get(u.department_id)?.name ?? "" : "";
-      return (
-        u.name.toLowerCase().includes(q) ||
-        u.email.toLowerCase().includes(q) ||
-        deptName.toLowerCase().includes(q)
-      );
+      return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || deptName.toLowerCase().includes(q);
     });
   }, [collaborators, delegateUserQuery, deptById]);
 
@@ -166,13 +163,9 @@ export default function TrackLibrary() {
                   <div className="flex w-full items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{dept.name}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        {deptTracks.length ? `${deptTracks.length} trilhas` : "Nenhuma trilha"}
-                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{deptTracks.length ? `${deptTracks.length} trilhas` : "Nenhuma trilha"}</div>
                     </div>
-                    <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                      {deptTracks.length}
-                    </Badge>
+                    <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{deptTracks.length}</Badge>
                   </div>
                 </AccordionTrigger>
 
@@ -184,11 +177,14 @@ export default function TrackLibrary() {
                           <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
-                                <div className="min-w-0 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
+                                <Link
+                                  to={`/tracks/${t.id}`}
+                                  className="min-w-0 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] underline-offset-4 hover:underline"
+                                >
+                                  {t.title}
+                                </Link>
                                 {t.published ? (
-                                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
-                                    Publicada
-                                  </Badge>
+                                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Publicada</Badge>
                                 ) : (
                                   <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Rascunho</Badge>
                                 )}
@@ -197,8 +193,12 @@ export default function TrackLibrary() {
                               <div className="mt-2 text-xs text-muted-foreground">Criada em {formatShortDate(t.created_at)}</div>
                             </div>
 
-                            {canDelegate ? (
-                              <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end md:w-auto">
+                            <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end md:w-auto">
+                              <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
+                                <Link to={`/tracks/${t.id}`}>Ver trilha</Link>
+                              </Button>
+
+                              {canDelegate ? (
                                 <Button
                                   className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
                                   disabled={!t.published}
@@ -213,16 +213,14 @@ export default function TrackLibrary() {
                                   <Send className="mr-2 h-4 w-4" />
                                   Delegar
                                 </Button>
-                              </div>
-                            ) : null}
+                              ) : null}
+                            </div>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                      Nenhuma trilha encontrada para este departamento.
-                    </div>
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhuma trilha encontrada para este departamento.</div>
                   )}
                 </AccordionContent>
               </AccordionItem>
@@ -253,9 +251,7 @@ export default function TrackLibrary() {
               <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilha</div>
                 <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{delegateTrack.title}</div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Departamento: {deptById.get(delegateTrack.department_id)?.name ?? "—"}
-                </div>
+                <div className="mt-1 text-xs text-muted-foreground">Departamento: {deptById.get(delegateTrack.department_id)?.name ?? "—"}</div>
               </div>
 
               <div className="grid gap-2">
@@ -263,12 +259,7 @@ export default function TrackLibrary() {
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <div className="relative w-full sm:w-[220px]">
                     <CalendarClock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      type="date"
-                      value={delegateDueDate}
-                      onChange={(e) => setDelegateDueDate(e.target.value)}
-                      className="h-11 w-full rounded-xl pl-9"
-                    />
+                    <Input type="date" value={delegateDueDate} onChange={(e) => setDelegateDueDate(e.target.value)} className="h-11 w-full rounded-xl pl-9" />
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {[
@@ -307,20 +298,13 @@ export default function TrackLibrary() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="outline"
-                    className="h-9 rounded-full"
-                    onClick={() => setDelegateUserIds(assignees.map((u) => u.id))}
-                    disabled={!assignees.length}
-                  >
+                  <Button variant="outline" className="h-9 rounded-full" onClick={() => setDelegateUserIds(assignees.map((u) => u.id))} disabled={!assignees.length}>
                     Selecionar todos (filtrados)
                   </Button>
                   <Button variant="outline" className="h-9 rounded-full" onClick={() => setDelegateUserIds([])} disabled={!delegateUserIds.length}>
                     Limpar
                   </Button>
-                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                    {delegateUserIds.length} selecionados
-                  </Badge>
+                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{delegateUserIds.length} selecionados</Badge>
                 </div>
 
                 <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
@@ -357,9 +341,7 @@ export default function TrackLibrary() {
                         );
                       })}
 
-                      {!assignees.length ? (
-                        <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma pessoa encontrada.</div>
-                      ) : null}
+                      {!assignees.length ? <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma pessoa encontrada.</div> : null}
                     </div>
                   </ScrollArea>
                 </div>

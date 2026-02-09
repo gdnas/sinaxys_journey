@@ -304,15 +304,29 @@ export async function getAssignmentsForUser(userId: string) {
   return (asgs ?? []).map((a) => {
     const t = trackById.get(a.track_id) as any as DbTrack;
     const st = stats.get(a.id) ?? { done: 0, total: 0 };
-    const progressPct = st.total ? Math.round((st.done / st.total) * 100) : 0;
+    const stSafe = (st as any) ?? { done: 0, total: 0 };
+    const progressPct = stSafe.total ? Math.round((stSafe.done / stSafe.total) * 100) : 0;
     return {
       assignment: a as any as DbAssignment,
       track: t,
-      completedModules: st.done,
-      totalModules: st.total,
+      completedModules: stSafe.done,
+      totalModules: stSafe.total,
       progressPct,
     };
   });
+}
+
+export async function getLatestAssignmentForUserAndTrack(params: { userId: string; trackId: string }) {
+  const { data, error } = await supabase
+    .from("track_assignments")
+    .select("*")
+    .eq("user_id", params.userId)
+    .eq("track_id", params.trackId)
+    .order("assigned_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as any as DbAssignment | null;
 }
 
 export async function getQuizForModule(moduleId: string): Promise<{

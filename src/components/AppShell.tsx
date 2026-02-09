@@ -53,18 +53,18 @@ const nav: NavItem[] = [
     roles: ["MASTERADMIN"],
   },
 
-  // Jornada (colaborador + head)
+  // Jornada
   {
     to: "/app",
     label: "Minha jornada",
     icon: <LayoutDashboard className="h-4 w-4" />,
-    roles: ["COLABORADOR", "HEAD"],
+    roles: ["COLABORADOR", "HEAD", "ADMIN"],
   },
   {
     to: "/app/certificates",
     label: "Certificados",
     icon: <Award className="h-4 w-4" />,
-    roles: ["COLABORADOR", "HEAD"],
+    roles: ["COLABORADOR", "HEAD", "ADMIN"],
   },
 
   // Empresa
