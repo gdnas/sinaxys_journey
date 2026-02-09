@@ -15,6 +15,7 @@ import {
   Wallet,
   UploadCloud,
   Trophy,
+  Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -74,6 +75,14 @@ const nav: NavItem[] = [
     roles: ["ADMIN", "HEAD", "COLABORADOR", "MASTERADMIN"],
   },
 
+  // OKRs
+  {
+    to: "/okr",
+    label: "OKRs",
+    icon: <Target className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD", "COLABORADOR", "MASTERADMIN"],
+  },
+
   // Empresa
   {
     to: "/org",
@@ -117,12 +126,6 @@ const nav: NavItem[] = [
     to: "/admin/import",
     label: "Importar usuários",
     icon: <UploadCloud className="h-4 w-4" />,
-    roles: ["ADMIN"],
-  },
-  {
-    to: "/admin/org",
-    label: "Organograma (Admin)",
-    icon: <Network className="h-4 w-4" />,
     roles: ["ADMIN"],
   },
   {

@@ -32,6 +32,13 @@ import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadUsers from "./pages/HeadUsers";
 import HeadCosts from "./pages/HeadCosts";
 import OrgChart from "./pages/OrgChart";
+import OkrHome from "./pages/OkrHome";
+import OkrToday from "./pages/OkrToday";
+import OkrFundamentals from "./pages/OkrFundamentals";
+import OkrMap from "./pages/OkrMap";
+import OkrCycles from "./pages/OkrCycles";
+import OkrAssistant from "./pages/OkrAssistant";
+import OkrObjectiveDetail from "./pages/OkrObjectiveDetail";
 import { AuthProvider } from "@/lib/auth";
 import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
@@ -56,6 +63,64 @@ const App = () => (
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                       <ChangePassword />
+                    </RequireAuth>
+                  }
+                />
+
+                {/* OKRs */}
+                <Route
+                  path="/okr"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <OkrHome />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/okr/hoje"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <OkrToday />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/okr/fundamentos"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <OkrFundamentals />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/okr/mapa"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <OkrMap />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/okr/ciclos"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <OkrCycles />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/okr/assistente"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <OkrAssistant />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/okr/objetivos/:objectiveId"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <OkrObjectiveDetail />
                     </RequireAuth>
                   }
                 />
