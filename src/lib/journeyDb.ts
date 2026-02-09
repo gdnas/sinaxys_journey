@@ -149,6 +149,11 @@ export async function setTrackFlags(trackId: string, data: { strategic?: boolean
   if (error) throw error;
 }
 
+export async function setTrackDepartment(trackId: string, departmentId: string) {
+  const { error } = await supabase.from("learning_tracks").update({ department_id: departmentId }).eq("id", trackId);
+  if (error) throw error;
+}
+
 export async function upsertModule(next: TrackModule & { trackId: string }) {
   const payload: any = {
     id: next.id,

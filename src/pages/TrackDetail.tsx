@@ -1,12 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarClock, CheckCircle2, FileText, PlayCircle, Rocket, SquarePen, Trophy } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { ArrowLeft, CalendarClock, CheckCircle2, FileText, PlayCircle, Rocket, Settings2, SquarePen, Trophy } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { ResourceEmbed } from "@/components/ResourceEmbed";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +20,7 @@ import {
   getLatestAssignmentForUserAndTrack,
   getModulesByTrack,
   getTrack,
+  setTrackDepartment,
   type DbModule,
 } from "@/lib/journeyDb";
 import { formatShortDate, getYouTubeEmbedUrl } from "@/lib/sinaxys";
@@ -63,6 +67,7 @@ function moduleTypeIcon(t: DbModule["type"]) {
 
 export default function TrackDetail() {
   const { toast } = useToast();
+  const qc = useQueryClient();
   const { user } = useAuth();
   const navigate = useNavigate();
   const params = useParams();
@@ -70,6 +75,12 @@ export default function TrackDetail() {
 
   const [dueDate, setDueDate] = useState<string>("");
   const [starting, setStarting] = useState(false);
+
+  // Admin: change responsible department
+  const canChangeDept = user?.role === "ADMIN";
+  const [deptOpen, setDeptOpen] = useState(false);
+  const [deptSaving, setDeptSaving] = useState(false);
+  const [deptNextId, setDeptNextId] = useState<string>("");
 
   if (!user) return null;
   if (!user.companyId) return null;
@@ -130,6 +141,20 @@ export default function TrackDetail() {
             Voltar para biblioteca
           </Link>
         </Button>
+
+        {canChangeDept && track ? (
+          <Button
+            variant="outline"
+            className="rounded-xl"
+            onClick={() => {
+              setDeptNextId(track.department_id);
+              setDeptOpen(true);
+            }}
+          >
+            <Settings2 className="mr-2 h-4 w-4" />
+            Equipe responsável
+          </Button>
+        ) : null}
       </div>
 
       <div className="rounded-3xl border bg-white p-6">
@@ -350,6 +375,75 @@ export default function TrackDetail() {
           </div>
         )}
       </Card>
+
+      <Dialog
+        open={deptOpen}
+        onOpenChange={(v) => {
+          setDeptOpen(v);
+          if (!v) setDeptNextId("");
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Equipe responsável pela trilha</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+              Alterar a equipe responsável muda o <span className="font-semibold">departamento</span> da trilha na biblioteca.
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Departamento</Label>
+              <Select value={deptNextId} onValueChange={setDeptNextId}>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" className="rounded-xl" onClick={() => setDeptOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={!track || !deptNextId || deptSaving || deptNextId === track?.department_id}
+              onClick={async () => {
+                if (!track) return;
+                try {
+                  setDeptSaving(true);
+                  await setTrackDepartment(track.id, deptNextId);
+                  await Promise.all([
+                    qc.invalidateQueries({ queryKey: ["track", trackId] }),
+                    qc.invalidateQueries({ queryKey: ["tracks", companyId] }),
+                  ]);
+                  toast({ title: "Equipe responsável atualizada" });
+                  setDeptOpen(false);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível atualizar",
+                    description: e instanceof Error ? e.message : "Tente novamente.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setDeptSaving(false);
+                }
+              }}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
