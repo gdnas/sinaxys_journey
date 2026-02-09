@@ -146,9 +146,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Best-effort: register an access event (count + last access).
       // This is used on the Users pages for ADMIN/HEAD/MASTERADMIN visibility.
-      supabase.rpc("record_access").catch(() => {
-        // ignore
-      });
+      void (async () => {
+        try {
+          await supabase.rpc("record_access");
+        } catch {
+          // ignore
+        }
+      })();
     } finally {
       if (mountedRef.current) setLoading(false);
     }

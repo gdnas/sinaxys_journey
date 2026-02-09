@@ -87,6 +87,12 @@ const nav: NavItem[] = [
     icon: <GraduationCap className="h-4 w-4" />,
     roles: ["HEAD"],
   },
+  {
+    to: "/head/users",
+    label: "Head — Usuários",
+    icon: <Shield className="h-4 w-4" />,
+    roles: ["HEAD"],
+  },
 
   // Admin
   {
