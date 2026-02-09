@@ -61,8 +61,28 @@ export default function AdminUsers() {
   const qc = useQueryClient();
   const { user } = useAuth();
 
-  if (!user || user.role !== "ADMIN" || !user.companyId) return null;
+  if (!user || !(user.role === "ADMIN" || user.role === "MASTERADMIN")) return null;
+
   const companyId = user.companyId;
+  if (!companyId) {
+    return (
+      <div className="grid gap-6">
+        <div className="rounded-3xl border bg-white p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Usuários — Empresa</div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Para adicionar usuários, selecione uma empresa ativa em <span className="font-medium text-[color:var(--sinaxys-ink)]">Master Admin → Empresas</span>.
+              </p>
+            </div>
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+              <Shield className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments", companyId],
@@ -139,9 +159,9 @@ export default function AdminUsers() {
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Usuários</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Usuários — Empresa</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Gerencie usuários da sua empresa. Você pode criar com senha temporária (o usuário troca no primeiro acesso) ou enviar convite por e-mail.
+              Gerencie usuários desta empresa. Você pode criar com senha temporária (o usuário troca no primeiro acesso) ou enviar convite por e-mail.
             </p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">

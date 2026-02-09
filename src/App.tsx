@@ -177,7 +177,7 @@ const App = () => (
                 <Route
                   path="/admin/users"
                   element={
-                    <RequireAuth roles={["ADMIN"]}>
+                    <RequireAuth roles={["ADMIN", "MASTERADMIN"]}>
                       <AdminUsers />
                     </RequireAuth>
                   }
