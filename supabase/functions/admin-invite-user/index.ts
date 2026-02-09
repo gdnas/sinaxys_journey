@@ -24,6 +24,16 @@ function json(status: number, body: unknown) {
   });
 }
 
+function normalizeRole(raw: unknown) {
+  const t = String(raw ?? "")
+    .trim()
+    .toUpperCase()
+    .replace("COLABORADOR(A)", "COLABORADOR")
+    .replace("COLABORADORA", "COLABORADOR")
+    .replace("COLABORADOR/A", "COLABORADOR");
+  return t;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -62,7 +72,8 @@ serve(async (req) => {
       return json(500, { ok: false, message: "Erro ao validar permissão." });
     }
 
-    if (!callerProfile || callerProfile.role !== "ADMIN" || !callerProfile.company_id) {
+    const callerRole = normalizeRole(callerProfile?.role);
+    if (!callerProfile || callerRole !== "ADMIN" || !callerProfile.company_id) {
       return json(403, { ok: false, message: "Sem permissão." });
     }
 

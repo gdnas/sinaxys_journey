@@ -34,6 +34,26 @@ function toMonthlyCostNumber(v: string) {
   return n;
 }
 
+function edgeMessage(err: unknown) {
+  const anyErr = err as any;
+
+  // supabase-js FunctionsHttpError includes `context.body`
+  const body = anyErr?.context?.body;
+  if (typeof body === "string") {
+    try {
+      const parsed = JSON.parse(body);
+      return String(parsed?.message ?? parsed?.error ?? anyErr?.message ?? body);
+    } catch {
+      return String(anyErr?.message ?? body);
+    }
+  }
+  if (body && typeof body === "object") {
+    return String(body?.message ?? body?.error ?? anyErr?.message ?? "Erro desconhecido");
+  }
+
+  return err instanceof Error ? err.message : String(err);
+}
+
 export default function AdminUsers() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -132,9 +152,7 @@ export default function AdminUsers() {
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Base de usuários</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isLoading ? "Carregando…" : `${profiles.length} usuários nesta empresa.`}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{isLoading ? "Carregando…" : `${profiles.length} usuários nesta empresa.`}</p>
           </div>
 
           <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
@@ -347,11 +365,7 @@ export default function AdminUsers() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={
-                inviting ||
-                inviteEmail.trim().length < 6 ||
-                (inviteSetTempPassword && inviteTempPassword.trim().length < 6)
-              }
+              disabled={inviting || inviteEmail.trim().length < 6 || (inviteSetTempPassword && inviteTempPassword.trim().length < 6)}
               onClick={async () => {
                 try {
                   setInviting(true);
@@ -385,7 +399,7 @@ export default function AdminUsers() {
                 } catch (e) {
                   toast({
                     title: "Não foi possível adicionar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    description: edgeMessage(e),
                     variant: "destructive",
                   });
                 } finally {
@@ -476,25 +490,13 @@ export default function AdminUsers() {
 
               <div className="grid gap-2">
                 <Label>Custo mensal (BRL)</Label>
-                <Input
-                  className="h-11 rounded-xl"
-                  value={editMonthlyCost}
-                  onChange={(e) => setEditMonthlyCost(e.target.value)}
-                  inputMode="decimal"
-                  placeholder="Ex.: 6500"
-                />
+                <Input className="h-11 rounded-xl" value={editMonthlyCost} onChange={(e) => setEditMonthlyCost(e.target.value)} inputMode="decimal" placeholder="Ex.: 6500" />
                 <div className="text-xs text-muted-foreground">Usado no relatório de custos da empresa e do departamento.</div>
               </div>
 
               <div className="grid gap-2">
                 <Label>Contrato (URL)</Label>
-                <Input
-                  className="h-11 rounded-xl"
-                  value={editContractUrl}
-                  onChange={(e) => setEditContractUrl(e.target.value)}
-                  inputMode="url"
-                  placeholder="https://..."
-                />
+                <Input className="h-11 rounded-xl" value={editContractUrl} onChange={(e) => setEditContractUrl(e.target.value)} inputMode="url" placeholder="https://..." />
               </div>
 
               <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
