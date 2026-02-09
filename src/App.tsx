@@ -21,6 +21,8 @@ import AdminOrgChart from "./pages/AdminOrgChart";
 import AdminCosts from "./pages/AdminCosts";
 import AdminImportUsers from "./pages/AdminImportUsers";
 import AdminTracks from "./pages/AdminTracks";
+import AdminRewards from "./pages/AdminRewards";
+import Rankings from "./pages/Rankings";
 import MasterCompanies from "./pages/MasterCompanies";
 import MasterOverview from "./pages/MasterOverview";
 import MasterUsers from "./pages/MasterUsers";
@@ -86,6 +88,15 @@ const App = () => (
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                       <Profile />
+                    </RequireAuth>
+                  }
+                />
+
+                <Route
+                  path="/rankings"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <Rankings />
                     </RequireAuth>
                   }
                 />
@@ -176,6 +187,14 @@ const App = () => (
                   element={
                     <RequireAuth roles={["ADMIN"]}>
                       <AdminUserCard />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/rewards"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminRewards />
                     </RequireAuth>
                   }
                 />

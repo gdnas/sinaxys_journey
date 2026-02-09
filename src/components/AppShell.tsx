@@ -14,6 +14,7 @@ import {
   Network,
   Wallet,
   UploadCloud,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -65,6 +66,12 @@ const nav: NavItem[] = [
     label: "Certificados",
     icon: <Award className="h-4 w-4" />,
     roles: ["COLABORADOR", "HEAD", "ADMIN"],
+  },
+  {
+    to: "/rankings",
+    label: "Sinaxys Points",
+    icon: <Trophy className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD", "COLABORADOR", "MASTERADMIN"],
   },
 
   // Empresa
