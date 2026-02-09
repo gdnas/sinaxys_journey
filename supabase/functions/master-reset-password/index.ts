@@ -19,22 +19,15 @@ function json(status: number, body: unknown) {
 }
 
 function normalizeRole(raw: unknown) {
-  return String(raw ?? "")
-    .trim()
-    .toUpperCase()
-    .replace("COLABORADOR(A)", "COLABORADOR")
-    .replace("COLABORADORA", "COLABORADOR")
-    .replace("COLABORADOR/A", "COLABORADOR");
+  return String(raw ?? "").trim().toUpperCase();
 }
 
-function generateTempPassword(len = 10) {
-  // Simple, readable alphabet (avoid O/0, I/1).
-  const alphabet = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+function makeTempPassword(length = 12) {
+  // avoid ambiguous chars; keep it copy-friendly
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%";
   let out = "";
-  const bytes = crypto.getRandomValues(new Uint8Array(len));
-  for (let i = 0; i < bytes.length; i++) {
-    out += alphabet[bytes[i] % alphabet.length];
-  }
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  for (let i = 0; i < bytes.length; i++) out += alphabet[bytes[i] % alphabet.length];
   return out;
 }
 
@@ -82,13 +75,11 @@ serve(async (req) => {
     }
 
     const body = (await req.json().catch(() => null)) as Body | null;
-    const userId = (body?.userId ?? "").trim();
-
+    const userId = String(body?.userId ?? "").trim();
     if (!userId) return json(400, { ok: false, message: "userId é obrigatório." });
 
     const requested = (body?.tempPassword ?? null)?.trim() || null;
-    const tempPassword = requested ?? generateTempPassword(10);
-
+    const tempPassword = requested ?? makeTempPassword(12);
     if (tempPassword.length < 6) {
       return json(400, { ok: false, message: "A senha temporária deve ter no mínimo 6 caracteres." });
     }
@@ -96,21 +87,29 @@ serve(async (req) => {
     const { error: updErr } = await service.auth.admin.updateUserById(userId, {
       password: tempPassword,
     });
-
     if (updErr) {
       console.error("[master-reset-password] updateUserById failed", { updErr: updErr.message, userId });
       return json(400, { ok: false, message: updErr.message });
     }
 
-    const { error: profErr } = await service.from("profiles").update({ must_change_password: true }).eq("id", userId);
+    const { error: profErr } = await service
+      .from("profiles")
+      .update({ must_change_password: true })
+      .eq("id", userId);
+
     if (profErr) {
-      console.error("[master-reset-password] profiles update failed", { profErr: profErr.message, userId });
+      console.error("[master-reset-password] failed to set must_change_password", { profErr: profErr.message, userId });
       return json(500, { ok: false, message: "Senha resetada, mas falhou ao marcar troca obrigatória." });
     }
 
-    console.log("[master-reset-password] ok", { userId, generated: !requested });
+    console.log("[master-reset-password] temp password created", { userId });
 
-    return json(200, { ok: true, userId, tempPassword });
+    return json(200, {
+      ok: true,
+      userId,
+      tempPassword,
+      mustChangePassword: true,
+    });
   } catch (e) {
     console.error("[master-reset-password] unexpected error", { message: e instanceof Error ? e.message : String(e) });
     return json(500, { ok: false, message: "Erro inesperado." });

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MailPlus, Pencil, Search, Shield } from "lucide-react";
+import { KeyRound, MailPlus, Pencil, Search, Shield, Copy } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -90,6 +90,17 @@ export default function MasterUsers() {
     setEditCompanyId(p.company_id ?? "");
     setEditActive(!!p.active);
     setEditOpen(true);
+  };
+
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetTarget, setResetTarget] = useState<DbProfile | null>(null);
+  const [resetting, setResetting] = useState(false);
+  const [tempPassword, setTempPassword] = useState<string>("");
+
+  const openReset = (p: DbProfile) => {
+    setResetTarget(p);
+    setTempPassword("");
+    setResetOpen(true);
   };
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -219,9 +230,20 @@ export default function MasterUsers() {
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => openEdit(p)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 rounded-xl"
+                          title="Resetar senha (temporária)"
+                          onClick={() => openReset(p)}
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" title="Editar" onClick={() => openEdit(p)}>
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -236,6 +258,92 @@ export default function MasterUsers() {
           </Table>
         </div>
       </Card>
+
+      {/* Reset password */}
+      <Dialog
+        open={resetOpen}
+        onOpenChange={(v) => {
+          setResetOpen(v);
+          if (!v) {
+            setResetTarget(null);
+            setTempPassword("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Resetar senha (temporária)</DialogTitle>
+          </DialogHeader>
+
+          {resetTarget ? (
+            <div className="grid gap-4">
+              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                Você vai gerar uma <span className="font-semibold text-[color:var(--sinaxys-ink)]">senha temporária</span> para <span className="font-semibold text-[color:var(--sinaxys-ink)]">{resetTarget.email}</span>. No próximo login,
+                o usuário será obrigado a trocar a senha.
+              </div>
+
+              {tempPassword ? (
+                <div className="grid gap-2">
+                  <Label>Senha temporária gerada</Label>
+                  <div className="flex items-center gap-2">
+                    <Input className="h-11 rounded-xl font-mono" value={tempPassword} readOnly />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11 rounded-xl"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(tempPassword);
+                          toast({ title: "Copiado" });
+                        } catch {
+                          toast({ title: "Não foi possível copiar", variant: "destructive" });
+                        }
+                      }}
+                      title="Copiar"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="text-xs text-muted-foreground">Envie esta senha para o usuário por um canal seguro (ex.: WhatsApp corporativo).</div>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">Usuário não encontrado.</div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setResetOpen(false)}>
+              Fechar
+            </Button>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={!resetTarget || resetting}
+              onClick={async () => {
+                if (!resetTarget) return;
+                try {
+                  setResetting(true);
+                  const { data, error } = await supabase.functions.invoke("master-reset-password", {
+                    body: { userId: resetTarget.id },
+                  });
+                  if (error) throw error;
+                  if (!data?.tempPassword) throw new Error("Não foi possível gerar a senha.");
+                  setTempPassword(String(data.tempPassword));
+                  await qc.invalidateQueries({ queryKey: ["profiles-all"] });
+                  toast({ title: "Senha temporária criada" });
+                } catch (e) {
+                  const msg = await describeFunctionError(e);
+                  toast({ title: "Não foi possível resetar", description: msg, variant: "destructive" });
+                } finally {
+                  setResetting(false);
+                }
+              }}
+            >
+              {resetting ? "Gerando…" : tempPassword ? "Gerar novamente" : "Gerar senha temporária"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Invite / Create */}
       <Dialog
