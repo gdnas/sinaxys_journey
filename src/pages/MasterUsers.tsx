@@ -71,6 +71,9 @@ export default function MasterUsers() {
     return profiles.filter((p) => `${p.email} ${p.name ?? ""}`.toLowerCase().includes(q));
   }, [profiles, query]);
 
+  const emailQuery = query.trim().toLowerCase();
+  const showAuthHint = !isLoading && !!emailQuery && emailQuery.includes("@") && filtered.length === 0;
+
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<DbProfile | null>(null);
 
@@ -160,6 +163,16 @@ export default function MasterUsers() {
         </div>
 
         <Separator className="my-5" />
+
+        {showAuthHint ? (
+          <div className="mb-4 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-4 text-sm text-[color:var(--sinaxys-ink)]">
+            <div className="font-semibold">Não encontrou este e-mail aqui?</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Esta tela lista apenas registros de <span className="font-medium text-[color:var(--sinaxys-ink)]">profiles</span>. Se o usuário existir apenas no login (Supabase Auth), ele não aparece
+              até você usar <span className="font-medium text-[color:var(--sinaxys-ink)]">Adicionar usuário</span> para vincular/criar o perfil.
+            </div>
+          </div>
+        ) : null}
 
         <div className="max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
           <Table className="min-w-[1050px]">

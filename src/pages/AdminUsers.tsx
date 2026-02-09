@@ -106,6 +106,9 @@ export default function AdminUsers() {
     });
   }, [profiles, query]);
 
+  const emailQuery = query.trim().toLowerCase();
+  const showAuthHint = !isLoading && !!emailQuery && emailQuery.includes("@") && filtered.length === 0;
+
   const [editOpen, setEditOpen] = useState(false);
   const [editing, setEditing] = useState<DbProfile | null>(null);
 
@@ -197,6 +200,16 @@ export default function AdminUsers() {
         </div>
 
         <Separator className="my-5" />
+
+        {showAuthHint ? (
+          <div className="mb-4 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-4 text-sm text-[color:var(--sinaxys-ink)]">
+            <div className="font-semibold">Não encontrou este e-mail?</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Aqui aparecem apenas usuários com registro em <span className="font-medium text-[color:var(--sinaxys-ink)]">profiles</span>. Se a pessoa existir apenas no login (Supabase Auth), use
+              <span className="font-medium text-[color:var(--sinaxys-ink)]"> Adicionar usuário</span> para vincular/criar o perfil nesta empresa.
+            </div>
+          </div>
+        ) : null}
 
         <div className="max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
           <Table className="min-w-[980px]">
