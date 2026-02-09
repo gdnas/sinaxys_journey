@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { mockDb } from "@/lib/mockDb";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function ChangePassword() {
   const { toast } = useToast();
@@ -76,11 +76,22 @@ export default function ChangePassword() {
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
               disabled={!canSave || saving}
-              onClick={() => {
+              onClick={async () => {
                 try {
                   setSaving(true);
-                  mockDb.setUserPassword(user.id, password, { mustChangePassword: false });
-                  refresh?.();
+
+                  const nextPassword = password.trim();
+                  const { error: authErr } = await supabase.auth.updateUser({ password: nextPassword });
+                  if (authErr) throw authErr;
+
+                  // Clear must_change_password flag on profile
+                  const { error: profErr } = await supabase
+                    .from("profiles")
+                    .update({ must_change_password: false })
+                    .eq("id", user.id);
+                  if (profErr) throw profErr;
+
+                  await refresh();
                   toast({ title: "Senha atualizada" });
                   navigate("/");
                 } catch (e) {

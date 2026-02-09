@@ -276,8 +276,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   variant="outline"
                   size="icon"
                   className="rounded-full border-[color:var(--sinaxys-border)] bg-white"
-                  onClick={() => {
-                    logout();
+                  onClick={async () => {
+                    await logout();
                     navigate("/login");
                   }}
                   aria-label="Sair"
