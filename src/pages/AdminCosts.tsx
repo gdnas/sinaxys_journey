@@ -26,6 +26,21 @@ function initials(name: string) {
   return (a + b).toUpperCase();
 }
 
+function normalizeRole(raw: unknown) {
+  return String(raw ?? "").trim().toUpperCase();
+}
+
+type CostPerson = {
+  id: string;
+  name: string;
+  email: string;
+  job_title: string | null;
+  avatar_url: string | null;
+  department_id: string | null;
+  monthly_cost_brl: number | null;
+  isHead?: boolean;
+};
+
 export default function AdminCosts() {
   const nav = useNavigate();
   const { user } = useAuth();
@@ -44,8 +59,43 @@ export default function AdminCosts() {
   });
 
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d] as const)), [departments]);
+  const profileById = useMemo(() => new Map(profiles.map((p) => [p.id, p] as const)), [profiles]);
 
-  const activeWithCost = useMemo(() => {
+  const headByDeptId = useMemo(() => {
+    // Infer the "Head do departamento" pelo gestor mais recorrente das pessoas do dept.
+    const counts = new Map<string, Map<string, number>>();
+
+    for (const p of profiles) {
+      if (!p.active) continue;
+      if (!p.department_id) continue;
+      if (!p.manager_id) continue;
+
+      const deptId = p.department_id;
+      const byManager = counts.get(deptId) ?? new Map<string, number>();
+      byManager.set(p.manager_id, (byManager.get(p.manager_id) ?? 0) + 1);
+      counts.set(deptId, byManager);
+    }
+
+    const result = new Map<string, (typeof profiles)[number]>();
+
+    for (const [deptId, byManager] of counts.entries()) {
+      const sorted = Array.from(byManager.entries()).sort((a, b) => b[1] - a[1]);
+      const bestManagerId = sorted.find(([mid]) => {
+        const m = profileById.get(mid);
+        if (!m?.active) return false;
+        const r = normalizeRole(m.role);
+        return r === "HEAD" || r === "ADMIN";
+      })?.[0];
+
+      if (!bestManagerId) continue;
+      const managerProfile = profileById.get(bestManagerId);
+      if (managerProfile) result.set(deptId, managerProfile);
+    }
+
+    return result;
+  }, [profiles, profileById]);
+
+  const activeWithCost = useMemo((): CostPerson[] => {
     return profiles
       .filter((p) => p.active)
       .map((p) => ({
@@ -62,8 +112,64 @@ export default function AdminCosts() {
 
   const companyMonthly = useMemo(() => activeWithCost.reduce((acc, p) => acc + n(p.monthly_cost_brl), 0), [activeWithCost]);
 
+  const peopleByDept = useMemo(() => {
+    const m = new Map<string, CostPerson[]>();
+    const memberIdByDept = new Map<string, Set<string>>();
+
+    for (const p of activeWithCost) {
+      const deptId = p.department_id ?? "__none__";
+      const arr = m.get(deptId) ?? [];
+      arr.push(p);
+      m.set(deptId, arr);
+
+      const s = memberIdByDept.get(deptId) ?? new Set<string>();
+      s.add(p.id);
+      memberIdByDept.set(deptId, s);
+    }
+
+    // Inject head cost (when the head is not explicitly linked to the dept).
+    for (const d of departments) {
+      const head = headByDeptId.get(d.id);
+      if (!head) continue;
+      if (!head.active) continue;
+      if (n(head.monthly_cost_brl) <= 0) continue;
+
+      const deptId = d.id;
+      const already = memberIdByDept.get(deptId);
+      if (already?.has(head.id)) continue;
+
+      const arr = m.get(deptId) ?? [];
+      arr.unshift({
+        id: head.id,
+        name: head.name ?? head.email,
+        email: head.email,
+        job_title: head.job_title ?? "Head de Departamento",
+        avatar_url: head.avatar_url,
+        department_id: head.department_id,
+        monthly_cost_brl: head.monthly_cost_brl,
+        isHead: true,
+      });
+      m.set(deptId, arr);
+    }
+
+    for (const [k, arr] of m.entries()) {
+      const head = arr.find((p) => p.isHead);
+      const rest = arr.filter((p) => !p.isHead).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+      m.set(k, head ? [head, ...rest] : rest);
+    }
+
+    return m;
+  }, [activeWithCost, departments, headByDeptId]);
+
   const byDept = useMemo(() => {
     const m = new Map<string, { deptId: string; deptName: string; people: number; total: number }>();
+    const memberIds = new Map<string, Set<string>>();
+
+    // Start with all departments so head-only departments can appear in the report.
+    for (const d of departments) {
+      m.set(d.id, { deptId: d.id, deptName: d.name, people: 0, total: 0 });
+    }
+
     for (const p of activeWithCost) {
       const deptId = p.department_id ?? "__none__";
       const deptName = p.department_id ? deptById.get(p.department_id)?.name ?? "(departamento)" : "Sem departamento";
@@ -71,24 +177,33 @@ export default function AdminCosts() {
       row.people += 1;
       row.total += n(p.monthly_cost_brl);
       m.set(deptId, row);
-    }
-    return Array.from(m.values()).sort((a, b) => b.total - a.total);
-  }, [activeWithCost, deptById]);
 
-  const peopleByDept = useMemo(() => {
-    const m = new Map<string, typeof activeWithCost>();
-    for (const p of activeWithCost) {
-      const deptId = p.department_id ?? "__none__";
-      const arr = m.get(deptId) ?? [];
-      arr.push(p);
-      m.set(deptId, arr);
+      const s = memberIds.get(deptId) ?? new Set<string>();
+      s.add(p.id);
+      memberIds.set(deptId, s);
     }
-    for (const [k, arr] of m.entries()) {
-      arr.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
-      m.set(k, arr);
+
+    // Add inferred head cost per department (if not already counted).
+    for (const d of departments) {
+      const head = headByDeptId.get(d.id);
+      if (!head) continue;
+      if (!head.active) continue;
+      if (n(head.monthly_cost_brl) <= 0) continue;
+
+      const deptId = d.id;
+      const already = memberIds.get(deptId);
+      if (already?.has(head.id)) continue;
+
+      const row = m.get(deptId) ?? { deptId, deptName: d.name, people: 0, total: 0 };
+      row.people += 1;
+      row.total += n(head.monthly_cost_brl);
+      m.set(deptId, row);
     }
-    return m;
-  }, [activeWithCost]);
+
+    return Array.from(m.values())
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.total - a.total);
+  }, [activeWithCost, departments, deptById, headByDeptId]);
 
   const myDeptTotal = useMemo(() => {
     if (!user.departmentId) return 0;
@@ -258,7 +373,12 @@ export default function AdminCosts() {
                         <span className="text-xs font-bold">{initials(p.name)}</span>
                       </div>
                       <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{p.name}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{p.name}</div>
+                          {p.isHead ? (
+                            <Badge className="h-5 rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">Head</Badge>
+                          ) : null}
+                        </div>
                         <div className="mt-1 truncate text-xs text-muted-foreground">{p.job_title?.trim() ? p.job_title.trim() : "Cargo não informado"}</div>
                       </div>
                     </div>
