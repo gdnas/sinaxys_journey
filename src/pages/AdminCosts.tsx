@@ -1,21 +1,33 @@
-import { useMemo } from "react";
-import { Building2, Wallet } from "lucide-react";
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Building2, ChevronRight, Wallet } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/lib/auth";
+import { brl, brlPerHourFromMonthly } from "@/lib/costs";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany } from "@/lib/profilesDb";
-import { brl, brlPerHourFromMonthly } from "@/lib/costs";
 
 function n(v: unknown) {
   const x = typeof v === "number" ? v : Number(v);
   return Number.isFinite(x) ? x : 0;
 }
 
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
+  return (a + b).toUpperCase();
+}
+
 export default function AdminCosts() {
+  const nav = useNavigate();
   const { user } = useAuth();
   if (!user || user.role !== "ADMIN" || !user.companyId) return null;
 
@@ -40,6 +52,8 @@ export default function AdminCosts() {
         id: p.id,
         name: p.name ?? p.email,
         email: p.email,
+        job_title: p.job_title,
+        avatar_url: p.avatar_url,
         department_id: p.department_id,
         monthly_cost_brl: p.monthly_cost_brl,
       }))
@@ -61,10 +75,38 @@ export default function AdminCosts() {
     return Array.from(m.values()).sort((a, b) => b.total - a.total);
   }, [activeWithCost, deptById]);
 
+  const peopleByDept = useMemo(() => {
+    const m = new Map<string, typeof activeWithCost>();
+    for (const p of activeWithCost) {
+      const deptId = p.department_id ?? "__none__";
+      const arr = m.get(deptId) ?? [];
+      arr.push(p);
+      m.set(deptId, arr);
+    }
+    for (const [k, arr] of m.entries()) {
+      arr.sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+      m.set(k, arr);
+    }
+    return m;
+  }, [activeWithCost]);
+
   const myDeptTotal = useMemo(() => {
     if (!user.departmentId) return 0;
     return byDept.find((d) => d.deptId === user.departmentId)?.total ?? 0;
   }, [byDept, user.departmentId]);
+
+  const [openDept, setOpenDept] = useState(false);
+  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
+
+  const selectedDept = useMemo(() => {
+    if (!selectedDeptId) return null;
+    return byDept.find((d) => d.deptId === selectedDeptId) ?? null;
+  }, [byDept, selectedDeptId]);
+
+  const selectedPeople = useMemo(() => {
+    if (!selectedDeptId) return [];
+    return peopleByDept.get(selectedDeptId) ?? [];
+  }, [peopleByDept, selectedDeptId]);
 
   return (
     <div className="grid gap-6">
@@ -111,7 +153,7 @@ export default function AdminCosts() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos por departamento</div>
-            <p className="mt-1 text-sm text-muted-foreground">Total mensal por departamento (somatório).</p>
+            <p className="mt-1 text-sm text-muted-foreground">Clique no departamento para ver a discriminação por pessoa.</p>
           </div>
           <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
             {byDept.length} dept(s)
@@ -134,8 +176,20 @@ export default function AdminCosts() {
               {byDept.map((d) => {
                 const isMine = !!user.departmentId && d.deptId === user.departmentId;
                 return (
-                  <TableRow key={d.deptId} className={isMine ? "bg-[color:var(--sinaxys-tint)]/50" : undefined}>
-                    <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{d.deptName}</TableCell>
+                  <TableRow
+                    key={d.deptId}
+                    className={(isMine ? "bg-[color:var(--sinaxys-tint)]/50 " : "") + "cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/40"}
+                    onClick={() => {
+                      setSelectedDeptId(d.deptId);
+                      setOpenDept(true);
+                    }}
+                  >
+                    <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>{d.deptName}</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </TableCell>
                     <TableCell className="text-right text-muted-foreground">{d.people}</TableCell>
                     <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{brl(d.total)}</TableCell>
                     <TableCell className="text-right text-muted-foreground">{brlPerHourFromMonthly(d.total)}</TableCell>
@@ -146,7 +200,7 @@ export default function AdminCosts() {
               {!byDept.length ? (
                 <TableRow>
                   <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
-                    Nenhum custo cadastrado ainda. Edite usuários e preencha “custo mensal”.
+                    Nenhum custo cadastrado ainda. Edite usuários e preencha "custo mensal".
                   </TableCell>
                 </TableRow>
               ) : null}
@@ -154,6 +208,102 @@ export default function AdminCosts() {
           </Table>
         </div>
       </Card>
+
+      <Sheet
+        open={openDept}
+        onOpenChange={(v) => {
+          setOpenDept(v);
+          if (!v) setSelectedDeptId(null);
+        }}
+      >
+        <SheetContent className="w-full max-w-[92vw] rounded-l-3xl border-l-0 p-0 sm:max-w-xl">
+          <div className="p-6">
+            <SheetHeader>
+              <SheetTitle className="text-[color:var(--sinaxys-ink)]">{selectedDept?.deptName ?? "Departamento"}</SheetTitle>
+            </SheetHeader>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                {selectedDept?.people ?? 0} pessoa(s)
+              </Badge>
+              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                Total: {selectedDept ? brl(selectedDept.total) : "—"}
+              </Badge>
+              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                {selectedDept ? brlPerHourFromMonthly(selectedDept.total) : "—"}
+              </Badge>
+            </div>
+
+            <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+              Mostrando apenas perfis ativos com <span className="font-semibold">custo mensal &gt; 0</span>.
+            </div>
+          </div>
+
+          <Separator />
+
+          <ScrollArea className="h-[calc(100vh-220px)] px-6 py-5">
+            <div className="grid gap-3">
+              {selectedPeople.map((p) => (
+                <button
+                  key={p.id}
+                  className="group w-full rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/35"
+                  onClick={() => {
+                    setOpenDept(false);
+                    nav(`/admin/users/${p.id}`);
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                        <span className="text-xs font-bold">{initials(p.name)}</span>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{p.name}</div>
+                        <div className="mt-1 truncate text-xs text-muted-foreground">{p.job_title?.trim() ? p.job_title.trim() : "Cargo não informado"}</div>
+                      </div>
+                    </div>
+
+                    <div className="shrink-0 text-right">
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{brl(n(p.monthly_cost_brl))}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{brlPerHourFromMonthly(n(p.monthly_cost_brl))}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 rounded-xl bg-white/60 p-3 ring-1 ring-[color:var(--sinaxys-border)]/60 sm:grid-cols-3">
+                    <div className="text-xs text-muted-foreground">
+                      <div className="font-semibold text-[color:var(--sinaxys-ink)]">Nome</div>
+                      <div className="mt-0.5 truncate">{p.name}</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      <div className="font-semibold text-[color:var(--sinaxys-ink)]">Ordenado</div>
+                      <div className="mt-0.5 truncate">{brl(n(p.monthly_cost_brl))}</div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      <div className="font-semibold text-[color:var(--sinaxys-ink)]">Custo / hora</div>
+                      <div className="mt-0.5 truncate">{brlPerHourFromMonthly(n(p.monthly_cost_brl))}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="truncate">{p.email}</span>
+                    <span className="font-semibold text-[color:var(--sinaxys-primary)] opacity-0 transition group-hover:opacity-100">Abrir card</span>
+                  </div>
+                </button>
+              ))}
+
+              {!selectedPeople.length ? (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhuma pessoa com custo neste departamento.</div>
+              ) : null}
+            </div>
+          </ScrollArea>
+
+          <div className="border-t border-[color:var(--sinaxys-border)] p-4">
+            <Button variant="outline" className="h-11 w-full rounded-xl" onClick={() => setOpenDept(false)}>
+              Fechar
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

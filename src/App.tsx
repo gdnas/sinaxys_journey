@@ -14,6 +14,7 @@ import CertificateView from "./pages/CertificateView";
 import TrackLibrary from "./pages/TrackLibrary";
 import TrackDetail from "./pages/TrackDetail";
 import AdminUsers from "./pages/AdminUsers";
+import AdminUserCard from "./pages/AdminUserCard";
 import AdminDepartments from "./pages/AdminDepartments";
 import AdminBrand from "./pages/AdminBrand";
 import AdminOrgChart from "./pages/AdminOrgChart";
@@ -167,6 +168,14 @@ const App = () => (
                   element={
                     <RequireAuth roles={["ADMIN"]}>
                       <AdminUsers />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/users/:userId"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminUserCard />
                     </RequireAuth>
                   }
                 />
