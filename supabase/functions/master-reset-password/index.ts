@@ -84,8 +84,10 @@ serve(async (req) => {
       return json(400, { ok: false, message: "A senha temporária deve ter no mínimo 6 caracteres." });
     }
 
+    // Also confirms email, otherwise Supabase blocks login with "Email not confirmed".
     const { error: updErr } = await service.auth.admin.updateUserById(userId, {
       password: tempPassword,
+      email_confirm: true,
     });
     if (updErr) {
       console.error("[master-reset-password] updateUserById failed", { updErr: updErr.message, userId });

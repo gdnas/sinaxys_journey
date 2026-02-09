@@ -215,6 +215,12 @@ serve(async (req) => {
           }
           userId = existingId;
           mode = "linked";
+
+          // Ensure the user can login (common: existing accounts with email not confirmed)
+          const { error: confirmErr } = await service.auth.admin.updateUserById(existingId, { email_confirm: true });
+          if (confirmErr) {
+            console.error("[admin-invite-user] confirm email failed", { confirmErr: confirmErr.message });
+          }
         } else {
           console.error("[admin-invite-user] invite failed", { inviteErr: inviteErr?.message });
           return json(400, { ok: false, message: inviteErr?.message ?? "Não foi possível convidar." });
