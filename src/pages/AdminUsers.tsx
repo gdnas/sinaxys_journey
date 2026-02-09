@@ -85,6 +85,8 @@ export default function AdminUsers() {
   const [inviteDeptId, setInviteDeptId] = useState<string>("");
   const [inviteJobTitle, setInviteJobTitle] = useState("");
   const [invitePhone, setInvitePhone] = useState("");
+  const [inviteSetTempPassword, setInviteSetTempPassword] = useState(false);
+  const [inviteTempPassword, setInviteTempPassword] = useState("");
   const [inviting, setInviting] = useState(false);
 
   const resetInvite = () => {
@@ -94,6 +96,8 @@ export default function AdminUsers() {
     setInviteDeptId("");
     setInviteJobTitle("");
     setInvitePhone("");
+    setInviteSetTempPassword(false);
+    setInviteTempPassword("");
   };
 
   return (
@@ -103,7 +107,7 @@ export default function AdminUsers() {
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Usuários</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Gerencie usuários da sua empresa. Agora você também pode convidar novos usuários por e-mail (o Supabase envia o link de ativação).
+              Gerencie usuários da sua empresa. Você pode criar com senha temporária (o usuário troca no primeiro acesso) ou enviar convite por e-mail.
             </p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
@@ -130,7 +134,7 @@ export default function AdminUsers() {
               }}
             >
               <MailPlus className="mr-2 h-4 w-4" />
-              Convidar usuário
+              Adicionar usuário
             </Button>
 
             <div className="relative w-full md:w-[360px]">
@@ -212,11 +216,11 @@ export default function AdminUsers() {
         </div>
 
         <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-          Dica: o usuário convidado vai receber um e-mail do Supabase para definir a senha e entrar.
+          Se você criar com senha temporária, o sistema força a troca no primeiro acesso.
         </div>
       </Card>
 
-      {/* Invite */}
+      {/* Invite / Create */}
       <Dialog
         open={inviteOpen}
         onOpenChange={(v) => {
@@ -226,16 +230,44 @@ export default function AdminUsers() {
       >
         <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Convidar usuário</DialogTitle>
+            <DialogTitle>Adicionar usuário</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4">
             <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Convite por e-mail</div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Escolha o modo</div>
               <p className="mt-1 text-xs text-muted-foreground">
-                Vamos criar o usuário no Supabase e gerar um convite. Você define papel/dep. agora, e ele ativa a conta pelo e-mail.
+                Ative "senha temporária" para criar o usuário agora. Desativado = enviamos convite por e-mail.
               </p>
             </div>
+
+            <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Definir senha temporária</div>
+                <div className="mt-1 text-xs text-muted-foreground">O usuário entra com essa senha e é obrigado a trocar.</div>
+              </div>
+              <Switch
+                checked={inviteSetTempPassword}
+                onCheckedChange={(v) => {
+                  setInviteSetTempPassword(v);
+                  if (!v) setInviteTempPassword("");
+                }}
+              />
+            </div>
+
+            {inviteSetTempPassword ? (
+              <div className="grid gap-2">
+                <Label>Senha temporária (mín. 6)</Label>
+                <Input
+                  className="h-11 rounded-xl"
+                  value={inviteTempPassword}
+                  onChange={(e) => setInviteTempPassword(e.target.value)}
+                  type="password"
+                  autoComplete="new-password"
+                  placeholder="Defina uma senha inicial"
+                />
+              </div>
+            ) : null}
 
             <div className="grid gap-2">
               <Label>E-mail</Label>
@@ -303,7 +335,11 @@ export default function AdminUsers() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={inviting || inviteEmail.trim().length < 6}
+              disabled={
+                inviting ||
+                inviteEmail.trim().length < 6 ||
+                (inviteSetTempPassword && inviteTempPassword.trim().length < 6)
+              }
               onClick={async () => {
                 try {
                   setInviting(true);
@@ -315,6 +351,7 @@ export default function AdminUsers() {
                       departmentId: inviteDeptId || null,
                       jobTitle: inviteJobTitle || null,
                       phone: invitePhone || null,
+                      password: inviteSetTempPassword ? inviteTempPassword : null,
                     },
                   });
 
@@ -322,6 +359,11 @@ export default function AdminUsers() {
 
                   if (data?.alreadyMember) {
                     toast({ title: "Usuário já existe", description: data?.message ?? "Este e-mail já está na sua empresa." });
+                  } else if (data?.mode === "created") {
+                    toast({
+                      title: "Usuário criado",
+                      description: "Senha temporária definida. No primeiro acesso, o usuário será obrigado a trocar a senha.",
+                    });
                   } else {
                     toast({ title: "Convite enviado", description: `Enviamos um convite para ${inviteEmail.trim()}.` });
                   }
@@ -330,7 +372,7 @@ export default function AdminUsers() {
                   setInviteOpen(false);
                 } catch (e) {
                   toast({
-                    title: "Não foi possível convidar",
+                    title: "Não foi possível adicionar",
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
@@ -339,7 +381,7 @@ export default function AdminUsers() {
                 }
               }}
             >
-              {inviting ? "Enviando…" : "Enviar convite"}
+              {inviting ? "Salvando…" : inviteSetTempPassword ? "Criar usuário" : "Enviar convite"}
             </Button>
           </DialogFooter>
         </DialogContent>

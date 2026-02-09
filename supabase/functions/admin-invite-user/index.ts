@@ -13,6 +13,8 @@ type Body = {
   departmentId?: string | null;
   jobTitle?: string | null;
   phone?: string | null;
+  /** If provided, creates the user immediately with this temporary password (no invite email required). */
+  password?: string | null;
 };
 
 function json(status: number, body: unknown) {
@@ -71,6 +73,7 @@ serve(async (req) => {
     const departmentId = (body?.departmentId ?? null) || null;
     const jobTitle = (body?.jobTitle ?? null) || null;
     const phone = (body?.phone ?? null) || null;
+    const password = (body?.password ?? null)?.trim() || null;
 
     if (!email || !email.includes("@")) {
       return json(400, { ok: false, message: "Informe um e-mail válido." });
@@ -78,6 +81,10 @@ serve(async (req) => {
 
     if (!(["ADMIN", "HEAD", "COLABORADOR"] as const).includes(role)) {
       return json(400, { ok: false, message: "Papel inválido." });
+    }
+
+    if (password && password.length < 6) {
+      return json(400, { ok: false, message: "A senha temporária deve ter no mínimo 6 caracteres." });
     }
 
     // Avoid cross-company duplicates (same email in multiple tenants) — requires MASTERADMIN to resolve.
@@ -111,26 +118,45 @@ serve(async (req) => {
       });
     }
 
-    const { data: inviteData, error: inviteErr } = await service.auth.admin.inviteUserByEmail(email);
-    if (inviteErr || !inviteData?.user) {
-      console.error("[admin-invite-user] invite failed", { inviteErr: inviteErr?.message });
-      return json(400, { ok: false, message: inviteErr?.message ?? "Não foi possível convidar." });
-    }
+    let userId: string | null = null;
+    let mode: "created" | "invited" = "invited";
 
-    const invitedUser = inviteData.user;
+    if (password) {
+      const { data: created, error: createErr } = await service.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+      });
+
+      if (createErr || !created?.user) {
+        console.error("[admin-invite-user] createUser failed", { createErr: createErr?.message });
+        return json(400, { ok: false, message: createErr?.message ?? "Não foi possível criar o usuário." });
+      }
+
+      userId = created.user.id;
+      mode = "created";
+    } else {
+      const { data: inviteData, error: inviteErr } = await service.auth.admin.inviteUserByEmail(email);
+      if (inviteErr || !inviteData?.user) {
+        console.error("[admin-invite-user] invite failed", { inviteErr: inviteErr?.message });
+        return json(400, { ok: false, message: inviteErr?.message ?? "Não foi possível convidar." });
+      }
+      userId = inviteData.user.id;
+      mode = "invited";
+    }
 
     const { error: upsertErr } = await service
       .from("profiles")
       .upsert(
         {
-          id: invitedUser.id,
+          id: userId,
           email,
           name,
           role,
           company_id: callerProfile.company_id,
           department_id: departmentId,
           active: true,
-          must_change_password: false,
+          must_change_password: mode === "created",
           job_title: jobTitle,
           phone,
           joined_at: new Date().toISOString(),
@@ -140,15 +166,18 @@ serve(async (req) => {
 
     if (upsertErr) {
       console.error("[admin-invite-user] profile upsert failed", { upsertErr: upsertErr.message });
-      return json(500, { ok: false, message: "Convite enviado, mas falhou ao criar profile." });
+      return json(500, {
+        ok: false,
+        message: mode === "invited" ? "Convite enviado, mas falhou ao criar profile." : "Usuário criado, mas falhou ao criar profile.",
+      });
     }
 
-    console.log("[admin-invite-user] invited", { email, userId: invitedUser.id, companyId: callerProfile.company_id });
+    console.log("[admin-invite-user] provisioned", { email, userId, companyId: callerProfile.company_id, mode });
 
     return json(200, {
       ok: true,
-      invited: true,
-      userId: invitedUser.id,
+      mode,
+      userId,
       email,
     });
   } catch (e) {
