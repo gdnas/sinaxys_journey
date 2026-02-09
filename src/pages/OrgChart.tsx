@@ -95,6 +95,10 @@ function PersonDialog({
 
             <div className="grid gap-2 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-sm">
               <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">Cargo</span>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">{profile.job_title?.trim() ? profile.job_title.trim() : "—"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">ID</span>
                 <span className="font-mono text-xs text-[color:var(--sinaxys-ink)]">{profile.id}</span>
               </div>
@@ -299,7 +303,7 @@ export default function OrgChart() {
 
                     <div className="mt-2 w-[170px] text-center">
                       <div className={"truncate text-xs font-semibold " + (inactive ? "text-muted-foreground" : "text-[color:var(--sinaxys-ink)]")}>{p.name}</div>
-                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{deptName ?? roleLabel(p.role as any)}</div>
+                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">{p.job_title?.trim() || deptName || roleLabel(p.role as any)}</div>
                     </div>
 
                     {!p.active ? (
