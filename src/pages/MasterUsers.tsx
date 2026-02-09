@@ -637,6 +637,27 @@ export default function MasterUsers() {
                 </div>
                 <Switch checked={editActive} onCheckedChange={setEditActive} />
               </div>
+
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Segurança</div>
+                    <div className="mt-1 text-xs text-muted-foreground">Resete a senha e force troca no próximo login.</div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="h-10 rounded-xl"
+                    onClick={() => {
+                      // Close edit and open reset
+                      setEditOpen(false);
+                      openReset(editing);
+                    }}
+                  >
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    Resetar senha
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="text-sm text-muted-foreground">Perfil não encontrado.</div>
