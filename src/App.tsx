@@ -30,6 +30,8 @@ import Profile from "./pages/Profile";
 import HeadTracks from "./pages/HeadTracks";
 import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadUsers from "./pages/HeadUsers";
+import HeadCosts from "./pages/HeadCosts";
+import OrgChart from "./pages/OrgChart";
 import { AuthProvider } from "@/lib/auth";
 import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
@@ -98,6 +100,16 @@ const App = () => (
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                       <Rankings />
+                    </RequireAuth>
+                  }
+                />
+
+                {/* Organograma (visível para todos dentro da empresa) */}
+                <Route
+                  path="/org"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <OrgChart />
                     </RequireAuth>
                   }
                 />
@@ -178,6 +190,14 @@ const App = () => (
                   element={
                     <RequireAuth roles={["HEAD"]}>
                       <HeadUsers />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/head/costs"
+                  element={
+                    <RequireAuth roles={["HEAD"]}>
+                      <HeadCosts />
                     </RequireAuth>
                   }
                 />

@@ -76,6 +76,12 @@ const nav: NavItem[] = [
 
   // Empresa
   {
+    to: "/org",
+    label: "Organograma",
+    icon: <Network className="h-4 w-4" />,
+    roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+  },
+  {
     to: "/tracks",
     label: "Trilhas",
     icon: <GraduationCap className="h-4 w-4" />,
@@ -91,6 +97,12 @@ const nav: NavItem[] = [
     to: "/head/users",
     label: "Head — Usuários",
     icon: <Shield className="h-4 w-4" />,
+    roles: ["HEAD"],
+  },
+  {
+    to: "/head/costs",
+    label: "Head — Custos",
+    icon: <Wallet className="h-4 w-4" />,
     roles: ["HEAD"],
   },
 
@@ -109,7 +121,7 @@ const nav: NavItem[] = [
   },
   {
     to: "/admin/org",
-    label: "Organograma",
+    label: "Organograma (Admin)",
     icon: <Network className="h-4 w-4" />,
     roles: ["ADMIN"],
   },
