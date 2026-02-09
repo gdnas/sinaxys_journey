@@ -6,30 +6,21 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
-import Invite from "./pages/Invite";
 import ChangePassword from "./pages/ChangePassword";
 import AppDashboard from "./pages/AppDashboard";
 import TrackPlayer from "./pages/TrackPlayer";
 import AppCertificates from "./pages/AppCertificates";
 import CertificateView from "./pages/CertificateView";
-import HeadDashboard from "./pages/HeadDashboard";
-import HeadTracks from "./pages/HeadTracks";
-import HeadTrackEdit from "./pages/HeadTrackEdit";
-import HeadCollaboratorDetail from "./pages/HeadCollaboratorDetail";
 import TrackLibrary from "./pages/TrackLibrary";
-import Rankings from "./pages/Rankings";
 import AdminUsers from "./pages/AdminUsers";
-import AdminImportUsers from "./pages/AdminImportUsers";
 import AdminDepartments from "./pages/AdminDepartments";
-import AdminRewards from "./pages/AdminRewards";
 import AdminBrand from "./pages/AdminBrand";
-import AdminCosts from "./pages/AdminCosts";
 import MasterCompanies from "./pages/MasterCompanies";
 import MasterOverview from "./pages/MasterOverview";
 import MasterUsers from "./pages/MasterUsers";
 import Profile from "./pages/Profile";
-import OrgChart from "./pages/OrgChart";
-import PersonProfile from "./pages/PersonProfile";
+import HeadTracks from "./pages/HeadTracks";
+import HeadTrackEdit from "./pages/HeadTrackEdit";
 import { AuthProvider } from "@/lib/auth";
 import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
@@ -49,7 +40,6 @@ const App = () => (
               <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/invite/:token" element={<Invite />} />
                 <Route
                   path="/password"
                   element={
@@ -94,41 +84,14 @@ const App = () => (
                   }
                 />
 
-                <Route
-                  path="/org"
-                  element={
-                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                      <OrgChart />
-                    </RequireAuth>
-                  }
-                />
-
-                <Route
-                  path="/people/:userId"
-                  element={
-                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                      <PersonProfile />
-                    </RequireAuth>
-                  }
-                />
-
                 {/* Compat: rota antiga */}
                 <Route path="/library" element={<Navigate to="/tracks" replace />} />
 
                 <Route
                   path="/tracks"
                   element={
-                    <RequireAuth roles={["ADMIN", "COLABORADOR"]}>
-                      <TrackLibrary />
-                    </RequireAuth>
-                  }
-                />
-
-                <Route
-                  path="/rankings"
-                  element={
                     <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                      <Rankings />
+                      <TrackLibrary />
                     </RequireAuth>
                   }
                 />
@@ -169,22 +132,6 @@ const App = () => (
 
                 {/* Head */}
                 <Route
-                  path="/head"
-                  element={
-                    <RequireAuth roles={["HEAD"]}>
-                      <HeadDashboard />
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/head/collaborators/:userId"
-                  element={
-                    <RequireAuth roles={["HEAD"]}>
-                      <HeadCollaboratorDetail />
-                    </RequireAuth>
-                  }
-                />
-                <Route
                   path="/head/tracks"
                   element={
                     <RequireAuth roles={["HEAD"]}>
@@ -215,30 +162,6 @@ const App = () => (
                   element={
                     <RequireAuth roles={["ADMIN"]}>
                       <AdminDepartments />
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/admin/users/import"
-                  element={
-                    <RequireAuth roles={["ADMIN"]}>
-                      <AdminImportUsers />
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/admin/rewards"
-                  element={
-                    <RequireAuth roles={["ADMIN"]}>
-                      <AdminRewards />
-                    </RequireAuth>
-                  }
-                />
-                <Route
-                  path="/admin/costs"
-                  element={
-                    <RequireAuth roles={["ADMIN"]}>
-                      <AdminCosts />
                     </RequireAuth>
                   }
                 />

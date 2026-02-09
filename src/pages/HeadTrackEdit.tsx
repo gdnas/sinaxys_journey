@@ -1,250 +1,315 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
-  Plus,
-  Trash2,
-  PlayCircle,
-  ClipboardCheck,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  FileText,
   HelpCircle,
-  BookOpenText,
-  Pencil,
-  X,
-  GripVertical,
-  Users,
-  UserPlus,
-  Eye,
-  EyeOff,
+  LayoutList,
+  PlayCircle,
+  Plus,
+  Save,
+  Trash2,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
-import type { QuizOption, QuizQuestion, TrackModule } from "@/lib/domain";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
-import { mockDb } from "@/lib/mockDb";
+import type { QuizQuestion, TrackModule } from "@/lib/domain";
+import {
+  deleteModule,
+  getModulesByTrack,
+  getQuizForModule,
+  getTrack,
+  replaceQuiz,
+  setTrackPublished,
+  upsertModule,
+  updateTrack,
+  type DbModule,
+} from "@/lib/journeyDb";
+
+function mapDbModule(m: DbModule): TrackModule {
+  return {
+    id: m.id,
+    trackId: m.track_id,
+    orderIndex: m.order_index,
+    type: m.type,
+    title: m.title,
+    description: m.description ?? undefined,
+    xpReward: m.xp_reward,
+    youtubeUrl: m.youtube_url ?? undefined,
+    materialUrl: m.material_url ?? undefined,
+    checkpointPrompt: m.checkpoint_prompt ?? undefined,
+    minScore: m.min_score ?? undefined,
+  };
+}
 
 function typeLabel(t: TrackModule["type"]) {
-  switch (t) {
-    case "VIDEO":
-      return "Vídeo";
-    case "MATERIAL":
-      return "Material";
-    case "QUIZ":
-      return "Quiz";
-    case "CHECKPOINT":
-      return "Checkpoint";
-  }
+  if (t === "VIDEO") return "Vídeo";
+  if (t === "MATERIAL") return "Material";
+  if (t === "CHECKPOINT") return "Checkpoint";
+  return "Quiz";
 }
 
 function typeIcon(t: TrackModule["type"]) {
-  switch (t) {
-    case "VIDEO":
-      return <PlayCircle className="h-4 w-4" />;
-    case "MATERIAL":
-      return <BookOpenText className="h-4 w-4" />;
-    case "QUIZ":
-      return <HelpCircle className="h-4 w-4" />;
-    case "CHECKPOINT":
-      return <ClipboardCheck className="h-4 w-4" />;
-  }
+  if (t === "VIDEO") return <PlayCircle className="h-4 w-4" />;
+  if (t === "MATERIAL") return <FileText className="h-4 w-4" />;
+  if (t === "CHECKPOINT") return <LayoutList className="h-4 w-4" />;
+  return <HelpCircle className="h-4 w-4" />;
 }
 
-type QuizQuestionDraft = {
-  id: string;
-  type: "TRUE_FALSE" | "MULTIPLE_CHOICE";
+type QuizDraftQuestion = {
+  type: QuizQuestion["type"];
   prompt: string;
-  options: { id: string; text: string; isCorrect: boolean }[];
+  options: Array<{ text: string; isCorrect: boolean }>;
 };
-
-function tmpId(prefix: string) {
-  return `${prefix}_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
-}
-
-function optionLetter(i: number) {
-  return String.fromCharCode("A".charCodeAt(0) + i);
-}
-
-function makeTrueFalseQuestion(correct: "true" | "false" = "true"): QuizQuestionDraft {
-  return {
-    id: tmpId("qtmp"),
-    type: "TRUE_FALSE",
-    prompt: "",
-    options: [
-      { id: tmpId("otmp"), text: "Verdadeiro", isCorrect: correct === "true" },
-      { id: tmpId("otmp"), text: "Falso", isCorrect: correct === "false" },
-    ],
-  };
-}
-
-function makeMultipleChoiceQuestion(): QuizQuestionDraft {
-  const correctId = tmpId("otmp");
-  return {
-    id: tmpId("qtmp"),
-    type: "MULTIPLE_CHOICE",
-    prompt: "",
-    options: [
-      { id: correctId, text: "", isCorrect: true },
-      { id: tmpId("otmp"), text: "", isCorrect: false },
-      { id: tmpId("otmp"), text: "", isCorrect: false },
-      { id: tmpId("otmp"), text: "", isCorrect: false },
-    ],
-  };
-}
-
-function normalizeCorrect(opts: QuizQuestionDraft["options"], correctOptionId: string) {
-  return opts.map((o) => ({ ...o, isCorrect: o.id === correctOptionId }));
-}
-
-function isQuizDraftValid(minScore: string, questions: QuizQuestionDraft[]) {
-  const ms = Number(minScore);
-  if (!Number.isFinite(ms) || ms < 0 || ms > 100) return false;
-  if (!questions.length) return false;
-
-  for (const q of questions) {
-    if (q.prompt.trim().length < 8) return false;
-
-    const correctCount = q.options.filter((o) => o.isCorrect).length;
-    if (correctCount !== 1) return false;
-
-    if (q.type === "MULTIPLE_CHOICE") {
-      if (q.options.length < 2) return false;
-      if (q.options.some((o) => o.text.trim().length < 1)) return false;
-    }
-  }
-
-  return true;
-}
-
-function draftFromDb(questions: QuizQuestion[], optionsByQuestionId: Record<string, QuizOption[]>): QuizQuestionDraft[] {
-  return questions
-    .slice()
-    .sort((a, b) => a.orderIndex - b.orderIndex)
-    .map((q) => {
-      const opts = (optionsByQuestionId[q.id] ?? []).slice();
-      const correct = opts.find((o) => o.isCorrect) ?? opts[0];
-      const normalized = opts.map((o) => ({ ...o, isCorrect: o.id === correct?.id }));
-      return {
-        id: q.id,
-        type: q.type,
-        prompt: q.prompt,
-        options: normalized.map((o) => ({ id: o.id, text: o.text, isCorrect: o.isCorrect })),
-      };
-    });
-}
 
 export default function HeadTrackEdit() {
   const { toast } = useToast();
+  const qc = useQueryClient();
   const { user } = useAuth();
-  const { trackId } = useParams();
-  const [tick, setTick] = useState(0);
+  const navigate = useNavigate();
+  const { trackId } = useParams<{ trackId: string }>();
 
-  const track = useMemo(() => (trackId ? mockDb.getTrack(trackId) : null), [trackId, tick]);
-  const modules = useMemo(() => (trackId ? mockDb.getModulesByTrack(trackId) : []), [trackId, tick]);
+  if (!user || user.role !== "HEAD") return null;
+  if (!trackId) return null;
 
-  const [draggingId, setDraggingId] = useState<string | null>(null);
-  const [dragOverId, setDragOverId] = useState<string | null>(null);
+  const { data: track, isLoading: trackLoading } = useQuery({
+    queryKey: ["track", trackId],
+    queryFn: () => getTrack(trackId),
+  });
 
-  const deptId = user?.departmentId;
+  const { data: modulesRaw = [], isLoading: modsLoading } = useQuery({
+    queryKey: ["modules", trackId],
+    queryFn: () => getModulesByTrack(trackId),
+  });
 
-  const deptUsers = useMemo(() => {
-    if (!deptId) return [];
-    return mockDb
-      .getUsers()
-      .filter((u) => u.active && u.departmentId === deptId && u.role === "COLABORADOR")
-      .sort((a, b) => a.name.localeCompare(b.name));
-  }, [deptId, tick]);
+  const modules = useMemo(() => modulesRaw.map(mapDbModule).sort((a, b) => a.orderIndex - b.orderIndex), [modulesRaw]);
 
-  const [assignOpen, setAssignOpen] = useState(false);
-  const [assignMode, setAssignMode] = useState<"team" | "person">("team");
-  const [assignUserId, setAssignUserId] = useState<string>("");
-  const [assignTrackId, setAssignTrackId] = useState<string | null>(null);
-
-  const reorder = (fromId: string, toId: string) => {
-    const ordered = modules.slice().sort((a, b) => a.orderIndex - b.orderIndex);
-    const from = ordered.findIndex((m) => m.id === fromId);
-    const to = ordered.findIndex((m) => m.id === toId);
-    if (from < 0 || to < 0 || from === to) return;
-
-    const next = ordered.slice();
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-
-    next.forEach((m, idx) => {
-      const nextOrder = idx + 1;
-      if (m.orderIndex === nextOrder) return;
-      try {
-        mockDb.upsertModule({ ...m, orderIndex: nextOrder });
-      } catch (e) {
-        toast({
-          title: "Não foi possível salvar",
-          description: e instanceof Error ? e.message : "Tente novamente.",
-          variant: "destructive",
-        });
-      }
-    });
-
-    toast({
-      title: "Ordem atualizada",
-      description: "A sequência de desbloqueio foi ajustada.",
-    });
-
-    setTick((x) => x + 1);
-  };
-
-  const [trackTitle, setTrackTitle] = useState("");
-  const [trackDescription, setTrackDescription] = useState("");
-  const [savingTrack, setSavingTrack] = useState(false);
+  // Track form
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [published, setPublished] = useState(false);
 
   useEffect(() => {
     if (!track) return;
-    setTrackTitle(track.title);
-    setTrackDescription(track.description);
-  }, [track?.id, track?.title, track?.description]);
+    setTitle(track.title);
+    setDescription(track.description);
+    setPublished(!!track.published);
+  }, [track?.id]);
 
-  const trackDirty =
-    !!track && (trackTitle.trim() !== track.title.trim() || trackDescription.trim() !== track.description.trim());
+  const dirtyTrack = !!track && (title.trim() !== track.title || description.trim() !== track.description || published !== track.published);
 
-  const [open, setOpen] = useState(false);
-  const [moduleType, setModuleType] = useState<TrackModule["type"]>("VIDEO");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [materialUrl, setMaterialUrl] = useState("");
-  const [minScore, setMinScore] = useState("70");
-  const [checkpointPrompt, setCheckpointPrompt] = useState("");
-  const [quizQuestions, setQuizQuestions] = useState<QuizQuestionDraft[]>([makeTrueFalseQuestion("true")]);
+  const saveTrackMutation = useMutation({
+    mutationFn: async () => {
+      if (!track) return;
+      await updateTrack({ trackId: track.id, title, description });
+      if (published !== track.published) await setTrackPublished(track.id, published);
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["track", trackId] });
+      toast({ title: "Trilha atualizada" });
+    },
+  });
 
-  // Edit existing module
-  const [editOpen, setEditOpen] = useState(false);
-  const [editModuleId, setEditModuleId] = useState<string | null>(null);
-  const editModule = useMemo(
-    () => (editModuleId ? modules.find((m) => m.id === editModuleId) ?? null : null),
-    [editModuleId, modules],
-  );
+  // Module dialog
+  const [moduleOpen, setModuleOpen] = useState(false);
+  const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
+  const editingModule = useMemo(() => modules.find((m) => m.id === editingModuleId) ?? null, [modules, editingModuleId]);
 
-  const [editTitle, setEditTitle] = useState("");
-  const [editDescription, setEditDescription] = useState("");
-  const [editYoutubeUrl, setEditYoutubeUrl] = useState("");
-  const [editMaterialUrl, setEditMaterialUrl] = useState("");
-  const [editCheckpointPrompt, setEditCheckpointPrompt] = useState("");
-  const [editMinScore, setEditMinScore] = useState("70");
-  const [editQuizQuestions, setEditQuizQuestions] = useState<QuizQuestionDraft[]>([]);
+  const [mType, setMType] = useState<TrackModule["type"]>("VIDEO");
+  const [mTitle, setMTitle] = useState("");
+  const [mDesc, setMDesc] = useState("");
+  const [mXp, setMXp] = useState<string>("20");
+  const [mYoutube, setMYoutube] = useState("");
+  const [mMaterial, setMMaterial] = useState("");
+  const [mCheckpoint, setMCheckpoint] = useState("");
+  const [mMinScore, setMMinScore] = useState<string>("70");
 
-  if (!user || user.role !== "HEAD") return null;
-  if (!track || !trackId) {
+  useEffect(() => {
+    if (!moduleOpen) return;
+    if (!editingModule) {
+      setMType("VIDEO");
+      setMTitle("");
+      setMDesc("");
+      setMXp("20");
+      setMYoutube("");
+      setMMaterial("");
+      setMCheckpoint("");
+      setMMinScore("70");
+      return;
+    }
+
+    setMType(editingModule.type);
+    setMTitle(editingModule.title);
+    setMDesc(editingModule.description ?? "");
+    setMXp(String(editingModule.xpReward ?? 0));
+    setMYoutube(editingModule.youtubeUrl ?? "");
+    setMMaterial(editingModule.materialUrl ?? "");
+    setMCheckpoint(editingModule.checkpointPrompt ?? "");
+    setMMinScore(String(editingModule.minScore ?? 70));
+  }, [moduleOpen, editingModuleId]);
+
+  const saveModuleMutation = useMutation({
+    mutationFn: async () => {
+      const orderIndex = editingModule?.orderIndex ?? (modules[modules.length - 1]?.orderIndex ?? 0) + 1;
+      const payload: TrackModule & { trackId: string } = {
+        id: editingModule?.id ?? crypto.randomUUID(),
+        trackId,
+        orderIndex,
+        type: mType,
+        title: mTitle.trim(),
+        description: mDesc.trim() || undefined,
+        xpReward: Math.max(0, Math.floor(Number(mXp) || 0)),
+        youtubeUrl: mType === "VIDEO" ? mYoutube.trim() || undefined : undefined,
+        materialUrl: mType === "MATERIAL" ? mMaterial.trim() || undefined : undefined,
+        checkpointPrompt: mType === "CHECKPOINT" ? mCheckpoint.trim() || undefined : undefined,
+        minScore: mType === "QUIZ" ? Math.max(0, Math.min(100, Math.floor(Number(mMinScore) || 70))) : undefined,
+      };
+
+      await upsertModule(payload);
+
+      // If new QUIZ, ensure there is at least a baseline quiz.
+      if (mType === "QUIZ" && !editingModule) {
+        await replaceQuiz(payload.id, {
+          questions: [
+            {
+              type: "MULTIPLE_CHOICE",
+              prompt: "Pergunta 1",
+              options: [
+                { text: "Opção A", isCorrect: true },
+                { text: "Opção B", isCorrect: false },
+              ],
+            },
+          ],
+        });
+      }
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["modules", trackId] });
+      toast({ title: "Módulo salvo" });
+      setModuleOpen(false);
+      setEditingModuleId(null);
+    },
+  });
+
+  const deleteModuleMutation = useMutation({
+    mutationFn: async (moduleId: string) => {
+      await deleteModule(moduleId);
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["modules", trackId] });
+      toast({ title: "Módulo removido" });
+    },
+  });
+
+  const moveModule = async (id: string, dir: -1 | 1) => {
+    const idx = modules.findIndex((m) => m.id === id);
+    if (idx < 0) return;
+    const targetIdx = idx + dir;
+    if (targetIdx < 0 || targetIdx >= modules.length) return;
+
+    const a = modules[idx];
+    const b = modules[targetIdx];
+
+    // swap order indexes
+    await upsertModule({ ...a, trackId, orderIndex: b.orderIndex });
+    await upsertModule({ ...b, trackId, orderIndex: a.orderIndex });
+    await qc.invalidateQueries({ queryKey: ["modules", trackId] });
+  };
+
+  // Quiz editor
+  const [quizOpen, setQuizOpen] = useState(false);
+  const [quizModuleId, setQuizModuleId] = useState<string | null>(null);
+
+  const { data: quizData } = useQuery({
+    queryKey: ["quiz-editor", quizModuleId],
+    queryFn: async () => {
+      if (!quizModuleId) return null;
+      return getQuizForModule(quizModuleId);
+    },
+    enabled: !!quizModuleId,
+  });
+
+  const [quizDraft, setQuizDraft] = useState<QuizDraftQuestion[]>([]);
+
+  useEffect(() => {
+    if (!quizOpen) return;
+    if (!quizData) {
+      setQuizDraft([]);
+      return;
+    }
+
+    const next: QuizDraftQuestion[] = quizData.questions.map((q) => {
+      const opts = quizData.optionsByQuestionId[q.id] ?? [];
+      return {
+        type: q.type,
+        prompt: q.prompt,
+        options: opts.map((o) => ({ text: o.text, isCorrect: !!o.isCorrect })),
+      };
+    });
+
+    setQuizDraft(next);
+  }, [quizOpen, quizData?.questions.length, quizModuleId]);
+
+  const saveQuizMutation = useMutation({
+    mutationFn: async () => {
+      if (!quizModuleId) return;
+      const clean = quizDraft
+        .map((q) => ({
+          type: q.type,
+          prompt: q.prompt.trim(),
+          options: q.options
+            .map((o) => ({ text: o.text.trim(), isCorrect: !!o.isCorrect }))
+            .filter((o) => o.text.length > 0),
+        }))
+        .filter((q) => q.prompt.length > 0);
+
+      if (!clean.length) throw new Error("Inclua pelo menos 1 pergunta.");
+      for (const q of clean) {
+        const correct = q.options.filter((o) => o.isCorrect).length;
+        if (q.type === "TRUE_FALSE") {
+          if (q.options.length !== 2) throw new Error("Verdadeiro/Falso exige exatamente 2 opções.");
+          if (correct !== 1) throw new Error("Verdadeiro/Falso exige exatamente 1 opção correta.");
+        } else {
+          if (q.options.length < 2) throw new Error("Múltipla escolha exige pelo menos 2 opções.");
+          if (correct !== 1) throw new Error("Marque exatamente 1 opção correta por pergunta.");
+        }
+      }
+
+      await replaceQuiz(quizModuleId, { questions: clean });
+    },
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["quiz-editor", quizModuleId] });
+      toast({ title: "Quiz atualizado" });
+      setQuizOpen(false);
+      setQuizModuleId(null);
+    },
+  });
+
+  if (trackLoading) {
+    return (
+      <div className="rounded-3xl border bg-white p-6">
+        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Carregando trilha…</div>
+      </div>
+    );
+  }
+
+  if (!track) {
     return (
       <div className="rounded-3xl border bg-white p-6">
         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilha não encontrada</div>
-        <p className="mt-1 text-sm text-muted-foreground">Verifique o link ou volte para a lista.</p>
         <Button asChild variant="outline" className="mt-4 rounded-xl">
           <Link to="/head/tracks">
             <ArrowLeft className="mr-2 h-4 w-4" />
@@ -255,1126 +320,507 @@ export default function HeadTrackEdit() {
     );
   }
 
-  const resetDialog = () => {
-    setModuleType("VIDEO");
-    setTitle("");
-    setDescription("");
-    setYoutubeUrl("");
-    setMaterialUrl("");
-    setMinScore("70");
-    setCheckpointPrompt("");
-    setQuizQuestions([makeTrueFalseQuestion("true")]);
-  };
-
-  const openEdit = (m: TrackModule) => {
-    setEditModuleId(m.id);
-    setEditTitle(m.title);
-    setEditDescription(m.description ?? "");
-    setEditYoutubeUrl(m.youtubeUrl ?? "");
-    setEditMaterialUrl(m.materialUrl ?? "");
-    setEditCheckpointPrompt(m.checkpointPrompt ?? "");
-    setEditMinScore(String(m.minScore ?? 70));
-
-    if (m.type === "QUIZ") {
-      const q = mockDb.getQuizForModule(m.id);
-      const draft = draftFromDb(q.questions, q.optionsByQuestionId);
-      setEditQuizQuestions(draft.length ? draft : [makeTrueFalseQuestion("true")]);
-    } else {
-      setEditQuizQuestions([]);
-    }
-
-    setEditOpen(true);
-  };
-
-  const saveEdit = () => {
-    if (!editModule) return;
-
-    const updated: TrackModule = {
-      ...editModule,
-      title: editTitle.trim(),
-      description: editDescription.trim() || undefined,
-      youtubeUrl: editModule.type === "VIDEO" ? editYoutubeUrl.trim() : undefined,
-      materialUrl: editModule.type === "MATERIAL" ? editMaterialUrl.trim() : undefined,
-      checkpointPrompt: editModule.type === "CHECKPOINT" ? editCheckpointPrompt.trim() : undefined,
-      minScore: editModule.type === "QUIZ" ? Number(editMinScore) || 70 : undefined,
-    };
-
-    try {
-      mockDb.upsertModule(updated);
-
-      if (editModule.type === "QUIZ") {
-        mockDb.replaceQuiz(editModule.id, {
-          questions: editQuizQuestions.map((q) => ({
-            type: q.type,
-            prompt: q.prompt.trim(),
-            options: q.options.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
-          })),
-        });
-      }
-
-      toast({
-        title: "Módulo salvo",
-        description: "As alterações foram aplicadas.",
-      });
-
-      setEditOpen(false);
-      setTick((x) => x + 1);
-    } catch (e) {
-      toast({
-        title: "Não foi possível salvar",
-        description: e instanceof Error ? e.message : "Tente novamente.",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const isEditValid = (() => {
-    if (!editModule) return false;
-    if (editTitle.trim().length < 4) return false;
-    if (editModule.type === "VIDEO" && editYoutubeUrl.trim().length < 10) return false;
-    if (editModule.type === "MATERIAL" && editMaterialUrl.trim().length < 10) return false;
-    if (editModule.type === "CHECKPOINT" && editCheckpointPrompt.trim().length < 10) return false;
-    if (editModule.type === "QUIZ" && !isQuizDraftValid(editMinScore, editQuizQuestions)) return false;
-    return true;
-  })();
-
-  const nextOrder = (modules.reduce((max, m) => Math.max(max, m.orderIndex), 0) || 0) + 1;
-
-  const isNewModuleValid =
-    title.trim().length >= 4 &&
-    (moduleType !== "VIDEO" || youtubeUrl.trim().length >= 10) &&
-    (moduleType !== "MATERIAL" || materialUrl.trim().length >= 10) &&
-    (moduleType !== "CHECKPOINT" || checkpointPrompt.trim().length >= 10) &&
-    (moduleType !== "QUIZ" || isQuizDraftValid(minScore, quizQuestions));
-
   return (
     <div className="grid gap-6">
-      {/* Edit dialog */}
-      <Dialog
-        open={editOpen}
-        onOpenChange={(v) => {
-          setEditOpen(v);
-          if (!v) setEditModuleId(null);
-        }}
-      >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Editar módulo</DialogTitle>
-          </DialogHeader>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button asChild variant="outline" className="rounded-xl">
+          <Link to="/head/tracks">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Trilhas
+          </Link>
+        </Button>
 
-          <ScrollArea className="max-h-[70vh] pr-4">
-            <div className="grid gap-4">
-              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo</div>
-                <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                  {editModule ? typeLabel(editModule.type) : "—"}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  Atualize o conteúdo sempre que necessário — sem recriar a trilha.
-                </div>
-              </div>
+        <Button
+          className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+          disabled={!dirtyTrack || saveTrackMutation.isPending || title.trim().length < 6 || description.trim().length < 10}
+          onClick={async () => {
+            try {
+              await saveTrackMutation.mutateAsync();
+            } catch (e) {
+              toast({
+                title: "Não foi possível salvar",
+                description: e instanceof Error ? e.message : "Erro inesperado.",
+                variant: "destructive",
+              });
+            }
+          }}
+        >
+          <Save className="mr-2 h-4 w-4" />
+          Salvar
+        </Button>
+      </div>
 
-              <div className="grid gap-2">
-                <Label>Título</Label>
-                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="rounded-xl" />
-              </div>
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Configurações</div>
+            <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)]">Editar trilha</div>
+            <p className="mt-1 text-sm text-muted-foreground">Título, descrição e publicação.</p>
+          </div>
+          <Badge className={"rounded-full " + (published ? "bg-emerald-100 text-emerald-900 hover:bg-emerald-100" : "bg-amber-100 text-amber-900 hover:bg-amber-100")}>
+            {published ? "Publicada" : "Rascunho"}
+          </Badge>
+        </div>
 
-              <div className="grid gap-2">
-                <Label>Descrição (opcional)</Label>
-                <Textarea
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  className="min-h-24 rounded-2xl"
-                />
-              </div>
+        <div className="mt-5 grid gap-4">
+          <div className="grid gap-2">
+            <Label>Título</Label>
+            <Input className="h-11 rounded-xl" value={title} onChange={(e) => setTitle(e.target.value)} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Descrição</Label>
+            <Textarea className="min-h-28 rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} />
+          </div>
 
-              {editModule?.type === "VIDEO" ? (
-                <div className="grid gap-2">
-                  <Label>Link do YouTube</Label>
-                  <Input value={editYoutubeUrl} onChange={(e) => setEditYoutubeUrl(e.target.value)} className="rounded-xl" />
-                </div>
-              ) : null}
+          <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Publicar</div>
+              <div className="mt-1 text-xs text-muted-foreground">Trilhas publicadas aparecem para colaboradores.</div>
+            </div>
+            <Switch checked={published} onCheckedChange={setPublished} />
+          </div>
+        </div>
+      </Card>
 
-              {editModule?.type === "MATERIAL" ? (
-                <div className="grid gap-2">
-                  <Label>Link do material (Figma, ClickUp ou outro)</Label>
-                  <Input
-                    value={editMaterialUrl}
-                    onChange={(e) => setEditMaterialUrl(e.target.value)}
-                    className="rounded-xl"
-                    placeholder="https://..."
-                  />
-                </div>
-              ) : null}
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulos</div>
+            <p className="mt-1 text-sm text-muted-foreground">Ordem sequencial. O primeiro módulo fica disponível automaticamente.</p>
+          </div>
+          <Button
+            className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+            onClick={() => {
+              setEditingModuleId(null);
+              setModuleOpen(true);
+            }}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Novo módulo
+          </Button>
+        </div>
 
-              {editModule?.type === "CHECKPOINT" ? (
-                <div className="grid gap-2">
-                  <Label>Pergunta do checkpoint</Label>
-                  <Textarea
-                    value={editCheckpointPrompt}
-                    onChange={(e) => setEditCheckpointPrompt(e.target.value)}
-                    className="min-h-24 rounded-2xl"
-                  />
-                </div>
-              ) : null}
+        <Separator className="my-5" />
 
-              {editModule?.type === "QUIZ" ? (
-                <div className="grid gap-4">
-                  <div className="grid gap-2">
-                    <Label>Nota mínima (%)</Label>
-                    <Input
-                      value={editMinScore}
-                      onChange={(e) => setEditMinScore(e.target.value)}
-                      className="rounded-xl"
-                      inputMode="numeric"
-                    />
-                    <div className="text-xs text-muted-foreground">
-                      Perguntas de múltipla escolha (A, B, C, D…). Uma alternativa correta por pergunta.
+        {modsLoading ? (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando módulos…</div>
+        ) : modules.length ? (
+          <div className="grid gap-3">
+            {modules.map((m, idx) => (
+              <div key={m.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                        {typeIcon(m.type)}
+                        <span className="ml-2">{typeLabel(m.type)}</span>
+                      </Badge>
+                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{m.title}</div>
+                      <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">+{m.xpReward} XP</Badge>
                     </div>
+                    {m.description ? <div className="mt-2 text-sm text-muted-foreground">{m.description}</div> : null}
                   </div>
 
-                  <Separator />
-
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Perguntas</div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       variant="outline"
-                      className="rounded-xl"
-                      onClick={() => setEditQuizQuestions((prev) => [...prev, makeMultipleChoiceQuestion()])}
+                      size="icon"
+                      className="h-9 w-9 rounded-xl"
+                      disabled={idx === 0}
+                      onClick={() => moveModule(m.id, -1)}
+                      aria-label="Subir"
                     >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Adicionar pergunta
+                      <ChevronUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl"
+                      disabled={idx === modules.length - 1}
+                      onClick={() => moveModule(m.id, 1)}
+                      aria-label="Descer"
+                    >
+                      <ChevronDown className="h-4 w-4" />
+                    </Button>
+
+                    {m.type === "QUIZ" ? (
+                      <Button
+                        variant="outline"
+                        className="h-9 rounded-xl"
+                        onClick={() => {
+                          setQuizModuleId(m.id);
+                          setQuizOpen(true);
+                        }}
+                      >
+                        <HelpCircle className="mr-2 h-4 w-4" />
+                        Editar quiz
+                      </Button>
+                    ) : null}
+
+                    <Button
+                      variant="outline"
+                      className="h-9 rounded-xl"
+                      onClick={() => {
+                        setEditingModuleId(m.id);
+                        setModuleOpen(true);
+                      }}
+                    >
+                      <Save className="mr-2 h-4 w-4" />
+                      Editar
+                    </Button>
+
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl"
+                      onClick={async () => {
+                        try {
+                          await deleteModuleMutation.mutateAsync(m.id);
+                        } catch (e) {
+                          toast({
+                            title: "Não foi possível remover",
+                            description: e instanceof Error ? e.message : "Erro inesperado.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      aria-label="Remover"
+                    >
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-
-                  <div className="grid gap-3">
-                    {editQuizQuestions.map((q, idx) => {
-                      const correctId = q.options.find((o) => o.isCorrect)?.id ?? q.options[0]?.id;
-                      return (
-                        <div key={q.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                            <div className="min-w-0">
-                              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                Pergunta {idx + 1}
-                              </div>
-                              <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                                {q.type === "TRUE_FALSE" ? "Verdadeiro/Falso" : "Múltipla escolha"}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Select
-                                value={q.type}
-                                onValueChange={(v) => {
-                                  setEditQuizQuestions((prev) =>
-                                    prev.map((x) => {
-                                      if (x.id !== q.id) return x;
-                                      return v === "TRUE_FALSE"
-                                        ? { ...makeTrueFalseQuestion("true"), id: x.id, prompt: x.prompt }
-                                        : { ...makeMultipleChoiceQuestion(), id: x.id, prompt: x.prompt };
-                                    }),
-                                  );
-                                }}
-                              >
-                                <SelectTrigger className="h-9 w-[180px] rounded-xl">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="TRUE_FALSE">Verdadeiro/Falso</SelectItem>
-                                  <SelectItem value="MULTIPLE_CHOICE">Múltipla escolha</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-9 w-9 rounded-xl"
-                                disabled={editQuizQuestions.length === 1}
-                                onClick={() => setEditQuizQuestions((prev) => prev.filter((x) => x.id !== q.id))}
-                                aria-label="Remover pergunta"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 grid gap-2">
-                            <Label>Enunciado</Label>
-                            <Textarea
-                              value={q.prompt}
-                              onChange={(e) =>
-                                setEditQuizQuestions((prev) =>
-                                  prev.map((x) => (x.id === q.id ? { ...x, prompt: e.target.value } : x)),
-                                )
-                              }
-                              className="min-h-20 rounded-2xl"
-                            />
-                          </div>
-
-                          <div className="mt-4 grid gap-2">
-                            <Label>Alternativas</Label>
-
-                            {q.type === "TRUE_FALSE" ? (
-                              <Select
-                                value={correctId}
-                                onValueChange={(v) =>
-                                  setEditQuizQuestions((prev) =>
-                                    prev.map((x) => (x.id === q.id ? { ...x, options: normalizeCorrect(x.options, v) } : x)),
-                                  )
-                                }
-                              >
-                                <SelectTrigger className="rounded-xl">
-                                  <SelectValue placeholder="Selecione a correta" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {q.options.map((o) => (
-                                    <SelectItem key={o.id} value={o.id}>
-                                      {o.text}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            ) : (
-                              <RadioGroup
-                                value={correctId}
-                                onValueChange={(v) =>
-                                  setEditQuizQuestions((prev) =>
-                                    prev.map((x) => (x.id === q.id ? { ...x, options: normalizeCorrect(x.options, v) } : x)),
-                                  )
-                                }
-                                className="grid gap-2"
-                              >
-                                {q.options.map((o, optIdx) => (
-                                  <div
-                                    key={o.id}
-                                    className="flex items-center gap-2 rounded-xl border border-[color:var(--sinaxys-border)] bg-white px-3 py-2"
-                                  >
-                                    <RadioGroupItem value={o.id} id={`${q.id}_${o.id}`} />
-                                    <div className="w-8 text-xs font-semibold text-muted-foreground">
-                                      {optionLetter(optIdx)}
-                                    </div>
-                                    <Input
-                                      value={o.text}
-                                      onChange={(e) =>
-                                        setEditQuizQuestions((prev) =>
-                                          prev.map((x) => {
-                                            if (x.id !== q.id) return x;
-                                            return {
-                                              ...x,
-                                              options: x.options.map((y) =>
-                                                y.id === o.id ? { ...y, text: e.target.value } : y,
-                                              ),
-                                            };
-                                          }),
-                                        )
-                                      }
-                                      placeholder={`Opção ${optionLetter(optIdx)}`}
-                                      className="h-10 rounded-xl"
-                                    />
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-9 w-9 rounded-xl"
-                                      disabled={q.options.length <= 2}
-                                      onClick={() => {
-                                        setEditQuizQuestions((prev) =>
-                                          prev.map((x) => {
-                                            if (x.id !== q.id) return x;
-                                            const nextOpts = x.options.filter((y) => y.id !== o.id);
-                                            const nextCorrectId =
-                                              nextOpts.find((y) => y.isCorrect)?.id ?? nextOpts[0]?.id;
-                                            return {
-                                              ...x,
-                                              options: normalizeCorrect(nextOpts, nextCorrectId),
-                                            };
-                                          }),
-                                        );
-                                      }}
-                                      aria-label="Remover alternativa"
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                ))}
-
-                                <div className="pt-1">
-                                  <Button
-                                    variant="outline"
-                                    className="rounded-xl"
-                                    disabled={q.options.length >= 6}
-                                    onClick={() => {
-                                      setEditQuizQuestions((prev) =>
-                                        prev.map((x) =>
-                                          x.id === q.id
-                                            ? {
-                                                ...x,
-                                                options: [...x.options, { id: tmpId("otmp"), text: "", isCorrect: false }],
-                                              }
-                                            : x,
-                                        ),
-                                      );
-                                    }}
-                                  >
-                                    <Plus className="mr-2 h-4 w-4" />
-                                    Adicionar alternativa
-                                  </Button>
-                                </div>
-                              </RadioGroup>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
                 </div>
-              ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum módulo ainda.</div>
+        )}
+      </Card>
+
+      {/* Module dialog */}
+      <Dialog
+        open={moduleOpen}
+        onOpenChange={(v) => {
+          setModuleOpen(v);
+          if (!v) setEditingModuleId(null);
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{editingModule ? "Editar módulo" : "Novo módulo"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Tipo</Label>
+              <Select value={mType} onValueChange={(v) => setMType(v as any)}>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="VIDEO">Vídeo</SelectItem>
+                  <SelectItem value="MATERIAL">Material (link)</SelectItem>
+                  <SelectItem value="CHECKPOINT">Checkpoint</SelectItem>
+                  <SelectItem value="QUIZ">Quiz</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-          </ScrollArea>
+
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input className="h-11 rounded-xl" value={mTitle} onChange={(e) => setMTitle(e.target.value)} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Descrição (opcional)</Label>
+              <Textarea className="min-h-24 rounded-2xl" value={mDesc} onChange={(e) => setMDesc(e.target.value)} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>XP</Label>
+              <Input className="h-11 rounded-xl" value={mXp} onChange={(e) => setMXp(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" />
+            </div>
+
+            {mType === "VIDEO" ? (
+              <div className="grid gap-2">
+                <Label>URL do YouTube</Label>
+                <Input className="h-11 rounded-xl" value={mYoutube} onChange={(e) => setMYoutube(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
+              </div>
+            ) : null}
+
+            {mType === "MATERIAL" ? (
+              <div className="grid gap-2">
+                <Label>URL do material</Label>
+                <Input className="h-11 rounded-xl" value={mMaterial} onChange={(e) => setMMaterial(e.target.value)} placeholder="https://..." />
+              </div>
+            ) : null}
+
+            {mType === "CHECKPOINT" ? (
+              <div className="grid gap-2">
+                <Label>Pergunta do checkpoint</Label>
+                <Textarea className="min-h-24 rounded-2xl" value={mCheckpoint} onChange={(e) => setMCheckpoint(e.target.value)} />
+              </div>
+            ) : null}
+
+            {mType === "QUIZ" ? (
+              <div className="grid gap-2">
+                <Label>Nota mínima (%)</Label>
+                <Input className="h-11 rounded-xl" value={mMinScore} onChange={(e) => setMMinScore(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" />
+                <div className="text-xs text-muted-foreground">Após salvar, use “Editar quiz” na lista para configurar perguntas.</div>
+              </div>
+            ) : null}
+          </div>
 
           <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => setEditOpen(false)}>
+            <Button variant="outline" className="rounded-xl" onClick={() => setModuleOpen(false)}>
               Cancelar
             </Button>
             <Button
-              className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-              disabled={!isEditValid}
-              onClick={saveEdit}
-            >
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Track header + edit */}
-      <div className="rounded-3xl border bg-white p-6">
-        <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
-          <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Editor de trilha</div>
-            <div className="mt-2 grid gap-2">
-              <Label>Nome da trilha</Label>
-              <Input
-                value={trackTitle}
-                onChange={(e) => setTrackTitle(e.target.value)}
-                className="rounded-xl"
-                placeholder="Ex.: Onboarding — Produto"
-              />
-            </div>
-            <div className="mt-3 grid gap-2">
-              <Label>Descrição</Label>
-              <Textarea
-                value={trackDescription}
-                onChange={(e) => setTrackDescription(e.target.value)}
-                className="min-h-24 rounded-2xl"
-                placeholder="Explique o objetivo da trilha em 2–3 frases."
-              />
-            </div>
-
-            <div className="mt-3 flex flex-col gap-2 sm:flex-row">
-              <Button
-                className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                disabled={savingTrack || !trackDirty || trackTitle.trim().length < 6 || trackDescription.trim().length < 10}
-                onClick={() => {
-                  setSavingTrack(true);
-                  try {
-                    const updated = mockDb.updateTrack({ trackId: track.id, title: trackTitle, description: trackDescription });
-                    const after = mockDb.getTrack(track.id);
-                    setTick((x) => x + 1);
-
-                    const ok =
-                      !!updated &&
-                      !!after &&
-                      after.title.trim() === trackTitle.trim() &&
-                      after.description.trim() === trackDescription.trim();
-
-                    toast(
-                      ok
-                        ? {
-                            title: "Trilha salva",
-                            description: "Nome e descrição atualizados com sucesso.",
-                          }
-                        : {
-                            title: "Não foi possível salvar",
-                            description:
-                              "A alteração não foi persistida. Tente novamente e, se continuar, atualize a página.",
-                            variant: "destructive",
-                          },
-                    );
-                  } catch (e) {
-                    toast({
-                      title: "Não foi possível salvar",
-                      description: e instanceof Error ? e.message : "Tente novamente.",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setSavingTrack(false);
-                  }
-                }}
-              >
-                {savingTrack ? "Salvando…" : "Salvar trilha"}
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full rounded-xl sm:w-auto"
-                disabled={!trackDirty}
-                onClick={() => {
-                  setTrackTitle(track.title);
-                  setTrackDescription(track.description);
-                }}
-              >
-                Descartar alterações
-              </Button>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <Badge
-              className={
-                "rounded-full " +
-                (track.published
-                  ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-100"
-                  : "bg-amber-100 text-amber-800 hover:bg-amber-100")
-              }
-            >
-              {track.published ? "Publicada" : "Rascunho"}
-            </Badge>
-
-            <Button
-              variant="outline"
-              className="w-full rounded-xl sm:w-auto"
-              onClick={() => {
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={mTitle.trim().length < 3 || saveModuleMutation.isPending}
+              onClick={async () => {
                 try {
-                  mockDb.setTrackPublished(track.id, !track.published);
-                  toast({
-                    title: track.published ? "Trilha despublicada" : "Trilha publicada",
-                    description: track.published
-                      ? "Ela deixa de aparecer para o time."
-                      : "Agora você pode atribuir para pessoas/equipe.",
-                  });
-                  setTick((x) => x + 1);
+                  await saveModuleMutation.mutateAsync();
                 } catch (e) {
                   toast({
-                    title: "Não foi possível atualizar",
-                    description: e instanceof Error ? e.message : "Tente novamente.",
+                    title: "Não foi possível salvar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
                 }
               }}
             >
-              {track.published ? (
-                <>
-                  <EyeOff className="mr-2 h-4 w-4" />
-                  Despublicar
-                </>
-              ) : (
-                <>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Publicar
-                </>
-              )}
+              <Check className="mr-2 h-4 w-4" />
+              Salvar módulo
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-            <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                  disabled={!track.published}
-                  title={!track.published ? "Publique a trilha para poder atribuir" : undefined}
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Atribuir
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>Atribuir trilha</DialogTitle>
-                </DialogHeader>
+      {/* Quiz dialog */}
+      <Dialog
+        open={quizOpen}
+        onOpenChange={(v) => {
+          setQuizOpen(v);
+          if (!v) setQuizModuleId(null);
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Editar quiz</DialogTitle>
+          </DialogHeader>
 
-                <div className="grid gap-3">
-                  {!track.published ? (
-                    <div className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
-                      Publique a trilha para conseguir atribuir.
+          <div className="grid gap-4">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+              Regras: cada pergunta deve ter exatamente 1 alternativa correta.
+            </div>
+
+            <div className="grid gap-3">
+              {quizDraft.map((q, qi) => (
+                <div key={qi} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="grid gap-2 flex-1">
+                      <Label>Pergunta {qi + 1}</Label>
+                      <Input
+                        className="h-11 rounded-xl"
+                        value={q.prompt}
+                        onChange={(e) =>
+                          setQuizDraft((prev) => {
+                            const copy = prev.slice();
+                            copy[qi] = { ...copy[qi], prompt: e.target.value };
+                            return copy;
+                          })
+                        }
+                      />
                     </div>
-                  ) : null}
+                    <div className="grid gap-2 md:w-[240px]">
+                      <Label>Tipo</Label>
+                      <Select
+                        value={q.type}
+                        onValueChange={(v) =>
+                          setQuizDraft((prev) => {
+                            const copy = prev.slice();
+                            const nextType = v as QuizQuestion["type"];
+                            const baseOptions =
+                              nextType === "TRUE_FALSE"
+                                ? [
+                                    { text: "Verdadeiro", isCorrect: true },
+                                    { text: "Falso", isCorrect: false },
+                                  ]
+                                : [
+                                    { text: "Opção A", isCorrect: true },
+                                    { text: "Opção B", isCorrect: false },
+                                  ];
+                            copy[qi] = { ...copy[qi], type: nextType, options: baseOptions };
+                            return copy;
+                          })
+                        }
+                      >
+                        <SelectTrigger className="h-11 rounded-xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MULTIPLE_CHOICE">Múltipla escolha</SelectItem>
+                          <SelectItem value="TRUE_FALSE">Verdadeiro/Falso</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <Separator className="my-4" />
 
                   <div className="grid gap-2">
-                    <Label>Destino</Label>
-                    <Select value={assignMode} onValueChange={(v) => setAssignMode(v as any)}>
-                      <SelectTrigger className="rounded-xl">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="team">Equipe (departamento)</SelectItem>
-                        <SelectItem value="person">Pessoa</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Alternativas</div>
+
+                    {q.options.map((o, oi) => (
+                      <div key={oi} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                        <Input
+                          className="h-11 rounded-xl"
+                          value={o.text}
+                          onChange={(e) =>
+                            setQuizDraft((prev) => {
+                              const copy = prev.slice();
+                              const qq = copy[qi];
+                              const opts = qq.options.slice();
+                              opts[oi] = { ...opts[oi], text: e.target.value };
+                              copy[qi] = { ...qq, options: opts };
+                              return copy;
+                            })
+                          }
+                        />
+                        <Button
+                          type="button"
+                          variant={o.isCorrect ? "default" : "outline"}
+                          className={
+                            "h-11 rounded-xl " +
+                            (o.isCorrect ? "bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90" : "")
+                          }
+                          onClick={() =>
+                            setQuizDraft((prev) => {
+                              const copy = prev.slice();
+                              const qq = copy[qi];
+                              const opts = qq.options.map((x, idx) => ({ ...x, isCorrect: idx === oi }));
+                              copy[qi] = { ...qq, options: opts };
+                              return copy;
+                            })
+                          }
+                        >
+                          {o.isCorrect ? "Correta" : "Marcar correta"}
+                        </Button>
+
+                        {q.type === "MULTIPLE_CHOICE" ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-11 rounded-xl"
+                            onClick={() =>
+                              setQuizDraft((prev) => {
+                                const copy = prev.slice();
+                                const qq = copy[qi];
+                                const opts = qq.options.slice();
+                                opts.splice(oi, 1);
+                                copy[qi] = { ...qq, options: opts.length ? opts : qq.options };
+                                return copy;
+                              })
+                            }
+                            disabled={q.options.length <= 2}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Remover
+                          </Button>
+                        ) : null}
+                      </div>
+                    ))}
+
+                    {q.type === "MULTIPLE_CHOICE" ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 rounded-xl"
+                        onClick={() =>
+                          setQuizDraft((prev) => {
+                            const copy = prev.slice();
+                            const qq = copy[qi];
+                            copy[qi] = { ...qq, options: [...qq.options, { text: "", isCorrect: false }] };
+                            return copy;
+                          })
+                        }
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Adicionar alternativa
+                      </Button>
+                    ) : null}
                   </div>
 
-                  {assignMode === "team" ? (
-                    <div className="rounded-2xl border border-[color:var(--sinaxys-border)] p-3">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Equipe do departamento</div>
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {deptUsers.length} colaboradores ativos serão atribuídos.
-                          </div>
-                        </div>
-                        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                          <Users className="h-5 w-5" />
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid gap-2">
-                      <Label>Pessoa</Label>
-                      <Select value={assignUserId} onValueChange={setAssignUserId}>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue placeholder="Selecione…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {deptUsers.map((u) => (
-                            <SelectItem key={u.id} value={u.id}>
-                              {u.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-                </div>
+                  <Separator className="my-4" />
 
-                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                  <Button variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => setAssignOpen(false)}>
-                    Cancelar
-                  </Button>
                   <Button
-                    className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                    disabled={!track.published || (assignMode === "team" ? deptUsers.length === 0 : !assignUserId)}
-                    onClick={() => {
-                      try {
-                        if (!track.published) return;
-
-                        if (assignMode === "team") {
-                          deptUsers.forEach((u) => {
-                            mockDb.assignTrack({ trackId: track.id, userId: u.id, assignedByUserId: user.id });
-                          });
-                          toast({
-                            title: "Trilha atribuída",
-                            description: `Enviada para ${deptUsers.length} colaboradores.`,
-                          });
-                        } else {
-                          mockDb.assignTrack({ trackId: track.id, userId: assignUserId, assignedByUserId: user.id });
-                          const name = deptUsers.find((x) => x.id === assignUserId)?.name;
-                          toast({
-                            title: "Trilha atribuída",
-                            description: name ? `Enviada para ${name}.` : "Enviada.",
-                          });
-                        }
-
-                        setAssignOpen(false);
-                        setAssignUserId("");
-                        setTick((x) => x + 1);
-                      } catch (e) {
-                        toast({
-                          title: "Não foi possível atribuir",
-                          description: e instanceof Error ? e.message : "Tente novamente.",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
+                    type="button"
+                    variant="outline"
+                    className="h-10 rounded-xl"
+                    onClick={() => setQuizDraft((prev) => prev.filter((_, i) => i !== qi))}
+                    disabled={quizDraft.length <= 1}
                   >
-                    Atribuir
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Remover pergunta
                   </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                </div>
+              ))}
 
-            <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
-              <Link to="/head/tracks">
-                <ArrowLeft className="mr-2 h-4 w-4" />
-                Voltar
-              </Link>
+              {!quizDraft.length ? (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhuma pergunta ainda.</div>
+              ) : null}
+
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-xl"
+                onClick={() =>
+                  setQuizDraft((prev) => [
+                    ...prev,
+                    {
+                      type: "MULTIPLE_CHOICE",
+                      prompt: "",
+                      options: [
+                        { text: "Opção A", isCorrect: true },
+                        { text: "Opção B", isCorrect: false },
+                      ],
+                    },
+                  ])
+                }
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Adicionar pergunta
+              </Button>
+            </div>
+          </div>
+
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" className="rounded-xl" onClick={() => setQuizOpen(false)}>
+              Cancelar
             </Button>
-
-            <Dialog
-              open={open}
-              onOpenChange={(v) => {
-                setOpen(v);
-                if (!v) resetDialog();
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={saveQuizMutation.isPending}
+              onClick={async () => {
+                try {
+                  await saveQuizMutation.mutateAsync();
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível salvar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                }
               }}
             >
-              <DialogTrigger asChild>
-                <Button className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Adicionar módulo
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Novo módulo</DialogTitle>
-                </DialogHeader>
-
-                <ScrollArea className="max-h-[70vh] pr-4">
-                  <div className="grid gap-4">
-                    <div className="grid gap-2">
-                      <Label>Tipo</Label>
-                      <Select value={moduleType} onValueChange={(v) => setModuleType(v as TrackModule["type"]) }>
-                        <SelectTrigger className="rounded-xl">
-                          <SelectValue placeholder="Selecione…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="VIDEO">Vídeo</SelectItem>
-                          <SelectItem value="MATERIAL">Material (link)</SelectItem>
-                          <SelectItem value="QUIZ">Quiz</SelectItem>
-                          <SelectItem value="CHECKPOINT">Checkpoint</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label>Título</Label>
-                      <Input value={title} onChange={(e) => setTitle(e.target.value)} className="rounded-xl" />
-                    </div>
-
-                    <div className="grid gap-2">
-                      <Label>Descrição (opcional)</Label>
-                      <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-24 rounded-2xl" />
-                    </div>
-
-                    {moduleType === "VIDEO" ? (
-                      <div className="grid gap-2">
-                        <Label>Link do YouTube</Label>
-                        <Input value={youtubeUrl} onChange={(e) => setYoutubeUrl(e.target.value)} className="rounded-xl" placeholder="https://www.youtube.com/watch?v=..." />
-                      </div>
-                    ) : null}
-
-                    {moduleType === "MATERIAL" ? (
-                      <div className="grid gap-2">
-                        <Label>Link do material (Figma, ClickUp ou outro)</Label>
-                        <Input
-                          value={materialUrl}
-                          onChange={(e) => setMaterialUrl(e.target.value)}
-                          className="rounded-xl"
-                          placeholder="https://..."
-                        />
-                        <div className="text-xs text-muted-foreground">
-                          Aceita links externos (ex.: Figma, ClickUp, Notion, Drive). Se não der para embutir, o aluno abre em nova aba.
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {moduleType === "CHECKPOINT" ? (
-                      <div className="grid gap-2">
-                        <Label>Pergunta do checkpoint</Label>
-                        <Textarea value={checkpointPrompt} onChange={(e) => setCheckpointPrompt(e.target.value)} className="min-h-24 rounded-2xl" placeholder="Ex.: Em 4–6 linhas, descreva…" />
-                      </div>
-                    ) : null}
-
-                    {moduleType === "QUIZ" ? (
-                      <div className="grid gap-4">
-                        <div className="grid gap-2">
-                          <Label>Nota mínima (%)</Label>
-                          <Input value={minScore} onChange={(e) => setMinScore(e.target.value)} className="rounded-xl" inputMode="numeric" />
-                          <div className="text-xs text-muted-foreground">
-                            Você pode criar perguntas de Verdadeiro/Falso ou Múltipla escolha (A, B, C, D…).
-                          </div>
-                        </div>
-
-                        <Separator />
-
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Perguntas</div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button
-                              variant="outline"
-                              className="rounded-xl"
-                              onClick={() => setQuizQuestions((prev) => [...prev, makeTrueFalseQuestion("true")])}
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              V/F
-                            </Button>
-                            <Button
-                              variant="outline"
-                              className="rounded-xl"
-                              onClick={() => setQuizQuestions((prev) => [...prev, makeMultipleChoiceQuestion()])}
-                            >
-                              <Plus className="mr-2 h-4 w-4" />
-                              Múltipla escolha
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div className="grid gap-3">
-                          {quizQuestions.map((q, idx) => {
-                            const correctId = q.options.find((o) => o.isCorrect)?.id ?? q.options[0]?.id;
-                            return (
-                              <div key={q.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                                <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                                  <div className="min-w-0">
-                                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                                      Pergunta {idx + 1}
-                                    </div>
-                                    <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                                      {q.type === "TRUE_FALSE" ? "Verdadeiro/Falso" : "Múltipla escolha"}
-                                    </div>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <Select
-                                      value={q.type}
-                                      onValueChange={(v) => {
-                                        setQuizQuestions((prev) =>
-                                          prev.map((x) => {
-                                            if (x.id !== q.id) return x;
-                                            return v === "TRUE_FALSE"
-                                              ? { ...makeTrueFalseQuestion("true"), id: x.id, prompt: x.prompt }
-                                              : { ...makeMultipleChoiceQuestion(), id: x.id, prompt: x.prompt };
-                                          }),
-                                        );
-                                      }}
-                                    >
-                                      <SelectTrigger className="h-9 w-[180px] rounded-xl">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="TRUE_FALSE">Verdadeiro/Falso</SelectItem>
-                                        <SelectItem value="MULTIPLE_CHOICE">Múltipla escolha</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <Button
-                                      variant="outline"
-                                      size="icon"
-                                      className="h-9 w-9 rounded-xl"
-                                      disabled={quizQuestions.length === 1}
-                                      onClick={() => setQuizQuestions((prev) => prev.filter((x) => x.id !== q.id))}
-                                      aria-label="Remover pergunta"
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </div>
-
-                                <div className="mt-4 grid gap-2">
-                                  <Label>Enunciado</Label>
-                                  <Textarea
-                                    value={q.prompt}
-                                    onChange={(e) =>
-                                      setQuizQuestions((prev) =>
-                                        prev.map((x) => (x.id === q.id ? { ...x, prompt: e.target.value } : x)),
-                                      )
-                                    }
-                                    className="min-h-20 rounded-2xl"
-                                  />
-                                </div>
-
-                                <div className="mt-4 grid gap-2">
-                                  <Label>Alternativas</Label>
-
-                                  {q.type === "TRUE_FALSE" ? (
-                                    <Select
-                                      value={correctId}
-                                      onValueChange={(v) =>
-                                        setQuizQuestions((prev) =>
-                                          prev.map((x) => (x.id === q.id ? { ...x, options: normalizeCorrect(x.options, v) } : x)),
-                                        )
-                                      }
-                                    >
-                                      <SelectTrigger className="rounded-xl">
-                                        <SelectValue placeholder="Selecione a correta" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {q.options.map((o) => (
-                                          <SelectItem key={o.id} value={o.id}>
-                                            {o.text}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <RadioGroup
-                                      value={correctId}
-                                      onValueChange={(v) =>
-                                        setQuizQuestions((prev) =>
-                                          prev.map((x) => (x.id === q.id ? { ...x, options: normalizeCorrect(x.options, v) } : x)),
-                                        )
-                                      }
-                                      className="grid gap-2"
-                                    >
-                                      {q.options.map((o, optIdx) => (
-                                        <div
-                                          key={o.id}
-                                          className="flex items-center gap-2 rounded-xl border border-[color:var(--sinaxys-border)] bg-white px-3 py-2"
-                                        >
-                                          <RadioGroupItem value={o.id} id={`${q.id}_${o.id}`} />
-                                          <div className="w-8 text-xs font-semibold text-muted-foreground">
-                                            {optionLetter(optIdx)}
-                                          </div>
-                                          <Input
-                                            value={o.text}
-                                            onChange={(e) =>
-                                              setQuizQuestions((prev) =>
-                                                prev.map((x) => {
-                                                  if (x.id !== q.id) return x;
-                                                  return {
-                                                    ...x,
-                                                    options: x.options.map((y) =>
-                                                      y.id === o.id ? { ...y, text: e.target.value } : y,
-                                                    ),
-                                                  };
-                                                }),
-                                              )
-                                            }
-                                            placeholder={`Opção ${optionLetter(optIdx)}`}
-                                            className="h-10 rounded-xl"
-                                          />
-                                          <Button
-                                            variant="outline"
-                                            size="icon"
-                                            className="h-9 w-9 rounded-xl"
-                                            disabled={q.options.length <= 2}
-                                            onClick={() => {
-                                              setQuizQuestions((prev) =>
-                                                prev.map((x) => {
-                                                  if (x.id !== q.id) return x;
-                                                  const nextOpts = x.options.filter((y) => y.id !== o.id);
-                                                  const nextCorrectId =
-                                                    nextOpts.find((y) => y.isCorrect)?.id ?? nextOpts[0]?.id;
-                                                  return {
-                                                    ...x,
-                                                    options: normalizeCorrect(nextOpts, nextCorrectId),
-                                                  };
-                                                }),
-                                              );
-                                            }}
-                                            aria-label="Remover alternativa"
-                                          >
-                                            <X className="h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      ))}
-
-                                      <div className="pt-1">
-                                        <Button
-                                          variant="outline"
-                                          className="rounded-xl"
-                                          disabled={q.options.length >= 6}
-                                          onClick={() => {
-                                            setQuizQuestions((prev) =>
-                                              prev.map((x) =>
-                                                x.id === q.id
-                                                  ? {
-                                                      ...x,
-                                                      options: [...x.options, { id: tmpId("otmp"), text: "", isCorrect: false }],
-                                                    }
-                                                  : x,
-                                              ),
-                                            );
-                                          }}
-                                        >
-                                          <Plus className="mr-2 h-4 w-4" />
-                                          Adicionar alternativa
-                                        </Button>
-                                      </div>
-                                    </RadioGroup>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </ScrollArea>
-
-                <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                  <Button
-                    className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                    disabled={!isNewModuleValid}
-                    onClick={() => {
-                      try {
-                        const id = mockDb.uid("mod");
-                        const base: TrackModule = {
-                          id,
-                          trackId,
-                          orderIndex: nextOrder,
-                          type: moduleType,
-                          title: title.trim(),
-                          description: description.trim() || undefined,
-                          xpReward: moduleType === "VIDEO" ? 20 : moduleType === "MATERIAL" ? 20 : moduleType === "CHECKPOINT" ? 30 : 40,
-                          youtubeUrl: moduleType === "VIDEO" ? youtubeUrl.trim() : undefined,
-                          materialUrl: moduleType === "MATERIAL" ? materialUrl.trim() : undefined,
-                          checkpointPrompt: moduleType === "CHECKPOINT" ? checkpointPrompt.trim() : undefined,
-                          minScore: moduleType === "QUIZ" ? Number(minScore) || 70 : undefined,
-                        };
-
-                        mockDb.upsertModule(base);
-
-                        if (moduleType === "QUIZ") {
-                          mockDb.replaceQuiz(id, {
-                            questions: quizQuestions.map((q) => ({
-                              type: q.type,
-                              prompt: q.prompt.trim(),
-                              options: q.options.map((o) => ({ text: o.text.trim(), isCorrect: o.isCorrect })),
-                            })),
-                          });
-                        }
-
-                        toast({
-                          title: "Módulo adicionado",
-                          description: "Ele já foi salvo na trilha.",
-                        });
-
-                        setOpen(false);
-                        resetDialog();
-                        setTick((x) => x + 1);
-                      } catch (e) {
-                        toast({
-                          title: "Não foi possível salvar",
-                          description: e instanceof Error ? e.message : "Tente novamente.",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  >
-                    Adicionar
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-      </div>
-
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulos</div>
-        <p className="mt-1 text-sm text-muted-foreground">
-          A sequência é obrigatória: arraste os cards para ajustar o desbloqueio.
-        </p>
-
-        <div className="mt-4 grid gap-3">
-          {modules.length ? (
-            modules
-              .slice()
-              .sort((a, b) => a.orderIndex - b.orderIndex)
-              .map((m, idx) => {
-                const over = dragOverId === m.id && draggingId && draggingId !== m.id;
-                return (
-                  <div
-                    key={m.id}
-                    onDragOver={(e) => {
-                      e.preventDefault();
-                      if (draggingId) setDragOverId(m.id);
-                    }}
-                    onDragLeave={() => {
-                      if (dragOverId === m.id) setDragOverId(null);
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      const fromId = e.dataTransfer.getData("text/plain") || draggingId;
-                      if (!fromId) return;
-                      reorder(fromId, m.id);
-                      setDraggingId(null);
-                      setDragOverId(null);
-                    }}
-                    className={
-                      "rounded-2xl border p-4 transition " +
-                      (over
-                        ? "border-[color:var(--sinaxys-primary)] bg-[color:var(--sinaxys-tint)]/60"
-                        : "border-[color:var(--sinaxys-border)]")
-                    }
-                  >
-                    <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <button
-                            draggable
-                            onDragStart={(e) => {
-                              e.dataTransfer.setData("text/plain", m.id);
-                              e.dataTransfer.effectAllowed = "move";
-                              setDraggingId(m.id);
-                              setDragOverId(null);
-                            }}
-                            onDragEnd={() => {
-                              setDraggingId(null);
-                              setDragOverId(null);
-                            }}
-                            className="grid h-9 w-9 place-items-center rounded-xl border border-[color:var(--sinaxys-border)] bg-white text-muted-foreground transition hover:bg-[color:var(--sinaxys-tint)] active:cursor-grabbing"
-                            aria-label="Arrastar para reordenar"
-                            title="Arrastar para reordenar"
-                          >
-                            <GripVertical className="h-4 w-4" />
-                          </button>
-
-                          <div className="grid h-9 w-9 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                            {typeIcon(m.type)}
-                          </div>
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                              {idx + 1}. {m.title}
-                            </div>
-                            <div className="mt-0.5 text-xs text-muted-foreground">{typeLabel(m.type)} • +{m.xpReward} XP</div>
-                          </div>
-                        </div>
-
-                        {m.description ? (
-                          <div className="mt-2 text-sm text-muted-foreground">{m.description}</div>
-                        ) : null}
-
-                        {m.type === "VIDEO" && m.youtubeUrl ? (
-                          <div className="mt-2 text-xs text-muted-foreground">YouTube: {m.youtubeUrl}</div>
-                        ) : null}
-                        {m.type === "MATERIAL" && m.materialUrl ? (
-                          <div className="mt-2 text-xs text-muted-foreground">Material: {m.materialUrl}</div>
-                        ) : null}
-                        {m.type === "QUIZ" ? (
-                          <div className="mt-2 text-xs text-muted-foreground">Nota mínima: {m.minScore ?? 70}%</div>
-                        ) : null}
-                        {m.type === "CHECKPOINT" && m.checkpointPrompt ? (
-                          <div className="mt-2 text-xs text-muted-foreground">Pergunta: {m.checkpointPrompt}</div>
-                        ) : null}
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="rounded-xl"
-                          onClick={() => openEdit(m)}
-                          aria-label="Editar módulo"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="rounded-xl"
-                          onClick={() => {
-                            try {
-                              mockDb.deleteModule(m.id);
-                              toast({ title: "Módulo removido" });
-                              setTick((x) => x + 1);
-                            } catch (e) {
-                              toast({
-                                title: "Não foi possível remover",
-                                description: e instanceof Error ? e.message : "Tente novamente.",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                          aria-label="Remover módulo"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-          ) : (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-              Sem módulos ainda. Adicione o primeiro para estruturar a sequência.
-            </div>
-          )}
-        </div>
-      </Card>
+              <Save className="mr-2 h-4 w-4" />
+              Salvar quiz
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

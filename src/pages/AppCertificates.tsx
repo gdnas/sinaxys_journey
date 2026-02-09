@@ -1,16 +1,20 @@
 import { Link } from "react-router-dom";
 import { Award, Printer } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
-import { mockDb } from "@/lib/mockDb";
+import { getCertificatesForUser } from "@/lib/journeyDb";
 import { formatShortDate } from "@/lib/sinaxys";
 
 export default function AppCertificates() {
   const { user } = useAuth();
   if (!user) return null;
 
-  const certs = mockDb.getCertificatesForUser(user.id);
+  const { data: certs = [], isLoading } = useQuery({
+    queryKey: ["certificates", user.id],
+    queryFn: () => getCertificatesForUser(user.id),
+  });
 
   return (
     <div className="grid gap-6">
@@ -27,24 +31,24 @@ export default function AppCertificates() {
       </div>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        {certs.length ? (
+        {isLoading ? (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando…</div>
+        ) : certs.length ? (
           <div className="grid gap-3">
-            {certs.map((c) => (
+            {certs.map((c: any) => (
               <div
                 key={c.id}
                 className="flex flex-col justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] p-4 md:flex-row md:items-center"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.snapshotTrackTitle}</div>
+                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.snapshot_track_title}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    Emitido em {formatShortDate(c.issuedAt)} • Código {c.certificateCode}
+                    Emitido em {formatShortDate(c.issued_at)} • Código {c.certificate_code}
                   </div>
                 </div>
                 <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center md:w-auto">
                   <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
-                    <Link to={`/app/certificates/${c.id}`}>
-                      Ver
-                    </Link>
+                    <Link to={`/app/certificates/${c.id}`}>Ver</Link>
                   </Button>
                   <Button
                     variant="outline"

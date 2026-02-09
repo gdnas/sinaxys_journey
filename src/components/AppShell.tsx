@@ -4,15 +4,10 @@ import {
   Building2,
   GraduationCap,
   LogOut,
-  Medal,
   Menu,
-  Network,
   Palette,
   Shield,
-  Upload,
   User as UserIcon,
-  Users,
-  Wallet,
   LayoutDashboard,
   Award,
   Layers,
@@ -22,7 +17,6 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { NotificationBell } from "@/components/NotificationBell";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { roleLabel } from "@/lib/sinaxys";
@@ -36,7 +30,7 @@ type NavItem = {
 };
 
 const nav: NavItem[] = [
-  // Master admin (plataforma)
+  // Master admin
   {
     to: "/master/overview",
     label: "Visão geral",
@@ -56,7 +50,7 @@ const nav: NavItem[] = [
     roles: ["MASTERADMIN"],
   },
 
-  // Produto (empresa)
+  // Colaborador
   {
     to: "/app",
     label: "Minha jornada",
@@ -69,27 +63,17 @@ const nav: NavItem[] = [
     icon: <Award className="h-4 w-4" />,
     roles: ["COLABORADOR"],
   },
+
+  // Empresa
   {
     to: "/tracks",
     label: "Trilhas",
     icon: <GraduationCap className="h-4 w-4" />,
-    roles: ["ADMIN", "COLABORADOR"],
-  },
-  {
-    to: "/rankings",
-    label: "Sinaxys Points",
-    icon: <Medal className="h-4 w-4" />,
     roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
   {
-    to: "/head",
-    label: "Painel do departamento",
-    icon: <Users className="h-4 w-4" />,
-    roles: ["HEAD"],
-  },
-  {
     to: "/head/tracks",
-    label: "Trilhas",
+    label: "Head — Trilhas",
     icon: <GraduationCap className="h-4 w-4" />,
     roles: ["HEAD"],
   },
@@ -106,28 +90,10 @@ const nav: NavItem[] = [
     roles: ["ADMIN"],
   },
   {
-    to: "/admin/users/import",
-    label: "Importar planilha",
-    icon: <Upload className="h-4 w-4" />,
-    roles: ["ADMIN"],
-  },
-  {
-    to: "/admin/costs",
-    label: "Custos",
-    icon: <Wallet className="h-4 w-4" />,
-    roles: ["ADMIN"],
-  },
-  {
     to: "/admin/brand",
     label: "Empresa & marca",
     icon: <Palette className="h-4 w-4" />,
     roles: ["ADMIN"],
-  },
-  {
-    to: "/org",
-    label: "Organograma",
-    icon: <Network className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
   {
     to: "/profile",
@@ -137,13 +103,7 @@ const nav: NavItem[] = [
   },
 ];
 
-function SideNav({
-  items,
-  onNavigate,
-}: {
-  items: NavItem[];
-  onNavigate?: () => void;
-}) {
+function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
   return (
     <nav className="flex flex-col gap-1">
       {items.map((item) => (
@@ -154,9 +114,7 @@ function SideNav({
           className={({ isActive }) =>
             cn(
               "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition",
-              isActive
-                ? "bg-[color:var(--sinaxys-tint)]"
-                : "hover:bg-[color:var(--sinaxys-tint)]/70",
+              isActive ? "bg-[color:var(--sinaxys-tint)]" : "hover:bg-[color:var(--sinaxys-tint)]/70",
             )
           }
         >
@@ -171,12 +129,8 @@ function SideNav({
 function JourneyRuleCard() {
   return (
     <div className="rounded-xl bg-[color:var(--sinaxys-tint)] p-3">
-      <div className="text-xs font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
-        Regra da jornada
-      </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Você avança em sequência. Ao concluir o módulo atual, o próximo é liberado automaticamente.
-      </p>
+      <div className="text-xs font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">Regra da jornada</div>
+      <p className="mt-1 text-xs text-muted-foreground">Você avança em sequência. Ao concluir o módulo atual, o próximo é liberado automaticamente.</p>
     </div>
   );
 }
@@ -196,7 +150,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   if (!user) return <>{children}</>;
 
   const visible = nav.filter((n) => n.roles.includes(user.role));
-
   const jobTitleLabel = user.jobTitle?.trim() || "Sem cargo";
 
   return (
@@ -204,15 +157,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            {/* Mobile menu */}
             <Sheet>
               <SheetTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="rounded-xl"
-                  aria-label="Abrir menu"
-                >
+                <Button variant="outline" size="icon" className="rounded-xl" aria-label="Abrir menu">
                   <Menu className="h-4 w-4" />
                 </Button>
               </SheetTrigger>
@@ -232,7 +179,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </SheetContent>
             </Sheet>
 
-            <Link to={"/"} className="flex items-center gap-3">
+            <Link to="/" className="flex items-center gap-3">
               <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-[color:var(--sinaxys-primary)]">
                 {company.logoDataUrl ? (
                   <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
@@ -248,8 +195,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-3">
-            <NotificationBell />
-
             <button
               type="button"
               className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)]"
@@ -258,9 +203,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Avatar className="h-9 w-9">
                 <AvatarImage src={user.avatarUrl} alt={user.name} />
-                <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                  {initials(user.name)}
-                </AvatarFallback>
+                <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">{initials(user.name)}</AvatarFallback>
               </Avatar>
               <div className="hidden text-right sm:block">
                 <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">

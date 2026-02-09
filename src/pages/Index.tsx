@@ -10,6 +10,6 @@ export default function Index() {
 
   if (user.role === "MASTERADMIN") return <Navigate to="/master/overview" replace />;
   if (user.role === "COLABORADOR") return <Navigate to="/app" replace />;
-  if (user.role === "HEAD") return <Navigate to="/head" replace />;
+  if (user.role === "HEAD") return <Navigate to="/head/tracks" replace />;
   return <Navigate to="/admin/users" replace />;
 }

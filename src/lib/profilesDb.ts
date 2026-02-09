@@ -1,0 +1,59 @@
+import { supabase } from "@/integrations/supabase/client";
+
+export type DbProfile = {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  company_id: string | null;
+  department_id: string | null;
+  active: boolean;
+  must_change_password: boolean;
+  avatar_url: string | null;
+  phone: string | null;
+  job_title: string | null;
+  contract_url: string | null;
+  monthly_cost_brl: number | null;
+  joined_at: string | null;
+  manager_id: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+const baseSelect =
+  "id,email,name,role,company_id,department_id,active,must_change_password,avatar_url,phone,job_title,contract_url,monthly_cost_brl,joined_at,manager_id,created_at,updated_at";
+
+export async function getMyProfile() {
+  const { data: u } = await supabase.auth.getUser();
+  const uid = u.user?.id;
+  if (!uid) return null;
+  return getProfile(uid);
+}
+
+export async function getProfile(id: string) {
+  const { data, error } = await supabase.from("profiles").select(baseSelect).eq("id", id).maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as DbProfile | null;
+}
+
+export async function listProfilesByCompany(companyId: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(baseSelect)
+    .eq("company_id", companyId)
+    .order("name", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  return (data ?? []) as DbProfile[];
+}
+
+export async function listAllProfiles() {
+  const { data, error } = await supabase.from("profiles").select(baseSelect).order("email", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as DbProfile[];
+}
+
+export async function updateProfile(id: string, patch: Partial<DbProfile>) {
+  const { data, error } = await supabase.from("profiles").update(patch).eq("id", id).select(baseSelect).maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as DbProfile | null;
+}

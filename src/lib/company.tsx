@@ -107,7 +107,7 @@ export function applyCompanyTheme(brand: CompanyBrand) {
 }
 
 export function bootstrapCompanyTheme() {
-  // Applies a neutral default theme before React mounts. After login, CompanyProvider will correct it.
+  // Applies a neutral default theme before React mounts.
   applyCompanyTheme(DEFAULT_BRAND);
 }
 
@@ -140,8 +140,6 @@ async function fetchCompanyBrand(companyId: string): Promise<CompanyBrand> {
 export function CompanyProvider({ children }: { children: React.ReactNode }) {
   const { user, activeCompanyId } = useAuth();
 
-  const isMaster = user?.role === "MASTERADMIN";
-
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [company, setCompanyState] = useState<CompanyBrand>(DEFAULT_BRAND);
 
@@ -152,14 +150,10 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (isMaster) {
-      setCompanyId(null);
-      setCompanyState(DEFAULT_BRAND);
-      return;
-    }
-
+    // Company context is always derived from profiles.company_id (via AuthProvider)
     const cid = activeCompanyId;
     setCompanyId(cid);
+
     if (!cid) {
       setCompanyState(DEFAULT_BRAND);
       return;
@@ -179,7 +173,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, isMaster, activeCompanyId]);
+  }, [user?.id, activeCompanyId]);
 
   useEffect(() => {
     applyCompanyTheme(company);

@@ -1,11 +1,12 @@
 import { useMemo } from "react";
 import { Link, useSearchParams, useParams } from "react-router-dom";
 import { ArrowLeft, Printer, ShieldCheck } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { mockDb } from "@/lib/mockDb";
+import { getCertificate } from "@/lib/journeyDb";
 import { formatLongDate } from "@/lib/sinaxys";
 
 export default function CertificateView() {
@@ -15,12 +16,20 @@ export default function CertificateView() {
   const [sp] = useSearchParams();
   const printMode = sp.get("print") === "1";
 
-  const cert = useMemo(() => {
-    if (!certificateId) return null;
-    return mockDb.getCertificate(certificateId);
-  }, [certificateId]);
+  const { data: cert, isLoading } = useQuery({
+    queryKey: ["certificate", certificateId],
+    queryFn: async () => {
+      if (!certificateId) return null;
+      return getCertificate(certificateId);
+    },
+  });
 
-  if (!user || !cert) {
+  const safe = useMemo(() => {
+    if (!cert) return null;
+    return cert as any;
+  }, [cert]);
+
+  if (!user || (!safe && !isLoading)) {
     return (
       <div className="rounded-3xl border bg-white p-6">
         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Certificado não encontrado</div>
@@ -31,6 +40,14 @@ export default function CertificateView() {
             Voltar
           </Link>
         </Button>
+      </div>
+    );
+  }
+
+  if (isLoading || !safe) {
+    return (
+      <div className="rounded-3xl border bg-white p-6">
+        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Carregando certificado…</div>
       </div>
     );
   }
@@ -61,23 +78,14 @@ export default function CertificateView() {
         </div>
       ) : null}
 
-      <Card
-        className={
-          "rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-0 shadow-sm " +
-          (printMode ? "border-0 shadow-none" : "")
-        }
-      >
+      <Card className={"rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-0 shadow-sm " + (printMode ? "border-0 shadow-none" : "")}>
         <div className="relative overflow-hidden rounded-3xl p-8 md:p-10">
           <div className="absolute inset-0 bg-[color:var(--sinaxys-tint)]/50" />
           <div className="relative">
             <div className="flex items-start justify-between gap-6">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
-                  {company.name}
-                </div>
-                <h1 className="mt-2 text-2xl font-semibold leading-tight text-[color:var(--sinaxys-ink)] md:text-3xl">
-                  Certificado de Conclusão
-                </h1>
+                <div className="text-xs font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">{company.name}</div>
+                <h1 className="mt-2 text-2xl font-semibold leading-tight text-[color:var(--sinaxys-ink)] md:text-3xl">Certificado de Conclusão</h1>
                 <p className="mt-2 max-w-prose text-sm text-muted-foreground">
                   Este certificado confirma a conclusão integral da trilha, seguindo uma sequência obrigatória de módulos.
                 </p>
@@ -89,27 +97,27 @@ export default function CertificateView() {
 
             <div className="mt-8 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-6">
               <div className="text-sm text-muted-foreground">Certificamos que</div>
-              <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)] md:text-2xl">{cert.snapshotUserName}</div>
+              <div className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)] md:text-2xl">{safe.snapshot_user_name}</div>
 
               <div className="mt-5 text-sm text-muted-foreground">concluiu com êxito a trilha</div>
-              <div className="mt-1 text-lg font-semibold text-[color:var(--sinaxys-ink)]">{cert.snapshotTrackTitle}</div>
+              <div className="mt-1 text-lg font-semibold text-[color:var(--sinaxys-ink)]">{safe.snapshot_track_title}</div>
 
               <div className="mt-6 flex flex-col gap-2 text-sm text-muted-foreground md:flex-row md:items-center md:justify-between">
                 <div>
-                  Departamento: <span className="font-medium text-[color:var(--sinaxys-ink)]">{cert.snapshotDepartmentName}</span>
+                  Departamento: <span className="font-medium text-[color:var(--sinaxys-ink)]">{safe.snapshot_department_name}</span>
                 </div>
                 <div>
-                  Emitido em <span className="font-medium text-[color:var(--sinaxys-ink)]">{formatLongDate(cert.issuedAt)}</span>
+                  Emitido em <span className="font-medium text-[color:var(--sinaxys-ink)]">{formatLongDate(safe.issued_at)}</span>
                 </div>
               </div>
             </div>
 
             <div className="mt-6 flex flex-col gap-1 text-xs text-muted-foreground md:flex-row md:items-center md:justify-between">
               <div>
-                Código de verificação: <span className="font-medium text-[color:var(--sinaxys-ink)]">{cert.certificateCode}</span>
+                Código de verificação: <span className="font-medium text-[color:var(--sinaxys-ink)]">{safe.certificate_code}</span>
               </div>
               <div>
-                Registro interno: <span className="font-medium text-[color:var(--sinaxys-ink)]">{cert.publicSlug}</span>
+                Registro interno: <span className="font-medium text-[color:var(--sinaxys-ink)]">{safe.public_slug}</span>
               </div>
             </div>
           </div>

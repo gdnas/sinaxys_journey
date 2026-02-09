@@ -2,20 +2,16 @@ import React, { createContext, useContext, useEffect, useMemo, useRef, useState 
 import type { Role, User } from "@/lib/domain";
 import { supabase } from "@/integrations/supabase/client";
 
-// NOTE: historically this project used localStorage + mockDb for auth/tenant selection.
-// That caused multi-tenant bugs across browsers/sessions.
-// We now source the tenant from Supabase `profiles.company_id` and (for MASTERADMIN) persist the
-// selected company back into the profile so it is consistent across sessions.
-
-const ACTIVE_COMPANY_KEY = "sinaxys-journey-active-company:v1";
+// Multi-tenant is 100% Supabase-driven:
+// - Auth via Supabase Auth
+// - Tenant/company comes exclusively from public.profiles.company_id
+// - No local seed, no localStorage-based company selection
 
 type AuthState = {
   user: User | null;
-  /**
-   * For normal users: equals `user.companyId`.
-   * For MASTERADMIN: the currently selected company context.
-   */
+  /** Current tenant (always from profiles.company_id). */
   activeCompanyId: string | null;
+  /** Only meaningful for MASTERADMIN: updates profiles.company_id (server-side persisted). */
   setActiveCompanyId: (companyId: string | null) => Promise<void>;
   login: (email: string, password: string) => Promise<{ ok: true; mustChangePassword: boolean } | { ok: false; message: string }>;
   logout: () => Promise<void>;
@@ -42,15 +38,6 @@ type DbProfile = {
 };
 
 const AuthContext = createContext<AuthState | null>(null);
-
-function loadActiveCompanyIdFromStorage() {
-  return localStorage.getItem(ACTIVE_COMPANY_KEY);
-}
-
-function saveActiveCompanyIdToStorage(id: string | null) {
-  if (!id) localStorage.removeItem(ACTIVE_COMPANY_KEY);
-  else localStorage.setItem(ACTIVE_COMPANY_KEY, id);
-}
 
 function mapProfileToUser(p: DbProfile): User {
   return {
@@ -85,12 +72,6 @@ async function fetchMyProfile(userId: string): Promise<DbProfile | null> {
   return (data ?? null) as any;
 }
 
-async function chooseDefaultCompanyId(): Promise<string | null> {
-  const { data, error } = await supabase.from("companies").select("id").order("created_at", { ascending: true }).limit(1);
-  if (error) throw error;
-  return (data?.[0]?.id as string | undefined) ?? null;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [activeCompanyId, setActiveCompanyIdState] = useState<string | null>(null);
@@ -115,18 +96,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       sessionUserIdRef.current = session.user.id;
 
-      // Optional self-heal: if there are duplicated profile links for this email, normalize on the backend.
-      // This keeps company_id stable across browsers/sessions.
+      // Best-effort: normalize duplicated links (same email across companies) on the backend.
       try {
         await supabase.functions.invoke("tenant-unify", { body: {} });
       } catch {
-        // Best-effort. If the function is not deployed, we still proceed.
+        // If the function is not deployed, still proceed.
       }
 
       const p = await fetchMyProfile(session.user.id);
       if (!p) {
-        // Never create/vinculate a new company at login.
-        // If profile is missing, deny access (this must be provisioned by an admin).
+        // IMPORTANT: never create/vinculate tenant on login.
+        // If profile is missing, access must be provisioned out-of-band.
         await supabase.auth.signOut();
         sessionUserIdRef.current = null;
         if (!mountedRef.current) return;
@@ -147,31 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (!mountedRef.current) return;
       setUser(nextUser);
-
-      // Tenant selection
-      if (nextUser.role !== "MASTERADMIN") {
-        setActiveCompanyIdState(p.company_id ?? null);
-        return;
-      }
-
-      // MASTERADMIN: persist last selected company in the profile (so it's consistent across browsers).
-      // Prefer profile.company_id (server-side persisted), then localStorage fallback.
-      const stored = loadActiveCompanyIdFromStorage();
-      let cid = p.company_id ?? stored ?? null;
-
-      if (!cid) {
-        cid = await chooseDefaultCompanyId();
-      }
-
-      setActiveCompanyIdState(cid);
-
-      // Persist the selection to both profile + local storage.
-      saveActiveCompanyIdToStorage(cid);
-
-      if (cid && cid !== p.company_id) {
-        // Only MASTERADMIN can safely write this field without impacting RLS for normal users.
-        await supabase.from("profiles").update({ company_id: cid }).eq("id", p.id);
-      }
+      setActiveCompanyIdState(p.company_id ?? null);
     } finally {
       if (mountedRef.current) setLoading(false);
     }
@@ -202,13 +158,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       activeCompanyId,
       loading,
       async setActiveCompanyId(companyId: string | null) {
-        saveActiveCompanyIdToStorage(companyId);
-        setActiveCompanyIdState(companyId);
-
-        // Persist selection for MASTERADMIN.
-        if (user?.role === "MASTERADMIN") {
-          await supabase.from("profiles").update({ company_id: companyId }).eq("id", user.id);
-        }
+        // Only MASTERADMIN should change tenant context.
+        if (user?.role !== "MASTERADMIN") return;
+        await supabase.from("profiles").update({ company_id: companyId }).eq("id", user.id);
+        await hydrateFromSession();
       },
       async login(email: string, password: string) {
         const e = email.trim().toLowerCase();
@@ -226,9 +179,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ok: false as const, message: error.message };
         }
 
-        // Deterministic mustChangePassword:
-        // 1) refresh local state
-        // 2) fetch profile now and return its flag
         await hydrateFromSession();
 
         const { data: uData } = await supabase.auth.getUser();
