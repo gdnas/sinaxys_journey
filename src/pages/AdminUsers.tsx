@@ -34,24 +34,26 @@ function toMonthlyCostNumber(v: string) {
   return n;
 }
 
-function edgeMessage(err: unknown) {
-  const anyErr = err as any;
+async function describeFunctionError(e: unknown): Promise<string> {
+  // Supabase Functions errors (FunctionsHttpError/FunctionsRelayError/FunctionsFetchError)
+  const anyErr = e as any;
 
-  // supabase-js FunctionsHttpError includes `context.body`
-  const body = anyErr?.context?.body;
-  if (typeof body === "string") {
+  // For FunctionsHttpError, context is usually a Response.
+  const ctx = anyErr?.context;
+  if (ctx && typeof ctx.json === "function") {
     try {
-      const parsed = JSON.parse(body);
-      return String(parsed?.message ?? parsed?.error ?? anyErr?.message ?? body);
+      const payload = await ctx.json();
+      const msg = payload?.message;
+      if (typeof msg === "string" && msg.trim()) return msg;
     } catch {
-      return String(anyErr?.message ?? body);
+      // ignore
     }
   }
-  if (body && typeof body === "object") {
-    return String(body?.message ?? body?.error ?? anyErr?.message ?? "Erro desconhecido");
-  }
 
-  return err instanceof Error ? err.message : String(err);
+  const msg = anyErr?.message;
+  if (typeof msg === "string" && msg.trim()) return msg;
+
+  return "Erro inesperado.";
 }
 
 export default function AdminUsers() {
@@ -169,12 +171,7 @@ export default function AdminUsers() {
 
             <div className="relative w-full md:w-[360px]">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar por nome ou e-mail…"
-                className="h-11 rounded-xl pl-9"
-              />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="h-11 rounded-xl pl-9" />
             </div>
           </div>
         </div>
@@ -245,9 +242,7 @@ export default function AdminUsers() {
           </Table>
         </div>
 
-        <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-          Se você criar com senha temporária, o sistema força a troca no primeiro acesso.
-        </div>
+        <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Se você criar com senha temporária, o sistema força a troca no primeiro acesso.</div>
       </Card>
 
       {/* Invite / Create */}
@@ -266,9 +261,7 @@ export default function AdminUsers() {
           <div className="grid gap-4">
             <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Escolha o modo</div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Ative "senha temporária" para criar o usuário agora. Desativado = enviamos convite por e-mail.
-              </p>
+              <p className="mt-1 text-xs text-muted-foreground">Ative "senha temporária" para criar o usuário agora. Desativado = enviamos convite por e-mail.</p>
             </div>
 
             <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
@@ -301,13 +294,7 @@ export default function AdminUsers() {
 
             <div className="grid gap-2">
               <Label>E-mail</Label>
-              <Input
-                className="h-11 rounded-xl"
-                value={inviteEmail}
-                onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="nome@empresa.com"
-                inputMode="email"
-              />
+              <Input className="h-11 rounded-xl" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} placeholder="nome@empresa.com" inputMode="email" />
             </div>
 
             <div className="grid gap-2">
@@ -397,9 +384,14 @@ export default function AdminUsers() {
                   await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
                   setInviteOpen(false);
                 } catch (e) {
+                  const msg = await describeFunctionError(e);
+                  const maybeEmailIssue = msg.toLowerCase().includes("email") || msg.toLowerCase().includes("smtp") || msg.toLowerCase().includes("mail");
+
                   toast({
                     title: "Não foi possível adicionar",
-                    description: edgeMessage(e),
+                    description: maybeEmailIssue
+                      ? `${msg} (Dica: ative \"senha temporária\" para criar sem depender de e-mail.)`
+                      : msg,
                     variant: "destructive",
                   });
                 } finally {
