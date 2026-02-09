@@ -26,6 +26,14 @@ const ROLE_OPTIONS = [
 
 type CompanyRole = (typeof ROLE_OPTIONS)[number]["value"];
 
+function toMonthlyCostNumber(v: string) {
+  const t = v.trim();
+  if (!t) return null;
+  const n = Number(t.replace(/\./g, "").replace(/,/g, "."));
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
 export default function AdminUsers() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -65,6 +73,8 @@ export default function AdminUsers() {
   const [editActive, setEditActive] = useState(true);
   const [editJobTitle, setEditJobTitle] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editMonthlyCost, setEditMonthlyCost] = useState<string>("");
+  const [editContractUrl, setEditContractUrl] = useState<string>("");
   const [saving, setSaving] = useState(false);
 
   const openEdit = (p: DbProfile) => {
@@ -75,6 +85,8 @@ export default function AdminUsers() {
     setEditActive(!!p.active);
     setEditJobTitle(p.job_title ?? "");
     setEditPhone(p.phone ?? "");
+    setEditMonthlyCost(typeof p.monthly_cost_brl === "number" ? String(p.monthly_cost_brl) : "");
+    setEditContractUrl(p.contract_url ?? "");
     setEditOpen(true);
   };
 
@@ -462,6 +474,29 @@ export default function AdminUsers() {
                 <Input className="h-11 rounded-xl" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} />
               </div>
 
+              <div className="grid gap-2">
+                <Label>Custo mensal (BRL)</Label>
+                <Input
+                  className="h-11 rounded-xl"
+                  value={editMonthlyCost}
+                  onChange={(e) => setEditMonthlyCost(e.target.value)}
+                  inputMode="decimal"
+                  placeholder="Ex.: 6500"
+                />
+                <div className="text-xs text-muted-foreground">Usado no relatório de custos da empresa e do departamento.</div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Contrato (URL)</Label>
+                <Input
+                  className="h-11 rounded-xl"
+                  value={editContractUrl}
+                  onChange={(e) => setEditContractUrl(e.target.value)}
+                  inputMode="url"
+                  placeholder="https://..."
+                />
+              </div>
+
               <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
                 <div>
                   <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Ativo</div>
@@ -491,6 +526,8 @@ export default function AdminUsers() {
                     department_id: editDeptId || null,
                     job_title: editJobTitle.trim() || null,
                     phone: editPhone.trim() || null,
+                    contract_url: editContractUrl.trim() || null,
+                    monthly_cost_brl: toMonthlyCostNumber(editMonthlyCost),
                     active: editActive,
                   });
                   await qc.invalidateQueries({ queryKey: ["profiles", companyId] });

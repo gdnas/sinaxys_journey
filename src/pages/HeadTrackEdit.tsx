@@ -82,8 +82,10 @@ export default function HeadTrackEdit() {
   const navigate = useNavigate();
   const { trackId } = useParams<{ trackId: string }>();
 
-  if (!user || user.role !== "HEAD") return null;
+  if (!user || (user.role !== "HEAD" && user.role !== "ADMIN")) return null;
   if (!trackId) return null;
+
+  const backPath = user.role === "ADMIN" ? "/admin/tracks" : "/head/tracks";
 
   const { data: track, isLoading: trackLoading } = useQuery({
     queryKey: ["track", trackId],
@@ -311,7 +313,7 @@ export default function HeadTrackEdit() {
       <div className="rounded-3xl border bg-white p-6">
         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilha não encontrada</div>
         <Button asChild variant="outline" className="mt-4 rounded-xl">
-          <Link to="/head/tracks">
+          <Link to={backPath}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Voltar
           </Link>
@@ -324,7 +326,7 @@ export default function HeadTrackEdit() {
     <div className="grid gap-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <Button asChild variant="outline" className="rounded-xl">
-          <Link to="/head/tracks">
+          <Link to={backPath}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Trilhas
           </Link>
@@ -567,7 +569,7 @@ export default function HeadTrackEdit() {
               <div className="grid gap-2">
                 <Label>Nota mínima (%)</Label>
                 <Input className="h-11 rounded-xl" value={mMinScore} onChange={(e) => setMMinScore(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" />
-                <div className="text-xs text-muted-foreground">Após salvar, use “Editar quiz” na lista para configurar perguntas.</div>
+                <div className="text-xs text-muted-foreground">Após salvar, use "Editar quiz" na lista para configurar perguntas.</div>
               </div>
             ) : null}
           </div>

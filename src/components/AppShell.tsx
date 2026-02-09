@@ -11,6 +11,9 @@ import {
   LayoutDashboard,
   Award,
   Layers,
+  Network,
+  Wallet,
+  UploadCloud,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -77,10 +80,36 @@ const nav: NavItem[] = [
     icon: <GraduationCap className="h-4 w-4" />,
     roles: ["HEAD"],
   },
+
+  // Admin
   {
     to: "/admin/users",
     label: "Usuários",
     icon: <Shield className="h-4 w-4" />,
+    roles: ["ADMIN"],
+  },
+  {
+    to: "/admin/import",
+    label: "Importar usuários",
+    icon: <UploadCloud className="h-4 w-4" />,
+    roles: ["ADMIN"],
+  },
+  {
+    to: "/admin/org",
+    label: "Organograma",
+    icon: <Network className="h-4 w-4" />,
+    roles: ["ADMIN"],
+  },
+  {
+    to: "/admin/costs",
+    label: "Custos",
+    icon: <Wallet className="h-4 w-4" />,
+    roles: ["ADMIN"],
+  },
+  {
+    to: "/admin/tracks",
+    label: "Montar trilhas",
+    icon: <GraduationCap className="h-4 w-4" />,
     roles: ["ADMIN"],
   },
   {

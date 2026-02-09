@@ -15,6 +15,10 @@ import TrackLibrary from "./pages/TrackLibrary";
 import AdminUsers from "./pages/AdminUsers";
 import AdminDepartments from "./pages/AdminDepartments";
 import AdminBrand from "./pages/AdminBrand";
+import AdminOrgChart from "./pages/AdminOrgChart";
+import AdminCosts from "./pages/AdminCosts";
+import AdminImportUsers from "./pages/AdminImportUsers";
+import AdminTracks from "./pages/AdminTracks";
 import MasterCompanies from "./pages/MasterCompanies";
 import MasterOverview from "./pages/MasterOverview";
 import MasterUsers from "./pages/MasterUsers";
@@ -154,6 +158,46 @@ const App = () => (
                   element={
                     <RequireAuth roles={["ADMIN"]}>
                       <AdminUsers />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/import"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminImportUsers />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/org"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminOrgChart />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/costs"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminCosts />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/tracks"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <AdminTracks />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/admin/tracks/:trackId/edit"
+                  element={
+                    <RequireAuth roles={["ADMIN"]}>
+                      <HeadTrackEdit />
                     </RequireAuth>
                   }
                 />
