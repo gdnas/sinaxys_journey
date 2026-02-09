@@ -455,3 +455,42 @@ export async function getCertificate(certificateId: string) {
   if (error) throw error;
   return data;
 }
+
+export async function getTotalXpForUser(params: { companyId: string; userId: string }) {
+  const { data: asgs, error: aErr } = await supabase
+    .from("track_assignments")
+    .select("id")
+    .eq("company_id", params.companyId)
+    .eq("user_id", params.userId);
+  if (aErr) throw aErr;
+
+  const asgIds = (asgs ?? []).map((a) => a.id);
+  if (!asgIds.length) return 0;
+
+  const { data: prog, error: pErr } = await supabase
+    .from("module_progress")
+    .select("module_id,status,earned_xp,assignment_id")
+    .in("assignment_id", asgIds.length ? asgIds : [NIL]);
+  if (pErr) throw pErr;
+
+  const completed = (prog ?? []).filter((p: any) => p.status === "COMPLETED");
+
+  let total = 0;
+  const missingModuleIds: string[] = [];
+
+  for (const row of completed as any[]) {
+    const v = typeof row.earned_xp === "number" ? row.earned_xp : null;
+    if (typeof v === "number") total += v;
+    else if (row.module_id) missingModuleIds.push(row.module_id);
+  }
+
+  if (missingModuleIds.length) {
+    const uniq = Array.from(new Set(missingModuleIds));
+    const { data: mods, error: mErr } = await supabase.from("track_modules").select("id,xp_reward").in("id", uniq);
+    if (mErr) throw mErr;
+    const byId = new Map((mods ?? []).map((m: any) => [m.id, m.xp_reward] as const));
+    for (const mid of uniq) total += Math.max(0, Number(byId.get(mid) ?? 0) || 0);
+  }
+
+  return Math.max(0, Math.floor(total));
+}

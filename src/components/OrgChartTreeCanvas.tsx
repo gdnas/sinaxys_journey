@@ -25,6 +25,8 @@ export function OrgChartTreeCanvas<T>({ roots, renderNode, className }: Props<T>
   const contentRef = useRef<HTMLDivElement | null>(null);
 
   const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const dragRef = useRef<{ startX: number; startY: number; ox: number; oy: number } | null>(null);
 
   const fitScale = useMemo(() => {
     const wrap = wrapRef.current;
@@ -39,33 +41,56 @@ export function OrgChartTreeCanvas<T>({ roots, renderNode, className }: Props<T>
     if (!cw || !ch || !sw || !sh) return 1;
 
     return clamp(Math.min(cw / sw, ch / sh) * 0.98, 0.25, 1);
-  }, [roots.length]);
+  }, [roots]);
+
+  const fitAndCenter = () => {
+    const wrap = wrapRef.current;
+    const content = contentRef.current;
+    if (!wrap || !content) return;
+
+    const cw = wrap.clientWidth;
+    const ch = wrap.clientHeight;
+    const sw = content.scrollWidth;
+    const sh = content.scrollHeight;
+    if (!cw || !ch || !sw || !sh) return;
+
+    const nextScale = clamp(Math.min(cw / sw, ch / sh) * 0.98, 0.25, 1);
+    setScale(nextScale);
+
+    const x = Math.round((cw - sw * nextScale) / 2);
+    const y = Math.round((ch - sh * nextScale) / 2);
+    setOffset({ x: x > 0 ? x : 0, y: y > 0 ? y : 0 });
+  };
 
   useEffect(() => {
     // Auto-fit when mounted/changed.
     // Defer to ensure layout is computed.
-    const t = window.setTimeout(() => setScale(fitScale), 0);
+    const t = window.setTimeout(() => fitAndCenter(), 0);
     return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitScale]);
 
   useEffect(() => {
     const onResize = () => {
+      // If user is close to fit, keep it fitted.
       const wrap = wrapRef.current;
       const content = contentRef.current;
       if (!wrap || !content) return;
+
       const cw = wrap.clientWidth;
       const ch = wrap.clientHeight;
       const sw = content.scrollWidth;
       const sh = content.scrollHeight;
       if (!cw || !ch || !sw || !sh) return;
+
       const nextFit = clamp(Math.min(cw / sw, ch / sh) * 0.98, 0.25, 1);
       setScale((prev) => clamp(prev, 0.25, 1));
-      // If user was close to fit, keep it fitted.
-      if (Math.abs(scale - nextFit) < 0.02) setScale(nextFit);
+      if (Math.abs(scale - nextFit) < 0.02) fitAndCenter();
     };
 
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scale]);
 
   return (
@@ -73,7 +98,7 @@ export function OrgChartTreeCanvas<T>({ roots, renderNode, className }: Props<T>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
           <Move className="h-4 w-4" />
-          Visualização em árvore (auto-ajuste na página)
+          Visualização em árvore (arraste para mover, zoom para ajustar)
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -95,7 +120,7 @@ export function OrgChartTreeCanvas<T>({ roots, renderNode, className }: Props<T>
           >
             <Plus className="h-4 w-4" />
           </Button>
-          <Button type="button" variant="outline" className="h-9 rounded-full" onClick={() => setScale(fitScale)}>
+          <Button type="button" variant="outline" className="h-9 rounded-full" onClick={() => fitAndCenter()}>
             <RefreshCcw className="mr-2 h-4 w-4" />
             Ajustar
           </Button>
@@ -115,12 +140,28 @@ export function OrgChartTreeCanvas<T>({ roots, renderNode, className }: Props<T>
 
       <div
         ref={wrapRef}
-        className="relative h-[70vh] overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/20"
+        className="relative h-[70vh] touch-none overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/20"
+        onPointerDown={(e) => {
+          dragRef.current = { startX: e.clientX, startY: e.clientY, ox: offset.x, oy: offset.y };
+          (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          if (!dragRef.current) return;
+          const dx = e.clientX - dragRef.current.startX;
+          const dy = e.clientY - dragRef.current.startY;
+          setOffset({ x: dragRef.current.ox + dx, y: dragRef.current.oy + dy });
+        }}
+        onPointerUp={() => {
+          dragRef.current = null;
+        }}
+        onPointerCancel={() => {
+          dragRef.current = null;
+        }}
       >
         <div
           ref={contentRef}
           className="absolute left-0 top-0 origin-top-left"
-          style={{ transform: `scale(${scale})` }}
+          style={{ transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})` }}
         >
           <div className="inline-block p-6">
             <div className="flex items-start justify-center gap-10">

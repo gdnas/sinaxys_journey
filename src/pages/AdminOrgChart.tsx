@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
+import { OrgPersonDialog } from "@/components/OrgPersonDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
@@ -24,13 +27,7 @@ function displayName(p: DbProfile) {
   return p.name?.trim() ? p.name.trim() : p.email;
 }
 
-type Node = {
-  id: string;
-  profile: DbProfile;
-  children: Node[];
-};
-
-function buildTree(profiles: DbProfile[]) {
+function buildTree(profiles: DbProfile[]): OrgNode<DbProfile>[] {
   const byId = new Map(profiles.map((p) => [p.id, p] as const));
   const childrenByManager = new Map<string, DbProfile[]>();
   const roots: DbProfile[] = [];
@@ -46,12 +43,12 @@ function buildTree(profiles: DbProfile[]) {
     }
   }
 
-  const makeNode = (p: DbProfile): Node => {
+  const makeNode = (p: DbProfile): OrgNode<DbProfile> => {
     const kids = (childrenByManager.get(p.id) ?? [])
       .slice()
       .sort((a, b) => displayName(a).localeCompare(displayName(b)))
       .map(makeNode);
-    return { id: p.id, profile: p, children: kids };
+    return { id: p.id, data: p, children: kids };
   };
 
   return roots
@@ -66,12 +63,12 @@ function TreeRow({
   deptById,
   onEdit,
 }: {
-  node: Node;
+  node: OrgNode<DbProfile>;
   level: number;
   deptById: Map<string, string>;
   onEdit: (p: DbProfile) => void;
 }) {
-  const p = node.profile;
+  const p = node.data;
   const deptName = p.department_id ? deptById.get(p.department_id) : undefined;
 
   return (
@@ -147,6 +144,15 @@ export default function AdminOrgChart() {
 
   const tree = useMemo(() => buildTree(filteredProfiles), [filteredProfiles]);
 
+  // Quick card from node
+  const [cardOpen, setCardOpen] = useState(false);
+  const [selected, setSelected] = useState<DbProfile | null>(null);
+
+  const openCard = (p: DbProfile) => {
+    setSelected(p);
+    setCardOpen(true);
+  };
+
   // Edit manager
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<DbProfile | null>(null);
@@ -166,7 +172,7 @@ export default function AdminOrgChart() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Organograma</div>
-            <p className="mt-1 text-sm text-muted-foreground">Defina gestores (manager_id) e visualize a estrutura. Tudo é salvo em profiles.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Visualize a empresa como lista ou como árvore. Clique na bolinha para ver o card.</p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
             <Network className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -187,20 +193,109 @@ export default function AdminOrgChart() {
 
         <Separator className="my-5" />
 
-        <div className="grid gap-2">
-          {tree.map((n) => (
-            <TreeRow key={n.id} node={n} level={0} deptById={deptById} onEdit={openEdit} />
-          ))}
+        <Tabs defaultValue="tree" className="w-full">
+          <TabsList className="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+            <TabsTrigger
+              value="tree"
+              className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]"
+            >
+              Árvore
+            </TabsTrigger>
+            <TabsTrigger
+              value="list"
+              className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]"
+            >
+              Lista
+            </TabsTrigger>
+          </TabsList>
 
-          {!tree.length ? (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum perfil encontrado.</div>
-          ) : null}
-        </div>
+          <TabsContent value="tree" className="mt-4">
+            <OrgChartTreeCanvas
+              roots={tree}
+              renderNode={(n) => {
+                const p = n.data;
+                const deptName = p.department_id ? deptById.get(p.department_id) ?? null : null;
+                const title = displayName(p);
+                const inactive = !p.active;
 
-        <div className="mt-5 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-          Dica: se uma pessoa aparece como "raiz", ela não tem gestor definido.
-        </div>
+                return (
+                  <button
+                    type="button"
+                    onClick={() => openCard(p)}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className={
+                      "group relative grid place-items-center rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-[color:var(--sinaxys-primary)] focus-visible:ring-offset-2"
+                    }
+                    aria-label={`Abrir card de ${title}`}
+                    title={title}
+                  >
+                    <div
+                      className={
+                        "grid h-14 w-14 place-items-center rounded-full bg-white shadow-sm ring-1 ring-[color:var(--sinaxys-border)] transition group-hover:shadow-md"
+                      }
+                    >
+                      <div
+                        className={
+                          "grid h-12 w-12 place-items-center rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-2 ring-white"
+                        }
+                        style={inactive ? { opacity: 0.6 } : undefined}
+                      >
+                        <span className="text-xs font-bold">{initials(title)}</span>
+                      </div>
+                    </div>
+
+                    <div className="mt-2 w-[170px] text-center">
+                      <div className={"truncate text-xs font-semibold " + (inactive ? "text-muted-foreground" : "text-[color:var(--sinaxys-ink)]")}>
+                        {title}
+                      </div>
+                      <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
+                        {p.job_title?.trim() ? p.job_title.trim() : deptName ?? ""}
+                      </div>
+                    </div>
+
+                    {!p.active ? (
+                      <span className="absolute -right-1 -top-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900 ring-1 ring-white">
+                        Inativo
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              }}
+            />
+
+            {!tree.length ? (
+              <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum perfil encontrado.</div>
+            ) : null}
+          </TabsContent>
+
+          <TabsContent value="list" className="mt-4">
+            <div className="grid gap-2">
+              {tree.map((n) => (
+                <TreeRow key={n.id} node={n} level={0} deptById={deptById} onEdit={openEdit} />
+              ))}
+
+              {!tree.length ? (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum perfil encontrado.</div>
+              ) : null}
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+              Dica: se uma pessoa aparece como "raiz", ela não tem gestor definido.
+            </div>
+          </TabsContent>
+        </Tabs>
       </Card>
+
+      <OrgPersonDialog
+        open={cardOpen}
+        onOpenChange={(v) => {
+          setCardOpen(v);
+          if (!v) setSelected(null);
+        }}
+        profile={selected}
+        companyId={companyId}
+        departmentName={selected?.department_id ? deptById.get(selected.department_id) ?? null : null}
+      />
 
       <Dialog
         open={open}
