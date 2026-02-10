@@ -26,6 +26,7 @@ import {
   type DbOkrCycle,
   type DbOkrObjective,
   type DeliverableTier,
+  type KrKind,
   type ObjectiveLevel,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
@@ -103,13 +104,16 @@ export default function OkrAssistant() {
   const [fund, setFund] = useState<DbOkrObjective["linked_fundamental"]>(null);
   const [fundText, setFundText] = useState("");
 
+  const [objectiveExpected, setObjectiveExpected] = useState("80");
   const [objectiveValue, setObjectiveValue] = useState("");
   const [objectiveEffortHours, setObjectiveEffortHours] = useState("");
 
+  const [krKind, setKrKind] = useState<KrKind>("METRIC");
   const [krTitle, setKrTitle] = useState("");
   const [krUnit, setKrUnit] = useState("");
   const [krStart, setKrStart] = useState("");
   const [krTarget, setKrTarget] = useState("");
+  const [krDue, setKrDue] = useState("");
 
   const [tier, setTier] = useState<DeliverableTier>("TIER2");
   const [deliverableTitle, setDeliverableTitle] = useState("");
@@ -122,26 +126,33 @@ export default function OkrAssistant() {
   const [taskValue, setTaskValue] = useState("");
   const [tasks, setTasks] = useState<DraftTask[]>([]);
 
+  const [publishing, setPublishing] = useState(false);
+
   const requiresBusinessCase = !!user.departmentId;
   const myMonthly = user.monthlyCostBRL ?? null;
 
+  const expectedAtt = parsePtNumber(objectiveExpected);
   const objectiveValueBRL = parsePtNumber(objectiveValue);
   const objectiveHours = parsePtNumber(objectiveEffortHours);
   const objectiveCostBRL = laborCostFromMonthly(myMonthly, objectiveHours);
   const objectiveRoi = roiPct(objectiveValueBRL, objectiveCostBRL);
 
   const businessCaseOk =
-    !requiresBusinessCase ||
-    (!!objectiveValueBRL &&
-      objectiveValueBRL > 0 &&
-      !!objectiveHours &&
-      objectiveHours > 0 &&
-      !!myMonthly &&
-      myMonthly > 0 &&
-      objectiveCostBRL !== null &&
-      objectiveRoi !== null &&
-      tasks.length >= 1 &&
-      tasks.every((t) => t.estimated_value_brl !== null && t.estimated_cost_brl !== null && t.estimated_roi_pct !== null));
+    (!requiresBusinessCase ||
+      (expectedAtt !== null &&
+        expectedAtt >= 0 &&
+        expectedAtt <= 100 &&
+        !!objectiveValueBRL &&
+        objectiveValueBRL > 0 &&
+        !!objectiveHours &&
+        objectiveHours > 0 &&
+        !!myMonthly &&
+        myMonthly > 0 &&
+        objectiveCostBRL !== null &&
+        objectiveRoi !== null &&
+        tasks.length >= 1 &&
+        tasks.every((t) => t.estimated_value_brl !== null && t.estimated_cost_brl !== null && t.estimated_roi_pct !== null))) &&
+    (!requiresBusinessCase || tasks.length >= 1);
 
   const objectiveQuality = useMemo(() => {
     const t = objectiveTitle.trim();
@@ -153,7 +164,12 @@ export default function OkrAssistant() {
 
   const krQuality = useMemo(() => {
     const t = krTitle.trim();
-    if (!t) return { ok: false, msg: "Defina um KR mensurável." };
+    if (!t) return { ok: false, msg: "Defina um KR." };
+
+    if (krKind === "DELIVERABLE") {
+      return { ok: true, msg: "KR do tipo entregável." };
+    }
+
     const start = Number(String(krStart).replace(",", "."));
     const target = Number(String(krTarget).replace(",", "."));
     if (!Number.isFinite(start) || !Number.isFinite(target)) {
@@ -161,7 +177,7 @@ export default function OkrAssistant() {
     }
     if (start === target) return { ok: false, msg: "Início e meta não podem ser iguais." };
     return { ok: true, msg: "KR pronto para tracking." };
-  }, [krTitle, krStart, krTarget]);
+  }, [krTitle, krStart, krTarget, krKind]);
 
   const canSubmit =
     hasCompany &&
@@ -169,10 +185,14 @@ export default function OkrAssistant() {
     objectiveQuality.ok &&
     !!fund &&
     fundText.trim().length >= 6 &&
+    expectedAtt !== null &&
+    expectedAtt >= 0 &&
+    expectedAtt <= 100 &&
     krQuality.ok &&
     deliverableTitle.trim().length >= 4 &&
     tasks.length >= 1 &&
-    businessCaseOk;
+    businessCaseOk &&
+    !publishing;
 
   if (!hasCompany) {
     return (
@@ -276,7 +296,7 @@ export default function OkrAssistant() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">2) Objetivo</div>
-                <p className="mt-1 text-sm text-muted-foreground">Escreva um objetivo claro e conectado aos fundamentos.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Escreva um objetivo claro, defina o atingimento esperado e conecte aos fundamentos.</p>
               </div>
               <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{objectiveQuality.ok ? <Check className="h-4 w-4" /> : "Passo 2"}</Badge>
             </div>
@@ -292,6 +312,12 @@ export default function OkrAssistant() {
                 placeholder="Ex.: Aumentar previsibilidade do delivery"
               />
               <div className={`text-xs ${objectiveQuality.ok ? "text-[color:var(--sinaxys-ink)]" : "text-muted-foreground"}`}>{objectiveQuality.msg}</div>
+            </div>
+
+            <div className="mt-4 grid gap-2">
+              <Label>Atingimento esperado (%)</Label>
+              <Input className="h-11 rounded-xl" value={objectiveExpected} onChange={(e) => setObjectiveExpected(e.target.value)} placeholder="80" />
+              <div className="text-xs text-muted-foreground">Ex.: 70–85% costuma ser meta realista para objetivos aspiracionais.</div>
             </div>
 
             <div className="mt-4 grid gap-2">
@@ -377,37 +403,59 @@ export default function OkrAssistant() {
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">3) Key Result</div>
-                <p className="mt-1 text-sm text-muted-foreground">Transforme o objetivo em um resultado rastreável.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Escolha KR de métrica (de → para) ou KR entregável (até data).</p>
               </div>
               <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{krQuality.ok ? <Check className="h-4 w-4" /> : "Passo 3"}</Badge>
             </div>
 
             <Separator className="my-5" />
 
-            <div className="grid gap-2">
-              <Label>KR</Label>
-              <Input
-                className="h-11 rounded-xl"
-                value={krTitle}
-                onChange={(e) => setKrTitle(e.target.value)}
-                placeholder="Ex.: Reduzir lead time médio de 12 para 7 dias"
-              />
-              <div className={`text-xs ${krQuality.ok ? "text-[color:var(--sinaxys-ink)]" : "text-muted-foreground"}`}>{krQuality.msg}</div>
-            </div>
+            <div className="grid gap-3">
+              <div className="grid gap-2">
+                <Label>Tipo</Label>
+                <Select value={krKind} onValueChange={(v) => setKrKind(v as KrKind)}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="METRIC">Métrica (de → para)</SelectItem>
+                    <SelectItem value="DELIVERABLE">Entregável (até uma data)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="mt-4 grid gap-4 md:grid-cols-3">
               <div className="grid gap-2">
-                <Label>Início</Label>
-                <Input className="h-11 rounded-xl" value={krStart} onChange={(e) => setKrStart(e.target.value)} placeholder="12" />
+                <Label>KR</Label>
+                <Input
+                  className="h-11 rounded-xl"
+                  value={krTitle}
+                  onChange={(e) => setKrTitle(e.target.value)}
+                  placeholder={krKind === "DELIVERABLE" ? "Ex.: Entregar novo fluxo de onboarding" : "Ex.: Reduzir lead time médio de 12 para 7 dias"}
+                />
+                <div className={`text-xs ${krQuality.ok ? "text-[color:var(--sinaxys-ink)]" : "text-muted-foreground"}`}>{krQuality.msg}</div>
               </div>
-              <div className="grid gap-2">
-                <Label>Meta</Label>
-                <Input className="h-11 rounded-xl" value={krTarget} onChange={(e) => setKrTarget(e.target.value)} placeholder="7" />
-              </div>
-              <div className="grid gap-2">
-                <Label>Unidade (opcional)</Label>
-                <Input className="h-11 rounded-xl" value={krUnit} onChange={(e) => setKrUnit(e.target.value)} placeholder="dias" />
-              </div>
+
+              {krKind === "METRIC" ? (
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label>Início</Label>
+                    <Input className="h-11 rounded-xl" value={krStart} onChange={(e) => setKrStart(e.target.value)} placeholder="12" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Meta</Label>
+                    <Input className="h-11 rounded-xl" value={krTarget} onChange={(e) => setKrTarget(e.target.value)} placeholder="7" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Unidade (opcional)</Label>
+                    <Input className="h-11 rounded-xl" value={krUnit} onChange={(e) => setKrUnit(e.target.value)} placeholder="dias" />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <Label>Prazo (opcional)</Label>
+                  <Input className="h-11 rounded-xl" type="date" value={krDue} onChange={(e) => setKrDue(e.target.value)} />
+                </div>
+              )}
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
@@ -416,14 +464,9 @@ export default function OkrAssistant() {
                 "Reduzir ____ de __ para __",
                 "Elevar ____ de __ para __",
                 "Gerar ____ (R$) de __ para __",
+                "Entregar ____ até __",
               ].map((tpl) => (
-                <Button
-                  key={tpl}
-                  type="button"
-                  variant="outline"
-                  className="h-9 rounded-full"
-                  onClick={() => setKrTitle(tpl)}
-                >
+                <Button key={tpl} type="button" variant="outline" className="h-9 rounded-full" onClick={() => setKrTitle(tpl)}>
                   {tpl}
                 </Button>
               ))}
@@ -468,12 +511,7 @@ export default function OkrAssistant() {
               <div className="grid gap-2 md:grid-cols-2">
                 <div className="grid gap-2">
                   <Label>Prazo do entregável (opcional)</Label>
-                  <Input
-                    className="h-11 rounded-xl"
-                    type="date"
-                    value={deliverableDue}
-                    onChange={(e) => setDeliverableDue(e.target.value)}
-                  />
+                  <Input className="h-11 rounded-xl" type="date" value={deliverableDue} onChange={(e) => setDeliverableDue(e.target.value)} />
                 </div>
                 <div className="grid gap-2">
                   <Label className="text-muted-foreground">&nbsp;</Label>
@@ -493,12 +531,7 @@ export default function OkrAssistant() {
                 <p className="mt-1 text-sm text-muted-foreground">Inclua pelo menos 1 tarefa para sair com execução pronta.</p>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <Input
-                    className="h-11 rounded-xl"
-                    value={taskTitle}
-                    onChange={(e) => setTaskTitle(e.target.value)}
-                    placeholder="Ex.: Mapear etapas do fluxo"
-                  />
+                  <Input className="h-11 rounded-xl" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Ex.: Mapear etapas do fluxo" />
                   <Input className="h-11 rounded-xl" type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} />
                 </div>
 
@@ -568,12 +601,7 @@ export default function OkrAssistant() {
                             </div>
                           ) : null}
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="h-9 rounded-xl"
-                          onClick={() => setTasks((prev) => prev.filter((_, i) => i !== idx))}
-                        >
+                        <Button type="button" variant="outline" className="h-9 rounded-xl" onClick={() => setTasks((prev) => prev.filter((_, i) => i !== idx))}>
                           Remover
                         </Button>
                       </div>
@@ -596,6 +624,8 @@ export default function OkrAssistant() {
                 className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                 disabled={!canSubmit}
                 onClick={async () => {
+                  if (publishing) return;
+                  setPublishing(true);
                   try {
                     const start = Number(String(krStart).replace(",", "."));
                     const target = Number(String(krTarget).replace(",", "."));
@@ -613,6 +643,7 @@ export default function OkrAssistant() {
                       linked_fundamental: fund,
                       linked_fundamental_text: fundText,
                       due_at: null,
+                      expected_attainment_pct: expectedAtt,
                       estimated_value_brl: objectiveValueBRL,
                       estimated_effort_hours: objectiveHours,
                       estimated_cost_brl: objectiveCostBRL !== null ? Number(objectiveCostBRL.toFixed(2)) : null,
@@ -622,10 +653,13 @@ export default function OkrAssistant() {
                     const kr = await createKeyResult({
                       objective_id: obj.id,
                       title: krTitle,
-                      metric_unit: krUnit.trim() || null,
-                      start_value: Number.isFinite(start) ? start : null,
-                      current_value: Number.isFinite(start) ? start : null,
-                      target_value: Number.isFinite(target) ? target : null,
+                      kind: krKind,
+                      due_at: krKind === "DELIVERABLE" ? (krDue.trim() || null) : null,
+                      achieved: false,
+                      metric_unit: krKind === "METRIC" ? krUnit.trim() || null : null,
+                      start_value: krKind === "METRIC" && Number.isFinite(start) ? start : null,
+                      current_value: krKind === "METRIC" && Number.isFinite(start) ? start : null,
+                      target_value: krKind === "METRIC" && Number.isFinite(target) ? target : null,
                       owner_user_id: user.id,
                       confidence: "ON_TRACK",
                     });
@@ -664,10 +698,11 @@ export default function OkrAssistant() {
                       description: e instanceof Error ? e.message : "Erro inesperado.",
                       variant: "destructive",
                     });
+                    setPublishing(false);
                   }
                 }}
               >
-                Criar OKR
+                {publishing ? "Criando…" : "Criar OKR"}
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </div>
@@ -696,6 +731,7 @@ export default function OkrAssistant() {
 
             <div className="mt-4 grid gap-2">
               <Hint ok={objectiveQuality.ok} title="Objetivo" text={objectiveQuality.msg} />
+              <Hint ok={expectedAtt !== null && expectedAtt >= 0 && expectedAtt <= 100} title="Atingimento" text="Defina o % esperado do objetivo." />
               <Hint ok={!!fund && fundText.trim().length >= 6} title="Alinhamento" text="Conecte explicitamente ao propósito/visão." />
               <Hint ok={krQuality.ok} title="KR" text={krQuality.msg} />
               <Hint ok={tasks.length >= 1} title="Execução" text="Tenha pelo menos 1 tarefa conectada." />

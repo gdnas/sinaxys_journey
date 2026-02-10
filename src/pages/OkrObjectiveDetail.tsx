@@ -26,6 +26,8 @@ import {
   listDeliverablesByKeyResultIds,
   listKeyResults,
   listTasksByDeliverableIds,
+  updateKeyResult,
+  updateOkrObjective,
   updateTask,
   type DbDeliverable,
   type DbOkrKeyResult,
@@ -71,6 +73,14 @@ export default function OkrObjectiveDetail() {
     queryKey: ["okr-krs", objectiveId],
     queryFn: () => listKeyResults(objectiveId),
   });
+
+  const overallPct = useMemo(() => {
+    const pcts = krs
+      .map((k) => krProgressPct(k))
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+    if (!pcts.length) return null;
+    return Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+  }, [krs]);
 
   const krIds = useMemo(() => krs.map((k) => k.id), [krs]);
 
@@ -129,6 +139,10 @@ export default function OkrObjectiveDetail() {
   const canWrite =
     !!objective && (user.id === objective.owner_user_id || user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN");
 
+  const [markOpen, setMarkOpen] = useState(false);
+  const [markPct, setMarkPct] = useState<string>("");
+  const [markSaving, setMarkSaving] = useState(false);
+
   const [delOpen, setDelOpen] = useState(false);
   const [delKrId, setDelKrId] = useState<string | null>(null);
   const [delTier, setDelTier] = useState<DeliverableTier>("TIER1");
@@ -136,6 +150,7 @@ export default function OkrObjectiveDetail() {
   const [delDesc, setDelDesc] = useState("");
   const [delOwner, setDelOwner] = useState<string | null>(null);
   const [delDue, setDelDue] = useState<string>("");
+  const [delSaving, setDelSaving] = useState(false);
 
   const resetDeliverable = () => {
     setDelKrId(null);
@@ -154,6 +169,7 @@ export default function OkrObjectiveDetail() {
   const [taskDue, setTaskDue] = useState<string>("");
   const [taskEstimate, setTaskEstimate] = useState<string>("");
   const [taskValue, setTaskValue] = useState<string>("");
+  const [taskSaving, setTaskSaving] = useState(false);
 
   const resetTask = () => {
     setTaskDeliverableId(null);
@@ -191,6 +207,25 @@ export default function OkrObjectiveDetail() {
     }
   };
 
+  const toggleDeliverableKr = async (kr: DbOkrKeyResult) => {
+    if (!canWrite) return;
+    if (kr.kind !== "DELIVERABLE") return;
+    try {
+      const nextAchieved = !kr.achieved;
+      await updateKeyResult(kr.id, {
+        achieved: nextAchieved,
+        achieved_at: nextAchieved ? new Date().toISOString() : null,
+      });
+      await qc.invalidateQueries({ queryKey: ["okr-krs", objectiveId] });
+    } catch (e) {
+      toast({
+        title: "Não foi possível atualizar",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (!hasCompany) {
     return (
       <div className="grid gap-6">
@@ -214,6 +249,8 @@ export default function OkrObjectiveDetail() {
     );
   }
 
+  const expected = typeof objective?.expected_attainment_pct === "number" ? objective.expected_attainment_pct : null;
+
   return (
     <div className="grid gap-6">
       <OkrPageHeader
@@ -221,12 +258,25 @@ export default function OkrObjectiveDetail() {
         subtitle="KRs → entregáveis → tarefas. Uma linha reta até a execução."
         icon={<Target className="h-5 w-5" />}
         actions={
-          <Button asChild variant="outline" className="h-11 rounded-xl">
-            <Link to="/okr/ciclos">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
-            </Link>
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Button asChild variant="outline" className="h-11 rounded-xl">
+              <Link to="/okr/ciclos">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Voltar
+              </Link>
+            </Button>
+            {canWrite && objective?.status !== "ACHIEVED" ? (
+              <Button
+                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                onClick={() => {
+                  setMarkPct(typeof overallPct === "number" ? String(overallPct) : String(expected ?? 80));
+                  setMarkOpen(true);
+                }}
+              >
+                Marcar atingido
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -242,6 +292,11 @@ export default function OkrObjectiveDetail() {
                   <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                     {objective.level}
                   </Badge>
+                  {objective.status === "ACHIEVED" ? (
+                    <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                      Atingido
+                    </Badge>
+                  ) : null}
                   <span>•</span>
                   <span>Dono: {byUserId.get(objective.owner_user_id) ?? "—"}</span>
                   {objective.linked_fundamental ? (
@@ -253,6 +308,18 @@ export default function OkrObjectiveDetail() {
                     </>
                   ) : null}
                 </div>
+
+                {typeof overallPct === "number" ? (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>
+                        Evolução{expected !== null ? ` (esperado: ${expected}%)` : ""}
+                      </span>
+                      <span className="font-medium text-[color:var(--sinaxys-ink)]">{overallPct}%</span>
+                    </div>
+                    <Progress value={overallPct} className="mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
+                  </div>
+                ) : null}
               </div>
 
               {objective.linked_fundamental_text?.trim() ? (
@@ -285,6 +352,7 @@ export default function OkrObjectiveDetail() {
               tasksByDeliverableId={tasksByDeliverableId}
               byUserId={byUserId}
               canWrite={canWrite}
+              onToggleDeliverableKr={() => toggleDeliverableKr(kr)}
               onAddDeliverable={() => {
                 resetDeliverable();
                 setDelKrId(kr.id);
@@ -305,6 +373,69 @@ export default function OkrObjectiveDetail() {
           </Card>
         )}
       </div>
+
+      <Dialog open={markOpen} onOpenChange={setMarkOpen}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Marcar objetivo como atingido</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+              Isso registra o atingimento final do objetivo e dispara a pontuação (OKR atingido / no prazo / atingimento esperado cumprido).
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Atingimento final (%)</Label>
+              <Input className="h-11 rounded-xl" value={markPct} onChange={(e) => setMarkPct(e.target.value)} placeholder="85" />
+              {expected !== null ? (
+                <div className="text-xs text-muted-foreground">Esperado: {expected}%</div>
+              ) : (
+                <div className="text-xs text-muted-foreground">Defina o esperado no cadastro do objetivo (recomendado).</div>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setMarkOpen(false)} disabled={markSaving}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={markSaving || !objective}
+              onClick={async () => {
+                if (!objective || markSaving) return;
+                const pct = parsePtNumber(markPct);
+                if (pct === null || pct < 0 || pct > 100) {
+                  toast({ title: "Atingimento inválido", description: "Use um número entre 0 e 100.", variant: "destructive" });
+                  return;
+                }
+                setMarkSaving(true);
+                try {
+                  await updateOkrObjective(objective.id, {
+                    status: "ACHIEVED",
+                    achieved_pct: pct,
+                    achieved_at: new Date().toISOString(),
+                  });
+                  await qc.invalidateQueries({ queryKey: ["okr-objective", objectiveId] });
+                  toast({ title: "Objetivo marcado como atingido" });
+                  setMarkOpen(false);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível marcar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setMarkSaving(false);
+                }
+              }}
+            >
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={delOpen}
@@ -373,14 +504,15 @@ export default function OkrObjectiveDetail() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setDelOpen(false)}>
+            <Button variant="outline" className="rounded-xl" onClick={() => setDelOpen(false)} disabled={delSaving}>
               Cancelar
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!canWrite || !delKrId || delTitle.trim().length < 4}
+              disabled={!canWrite || !delKrId || delTitle.trim().length < 4 || delSaving}
               onClick={async () => {
-                if (!delKrId) return;
+                if (!delKrId || !canWrite || delSaving) return;
+                setDelSaving(true);
                 try {
                   await createDeliverable({
                     key_result_id: delKrId,
@@ -400,6 +532,8 @@ export default function OkrObjectiveDetail() {
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
+                } finally {
+                  setDelSaving(false);
                 }
               }}
             >
@@ -491,14 +625,15 @@ export default function OkrObjectiveDetail() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setTaskOpen(false)}>
+            <Button variant="outline" className="rounded-xl" onClick={() => setTaskOpen(false)} disabled={taskSaving}>
               Cancelar
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!canWrite || !taskDeliverableId || taskTitle.trim().length < 4 || !taskBusinessOk}
+              disabled={!canWrite || !taskDeliverableId || taskTitle.trim().length < 4 || !taskBusinessOk || taskSaving}
               onClick={async () => {
-                if (!taskDeliverableId) return;
+                if (!taskDeliverableId || !canWrite || taskSaving) return;
+                setTaskSaving(true);
                 try {
                   const n = Number(taskEstimate.trim());
                   await createTask({
@@ -523,6 +658,8 @@ export default function OkrObjectiveDetail() {
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
+                } finally {
+                  setTaskSaving(false);
                 }
               }}
             >
@@ -541,6 +678,7 @@ function KrCard({
   tasksByDeliverableId,
   byUserId,
   canWrite,
+  onToggleDeliverableKr,
   onAddDeliverable,
   onAddTask,
   onToggleTask,
@@ -550,6 +688,7 @@ function KrCard({
   tasksByDeliverableId: Map<string, DbTask[]>;
   byUserId: Map<string, string>;
   canWrite: boolean;
+  onToggleDeliverableKr: () => void;
   onAddDeliverable: () => void;
   onAddTask: (deliverableId: string) => void;
   onToggleTask: (t: DbTask) => void;
@@ -560,7 +699,14 @@ function KrCard({
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{kr.title}</div>
+          <div className="flex flex-wrap items-center gap-2">
+            {kr.kind === "DELIVERABLE" ? (
+              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                Entregável
+              </Badge>
+            ) : null}
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{kr.title}</div>
+          </div>
           <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             {typeof pct === "number" ? (
               <>
@@ -575,28 +721,50 @@ function KrCard({
                 <span>Resp.: {byUserId.get(kr.owner_user_id) ?? "—"}</span>
               </>
             ) : null}
-            {kr.metric_unit?.trim() ? (
+            {kr.kind === "DELIVERABLE" && kr.due_at ? (
+              <>
+                <span>•</span>
+                <span>Prazo: {fmtDate(kr.due_at) ?? kr.due_at}</span>
+              </>
+            ) : null}
+            {kr.kind === "METRIC" && kr.metric_unit?.trim() ? (
               <>
                 <span>•</span>
                 <span>Unidade: {kr.metric_unit}</span>
               </>
             ) : null}
           </div>
+
+          {typeof pct === "number" ? (
+            <div className="mt-4">
+              <Progress value={pct} className="h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
+            </div>
+          ) : null}
         </div>
 
-        {canWrite ? (
-          <Button variant="outline" className="h-11 rounded-xl" onClick={onAddDeliverable} title="Criar entregável (Tier I/II)">
-            <Plus className="mr-2 h-4 w-4" />
-            Entregável
-          </Button>
-        ) : null}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {kr.kind === "DELIVERABLE" && canWrite ? (
+            <Button
+              variant={kr.achieved ? "default" : "outline"}
+              className={
+                kr.achieved
+                  ? "h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  : "h-11 rounded-xl"
+              }
+              onClick={onToggleDeliverableKr}
+            >
+              {kr.achieved ? "Entregue" : "Marcar entregue"}
+            </Button>
+          ) : null}
+
+          {canWrite ? (
+            <Button variant="outline" className="h-11 rounded-xl" onClick={onAddDeliverable} title="Criar entregável (Tier I/II)">
+              <Plus className="mr-2 h-4 w-4" />
+              Entregável
+            </Button>
+          ) : null}
+        </div>
       </div>
-
-      {typeof pct === "number" ? (
-        <div className="mt-4">
-          <Progress value={pct} className="h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
-        </div>
-      ) : null}
 
       <Separator className="my-5" />
 
@@ -637,7 +805,7 @@ function KrCard({
                       type="button"
                       className="flex w-full items-start gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left transition hover:bg-[color:var(--sinaxys-tint)]/40"
                       onClick={() => onToggleTask(t)}
-                      title="Clique para alternar concluído"
+                      title={t.status === "DONE" ? `Concluída em ${fmtDate(t.completed_at) ?? "—"}` : "Clique para alternar concluído"}
                     >
                       <div className="mt-0.5 text-[color:var(--sinaxys-primary)]">
                         {t.status === "DONE" ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}

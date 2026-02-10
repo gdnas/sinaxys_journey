@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +24,7 @@ import {
   createOkrCycle,
   createOkrObjective,
   getCompanyFundamentals,
+  krProgressPct,
   listKeyResults,
   listOkrCycles,
   listOkrObjectives,
@@ -30,6 +32,7 @@ import {
   type CycleType,
   type DbOkrObjective,
   type KrConfidence,
+  type KrKind,
   type ObjectiveLevel,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
@@ -120,6 +123,7 @@ export default function OkrCycles() {
   const [cycleQuarter, setCycleQuarter] = useState<1 | 2 | 3 | 4>(1);
   const [cycleStatus, setCycleStatus] = useState<CycleStatus>("ACTIVE");
   const [cycleName, setCycleName] = useState("");
+  const [cycleSaving, setCycleSaving] = useState(false);
 
   const resetCycle = () => {
     setCycleType("QUARTERLY");
@@ -140,8 +144,11 @@ export default function OkrCycles() {
   const [objFund, setObjFund] = useState<DbOkrObjective["linked_fundamental"]>(null);
   const [objFundText, setObjFundText] = useState("");
 
+  const [objExpected, setObjExpected] = useState<string>("80");
+
   const [objValue, setObjValue] = useState("");
   const [objEffortHours, setObjEffortHours] = useState("");
+  const [objSaving, setObjSaving] = useState(false);
 
   const resetObjective = () => {
     setObjLevel("COMPANY");
@@ -153,40 +160,50 @@ export default function OkrCycles() {
     setObjParent(null);
     setObjFund(null);
     setObjFundText("");
+    setObjExpected("80");
     setObjValue("");
     setObjEffortHours("");
   };
 
   const [krOpen, setKrOpen] = useState(false);
   const [krObjectiveId, setKrObjectiveId] = useState<string | null>(null);
+  const [krKind, setKrKind] = useState<KrKind>("METRIC");
   const [krTitle, setKrTitle] = useState("");
   const [krUnit, setKrUnit] = useState("");
   const [krStart, setKrStart] = useState<string>("");
   const [krTarget, setKrTarget] = useState<string>("");
   const [krCurrent, setKrCurrent] = useState<string>("");
+  const [krDue, setKrDue] = useState<string>("");
   const [krConfidence, setKrConfidence] = useState<KrConfidence>("ON_TRACK");
   const [krOwner, setKrOwner] = useState<string | null>(null);
+  const [krSaving, setKrSaving] = useState(false);
 
   const resetKr = () => {
     setKrObjectiveId(null);
+    setKrKind("METRIC");
     setKrTitle("");
     setKrUnit("");
     setKrStart("");
     setKrTarget("");
     setKrCurrent("");
+    setKrDue("");
     setKrConfidence("ON_TRACK");
     setKrOwner(null);
   };
 
-  const { data: krCounts = new Map<string, number>() } = useQuery({
-    queryKey: ["okr-kr-counts", cid, cycleId, objectives.map((o) => o.id).join(",")],
+  const { data: objectiveStats = new Map<string, { count: number; pct: number | null }>() } = useQuery({
+    queryKey: ["okr-kr-stats", cid, cycleId, objectives.map((o) => o.id).join(",")],
     enabled: hasCompany && !!cycleId && objectives.length > 0,
     queryFn: async () => {
-      const m = new Map<string, number>();
+      const m = new Map<string, { count: number; pct: number | null }>();
       await Promise.all(
         objectives.map(async (o) => {
           const krs = await listKeyResults(o.id);
-          m.set(o.id, krs.length);
+          const pcts = krs
+            .map((k) => krProgressPct(k))
+            .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+          const pct = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
+          m.set(o.id, { count: krs.length, pct });
         }),
       );
       return m;
@@ -200,9 +217,11 @@ export default function OkrCycles() {
   const costBRL = laborCostFromMonthly(ownerMonthly, effortHours);
   const roi = roiPct(valueBRL, costBRL);
 
+  const expectedAtt = parsePtNumber(objExpected);
+
   const businessCaseOk =
-    !requiresBusinessCase ||
-    (!!valueBRL && valueBRL > 0 && !!effortHours && effortHours > 0 && !!ownerMonthly && ownerMonthly > 0 && costBRL !== null && roi !== null);
+    expectedAtt !== null && expectedAtt >= 0 && expectedAtt <= 100 &&
+    (!requiresBusinessCase || (!!valueBRL && valueBRL > 0 && !!effortHours && effortHours > 0 && !!ownerMonthly && ownerMonthly > 0 && costBRL !== null && roi !== null));
 
   if (!hasCompany) {
     return (
@@ -313,21 +332,26 @@ export default function OkrCycles() {
           {objectives.length ? (
             objectives.map((o) => {
               const owner = byUserId.get(o.owner_user_id)?.name ?? "—";
-              const count = krCounts.get(o.id) ?? 0;
+              const st = objectiveStats.get(o.id) ?? { count: 0, pct: null };
               return (
                 <div
                   key={o.id}
                   className="flex flex-col gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 md:flex-row md:items-center md:justify-between"
                 >
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       {levelBadge(o.level)}
                       <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
+                      {o.status === "ACHIEVED" ? (
+                        <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                          Atingido
+                        </Badge>
+                      ) : null}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                       <span>Dono: {owner}</span>
                       <span>•</span>
-                      <span>{count} KRs</span>
+                      <span>{st.count} KRs</span>
                       {o.linked_fundamental ? (
                         <>
                           <span>•</span>
@@ -337,6 +361,16 @@ export default function OkrCycles() {
                         </>
                       ) : null}
                     </div>
+
+                    {typeof st.pct === "number" ? (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>Evolução</span>
+                          <span className="font-medium text-[color:var(--sinaxys-ink)]">{st.pct}%</span>
+                        </div>
+                        <Progress value={st.pct} className="mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
+                      </div>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -441,12 +475,15 @@ export default function OkrCycles() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setCycleOpen(false)}>
+            <Button variant="outline" className="rounded-xl" onClick={() => setCycleOpen(false)} disabled={cycleSaving}>
               Cancelar
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={cycleSaving}
               onClick={async () => {
+                if (cycleSaving) return;
+                setCycleSaving(true);
                 try {
                   const c = await createOkrCycle(cid, {
                     type: cycleType,
@@ -467,6 +504,8 @@ export default function OkrCycles() {
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
+                } finally {
+                  setCycleSaving(false);
                 }
               }}
             >
@@ -515,6 +554,12 @@ export default function OkrCycles() {
               <div className="text-xs text-muted-foreground">
                 Dica: um bom objetivo é claro e aspiracional (evite "melhorar" sem contexto).
               </div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Atingimento esperado (%)</Label>
+              <Input className="h-11 rounded-xl" value={objExpected} onChange={(e) => setObjExpected(e.target.value)} placeholder="80" />
+              <div className="text-xs text-muted-foreground">Ex.: 70–85% costuma ser meta realista para objetivos aspiracionais.</div>
             </div>
 
             <div className="grid gap-2">
@@ -662,14 +707,23 @@ export default function OkrCycles() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setObjOpen(false)}>
+            <Button variant="outline" className="rounded-xl" onClick={() => setObjOpen(false)} disabled={objSaving}>
               Cancelar
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!selected || objTitle.trim().length < 6 || !objFund || objFundText.trim().length < 6 || !businessCaseOk}
+              disabled={
+                objSaving ||
+                !selected ||
+                objTitle.trim().length < 6 ||
+                !objFund ||
+                objFundText.trim().length < 6 ||
+                !businessCaseOk ||
+                expectedAtt === null
+              }
               onClick={async () => {
-                if (!selected) return;
+                if (!selected || objSaving) return;
+                setObjSaving(true);
                 try {
                   await createOkrObjective({
                     company_id: cid,
@@ -684,6 +738,7 @@ export default function OkrCycles() {
                     linked_fundamental: objFund,
                     linked_fundamental_text: objFundText,
                     due_at: null,
+                    expected_attainment_pct: expectedAtt,
                     estimated_value_brl: valueBRL,
                     estimated_effort_hours: effortHours,
                     estimated_cost_brl: costBRL !== null ? Number(costBRL.toFixed(2)) : null,
@@ -699,6 +754,8 @@ export default function OkrCycles() {
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
+                } finally {
+                  setObjSaving(false);
                 }
               }}
             >
@@ -722,21 +779,34 @@ export default function OkrCycles() {
 
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label>KR (mensurável)</Label>
+              <Label>Tipo</Label>
+              <Select value={krKind} onValueChange={(v) => setKrKind(v as KrKind)}>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="METRIC">Métrica (de → para)</SelectItem>
+                  <SelectItem value="DELIVERABLE">Entregável (até uma data)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>KR</Label>
               <Input
                 className="h-11 rounded-xl"
                 value={krTitle}
                 onChange={(e) => setKrTitle(e.target.value)}
-                placeholder="Ex.: Aumentar NPS de 52 para 65"
+                placeholder={krKind === "DELIVERABLE" ? "Ex.: Entregar novo playbook de CS" : "Ex.: Aumentar NPS de 52 para 65"}
               />
-              <div className="text-xs text-muted-foreground">Evite KR qualitativo: sempre que possível, coloque número, prazo e unidade.</div>
+              <div className="text-xs text-muted-foreground">
+                {krKind === "DELIVERABLE"
+                  ? "Quando o KR é um entregável, o atingimento é 0% ou 100%."
+                  : "Evite KR qualitativo: sempre que possível, coloque número, prazo e unidade."}
+              </div>
             </div>
 
             <div className="grid gap-2 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>Unidade (opcional)</Label>
-                <Input className="h-11 rounded-xl" value={krUnit} onChange={(e) => setKrUnit(e.target.value)} placeholder="%, pts, R$…" />
-              </div>
               <div className="grid gap-2">
                 <Label>Confiança</Label>
                 <Select value={krConfidence} onValueChange={(v) => setKrConfidence(v as KrConfidence)}>
@@ -750,55 +820,69 @@ export default function OkrCycles() {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid gap-2">
+                <Label>Responsável (opcional)</Label>
+                <Select
+                  value={krOwner ?? ""}
+                  onValueChange={(v) => {
+                    setKrOwner(v === SELECT_NONE ? null : v);
+                  }}
+                >
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Sem responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SELECT_NONE}>Sem responsável</SelectItem>
+                    {profiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name ?? p.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label>Responsável (opcional)</Label>
-              <Select
-                value={krOwner ?? ""}
-                onValueChange={(v) => {
-                  setKrOwner(v === SELECT_NONE ? null : v);
-                }}
-              >
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Sem responsável" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SELECT_NONE}>Sem responsável</SelectItem>
-                  {profiles.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name ?? p.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {krKind === "METRIC" ? (
+              <>
+                <div className="grid gap-2">
+                  <Label>Unidade (opcional)</Label>
+                  <Input className="h-11 rounded-xl" value={krUnit} onChange={(e) => setKrUnit(e.target.value)} placeholder="%, pts, R$…" />
+                </div>
 
-            <div className="grid gap-2 md:grid-cols-3">
+                <div className="grid gap-2 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label>Início (número)</Label>
+                    <Input className="h-11 rounded-xl" value={krStart} onChange={(e) => setKrStart(e.target.value)} placeholder="52" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Atual (número)</Label>
+                    <Input className="h-11 rounded-xl" value={krCurrent} onChange={(e) => setKrCurrent(e.target.value)} placeholder="56" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Meta (número)</Label>
+                    <Input className="h-11 rounded-xl" value={krTarget} onChange={(e) => setKrTarget(e.target.value)} placeholder="65" />
+                  </div>
+                </div>
+              </>
+            ) : (
               <div className="grid gap-2">
-                <Label>Início (número)</Label>
-                <Input className="h-11 rounded-xl" value={krStart} onChange={(e) => setKrStart(e.target.value)} placeholder="52" />
+                <Label>Prazo (opcional)</Label>
+                <Input className="h-11 rounded-xl" type="date" value={krDue} onChange={(e) => setKrDue(e.target.value)} />
               </div>
-              <div className="grid gap-2">
-                <Label>Atual (número)</Label>
-                <Input className="h-11 rounded-xl" value={krCurrent} onChange={(e) => setKrCurrent(e.target.value)} placeholder="56" />
-              </div>
-              <div className="grid gap-2">
-                <Label>Meta (número)</Label>
-                <Input className="h-11 rounded-xl" value={krTarget} onChange={(e) => setKrTarget(e.target.value)} placeholder="65" />
-              </div>
-            </div>
+            )}
           </div>
 
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setKrOpen(false)}>
+            <Button variant="outline" className="rounded-xl" onClick={() => setKrOpen(false)} disabled={krSaving}>
               Cancelar
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!krObjectiveId || krTitle.trim().length < 6}
+              disabled={!krObjectiveId || krTitle.trim().length < 6 || krSaving}
               onClick={async () => {
-                if (!krObjectiveId) return;
+                if (!krObjectiveId || krSaving) return;
+                setKrSaving(true);
                 try {
                   const parseOrNull = (v: string) => {
                     const n = Number(String(v).replace(",", "."));
@@ -808,15 +892,18 @@ export default function OkrCycles() {
                   await createKeyResult({
                     objective_id: krObjectiveId,
                     title: krTitle,
-                    metric_unit: krUnit.trim() || null,
-                    start_value: parseOrNull(krStart),
-                    current_value: parseOrNull(krCurrent),
-                    target_value: parseOrNull(krTarget),
+                    kind: krKind,
+                    due_at: krKind === "DELIVERABLE" ? (krDue.trim() || null) : null,
+                    achieved: false,
+                    metric_unit: krKind === "METRIC" ? krUnit.trim() || null : null,
+                    start_value: krKind === "METRIC" ? parseOrNull(krStart) : null,
+                    current_value: krKind === "METRIC" ? parseOrNull(krCurrent) : null,
+                    target_value: krKind === "METRIC" ? parseOrNull(krTarget) : null,
                     owner_user_id: krOwner,
                     confidence: krConfidence,
                   });
 
-                  await qc.invalidateQueries({ queryKey: ["okr-kr-counts", cid, cycleId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-kr-stats", cid, cycleId] });
                   toast({ title: "KR criado" });
                   setKrOpen(false);
                 } catch (e) {
@@ -825,6 +912,8 @@ export default function OkrCycles() {
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
+                } finally {
+                  setKrSaving(false);
                 }
               }}
             >
