@@ -152,17 +152,30 @@ function RiskList({
       <div className="grid gap-3">
         {tasks.length ? (
           tasks.slice(0, 5).map((t) => (
-            <div key={t.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+            <Link
+              key={t.id}
+              to={`/okr/objetivos/${t.objective_id}`}
+              className="block rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 transition hover:bg-[color:var(--sinaxys-tint)]/40"
+              title="Abrir objetivo"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">Objetivo: {t.objective_title}</div>
+                  <div className="mt-1 truncate text-xs text-muted-foreground">
+                    Objetivo: <span className="font-medium text-[color:var(--sinaxys-ink)]">{t.objective_title}</span>
+                  </div>
                 </div>
-                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                  {t.due_date ? String(t.due_date).slice(0, 10).split("-").reverse().join("/") : "sem prazo"}
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                    {t.due_date ? String(t.due_date).slice(0, 10).split("-").reverse().join("/") : "sem prazo"}
+                  </Badge>
+                  <span className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
+                    <span className="hidden sm:inline">Abrir</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                </div>
               </div>
-            </div>
+            </Link>
           ))
         ) : (
           <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum item crítico por aqui.</div>
