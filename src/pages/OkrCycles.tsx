@@ -158,6 +158,7 @@ export default function OkrCycles() {
   const [krTarget, setKrTarget] = useState<string>("");
   const [krCurrent, setKrCurrent] = useState<string>("");
   const [krConfidence, setKrConfidence] = useState<KrConfidence>("ON_TRACK");
+  const [krOwner, setKrOwner] = useState<string | null>(null);
 
   const resetKr = () => {
     setKrObjectiveId(null);
@@ -167,6 +168,7 @@ export default function OkrCycles() {
     setKrTarget("");
     setKrCurrent("");
     setKrConfidence("ON_TRACK");
+    setKrOwner(null);
   };
 
   const { data: krCounts = new Map<string, number>() } = useQuery({
@@ -686,6 +688,28 @@ export default function OkrCycles() {
               </div>
             </div>
 
+            <div className="grid gap-2">
+              <Label>Responsável (opcional)</Label>
+              <Select
+                value={krOwner ?? ""}
+                onValueChange={(v) => {
+                  setKrOwner(v === SELECT_NONE ? null : v);
+                }}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Sem responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SELECT_NONE}>Sem responsável</SelectItem>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name ?? p.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid gap-2 md:grid-cols-3">
               <div className="grid gap-2">
                 <Label>Início (número)</Label>
@@ -724,7 +748,7 @@ export default function OkrCycles() {
                     start_value: parseOrNull(krStart),
                     current_value: parseOrNull(krCurrent),
                     target_value: parseOrNull(krTarget),
-                    owner_user_id: null,
+                    owner_user_id: krOwner,
                     confidence: krConfidence,
                   });
 

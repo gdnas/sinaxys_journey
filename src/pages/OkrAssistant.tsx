@@ -102,6 +102,7 @@ export default function OkrAssistant() {
   const [tier, setTier] = useState<DeliverableTier>("TIER2");
   const [deliverableTitle, setDeliverableTitle] = useState("");
   const [deliverableDesc, setDeliverableDesc] = useState("");
+  const [deliverableDue, setDeliverableDue] = useState("");
 
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDue, setTaskDue] = useState("");
@@ -388,6 +389,24 @@ export default function OkrAssistant() {
                 />
               </div>
 
+              <div className="grid gap-2 md:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label>Prazo do entregável (opcional)</Label>
+                  <Input
+                    className="h-11 rounded-xl"
+                    type="date"
+                    value={deliverableDue}
+                    onChange={(e) => setDeliverableDue(e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label className="text-muted-foreground">&nbsp;</Label>
+                  <div className="h-11 rounded-xl border border-dashed border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 text-sm text-muted-foreground flex items-center">
+                    Dica: use prazo no entregável; as tarefas ficam no dia a dia.
+                  </div>
+                </div>
+              </div>
+
               <div className="grid gap-2">
                 <Label>Descrição do entregável (opcional)</Label>
                 <Textarea className="min-h-[88px] rounded-2xl" value={deliverableDesc} onChange={(e) => setDeliverableDesc(e.target.value)} />
@@ -492,7 +511,7 @@ export default function OkrAssistant() {
                       description: deliverableDesc,
                       owner_user_id: user.id,
                       status: "TODO",
-                      due_at: null,
+                      due_at: deliverableDue.trim() || null,
                     });
 
                     for (const t of tasks) {

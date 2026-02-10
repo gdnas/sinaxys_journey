@@ -41,6 +41,13 @@ function statusLabel(s: WorkStatus) {
   return "A fazer";
 }
 
+function fmtDate(d?: string | null) {
+  if (!d) return null;
+  const asDate = new Date(d);
+  if (Number.isNaN(asDate.getTime())) return d;
+  return asDate.toLocaleDateString("pt-BR");
+}
+
 export default function OkrObjectiveDetail() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -120,6 +127,7 @@ export default function OkrObjectiveDetail() {
   const [delTitle, setDelTitle] = useState("");
   const [delDesc, setDelDesc] = useState("");
   const [delOwner, setDelOwner] = useState<string | null>(null);
+  const [delDue, setDelDue] = useState<string>("");
 
   const resetDeliverable = () => {
     setDelKrId(null);
@@ -127,6 +135,7 @@ export default function OkrObjectiveDetail() {
     setDelTitle("");
     setDelDesc("");
     setDelOwner(null);
+    setDelDue("");
   };
 
   const [taskOpen, setTaskOpen] = useState(false);
@@ -311,26 +320,33 @@ export default function OkrObjectiveDetail() {
               <Textarea className="min-h-[92px] rounded-2xl" value={delDesc} onChange={(e) => setDelDesc(e.target.value)} />
             </div>
 
-            <div className="grid gap-2">
-              <Label>Responsável (opcional)</Label>
-              <Select
-                value={delOwner ?? ""}
-                onValueChange={(v) => {
-                  setDelOwner(v === SELECT_NONE ? null : v);
-                }}
-              >
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Sem responsável" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SELECT_NONE}>Sem responsável</SelectItem>
-                  {profiles.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name ?? p.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid gap-2 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Responsável (opcional)</Label>
+                <Select
+                  value={delOwner ?? ""}
+                  onValueChange={(v) => {
+                    setDelOwner(v === SELECT_NONE ? null : v);
+                  }}
+                >
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Sem responsável" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SELECT_NONE}>Sem responsável</SelectItem>
+                    {profiles.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name ?? p.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Prazo (opcional)</Label>
+                <Input className="h-11 rounded-xl" type="date" value={delDue} onChange={(e) => setDelDue(e.target.value)} />
+              </div>
             </div>
           </div>
 
@@ -351,7 +367,7 @@ export default function OkrObjectiveDetail() {
                     description: delDesc,
                     owner_user_id: delOwner,
                     status: "TODO",
-                    due_at: null,
+                    due_at: delDue.trim() || null,
                   });
                   await qc.invalidateQueries({ queryKey: ["okr-deliverables", objectiveId] });
                   toast({ title: "Entregável criado" });
@@ -499,6 +515,12 @@ function KrCard({
               </>
             ) : null}
             <span>Confiança: {kr.confidence}</span>
+            {kr.owner_user_id ? (
+              <>
+                <span>•</span>
+                <span>Resp.: {byUserId.get(kr.owner_user_id) ?? "—"}</span>
+              </>
+            ) : null}
             {kr.metric_unit?.trim() ? (
               <>
                 <span>•</span>
@@ -540,6 +562,7 @@ function KrCard({
                   <div className="mt-1 text-xs text-muted-foreground">
                     Status: {statusLabel(d.status)}
                     {d.owner_user_id ? ` • Resp.: ${byUserId.get(d.owner_user_id) ?? "—"}` : ""}
+                    {d.due_at ? ` • Prazo: ${fmtDate(d.due_at) ?? d.due_at}` : ""}
                   </div>
                   {d.description?.trim() ? <p className="mt-2 text-sm text-muted-foreground">{d.description}</p> : null}
                 </div>
