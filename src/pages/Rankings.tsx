@@ -385,7 +385,7 @@ function TiersAdmin({ companyId, tiers }: { companyId: string; tiers: RewardTier
               Novo tier
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg rounded-3xl">
+          <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
             <DialogHeader>
               <DialogTitle className="text-[color:var(--sinaxys-ink)]">Criar tier</DialogTitle>
             </DialogHeader>

@@ -57,7 +57,7 @@ export function OrgPersonDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[92vw] rounded-3xl p-0 sm:max-w-xl">
+      <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl p-0 sm:max-w-xl">
         <div className="relative overflow-hidden rounded-3xl">
           <div className="absolute inset-0 bg-[color:var(--sinaxys-tint)]/45" />
           <div className="relative p-6">

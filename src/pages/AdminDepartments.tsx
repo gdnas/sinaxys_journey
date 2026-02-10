@@ -193,7 +193,7 @@ export default function AdminDepartments() {
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </AlertDialogTrigger>
-                          <AlertDialogContent className="rounded-3xl">
+                          <AlertDialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl">
                             <AlertDialogHeader>
                               <AlertDialogTitle>Remover departamento?</AlertDialogTitle>
                               <AlertDialogDescription>
@@ -257,7 +257,7 @@ export default function AdminDepartments() {
           if (!v) setCreateName("");
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Novo departamento</DialogTitle>
           </DialogHeader>
@@ -302,7 +302,7 @@ export default function AdminDepartments() {
           if (!v) setEditId(null);
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar departamento</DialogTitle>
           </DialogHeader>

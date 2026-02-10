@@ -361,7 +361,7 @@ export default function OkrCycles() {
           if (!v) resetCycle();
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Novo ciclo</DialogTitle>
           </DialogHeader>
@@ -465,7 +465,7 @@ export default function OkrCycles() {
           if (!v) resetObjective();
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-2xl">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Novo objetivo do ciclo</DialogTitle>
           </DialogHeader>
@@ -651,7 +651,7 @@ export default function OkrCycles() {
           if (!v) resetKr();
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Novo Key Result</DialogTitle>
           </DialogHeader>

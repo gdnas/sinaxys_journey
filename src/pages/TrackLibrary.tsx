@@ -241,7 +241,7 @@ export default function TrackLibrary() {
           }
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-2xl">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Delegar trilha</DialogTitle>
           </DialogHeader>

@@ -526,7 +526,7 @@ export default function Profile() {
 
       {/* Add attachment dialog */}
       <Dialog open={addAttachmentOpen} onOpenChange={setAddAttachmentOpen}>
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Adicionar anexo / aditivo</DialogTitle>
           </DialogHeader>
@@ -577,7 +577,7 @@ export default function Profile() {
 
       {/* Add document dialog */}
       <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Adicionar documento</DialogTitle>
           </DialogHeader>

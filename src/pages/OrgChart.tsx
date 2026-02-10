@@ -64,7 +64,7 @@ function PersonDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+      <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Card da pessoa</DialogTitle>
         </DialogHeader>
@@ -332,7 +332,7 @@ export default function OrgChart() {
               ) : null}
             </div>
 
-            <div className="mt-5 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Dica: quem aparece como “raiz” está sem gestor definido.</div>
+            <div className="mt-5 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Dica: quem aparece como "raiz" está sem gestor definido.</div>
           </TabsContent>
         </Tabs>
       </Card>

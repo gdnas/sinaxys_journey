@@ -309,7 +309,7 @@ export default function AdminUsers() {
           if (!v) resetInvite();
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Adicionar usuário</DialogTitle>
           </DialogHeader>
@@ -476,7 +476,7 @@ export default function AdminUsers() {
           if (!v) setEditing(null);
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar usuário</DialogTitle>
           </DialogHeader>

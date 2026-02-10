@@ -148,10 +148,11 @@ export default function HeadTracks() {
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Criar trilha</DialogTitle>
           </DialogHeader>
+
           <div className="grid gap-3">
             <div className="grid gap-2">
               <div className="text-sm font-medium">Título</div>

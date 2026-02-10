@@ -297,14 +297,8 @@ export default function AdminOrgChart() {
         departmentName={selected?.department_id ? deptById.get(selected.department_id) ?? null : null}
       />
 
-      <Dialog
-        open={open}
-        onOpenChange={(v) => {
-          setOpen(v);
-          if (!v) setEditing(null);
-        }}
-      >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Definir gestor</DialogTitle>
           </DialogHeader>

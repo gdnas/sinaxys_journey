@@ -291,7 +291,7 @@ export default function MasterUsers() {
           }
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Resetar senha (temporária)</DialogTitle>
           </DialogHeader>
@@ -374,7 +374,7 @@ export default function MasterUsers() {
           if (!v) resetInvite();
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Adicionar usuário</DialogTitle>
           </DialogHeader>
@@ -600,7 +600,7 @@ export default function MasterUsers() {
           if (!v) setEditing(null);
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Editar perfil</DialogTitle>
           </DialogHeader>

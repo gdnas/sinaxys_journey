@@ -291,7 +291,7 @@ export default function OkrObjectiveDetail() {
           if (!v) resetDeliverable();
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Novo entregável</DialogTitle>
           </DialogHeader>
@@ -394,7 +394,7 @@ export default function OkrObjectiveDetail() {
           if (!v) resetTask();
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Nova tarefa</DialogTitle>
           </DialogHeader>

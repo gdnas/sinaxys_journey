@@ -253,7 +253,7 @@ export default function OkrMap() {
           if (!v) reset();
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Novo objetivo de longo prazo</DialogTitle>
           </DialogHeader>

@@ -383,7 +383,7 @@ export default function TrackDetail() {
           if (!v) setDeptNextId("");
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Equipe responsável pela trilha</DialogTitle>
           </DialogHeader>
