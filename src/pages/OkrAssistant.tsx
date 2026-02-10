@@ -28,6 +28,8 @@ import {
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 
+const SELECT_NONE = "__none__";
+
 function looksLikeVerbPt(text: string) {
   const first = text.trim().split(/\s+/)[0]?.toLowerCase();
   if (!first) return false;
@@ -211,12 +213,17 @@ export default function OkrAssistant() {
 
             <div className="mt-4 grid gap-2">
               <Label>Contribui para qual objetivo estratégico (opcional)?</Label>
-              <Select value={parentId} onValueChange={setParentId}>
+              <Select
+                value={parentId}
+                onValueChange={(v) => {
+                  setParentId(v === SELECT_NONE ? "" : v);
+                }}
+              >
                 <SelectTrigger className="h-11 rounded-xl">
                   <SelectValue placeholder={companyObjectives.length ? "Escolha um objetivo da empresa" : "Nenhum objetivo da empresa neste ciclo"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem objetivo pai</SelectItem>
+                  <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
                   {companyObjectives.map((o) => (
                     <SelectItem key={o.id} value={o.id}>
                       {o.title}

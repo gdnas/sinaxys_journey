@@ -32,6 +32,8 @@ import {
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 
+const SELECT_NONE = "__none__";
+
 function cycleLabel(c: { type: CycleType; year: number; quarter: number | null; name: string | null }) {
   const base = c.type === "ANNUAL" ? `${c.year}` : `Q${c.quarter ?? "?"} / ${c.year}`;
   return c.name?.trim() ? `${c.name} · ${base}` : base;
@@ -524,12 +526,17 @@ export default function OkrCycles() {
 
               <div className="grid gap-2">
                 <Label>Departamento (opcional)</Label>
-                <Select value={objDept ?? ""} onValueChange={(v) => setObjDept(v || null)}>
+                <Select
+                  value={objDept ?? ""}
+                  onValueChange={(v) => {
+                    setObjDept(v === SELECT_NONE ? null : v);
+                  }}
+                >
                   <SelectTrigger className="h-11 rounded-xl">
                     <SelectValue placeholder="Sem departamento" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sem departamento</SelectItem>
+                    <SelectItem value={SELECT_NONE}>Sem departamento</SelectItem>
                     {departments.map((d) => (
                       <SelectItem key={d.id} value={d.id}>
                         {d.name}
@@ -569,12 +576,17 @@ export default function OkrCycles() {
 
             <div className="grid gap-2">
               <Label>Objetivo pai (cascata opcional)</Label>
-              <Select value={objParent ?? ""} onValueChange={(v) => setObjParent(v || null)}>
+              <Select
+                value={objParent ?? ""}
+                onValueChange={(v) => {
+                  setObjParent(v === SELECT_NONE ? null : v);
+                }}
+              >
                 <SelectTrigger className="h-11 rounded-xl">
                   <SelectValue placeholder="Sem objetivo pai" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem objetivo pai</SelectItem>
+                  <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
                   {objectives
                     .filter((o) => o.id !== objParent)
                     .map((o) => (

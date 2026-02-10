@@ -33,6 +33,8 @@ import {
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 
+const SELECT_NONE = "__none__";
+
 function statusLabel(s: WorkStatus) {
   if (s === "DONE") return "Concluído";
   if (s === "IN_PROGRESS") return "Em andamento";
@@ -224,7 +226,7 @@ export default function OkrObjectiveDetail() {
 
               {objective.linked_fundamental_text?.trim() ? (
                 <div className="max-w-xl rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-[color:var(--sinaxys-ink)]">
-                  “{objective.linked_fundamental_text}”
+                  "{objective.linked_fundamental_text}"
                 </div>
               ) : null}
             </div>
@@ -268,7 +270,7 @@ export default function OkrObjectiveDetail() {
         ) : (
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Sem KRs ainda</div>
-            <p className="mt-1 text-sm text-muted-foreground">Volte para “Ciclos & OKRs” e adicione KRs mensuráveis.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Volte para "Ciclos & OKRs" e adicione KRs mensuráveis.</p>
           </Card>
         )}
       </div>
@@ -311,12 +313,17 @@ export default function OkrObjectiveDetail() {
 
             <div className="grid gap-2">
               <Label>Responsável (opcional)</Label>
-              <Select value={delOwner ?? ""} onValueChange={(v) => setDelOwner(v || null)}>
+              <Select
+                value={delOwner ?? ""}
+                onValueChange={(v) => {
+                  setDelOwner(v === SELECT_NONE ? null : v);
+                }}
+              >
                 <SelectTrigger className="h-11 rounded-xl">
                   <SelectValue placeholder="Sem responsável" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sem responsável</SelectItem>
+                  <SelectItem value={SELECT_NONE}>Sem responsável</SelectItem>
                   {profiles.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
                       {p.name ?? p.email}
