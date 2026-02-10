@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BriefcaseBusiness, Building2, Mail, Phone, Sparkles, UserRound } from "lucide-react";
+import { BriefcaseBusiness, Building2, CalendarClock, Mail, Phone, Sparkles, Trophy, UserRound } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -21,18 +21,29 @@ function displayName(p: DbProfile) {
   return p.name?.trim() ? p.name.trim() : p.email;
 }
 
+function formatJoinedAt(v: string | null | undefined) {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("pt-BR", { year: "numeric", month: "short" });
+}
+
 export function OrgPersonDialog({
   open,
   onOpenChange,
   profile,
   departmentName,
   companyId,
+  points,
+  tier,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
   profile: DbProfile | null;
   departmentName: string | null;
   companyId: string;
+  points?: number;
+  tier?: string | null;
 }) {
   const title = profile ? displayName(profile) : "Pessoa";
 
@@ -81,6 +92,11 @@ export function OrgPersonDialog({
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="truncate text-base font-semibold text-[color:var(--sinaxys-ink)]">{title}</div>
+                        {tier ? (
+                          <Badge className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">
+                            {tier}
+                          </Badge>
+                        ) : null}
                         {statusBadge}
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
@@ -90,14 +106,42 @@ export function OrgPersonDialog({
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 sm:min-w-[190px]">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">XP acumulado</div>
-                        <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{isLoadingXp ? "…" : xp}</div>
+                  <div className="grid w-full gap-2 sm:min-w-[220px]">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">XP</div>
+                            <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{isLoadingXp ? "…" : xp}</div>
+                          </div>
+                          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                            <Sparkles className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                          </div>
+                        </div>
                       </div>
-                      <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                        <Sparkles className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+
+                      <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pontos</div>
+                            <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{typeof points === "number" ? points : "—"}</div>
+                          </div>
+                          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                            <Trophy className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Admissão</div>
+                          <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{formatJoinedAt(profile.joined_at)}</div>
+                        </div>
+                        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                          <CalendarClock className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                        </div>
                       </div>
                     </div>
                   </div>

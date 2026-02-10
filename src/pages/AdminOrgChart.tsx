@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { Network, Pencil, UserRound } from "lucide-react";
+import { CalendarClock, ChevronDown, ChevronRight, Network, Pencil, Search, Sparkles, Trophy, UserRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -14,7 +15,10 @@ import { OrgPersonDialog } from "@/components/OrgPersonDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
+import { fetchLeaderboard, listRewardTiers } from "@/lib/pointsDb";
+import { fetchXpLeaderboard } from "@/lib/journeyDb";
 import { listProfilesByCompany, updateProfile, type DbProfile } from "@/lib/profilesDb";
+import { cn } from "@/lib/utils";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -25,6 +29,35 @@ function initials(name: string) {
 
 function displayName(p: DbProfile) {
   return p.name?.trim() ? p.name.trim() : p.email;
+}
+
+function formatJoinedAt(v: string | null | undefined) {
+  if (!v) return "—";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("pt-BR", { year: "numeric", month: "short" });
+}
+
+const deptPalette = [
+  { bar: "bg-indigo-500", chip: "bg-indigo-50 text-indigo-900 ring-indigo-200", hover: "hover:bg-indigo-50/60" },
+  { bar: "bg-emerald-500", chip: "bg-emerald-50 text-emerald-900 ring-emerald-200", hover: "hover:bg-emerald-50/60" },
+  { bar: "bg-rose-500", chip: "bg-rose-50 text-rose-900 ring-rose-200", hover: "hover:bg-rose-50/60" },
+  { bar: "bg-amber-500", chip: "bg-amber-50 text-amber-950 ring-amber-200", hover: "hover:bg-amber-50/60" },
+  { bar: "bg-sky-500", chip: "bg-sky-50 text-sky-900 ring-sky-200", hover: "hover:bg-sky-50/60" },
+  { bar: "bg-violet-500", chip: "bg-violet-50 text-violet-900 ring-violet-200", hover: "hover:bg-violet-50/60" },
+  { bar: "bg-teal-500", chip: "bg-teal-50 text-teal-900 ring-teal-200", hover: "hover:bg-teal-50/60" },
+  { bar: "bg-lime-500", chip: "bg-lime-50 text-lime-950 ring-lime-200", hover: "hover:bg-lime-50/60" },
+] as const;
+
+function deptTheme(deptIndex: number | null) {
+  if (deptIndex == null || deptIndex < 0) {
+    return {
+      bar: "bg-[color:var(--sinaxys-border)]",
+      chip: "bg-white text-[color:var(--sinaxys-ink)] ring-[color:var(--sinaxys-border)]",
+      hover: "hover:bg-[color:var(--sinaxys-tint)]/40",
+    };
+  }
+  return deptPalette[deptIndex % deptPalette.length];
 }
 
 function buildTree(profiles: DbProfile[]): OrgNode<DbProfile>[] {
@@ -57,55 +90,153 @@ function buildTree(profiles: DbProfile[]): OrgNode<DbProfile>[] {
     .map(makeNode);
 }
 
-function TreeRow({
+function ListNode({
   node,
   level,
+  collapsed,
+  setCollapsed,
   deptById,
+  deptIndexById,
+  pointsByUserId,
+  xpByUserId,
+  tierByUserId,
+  onOpenCard,
   onEdit,
 }: {
   node: OrgNode<DbProfile>;
   level: number;
+  collapsed: Set<string>;
+  setCollapsed: (fn: (prev: Set<string>) => Set<string>) => void;
   deptById: Map<string, string>;
+  deptIndexById: Map<string, number>;
+  pointsByUserId: Map<string, number>;
+  xpByUserId: Map<string, number>;
+  tierByUserId: Map<string, string | null>;
+  onOpenCard: (p: DbProfile) => void;
   onEdit: (p: DbProfile) => void;
 }) {
   const p = node.data;
   const deptName = p.department_id ? deptById.get(p.department_id) : undefined;
+  const deptIdx = p.department_id ? deptIndexById.get(p.department_id) ?? null : null;
+  const theme = deptTheme(deptIdx);
+
+  const isCollapsed = collapsed.has(p.id);
+  const hasKids = node.children.length > 0;
+
+  const points = pointsByUserId.get(p.id) ?? 0;
+  const xp = xpByUserId.get(p.id) ?? 0;
+  const tier = tierByUserId.get(p.id) ?? null;
 
   return (
     <div>
       <div
-        className={
-          "flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 transition hover:bg-[color:var(--sinaxys-tint)]/40"
-        }
-        style={{ marginLeft: level * 16 }}
+        className={cn(
+          "relative overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-white",
+          theme.hover,
+        )}
+        style={{ marginLeft: level * 14 }}
       >
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-            <span className="text-xs font-bold">{initials(displayName(p))}</span>
-          </div>
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{displayName(p)}</div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span className="truncate">{p.email}</span>
-              {deptName ? (
-                <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
-                  {deptName}
-                </span>
-              ) : null}
-              {!p.active ? <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900">Inativo</span> : null}
+        <div className={cn("absolute left-0 top-0 h-full w-1.5", theme.bar)} />
+
+        <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <button type="button" onClick={() => onOpenCard(p)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <div className={cn("grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-white", theme.bar)}>
+              <span className="text-xs font-bold">{initials(displayName(p))}</span>
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{displayName(p)}</div>
+                {tier ? (
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">
+                    {tier}
+                  </Badge>
+                ) : null}
+                {!p.active ? <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Inativo</Badge> : null}
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span className="truncate">{p.email}</span>
+                {deptName ? <span className={cn("rounded-full px-2 py-0.5 font-semibold ring-1", theme.chip)}>{deptName}</span> : null}
+                <span className="truncate">{p.job_title?.trim() || "—"}</span>
+              </div>
+            </div>
+          </button>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-end">
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--sinaxys-tint)] px-2 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
+                <Trophy className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" /> {points}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--sinaxys-tint)] px-2 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
+                <Sparkles className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" /> {xp} XP
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-[color:var(--sinaxys-tint)] px-2 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
+                <CalendarClock className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" /> {formatJoinedAt(p.joined_at)}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {hasKids ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCollapsed((prev) => {
+                      const next = new Set(prev);
+                      if (next.has(p.id)) next.delete(p.id);
+                      else next.add(p.id);
+                      return next;
+                    });
+                  }}
+                  aria-label={isCollapsed ? "Expandir time" : "Recolher time"}
+                  title={isCollapsed ? "Expandir" : "Recolher"}
+                >
+                  {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </Button>
+              ) : (
+                <div className="grid h-9 w-9 place-items-center rounded-xl border border-[color:var(--sinaxys-border)] bg-white text-[color:var(--sinaxys-primary)]">
+                  <UserRound className="h-4 w-4" />
+                </div>
+              )}
+
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 rounded-xl"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(p);
+                }}
+                aria-label="Definir gestor"
+                title="Definir gestor"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
-
-        <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => onEdit(p)}>
-          <Pencil className="h-4 w-4" />
-        </Button>
       </div>
 
-      {node.children.length ? (
+      {hasKids && !isCollapsed ? (
         <div className="mt-2 grid gap-2">
           {node.children.map((c) => (
-            <TreeRow key={c.id} node={c} level={level + 1} deptById={deptById} onEdit={onEdit} />
+            <ListNode
+              key={c.id}
+              node={c}
+              level={level + 1}
+              collapsed={collapsed}
+              setCollapsed={setCollapsed}
+              deptById={deptById}
+              deptIndexById={deptIndexById}
+              pointsByUserId={pointsByUserId}
+              xpByUserId={xpByUserId}
+              tierByUserId={tierByUserId}
+              onOpenCard={onOpenCard}
+              onEdit={onEdit}
+            />
           ))}
         </div>
       ) : null}
@@ -128,6 +259,13 @@ export default function AdminOrgChart() {
 
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d.name] as const)), [departments]);
 
+  const deptIndexById = useMemo(() => {
+    const sorted = [...departments].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+    const m = new Map<string, number>();
+    sorted.forEach((d, idx) => m.set(d.id, idx));
+    return m;
+  }, [departments]);
+
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles", companyId],
     queryFn: () => listProfilesByCompany(companyId),
@@ -143,6 +281,52 @@ export default function AdminOrgChart() {
   }, [visibleProfiles, query]);
 
   const tree = useMemo(() => buildTree(filteredProfiles), [filteredProfiles]);
+
+  const qPoints = useQuery({
+    queryKey: ["points", "leaderboard", companyId],
+    queryFn: () => fetchLeaderboard(companyId, 200),
+  });
+
+  const qTiers = useQuery({
+    queryKey: ["points", "tiers", companyId],
+    queryFn: () => listRewardTiers(companyId),
+  });
+
+  const qXp = useQuery({
+    queryKey: ["xp", "leaderboard", companyId],
+    queryFn: () => fetchXpLeaderboard(companyId, 200),
+  });
+
+  const pointsByUserId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const row of qPoints.data ?? []) m.set(row.user_id, row.total_points);
+    return m;
+  }, [qPoints.data]);
+
+  const xpByUserId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const row of qXp.data ?? []) m.set(row.user_id, row.total_xp);
+    return m;
+  }, [qXp.data]);
+
+  const tierByUserId = useMemo(() => {
+    const active = (qTiers.data ?? []).filter((t) => t.active).sort((a, b) => a.min_points - b.min_points);
+    const m = new Map<string, string | null>();
+
+    const getTier = (pts: number) => {
+      const cur = [...active].reverse().find((t) => pts >= t.min_points) ?? null;
+      return cur?.name ?? null;
+    };
+
+    for (const p of profiles) {
+      const pts = pointsByUserId.get(p.id) ?? 0;
+      m.set(p.id, getTier(pts));
+    }
+
+    return m;
+  }, [profiles, pointsByUserId, qTiers.data]);
+
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   // Quick card from node
   const [cardOpen, setCardOpen] = useState(false);
@@ -166,13 +350,18 @@ export default function AdminOrgChart() {
 
   const managerOptions = useMemo(() => visibleProfiles.filter((p) => p.active), [visibleProfiles]);
 
+  const selectedPoints = selected ? pointsByUserId.get(selected.id) ?? 0 : 0;
+  const selectedTier = selected ? tierByUserId.get(selected.id) ?? null : null;
+
   return (
     <div className="grid gap-6">
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Organograma</div>
-            <p className="mt-1 text-sm text-muted-foreground">Visualize a empresa como lista ou como árvore. Clique na bolinha para ver o card.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              A lista é a visão primária. Recolha/expanda times pelos líderes e clique para abrir o card.
+            </p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
             <Network className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -186,28 +375,64 @@ export default function AdminOrgChart() {
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Estrutura</div>
             <p className="mt-1 text-sm text-muted-foreground">{profiles.length} perfis na empresa.</p>
           </div>
-          <div className="w-full md:w-[360px]">
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} className="h-11 rounded-xl" placeholder="Buscar por nome ou e-mail…" />
+          <div className="relative w-full md:w-[360px]">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} className="h-11 rounded-xl pl-9" placeholder="Buscar por nome ou e-mail…" />
           </div>
         </div>
 
         <Separator className="my-5" />
 
-        <Tabs defaultValue="tree" className="w-full">
+        <Tabs defaultValue="list" className="w-full">
           <TabsList className="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-            <TabsTrigger
-              value="tree"
-              className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]"
-            >
-              Árvore
-            </TabsTrigger>
-            <TabsTrigger
-              value="list"
-              className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]"
-            >
+            <TabsTrigger value="list" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
               Lista
             </TabsTrigger>
+            <TabsTrigger value="tree" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
+              Árvore
+            </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="list" className="mt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="text-xs text-muted-foreground">Dica: use o botão ▸/▾ para recolher/expandir o time de um líder.</div>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={() => setCollapsed(new Set())}>
+                  Expandir tudo
+                </Button>
+                <Button type="button" variant="outline" className="h-10 rounded-xl" onClick={() => setCollapsed(new Set(tree.map((n) => n.id)))}>
+                  Recolher topo
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2">
+              {tree.map((n) => (
+                <ListNode
+                  key={n.id}
+                  node={n}
+                  level={0}
+                  collapsed={collapsed}
+                  setCollapsed={setCollapsed}
+                  deptById={deptById}
+                  deptIndexById={deptIndexById}
+                  pointsByUserId={pointsByUserId}
+                  xpByUserId={xpByUserId}
+                  tierByUserId={tierByUserId}
+                  onOpenCard={openCard}
+                  onEdit={openEdit}
+                />
+              ))}
+
+              {!tree.length ? (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum perfil encontrado.</div>
+              ) : null}
+            </div>
+
+            <div className="mt-5 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+              Dica: se uma pessoa aparece como "raiz", ela não tem gestor definido.
+            </div>
+          </TabsContent>
 
           <TabsContent value="tree" className="mt-4">
             <OrgChartTreeCanvas
@@ -215,6 +440,8 @@ export default function AdminOrgChart() {
               renderNode={(n) => {
                 const p = n.data;
                 const deptName = p.department_id ? deptById.get(p.department_id) ?? null : null;
+                const deptIdx = p.department_id ? deptIndexById.get(p.department_id) ?? null : null;
+                const theme = deptTheme(deptIdx);
                 const title = displayName(p);
                 const inactive = !p.active;
 
@@ -235,9 +462,7 @@ export default function AdminOrgChart() {
                       }
                     >
                       <div
-                        className={
-                          "grid h-12 w-12 place-items-center rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-2 ring-white"
-                        }
+                        className={cn("grid h-12 w-12 place-items-center rounded-full text-white ring-2 ring-white", theme.bar)}
                         style={inactive ? { opacity: 0.6 } : undefined}
                       >
                         <span className="text-xs font-bold">{initials(title)}</span>
@@ -267,22 +492,6 @@ export default function AdminOrgChart() {
               <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum perfil encontrado.</div>
             ) : null}
           </TabsContent>
-
-          <TabsContent value="list" className="mt-4">
-            <div className="grid gap-2">
-              {tree.map((n) => (
-                <TreeRow key={n.id} node={n} level={0} deptById={deptById} onEdit={openEdit} />
-              ))}
-
-              {!tree.length ? (
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum perfil encontrado.</div>
-              ) : null}
-            </div>
-
-            <div className="mt-5 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-              Dica: se uma pessoa aparece como "raiz", ela não tem gestor definido.
-            </div>
-          </TabsContent>
         </Tabs>
       </Card>
 
@@ -295,6 +504,8 @@ export default function AdminOrgChart() {
         profile={selected}
         companyId={companyId}
         departmentName={selected?.department_id ? deptById.get(selected.department_id) ?? null : null}
+        points={selectedPoints}
+        tier={selectedTier}
       />
 
       <Dialog open={open} onOpenChange={setOpen}>
