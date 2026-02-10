@@ -26,6 +26,7 @@ import {
 } from "@/lib/documentsDb";
 import { getProfile, updateProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
+import { FinanceiroPanel } from "@/components/FinanceiroPanel";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -56,6 +57,7 @@ export default function Profile() {
   if (!user) return null;
 
   const canEditSensitive = user.role === "ADMIN" || user.role === "MASTERADMIN";
+  const canEditCompanyFinance = user.role === "ADMIN" || user.role === "MASTERADMIN";
 
   const { data: me } = useQuery({
     queryKey: ["profile", user.id],
@@ -150,7 +152,8 @@ export default function Profile() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minha área</div>
-            <p className="mt-1 text-sm text-muted-foreground">Perfil, dados de trabalho e documentos.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Perfil, trabalho, documentos e financeiro.</p>
+
             <div className="mt-3 flex flex-wrap gap-2">
               <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                 {roleLabel(user.role)}
@@ -221,6 +224,7 @@ export default function Profile() {
             <TabsTrigger value="perfil" className="rounded-xl">Perfil</TabsTrigger>
             <TabsTrigger value="trabalho" className="rounded-xl">Trabalho</TabsTrigger>
             <TabsTrigger value="docs" className="rounded-xl">Documentos</TabsTrigger>
+            <TabsTrigger value="financeiro" className="rounded-xl">Financeiro</TabsTrigger>
           </TabsList>
 
           <TabsContent value="perfil" className="mt-5">
@@ -520,6 +524,10 @@ export default function Profile() {
                 )}
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="financeiro" className="mt-5">
+            <FinanceiroPanel userId={user.id} companyId={user.companyId ?? null} canEditCompany={canEditCompanyFinance} />
           </TabsContent>
         </Tabs>
       </Card>
