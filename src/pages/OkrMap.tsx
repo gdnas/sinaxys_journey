@@ -73,19 +73,35 @@ export default function OkrMap() {
 
   const groupedStrategy = useMemo(() => {
     return {
+      y1: strategy.filter((s) => s.horizon_years === 1),
       y3: strategy.filter((s) => s.horizon_years === 3),
       y5: strategy.filter((s) => s.horizon_years === 5),
       y10: strategy.filter((s) => s.horizon_years === 10),
     };
   }, [strategy]);
 
+  const [showTenYears, setShowTenYears] = useState(() => groupedStrategy.y10.length > 0);
+
+  const columns = useMemo(() => {
+    const base = [
+      { label: "1 ano", key: "y1" as const, items: groupedStrategy.y1 },
+      { label: "3 anos", key: "y3" as const, items: groupedStrategy.y3 },
+      { label: "5 anos", key: "y5" as const, items: groupedStrategy.y5 },
+    ];
+
+    const includeTen = showTenYears || groupedStrategy.y10.length > 0;
+    return includeTen
+      ? ([...base, { label: "10 anos", key: "y10" as const, items: groupedStrategy.y10 }] as const)
+      : (base as const);
+  }, [groupedStrategy.y1, groupedStrategy.y3, groupedStrategy.y5, groupedStrategy.y10, showTenYears]);
+
   const [open, setOpen] = useState(false);
-  const [horizon, setHorizon] = useState<3 | 5 | 10>(3);
+  const [horizon, setHorizon] = useState<1 | 3 | 5 | 10>(1);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
 
   const reset = () => {
-    setHorizon(3);
+    setHorizon(1);
     setTitle("");
     setDescription("");
   };
@@ -159,12 +175,30 @@ export default function OkrMap() {
         </div>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        {([
-          { label: "3 anos", key: "y3" as const, items: groupedStrategy.y3 },
-          { label: "5 anos", key: "y5" as const, items: groupedStrategy.y5 },
-          { label: "10 anos", key: "y10" as const, items: groupedStrategy.y10 },
-        ] as const).map((col) => (
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos de longo prazo</div>
+          <p className="mt-1 text-sm text-muted-foreground">1 ano é o mais comum. 10 anos fica opcional.</p>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          className="h-11 rounded-xl bg-white"
+          onClick={() => setShowTenYears((v) => !v)}
+        >
+          {showTenYears ? "Ocultar 10 anos" : "Mostrar 10 anos"}
+        </Button>
+      </div>
+
+      <div
+        className={
+          columns.length === 4
+            ? "grid gap-6 lg:grid-cols-4"
+            : "grid gap-6 lg:grid-cols-3"
+        }
+      >
+        {columns.map((col) => (
           <Card key={col.key} className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos — {col.label}</div>
@@ -262,7 +296,7 @@ export default function OkrMap() {
             <div className="grid gap-2">
               <Label>Horizonte</Label>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {([3, 5, 10] as const).map((y) => (
+                {([1, 3, 5] as const).map((y) => (
                   <Button
                     key={y}
                     type="button"
@@ -274,9 +308,28 @@ export default function OkrMap() {
                     }
                     onClick={() => setHorizon(y)}
                   >
-                    {y} anos
+                    {y === 1 ? "1 ano" : `${y} anos`}
                   </Button>
                 ))}
+              </div>
+
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-3">
+                <div className="text-sm text-muted-foreground">10 anos é opcional (pode esconder no mapa).</div>
+                <Button
+                  type="button"
+                  variant={horizon === 10 ? "default" : "outline"}
+                  className={
+                    horizon === 10
+                      ? "h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                      : "h-10 rounded-xl bg-white"
+                  }
+                  onClick={() => {
+                    setShowTenYears(true);
+                    setHorizon(10);
+                  }}
+                >
+                  10 anos
+                </Button>
               </div>
             </div>
 
