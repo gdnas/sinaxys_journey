@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { getCompany } from "@/lib/companiesDb";
@@ -98,6 +99,17 @@ export default function Profile() {
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
 
+  // Address + extra (keep compact)
+  const [addressZip, setAddressZip] = useState("");
+  const [addressLine1, setAddressLine1] = useState("");
+  const [addressLine2, setAddressLine2] = useState("");
+  const [addressNeighborhood, setAddressNeighborhood] = useState("");
+  const [addressCity, setAddressCity] = useState("");
+  const [addressState, setAddressState] = useState("");
+  const [addressCountry, setAddressCountry] = useState("Brasil");
+  const [emergencyName, setEmergencyName] = useState("");
+  const [emergencyPhone, setEmergencyPhone] = useState("");
+
   // Sensitive fields (view for everyone, edit for admin/master)
   const [jobTitle, setJobTitle] = useState(user.jobTitle ?? "");
   const [monthlyCost, setMonthlyCost] = useState<string>(user.monthlyCostBRL ? String(user.monthlyCostBRL) : "");
@@ -110,6 +122,17 @@ export default function Profile() {
     setName(me.name ?? user.name);
     setAvatarUrl(me.avatar_url ?? "");
     setPhone(me.phone ?? "");
+
+    setAddressZip(me.address_zip ?? "");
+    setAddressLine1(me.address_line1 ?? "");
+    setAddressLine2(me.address_line2 ?? "");
+    setAddressNeighborhood(me.address_neighborhood ?? "");
+    setAddressCity(me.address_city ?? "");
+    setAddressState(me.address_state ?? "");
+    setAddressCountry(me.address_country ?? "Brasil");
+    setEmergencyName(me.emergency_contact_name ?? "");
+    setEmergencyPhone(me.emergency_contact_phone ?? "");
+
     setJobTitle(me.job_title ?? "");
     setMonthlyCost(typeof me.monthly_cost_brl === "number" ? String(me.monthly_cost_brl) : "");
     setContractUrl(me.contract_url ?? "");
@@ -126,8 +149,47 @@ export default function Profile() {
     const baseName = me?.name ?? user.name;
     const baseAvatar = me?.avatar_url ?? "";
     const basePhone = me?.phone ?? "";
-    return name.trim() !== baseName || avatarUrl.trim() !== baseAvatar || phone.trim() !== basePhone;
-  }, [name, avatarUrl, phone, me, user.name]);
+
+    const baseZip = me?.address_zip ?? "";
+    const baseL1 = me?.address_line1 ?? "";
+    const baseL2 = me?.address_line2 ?? "";
+    const baseNb = me?.address_neighborhood ?? "";
+    const baseCity = me?.address_city ?? "";
+    const baseState = me?.address_state ?? "";
+    const baseCountry = me?.address_country ?? "Brasil";
+    const baseEN = me?.emergency_contact_name ?? "";
+    const baseEP = me?.emergency_contact_phone ?? "";
+
+    return (
+      name.trim() !== baseName ||
+      avatarUrl.trim() !== baseAvatar ||
+      phone.trim() !== basePhone ||
+      addressZip.trim() !== baseZip ||
+      addressLine1.trim() !== baseL1 ||
+      addressLine2.trim() !== baseL2 ||
+      addressNeighborhood.trim() !== baseNb ||
+      addressCity.trim() !== baseCity ||
+      addressState.trim() !== baseState ||
+      addressCountry.trim() !== baseCountry ||
+      emergencyName.trim() !== baseEN ||
+      emergencyPhone.trim() !== baseEP
+    );
+  }, [
+    name,
+    avatarUrl,
+    phone,
+    addressZip,
+    addressLine1,
+    addressLine2,
+    addressNeighborhood,
+    addressCity,
+    addressState,
+    addressCountry,
+    emergencyName,
+    emergencyPhone,
+    me,
+    user.name,
+  ]);
 
   const dirtySensitive = useMemo(() => {
     const baseJob = me?.job_title ?? "";
@@ -244,6 +306,99 @@ export default function Profile() {
                 <Input className="h-11 rounded-xl" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://..." />
               </div>
 
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/60 p-1">
+                <Accordion type="single" collapsible>
+                  <AccordionItem value="endereco" className="border-none">
+                    <AccordionTrigger className="rounded-2xl px-4 py-3 text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:no-underline">
+                      Endereço
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                      <div className="grid gap-3">
+                        <div className="grid gap-2 sm:max-w-[220px]">
+                          <Label>CEP</Label>
+                          <Input className="h-11 rounded-xl bg-white" value={addressZip} onChange={(e) => setAddressZip(e.target.value)} placeholder="00000-000" />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>Endereço</Label>
+                          <Input
+                            className="h-11 rounded-xl bg-white"
+                            value={addressLine1}
+                            onChange={(e) => setAddressLine1(e.target.value)}
+                            placeholder="Rua, número"
+                          />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>Complemento (opcional)</Label>
+                          <Input
+                            className="h-11 rounded-xl bg-white"
+                            value={addressLine2}
+                            onChange={(e) => setAddressLine2(e.target.value)}
+                            placeholder="Apto, bloco, etc."
+                          />
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="grid gap-2">
+                            <Label>Bairro</Label>
+                            <Input
+                              className="h-11 rounded-xl bg-white"
+                              value={addressNeighborhood}
+                              onChange={(e) => setAddressNeighborhood(e.target.value)}
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label>Cidade</Label>
+                            <Input className="h-11 rounded-xl bg-white" value={addressCity} onChange={(e) => setAddressCity(e.target.value)} />
+                          </div>
+                        </div>
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="grid gap-2">
+                            <Label>Estado</Label>
+                            <Input className="h-11 rounded-xl bg-white" value={addressState} onChange={(e) => setAddressState(e.target.value)} placeholder="SP" />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label>País</Label>
+                            <Input
+                              className="h-11 rounded-xl bg-white"
+                              value={addressCountry}
+                              onChange={(e) => setAddressCountry(e.target.value)}
+                              placeholder="Brasil"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+
+                  <AccordionItem value="emergencia" className="border-none">
+                    <AccordionTrigger className="rounded-2xl px-4 py-3 text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:no-underline">
+                      Contato de emergência
+                    </AccordionTrigger>
+                    <AccordionContent className="px-4 pb-4">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-2">
+                          <Label>Nome (opcional)</Label>
+                          <Input className="h-11 rounded-xl bg-white" value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Telefone (opcional)</Label>
+                          <Input
+                            className="h-11 rounded-xl bg-white"
+                            value={emergencyPhone}
+                            onChange={(e) => setEmergencyPhone(e.target.value)}
+                            placeholder="+55 11 9…"
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-2 text-xs text-muted-foreground">Somente para uso interno em casos necessários.</div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+              </div>
+
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs text-muted-foreground">Alterações salvam em public.profiles.</div>
                 <Button
@@ -256,6 +411,16 @@ export default function Profile() {
                         name: name.trim(),
                         phone: phone.trim() || null,
                         avatar_url: avatarUrl.trim() || null,
+
+                        address_zip: addressZip.trim() || null,
+                        address_line1: addressLine1.trim() || null,
+                        address_line2: addressLine2.trim() || null,
+                        address_neighborhood: addressNeighborhood.trim() || null,
+                        address_city: addressCity.trim() || null,
+                        address_state: addressState.trim() || null,
+                        address_country: addressCountry.trim() || null,
+                        emergency_contact_name: emergencyName.trim() || null,
+                        emergency_contact_phone: emergencyPhone.trim() || null,
                       } as any);
 
                       await qc.invalidateQueries({ queryKey: ["profile", user.id] });

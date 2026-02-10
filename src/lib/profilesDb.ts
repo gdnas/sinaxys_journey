@@ -16,12 +16,21 @@ export type DbProfile = {
   monthly_cost_brl: number | null;
   joined_at: string | null;
   manager_id: string | null;
+  address_zip: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
+  address_neighborhood: string | null;
+  address_city: string | null;
+  address_state: string | null;
+  address_country: string | null;
+  emergency_contact_name: string | null;
+  emergency_contact_phone: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
 const baseSelect =
-  "id,email,name,role,company_id,department_id,active,must_change_password,avatar_url,phone,job_title,contract_url,monthly_cost_brl,joined_at,manager_id,created_at,updated_at";
+  "id,email,name,role,company_id,department_id,active,must_change_password,avatar_url,phone,job_title,contract_url,monthly_cost_brl,joined_at,manager_id,address_zip,address_line1,address_line2,address_neighborhood,address_city,address_state,address_country,emergency_contact_name,emergency_contact_phone,created_at,updated_at";
 
 export async function getMyProfile() {
   const { data: u } = await supabase.auth.getUser();
