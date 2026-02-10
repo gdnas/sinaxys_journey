@@ -15,6 +15,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { brl, brlPerHourFromMonthly } from "@/lib/costs";
+import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
 import { listProfilesByCompany } from "@/lib/profilesDb";
 import {
   createDeliverable,
@@ -92,6 +94,12 @@ export default function OkrObjectiveDetail() {
     queryFn: () => listProfilesByCompany(cid),
   });
 
+  const profileById = useMemo(() => {
+    const m = new Map<string, { name: string; monthlyCostBRL: number | null }>();
+    for (const p of profiles) m.set(p.id, { name: p.name ?? p.email, monthlyCostBRL: p.monthly_cost_brl });
+    return m;
+  }, [profiles]);
+
   const byUserId = useMemo(() => {
     const m = new Map<string, string>();
     for (const p of profiles) m.set(p.id, p.name ?? p.email);
@@ -145,6 +153,7 @@ export default function OkrObjectiveDetail() {
   const [taskOwner, setTaskOwner] = useState<string>(user.id);
   const [taskDue, setTaskDue] = useState<string>("");
   const [taskEstimate, setTaskEstimate] = useState<string>("");
+  const [taskValue, setTaskValue] = useState<string>("");
 
   const resetTask = () => {
     setTaskDeliverableId(null);
@@ -153,7 +162,20 @@ export default function OkrObjectiveDetail() {
     setTaskOwner(user.id);
     setTaskDue("");
     setTaskEstimate("");
+    setTaskValue("");
   };
+
+  const requiresTaskBusinessCase = !!objective?.department_id;
+  const taskOwnerMonthly = profileById.get(taskOwner)?.monthlyCostBRL ?? null;
+  const taskMinutes = parsePtNumber(taskEstimate);
+  const taskHours = taskMinutes !== null ? taskMinutes / 60 : null;
+  const taskValueBRL = parsePtNumber(taskValue);
+  const taskCostBRL = laborCostFromMonthly(taskOwnerMonthly, taskHours);
+  const taskRoi = roiPct(taskValueBRL, taskCostBRL);
+
+  const taskBusinessOk =
+    !requiresTaskBusinessCase ||
+    (!!taskValueBRL && taskValueBRL > 0 && !!taskMinutes && taskMinutes > 0 && !!taskOwnerMonthly && taskOwnerMonthly > 0 && taskCostBRL !== null && taskRoi !== null);
 
   const toggleTaskDone = async (t: DbTask) => {
     try {
@@ -434,9 +456,38 @@ export default function OkrObjectiveDetail() {
             </div>
 
             <div className="grid gap-2">
-              <Label>Tempo estimado (min, opcional)</Label>
+              <Label>Tempo estimado (min{requiresTaskBusinessCase ? ", obrigatório" : ", opcional"})</Label>
               <Input className="h-11 rounded-xl" value={taskEstimate} onChange={(e) => setTaskEstimate(e.target.value)} placeholder="30" />
             </div>
+
+            {requiresTaskBusinessCase ? (
+              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
+                <p className="mt-1 text-sm text-muted-foreground">Estimativa rápida: impacto (R$) e ROI baseado no custo/h do responsável.</p>
+
+                <div className="mt-4 grid gap-2">
+                  <Label>Impacto estimado (R$)</Label>
+                  <Input className="h-11 rounded-xl" value={taskValue} onChange={(e) => setTaskValue(e.target.value)} placeholder="5000" />
+                </div>
+
+                <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
+                  <div className="text-xs text-muted-foreground">Custo/h do responsável: {brlPerHourFromMonthly(taskOwnerMonthly ?? 0)}</div>
+                  {!taskOwnerMonthly ? (
+                    <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]">
+                      Para calcular ROI, cadastre o custo mensal da pessoa em <span className="font-semibold">Custos</span>.
+                    </div>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Custo estimado:</span>
+                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{taskCostBRL !== null ? brl(taskCostBRL) : "—"}</span>
+                    <span className="text-muted-foreground">• ROI:</span>
+                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">
+                      {taskRoi !== null ? `${taskRoi.toFixed(1)}%` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <DialogFooter>
@@ -445,7 +496,7 @@ export default function OkrObjectiveDetail() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!canWrite || !taskDeliverableId || taskTitle.trim().length < 4}
+              disabled={!canWrite || !taskDeliverableId || taskTitle.trim().length < 4 || !taskBusinessOk}
               onClick={async () => {
                 if (!taskDeliverableId) return;
                 try {
@@ -459,6 +510,9 @@ export default function OkrObjectiveDetail() {
                     due_date: taskDue.trim() || null,
                     estimate_minutes: Number.isFinite(n) ? n : null,
                     checklist: null,
+                    estimated_value_brl: taskValueBRL,
+                    estimated_cost_brl: taskCostBRL !== null ? Number(taskCostBRL.toFixed(2)) : null,
+                    estimated_roi_pct: taskRoi !== null ? Number(taskRoi.toFixed(2)) : null,
                   });
                   await qc.invalidateQueries({ queryKey: ["okr-tasks-for-objective", objectiveId] });
                   toast({ title: "Tarefa criada" });

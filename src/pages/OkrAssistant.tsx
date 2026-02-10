@@ -13,6 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { brl, brlPerHourFromMonthly } from "@/lib/costs";
+import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
 import {
   createDeliverable,
   createKeyResult,
@@ -42,7 +44,14 @@ function cycleLabel(c: DbOkrCycle) {
   return c.name?.trim() ? `${c.name} · ${base}` : base;
 }
 
-type DraftTask = { title: string; due?: string };
+type DraftTask = {
+  title: string;
+  due?: string;
+  estimate_minutes: number | null;
+  estimated_value_brl: number | null;
+  estimated_cost_brl: number | null;
+  estimated_roi_pct: number | null;
+};
 
 export default function OkrAssistant() {
   const { toast } = useToast();
@@ -94,6 +103,9 @@ export default function OkrAssistant() {
   const [fund, setFund] = useState<DbOkrObjective["linked_fundamental"]>(null);
   const [fundText, setFundText] = useState("");
 
+  const [objectiveValue, setObjectiveValue] = useState("");
+  const [objectiveEffortHours, setObjectiveEffortHours] = useState("");
+
   const [krTitle, setKrTitle] = useState("");
   const [krUnit, setKrUnit] = useState("");
   const [krStart, setKrStart] = useState("");
@@ -106,7 +118,30 @@ export default function OkrAssistant() {
 
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDue, setTaskDue] = useState("");
+  const [taskEstimate, setTaskEstimate] = useState("");
+  const [taskValue, setTaskValue] = useState("");
   const [tasks, setTasks] = useState<DraftTask[]>([]);
+
+  const requiresBusinessCase = !!user.departmentId;
+  const myMonthly = user.monthlyCostBRL ?? null;
+
+  const objectiveValueBRL = parsePtNumber(objectiveValue);
+  const objectiveHours = parsePtNumber(objectiveEffortHours);
+  const objectiveCostBRL = laborCostFromMonthly(myMonthly, objectiveHours);
+  const objectiveRoi = roiPct(objectiveValueBRL, objectiveCostBRL);
+
+  const businessCaseOk =
+    !requiresBusinessCase ||
+    (!!objectiveValueBRL &&
+      objectiveValueBRL > 0 &&
+      !!objectiveHours &&
+      objectiveHours > 0 &&
+      !!myMonthly &&
+      myMonthly > 0 &&
+      objectiveCostBRL !== null &&
+      objectiveRoi !== null &&
+      tasks.length >= 1 &&
+      tasks.every((t) => t.estimated_value_brl !== null && t.estimated_cost_brl !== null && t.estimated_roi_pct !== null));
 
   const objectiveQuality = useMemo(() => {
     const t = objectiveTitle.trim();
@@ -136,7 +171,8 @@ export default function OkrAssistant() {
     fundText.trim().length >= 6 &&
     krQuality.ok &&
     deliverableTitle.trim().length >= 4 &&
-    tasks.length >= 1;
+    tasks.length >= 1 &&
+    businessCaseOk;
 
   if (!hasCompany) {
     return (
@@ -267,6 +303,46 @@ export default function OkrAssistant() {
               <Label>Motivo estratégico (opcional)</Label>
               <Textarea className="min-h-[88px] rounded-2xl" value={objectiveReason} onChange={(e) => setObjectiveReason(e.target.value)} />
             </div>
+
+            {requiresBusinessCase ? (
+              <div className="mt-4 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
+                <p className="mt-1 text-sm text-muted-foreground">Como esse objetivo retorna dinheiro — e qual o ROI, baseado no seu custo/hora.</p>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label>Impacto estimado (R$)</Label>
+                    <Input className="h-11 rounded-xl" value={objectiveValue} onChange={(e) => setObjectiveValue(e.target.value)} placeholder="50000" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Esforço estimado (horas)</Label>
+                    <Input
+                      className="h-11 rounded-xl"
+                      value={objectiveEffortHours}
+                      onChange={(e) => setObjectiveEffortHours(e.target.value)}
+                      placeholder="40"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
+                  <div className="text-xs text-muted-foreground">Seu custo/h: {brlPerHourFromMonthly(myMonthly ?? 0)}</div>
+                  {!myMonthly ? (
+                    <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]">
+                      Para calcular ROI, cadastre seu custo mensal em <span className="font-semibold">Custos</span>.
+                    </div>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Custo estimado:</span>
+                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{objectiveCostBRL !== null ? brl(objectiveCostBRL) : "—"}</span>
+                    <span className="text-muted-foreground">• ROI:</span>
+                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">
+                      {objectiveRoi !== null ? `${objectiveRoi.toFixed(1)}%` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             <div className="mt-4 grid gap-2">
               <Label>Esse objetivo está conectado a…</Label>
@@ -401,7 +477,7 @@ export default function OkrAssistant() {
                 </div>
                 <div className="grid gap-2">
                   <Label className="text-muted-foreground">&nbsp;</Label>
-                  <div className="h-11 rounded-xl border border-dashed border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 text-sm text-muted-foreground flex items-center">
+                  <div className="flex h-11 items-center rounded-xl border border-dashed border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 text-sm text-muted-foreground">
                     Dica: use prazo no entregável; as tarefas ficam no dia a dia.
                   </div>
                 </div>
@@ -416,7 +492,7 @@ export default function OkrAssistant() {
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Tarefas</div>
                 <p className="mt-1 text-sm text-muted-foreground">Inclua pelo menos 1 tarefa para sair com execução pronta.</p>
 
-                <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px_auto]">
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <Input
                     className="h-11 rounded-xl"
                     value={taskTitle}
@@ -424,14 +500,55 @@ export default function OkrAssistant() {
                     placeholder="Ex.: Mapear etapas do fluxo"
                   />
                   <Input className="h-11 rounded-xl" type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} />
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label>Tempo estimado (min{requiresBusinessCase ? ", obrigatório" : ", opcional"})</Label>
+                    <Input className="h-11 rounded-xl" value={taskEstimate} onChange={(e) => setTaskEstimate(e.target.value)} placeholder="60" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Impacto estimado (R$){requiresBusinessCase ? " (obrigatório)" : " (opcional)"}</Label>
+                    <Input className="h-11 rounded-xl" value={taskValue} onChange={(e) => setTaskValue(e.target.value)} placeholder="5000" />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div className="text-xs text-muted-foreground">Custo/h base: {brlPerHourFromMonthly(myMonthly ?? 0)}</div>
                   <Button
                     type="button"
                     className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                     onClick={() => {
                       if (taskTitle.trim().length < 3) return;
-                      setTasks((prev) => [...prev, { title: taskTitle.trim(), due: taskDue.trim() || undefined }]);
+
+                      const minutes = parsePtNumber(taskEstimate);
+                      const value = parsePtNumber(taskValue);
+                      const hours = minutes !== null ? minutes / 60 : null;
+                      const cost = laborCostFromMonthly(myMonthly, hours);
+                      const r = roiPct(value, cost);
+
+                      if (requiresBusinessCase) {
+                        if (!myMonthly || myMonthly <= 0) return;
+                        if (!minutes || minutes <= 0) return;
+                        if (!value || value <= 0) return;
+                        if (cost === null || r === null) return;
+                      }
+
+                      setTasks((prev) => [
+                        ...prev,
+                        {
+                          title: taskTitle.trim(),
+                          due: taskDue.trim() || undefined,
+                          estimate_minutes: minutes && minutes > 0 ? minutes : null,
+                          estimated_value_brl: value && value > 0 ? value : null,
+                          estimated_cost_brl: cost !== null ? Number(cost.toFixed(2)) : null,
+                          estimated_roi_pct: r !== null ? Number(r.toFixed(2)) : null,
+                        },
+                      ]);
                       setTaskTitle("");
                       setTaskDue("");
+                      setTaskEstimate("");
+                      setTaskValue("");
                     }}
                   >
                     + adicionar
@@ -445,6 +562,11 @@ export default function OkrAssistant() {
                         <div className="min-w-0">
                           <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
                           <div className="text-xs text-muted-foreground">{t.due ? `Vence: ${t.due}` : "Sem data"}</div>
+                          {t.estimated_cost_brl !== null && t.estimated_value_brl !== null ? (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              Custo: {brl(t.estimated_cost_brl)} • ROI: {t.estimated_roi_pct !== null ? `${t.estimated_roi_pct.toFixed(1)}%` : "—"}
+                            </div>
+                          ) : null}
                         </div>
                         <Button
                           type="button"
@@ -491,6 +613,10 @@ export default function OkrAssistant() {
                       linked_fundamental: fund,
                       linked_fundamental_text: fundText,
                       due_at: null,
+                      estimated_value_brl: objectiveValueBRL,
+                      estimated_effort_hours: objectiveHours,
+                      estimated_cost_brl: objectiveCostBRL !== null ? Number(objectiveCostBRL.toFixed(2)) : null,
+                      estimated_roi_pct: objectiveRoi !== null ? Number(objectiveRoi.toFixed(2)) : null,
                     });
 
                     const kr = await createKeyResult({
@@ -522,8 +648,11 @@ export default function OkrAssistant() {
                         owner_user_id: user.id,
                         status: "TODO",
                         due_date: t.due ?? null,
-                        estimate_minutes: null,
+                        estimate_minutes: t.estimate_minutes,
                         checklist: null,
+                        estimated_value_brl: t.estimated_value_brl,
+                        estimated_cost_brl: t.estimated_cost_brl,
+                        estimated_roi_pct: t.estimated_roi_pct,
                       });
                     }
 
@@ -570,6 +699,13 @@ export default function OkrAssistant() {
               <Hint ok={!!fund && fundText.trim().length >= 6} title="Alinhamento" text="Conecte explicitamente ao propósito/visão." />
               <Hint ok={krQuality.ok} title="KR" text={krQuality.msg} />
               <Hint ok={tasks.length >= 1} title="Execução" text="Tenha pelo menos 1 tarefa conectada." />
+              {requiresBusinessCase ? (
+                <Hint
+                  ok={businessCaseOk}
+                  title="ROI"
+                  text={myMonthly ? "Inclua impacto + esforço para calcular ROI (objetivo e tarefas)." : "Cadastre seu custo mensal para liberar o cálculo de ROI."}
+                />
+              ) : null}
             </div>
           </Card>
 

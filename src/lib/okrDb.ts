@@ -161,16 +161,22 @@ export type DbOkrObjective = {
   linked_fundamental: "MISSION" | "VISION" | "PURPOSE" | "VALUES" | "CULTURE" | "NORTH" | null;
   linked_fundamental_text: string | null;
   due_at: string | null;
+  // Business case (optional)
+  estimated_value_brl: number | null;
+  estimated_effort_hours: number | null;
+  estimated_cost_brl: number | null;
+  estimated_roi_pct: number | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
+const objectiveSelect =
+  "id,company_id,cycle_id,parent_objective_id,level,department_id,owner_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,created_at,updated_at";
+
 export async function listOkrObjectives(companyId: string, cycleId: string) {
   const { data, error } = await supabase
     .from("okr_objectives")
-    .select(
-      "id,company_id,cycle_id,parent_objective_id,level,department_id,owner_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,created_at,updated_at",
-    )
+    .select(objectiveSelect)
     .eq("company_id", companyId)
     .eq("cycle_id", cycleId)
     .order("created_at", { ascending: false });
@@ -180,13 +186,7 @@ export async function listOkrObjectives(companyId: string, cycleId: string) {
 }
 
 export async function getOkrObjective(objectiveId: string) {
-  const { data, error } = await supabase
-    .from("okr_objectives")
-    .select(
-      "id,company_id,cycle_id,parent_objective_id,level,department_id,owner_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,created_at,updated_at",
-    )
-    .eq("id", objectiveId)
-    .maybeSingle();
+  const { data, error } = await supabase.from("okr_objectives").select(objectiveSelect).eq("id", objectiveId).maybeSingle();
 
   if (error) throw error;
   return (data ?? null) as DbOkrObjective | null;
@@ -208,10 +208,12 @@ export async function createOkrObjective(payload: Omit<DbOkrObjective, "id" | "c
       linked_fundamental: payload.linked_fundamental ?? null,
       linked_fundamental_text: payload.linked_fundamental_text ?? null,
       due_at: payload.due_at ?? null,
+      estimated_value_brl: payload.estimated_value_brl ?? null,
+      estimated_effort_hours: payload.estimated_effort_hours ?? null,
+      estimated_cost_brl: payload.estimated_cost_brl ?? null,
+      estimated_roi_pct: payload.estimated_roi_pct ?? null,
     })
-    .select(
-      "id,company_id,cycle_id,parent_objective_id,level,department_id,owner_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,created_at,updated_at",
-    )
+    .select(objectiveSelect)
     .single();
 
   if (error) throw error;
@@ -328,17 +330,22 @@ export type DbTask = {
   due_date: string | null;
   estimate_minutes: number | null;
   checklist: any;
+  // Business case (optional)
+  estimated_value_brl: number | null;
+  estimated_cost_brl: number | null;
+  estimated_roi_pct: number | null;
   created_at: string | null;
   updated_at: string | null;
 };
+
+const taskSelect =
+  "id,deliverable_id,title,description,owner_user_id,status,due_date,estimate_minutes,checklist,estimated_value_brl,estimated_cost_brl,estimated_roi_pct,created_at,updated_at";
 
 export async function listTasksByDeliverableIds(deliverableIds: string[]) {
   if (!deliverableIds.length) return [] as DbTask[];
   const { data, error } = await supabase
     .from("okr_tasks")
-    .select(
-      "id,deliverable_id,title,description,owner_user_id,status,due_date,estimate_minutes,checklist,created_at,updated_at",
-    )
+    .select(taskSelect)
     .in("deliverable_id", deliverableIds)
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
@@ -351,9 +358,7 @@ export async function listTasksForUser(companyId: string, userId: string, opts?:
   // We filter by owner on okr_tasks, and by date range (optional).
   let q = supabase
     .from("okr_tasks")
-    .select(
-      "id,deliverable_id,title,description,owner_user_id,status,due_date,estimate_minutes,checklist,created_at,updated_at",
-    )
+    .select(taskSelect)
     .eq("owner_user_id", userId)
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
@@ -369,7 +374,15 @@ export async function listTasksForUser(companyId: string, userId: string, opts?:
   return (data ?? []) as DbTask[];
 }
 
-export async function updateTask(taskId: string, patch: Partial<Pick<DbTask, "status" | "title" | "description" | "due_date" | "estimate_minutes" | "checklist">>) {
+export async function updateTask(
+  taskId: string,
+  patch: Partial<
+    Pick<
+      DbTask,
+      "status" | "title" | "description" | "due_date" | "estimate_minutes" | "checklist" | "estimated_value_brl" | "estimated_cost_brl" | "estimated_roi_pct"
+    >
+  >,
+) {
   const { data, error } = await supabase
     .from("okr_tasks")
     .update({
@@ -379,11 +392,12 @@ export async function updateTask(taskId: string, patch: Partial<Pick<DbTask, "st
       due_date: patch.due_date,
       estimate_minutes: patch.estimate_minutes,
       checklist: patch.checklist,
+      estimated_value_brl: patch.estimated_value_brl,
+      estimated_cost_brl: patch.estimated_cost_brl,
+      estimated_roi_pct: patch.estimated_roi_pct,
     })
     .eq("id", taskId)
-    .select(
-      "id,deliverable_id,title,description,owner_user_id,status,due_date,estimate_minutes,checklist,created_at,updated_at",
-    )
+    .select(taskSelect)
     .maybeSingle();
 
   if (error) throw error;
@@ -402,10 +416,11 @@ export async function createTask(payload: Omit<DbTask, "id" | "created_at" | "up
       due_date: payload.due_date ?? null,
       estimate_minutes: payload.estimate_minutes ?? null,
       checklist: payload.checklist ?? null,
+      estimated_value_brl: payload.estimated_value_brl ?? null,
+      estimated_cost_brl: payload.estimated_cost_brl ?? null,
+      estimated_roi_pct: payload.estimated_roi_pct ?? null,
     })
-    .select(
-      "id,deliverable_id,title,description,owner_user_id,status,due_date,estimate_minutes,checklist,created_at,updated_at",
-    )
+    .select(taskSelect)
     .single();
 
   if (error) throw error;

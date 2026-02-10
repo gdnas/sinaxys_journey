@@ -14,8 +14,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { brl, brlPerHourFromMonthly } from "@/lib/costs";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany } from "@/lib/profilesDb";
+import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
 import {
   createKeyResult,
   createOkrCycle,
@@ -107,8 +109,8 @@ export default function OkrCycles() {
   });
 
   const byUserId = useMemo(() => {
-    const m = new Map<string, { name: string; role: string }>();
-    for (const p of profiles) m.set(p.id, { name: p.name ?? p.email, role: p.role });
+    const m = new Map<string, { name: string; role: string; monthlyCostBRL: number | null }>();
+    for (const p of profiles) m.set(p.id, { name: p.name ?? p.email, role: p.role, monthlyCostBRL: p.monthly_cost_brl });
     return m;
   }, [profiles]);
 
@@ -138,6 +140,9 @@ export default function OkrCycles() {
   const [objFund, setObjFund] = useState<DbOkrObjective["linked_fundamental"]>(null);
   const [objFundText, setObjFundText] = useState("");
 
+  const [objValue, setObjValue] = useState("");
+  const [objEffortHours, setObjEffortHours] = useState("");
+
   const resetObjective = () => {
     setObjLevel("COMPANY");
     setObjTitle("");
@@ -148,6 +153,8 @@ export default function OkrCycles() {
     setObjParent(null);
     setObjFund(null);
     setObjFundText("");
+    setObjValue("");
+    setObjEffortHours("");
   };
 
   const [krOpen, setKrOpen] = useState(false);
@@ -185,6 +192,17 @@ export default function OkrCycles() {
       return m;
     },
   });
+
+  const requiresBusinessCase = !!objDept;
+  const ownerMonthly = byUserId.get(objOwner)?.monthlyCostBRL ?? null;
+  const valueBRL = parsePtNumber(objValue);
+  const effortHours = parsePtNumber(objEffortHours);
+  const costBRL = laborCostFromMonthly(ownerMonthly, effortHours);
+  const roi = roiPct(valueBRL, costBRL);
+
+  const businessCaseOk =
+    !requiresBusinessCase ||
+    (!!valueBRL && valueBRL > 0 && !!effortHours && effortHours > 0 && !!ownerMonthly && ownerMonthly > 0 && costBRL !== null && roi !== null);
 
   if (!hasCompany) {
     return (
@@ -549,6 +567,48 @@ export default function OkrCycles() {
               </div>
             </div>
 
+            {requiresBusinessCase ? (
+              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Como esse objetivo retorna dinheiro para a empresa — e qual o ROI, baseado no custo/hora do responsável.
+                </p>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="grid gap-2">
+                    <Label>Impacto estimado (R$)</Label>
+                    <Input className="h-11 rounded-xl" value={objValue} onChange={(e) => setObjValue(e.target.value)} placeholder="50000" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Esforço estimado (horas)</Label>
+                    <Input
+                      className="h-11 rounded-xl"
+                      value={objEffortHours}
+                      onChange={(e) => setObjEffortHours(e.target.value)}
+                      placeholder="40"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
+                  <div className="text-xs text-muted-foreground">Custo/h do responsável: {brlPerHourFromMonthly(ownerMonthly ?? 0)}</div>
+                  {!ownerMonthly ? (
+                    <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]">
+                      Para calcular ROI, cadastre o custo mensal da pessoa em <span className="font-semibold">Custos</span>.
+                    </div>
+                  ) : null}
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Custo estimado:</span>
+                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{costBRL !== null ? brl(costBRL) : "—"}</span>
+                    <span className="text-muted-foreground">• ROI:</span>
+                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">
+                      {roi !== null ? `${roi.toFixed(1)}%` : "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="grid gap-2">
               <Label>Conexão com estratégia (obrigatório)</Label>
               <Select value={objFund ?? ""} onValueChange={(v) => setObjFund((v || null) as any)}>
@@ -607,7 +667,7 @@ export default function OkrCycles() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!selected || objTitle.trim().length < 6 || !objFund || objFundText.trim().length < 6}
+              disabled={!selected || objTitle.trim().length < 6 || !objFund || objFundText.trim().length < 6 || !businessCaseOk}
               onClick={async () => {
                 if (!selected) return;
                 try {
@@ -624,6 +684,10 @@ export default function OkrCycles() {
                     linked_fundamental: objFund,
                     linked_fundamental_text: objFundText,
                     due_at: null,
+                    estimated_value_brl: valueBRL,
+                    estimated_effort_hours: effortHours,
+                    estimated_cost_brl: costBRL !== null ? Number(costBRL.toFixed(2)) : null,
+                    estimated_roi_pct: roi !== null ? Number(roi.toFixed(2)) : null,
                   });
 
                   await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, cycleId] });
