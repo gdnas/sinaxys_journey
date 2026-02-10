@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
@@ -160,71 +161,73 @@ export default function OkrFundamentals() {
           if (!v) syncFromInitial();
         }}
       >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-2xl">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-hidden rounded-3xl sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>Editar fundamentos</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Propósito</Label>
-              <Textarea
-                value={purpose}
-                onChange={(e) => setPurpose(e.target.value)}
-                className="min-h-[88px] rounded-2xl"
-                placeholder="Por que existimos? Qual impacto queremos no mundo?"
-              />
-            </div>
-            <div className="grid gap-2">
-              <Label>Visão</Label>
-              <Textarea
-                value={vision}
-                onChange={(e) => setVision(e.target.value)}
-                className="min-h-[88px] rounded-2xl"
-                placeholder="Como é o futuro quando a empresa vence?"
-              />
-            </div>
+          <ScrollArea className="-mx-1 max-h-[62vh] px-1">
+            <div className="grid gap-4 pr-3">
+              <div className="grid gap-2">
+                <Label>Propósito</Label>
+                <Textarea
+                  value={purpose}
+                  onChange={(e) => setPurpose(e.target.value)}
+                  className="min-h-[88px] rounded-2xl"
+                  placeholder="Por que existimos? Qual impacto queremos no mundo?"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label>Visão</Label>
+                <Textarea
+                  value={vision}
+                  onChange={(e) => setVision(e.target.value)}
+                  className="min-h-[88px] rounded-2xl"
+                  placeholder="Como é o futuro quando a empresa vence?"
+                />
+              </div>
 
-            <div className="grid gap-2">
-              <Label>Missão</Label>
-              <Textarea
-                value={mission}
-                onChange={(e) => setMission(e.target.value)}
-                className="min-h-[88px] rounded-2xl"
-                placeholder="O que fazemos diariamente para chegar lá?"
-              />
-            </div>
+              <div className="grid gap-2">
+                <Label>Missão</Label>
+                <Textarea
+                  value={mission}
+                  onChange={(e) => setMission(e.target.value)}
+                  className="min-h-[88px] rounded-2xl"
+                  placeholder="O que fazemos diariamente para chegar lá?"
+                />
+              </div>
 
-            <div className="grid gap-2">
-              <Label>Norte estratégico</Label>
-              <Textarea
-                value={north}
-                onChange={(e) => setNorth(e.target.value)}
-                className="min-h-[88px] rounded-2xl"
-                placeholder="Uma frase ou princípio que orienta decisões difíceis."
-              />
-            </div>
+              <div className="grid gap-2">
+                <Label>Norte estratégico</Label>
+                <Textarea
+                  value={north}
+                  onChange={(e) => setNorth(e.target.value)}
+                  className="min-h-[88px] rounded-2xl"
+                  placeholder="Uma frase ou princípio que orienta decisões difíceis."
+                />
+              </div>
 
-            <div className="grid gap-2">
-              <Label>Valores</Label>
-              <Textarea
-                value={values}
-                onChange={(e) => setValues(e.target.value)}
-                className="min-h-[88px] rounded-2xl"
-                placeholder="O que não negociamos (em bullet points ou texto curto)."
-              />
-            </div>
+              <div className="grid gap-2">
+                <Label>Valores</Label>
+                <Textarea
+                  value={values}
+                  onChange={(e) => setValues(e.target.value)}
+                  className="min-h-[88px] rounded-2xl"
+                  placeholder="O que não negociamos (em bullet points ou texto curto)."
+                />
+              </div>
 
-            <div className="grid gap-2">
-              <Label>Cultura</Label>
-              <Textarea
-                value={culture}
-                onChange={(e) => setCulture(e.target.value)}
-                className="min-h-[88px] rounded-2xl"
-                placeholder="Como trabalhamos por aqui?"
-              />
+              <div className="grid gap-2">
+                <Label>Cultura</Label>
+                <Textarea
+                  value={culture}
+                  onChange={(e) => setCulture(e.target.value)}
+                  className="min-h-[88px] rounded-2xl"
+                  placeholder="Como trabalhamos por aqui?"
+                />
+              </div>
             </div>
-          </div>
+          </ScrollArea>
 
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => setOpen(false)}>
