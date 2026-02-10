@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Circle, Clock, Flame, ListChecks } from "lucide-react";
+import { CheckCircle2, Circle, Clock, Flame, ListChecks, Pencil, Trash2 } from "lucide-react";
 import { format, endOfWeek, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -8,19 +8,44 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import type { DbTask } from "@/lib/okrDb";
-import { listTasksForUser, updateTask } from "@/lib/okrDb";
+import { deleteTask, listTasksForUser, updateTask } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 
-function TaskRow({ task, onToggleDone }: { task: DbTask; onToggleDone: (t: DbTask) => void }) {
+function TaskRow({
+  task,
+  onToggleDone,
+  onEdit,
+  onDelete,
+}: {
+  task: DbTask;
+  onToggleDone: (t: DbTask) => void;
+  onEdit: (t: DbTask) => void;
+  onDelete: (t: DbTask) => void;
+}) {
   const done = task.status === "DONE";
 
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       className="group flex w-full items-start gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/40"
       onClick={() => onToggleDone(task)}
     >
@@ -44,11 +69,40 @@ function TaskRow({ task, onToggleDone }: { task: DbTask; onToggleDone: (t: DbTas
                 {task.estimate_minutes}min
               </Badge>
             ) : null}
+
+            <div className="ml-1 flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-white hover:text-[color:var(--sinaxys-ink)]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(task);
+                }}
+                title="Editar"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(task);
+                }}
+                title="Excluir"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
         {task.description?.trim() ? <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">{task.description}</p> : null}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -73,6 +127,26 @@ export default function OkrToday() {
     enabled: hasCompany,
     queryFn: () => listTasksForUser(cid, user.id, { from: weekFrom, to: weekTo }),
   });
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<DbTask | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDesc, setEditDesc] = useState("");
+  const [editDue, setEditDue] = useState("");
+  const [editEstimate, setEditEstimate] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const openEdit = (t: DbTask) => {
+    setEditingTask(t);
+    setEditTitle(t.title);
+    setEditDesc(t.description ?? "");
+    setEditDue(t.due_date ?? "");
+    setEditEstimate(typeof t.estimate_minutes === "number" ? String(t.estimate_minutes) : "");
+    setEditOpen(true);
+  };
 
   const groups = useMemo(() => {
     const overdue: DbTask[] = [];
@@ -154,7 +228,18 @@ export default function OkrToday() {
               {isLoading ? (
                 <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando…</div>
               ) : groups.todayList.length ? (
-                groups.todayList.map((t) => <TaskRow key={t.id} task={t} onToggleDone={toggleDone} />)
+                groups.todayList.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    onToggleDone={toggleDone}
+                    onEdit={openEdit}
+                    onDelete={(task) => {
+                      setDeleteId(task.id);
+                      setDeleteOpen(true);
+                    }}
+                  />
+                ))
               ) : (
                 <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
                   Nenhuma tarefa com vencimento hoje.
@@ -178,7 +263,18 @@ export default function OkrToday() {
               {isLoading ? (
                 <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando…</div>
               ) : groups.week.length ? (
-                groups.week.map((t) => <TaskRow key={t.id} task={t} onToggleDone={toggleDone} />)
+                groups.week.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    onToggleDone={toggleDone}
+                    onEdit={openEdit}
+                    onDelete={(task) => {
+                      setDeleteId(task.id);
+                      setDeleteOpen(true);
+                    }}
+                  />
+                ))
               ) : (
                 <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem tarefas para esta semana.</div>
               )}
@@ -202,7 +298,18 @@ export default function OkrToday() {
 
             <div className="grid gap-3">
               {groups.overdue.length ? (
-                groups.overdue.map((t) => <TaskRow key={t.id} task={t} onToggleDone={toggleDone} />)
+                groups.overdue.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    onToggleDone={toggleDone}
+                    onEdit={openEdit}
+                    onDelete={(task) => {
+                      setDeleteId(task.id);
+                      setDeleteOpen(true);
+                    }}
+                  />
+                ))
               ) : (
                 <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem tarefas atrasadas.</div>
               )}
@@ -217,7 +324,18 @@ export default function OkrToday() {
 
             <div className="grid gap-3">
               {groups.done.length ? (
-                groups.done.map((t) => <TaskRow key={t.id} task={t} onToggleDone={toggleDone} />)
+                groups.done.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    onToggleDone={toggleDone}
+                    onEdit={openEdit}
+                    onDelete={(task) => {
+                      setDeleteId(task.id);
+                      setDeleteOpen(true);
+                    }}
+                  />
+                ))
               ) : (
                 <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nada concluído nesta janela.</div>
               )}
@@ -239,6 +357,119 @@ export default function OkrToday() {
           </Card>
         </div>
       </div>
+
+      <Dialog
+        open={editOpen}
+        onOpenChange={(v) => {
+          setEditOpen(v);
+          if (!v) setEditingTask(null);
+        }}
+      >
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Editar tarefa</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input className="h-11 rounded-xl" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Descrição (opcional)</Label>
+              <Textarea className="min-h-[92px] rounded-2xl" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label>Vencimento (opcional)</Label>
+                <Input className="h-11 rounded-xl" type="date" value={editDue} onChange={(e) => setEditDue(e.target.value)} />
+              </div>
+              <div className="grid gap-2">
+                <Label>Tempo estimado (min, opcional)</Label>
+                <Input className="h-11 rounded-xl" value={editEstimate} onChange={(e) => setEditEstimate(e.target.value)} placeholder="30" />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setEditOpen(false)} disabled={editSaving}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={editSaving || !editingTask || editTitle.trim().length < 4}
+              onClick={async () => {
+                if (!editingTask || editSaving) return;
+                setEditSaving(true);
+                try {
+                  const n = Number(editEstimate.trim());
+                  await updateTask(editingTask.id, {
+                    title: editTitle,
+                    description: editDesc,
+                    due_date: editDue.trim() || null,
+                    estimate_minutes: Number.isFinite(n) ? n : null,
+                  });
+                  await qc.invalidateQueries({ queryKey: ["okr-my-tasks", cid, user.id, weekFrom, weekTo] });
+                  toast({ title: "Tarefa atualizada" });
+                  setEditOpen(false);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível salvar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setEditSaving(false);
+                }
+              }}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(v) => {
+          setDeleteOpen(v);
+          if (!v) setDeleteId(null);
+        }}
+      >
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteId) return;
+                try {
+                  await deleteTask(deleteId);
+                  await qc.invalidateQueries({ queryKey: ["okr-my-tasks", cid, user.id, weekFrom, weekTo] });
+                  toast({ title: "Tarefa excluída" });
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível excluir",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setDeleteOpen(false);
+                  setDeleteId(null);
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

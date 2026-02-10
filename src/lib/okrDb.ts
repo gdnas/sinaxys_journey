@@ -229,23 +229,96 @@ export async function createOkrObjective(payload: Omit<DbOkrObjective, "id" | "c
 
 export async function updateOkrObjective(
   objectiveId: string,
-  patch: Partial<Pick<DbOkrObjective, "expected_attainment_pct" | "status" | "achieved_pct" | "achieved_at" | "due_at">>,
+  patch: Partial<
+    Pick<
+      DbOkrObjective,
+      | "title"
+      | "description"
+      | "strategic_reason"
+      | "linked_fundamental"
+      | "linked_fundamental_text"
+      | "owner_user_id"
+      | "department_id"
+      | "parent_objective_id"
+      | "expected_attainment_pct"
+      | "estimated_value_brl"
+      | "estimated_effort_hours"
+      | "estimated_cost_brl"
+      | "estimated_roi_pct"
+      | "status"
+      | "achieved_pct"
+      | "achieved_at"
+      | "due_at"
+      | "level"
+    >
+  >,
 ) {
-  const { data, error } = await supabase
-    .from("okr_objectives")
-    .update({
-      expected_attainment_pct: patch.expected_attainment_pct,
-      status: patch.status,
-      achieved_pct: patch.achieved_pct,
-      achieved_at: patch.achieved_at,
-      due_at: patch.due_at,
-    })
-    .eq("id", objectiveId)
-    .select(objectiveSelect)
-    .maybeSingle();
+  const update: Record<string, any> = {};
+
+  if ("title" in patch) update.title = patch.title?.trim();
+  if ("description" in patch) update.description = patch.description ?? null;
+  if ("strategic_reason" in patch) update.strategic_reason = patch.strategic_reason ?? null;
+
+  if ("linked_fundamental" in patch) update.linked_fundamental = patch.linked_fundamental ?? null;
+  if ("linked_fundamental_text" in patch) update.linked_fundamental_text = patch.linked_fundamental_text ?? null;
+
+  if ("owner_user_id" in patch) update.owner_user_id = patch.owner_user_id;
+  if ("department_id" in patch) update.department_id = patch.department_id ?? null;
+  if ("parent_objective_id" in patch) update.parent_objective_id = patch.parent_objective_id ?? null;
+  if ("level" in patch) update.level = patch.level;
+
+  if ("expected_attainment_pct" in patch) update.expected_attainment_pct = patch.expected_attainment_pct ?? null;
+  if ("estimated_value_brl" in patch) update.estimated_value_brl = patch.estimated_value_brl ?? null;
+  if ("estimated_effort_hours" in patch) update.estimated_effort_hours = patch.estimated_effort_hours ?? null;
+  if ("estimated_cost_brl" in patch) update.estimated_cost_brl = patch.estimated_cost_brl ?? null;
+  if ("estimated_roi_pct" in patch) update.estimated_roi_pct = patch.estimated_roi_pct ?? null;
+
+  if ("status" in patch) update.status = patch.status;
+  if ("achieved_pct" in patch) update.achieved_pct = patch.achieved_pct ?? null;
+  if ("achieved_at" in patch) update.achieved_at = patch.achieved_at ?? null;
+  if ("due_at" in patch) update.due_at = patch.due_at ?? null;
+
+  const { data, error } = await supabase.from("okr_objectives").update(update).eq("id", objectiveId).select(objectiveSelect).maybeSingle();
 
   if (error) throw error;
   return (data ?? null) as DbOkrObjective | null;
+}
+
+export async function deleteKeyResult(keyResultId: string) {
+  const { error } = await supabase.from("okr_key_results").delete().eq("id", keyResultId);
+  if (error) throw error;
+}
+
+export async function deleteDeliverable(deliverableId: string) {
+  const { error } = await supabase.from("okr_deliverables").delete().eq("id", deliverableId);
+  if (error) throw error;
+}
+
+export async function deleteTask(taskId: string) {
+  const { error } = await supabase.from("okr_tasks").delete().eq("id", taskId);
+  if (error) throw error;
+}
+
+export async function deleteOkrObjective(objectiveId: string) {
+  const { error } = await supabase.from("okr_objectives").delete().eq("id", objectiveId);
+  if (error) throw error;
+}
+
+export async function deleteOkrObjectiveCascade(objectiveId: string) {
+  // Client-side cascade delete to avoid FK constraint issues.
+  const krs = await listKeyResults(objectiveId);
+  const krIds = krs.map((k) => k.id);
+
+  const deliverables = krIds.length ? await listDeliverablesByKeyResultIds(krIds) : [];
+  const deliverableIds = deliverables.map((d) => d.id);
+
+  const tasks = deliverableIds.length ? await listTasksByDeliverableIds(deliverableIds) : [];
+
+  // Delete bottom-up
+  await Promise.all(tasks.map((t) => deleteTask(t.id)));
+  await Promise.all(deliverables.map((d) => deleteDeliverable(d.id)));
+  await Promise.all(krs.map((k) => deleteKeyResult(k.id)));
+  await deleteOkrObjective(objectiveId);
 }
 
 export type KrConfidence = "ON_TRACK" | "AT_RISK" | "OFF_TRACK";
@@ -449,6 +522,7 @@ export async function updateTask(
       | "status"
       | "title"
       | "description"
+      | "owner_user_id"
       | "due_date"
       | "estimate_minutes"
       | "checklist"
@@ -464,6 +538,7 @@ export async function updateTask(
       status: patch.status,
       title: patch.title,
       description: patch.description,
+      owner_user_id: patch.owner_user_id,
       due_date: patch.due_date,
       estimate_minutes: patch.estimate_minutes,
       checklist: patch.checklist,

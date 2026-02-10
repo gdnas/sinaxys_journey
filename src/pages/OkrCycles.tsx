@@ -1,11 +1,21 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Plus, Target, Wand2 } from "lucide-react";
+import { ArrowRight, Pencil, Plus, Target, Trash2, Wand2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -23,11 +33,13 @@ import {
   createKeyResult,
   createOkrCycle,
   createOkrObjective,
+  deleteOkrObjectiveCascade,
   getCompanyFundamentals,
   krProgressPct,
   listKeyResults,
   listOkrCycles,
   listOkrObjectives,
+  updateOkrObjective,
   type CycleStatus,
   type CycleType,
   type DbOkrObjective,
@@ -66,7 +78,7 @@ export default function OkrCycles() {
   const cid = companyId ?? "";
   const hasCompany = !!companyId;
 
-  const canEdit = user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN";
+  const isAdminish = user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN";
 
   const { data: fundamentals } = useQuery({
     queryKey: ["okr-fundamentals", cid],
@@ -134,6 +146,7 @@ export default function OkrCycles() {
   };
 
   const [objOpen, setObjOpen] = useState(false);
+  const [editingObjectiveId, setEditingObjectiveId] = useState<string | null>(null);
   const [objLevel, setObjLevel] = useState<ObjectiveLevel>("COMPANY");
   const [objTitle, setObjTitle] = useState("");
   const [objDesc, setObjDesc] = useState("");
@@ -151,6 +164,7 @@ export default function OkrCycles() {
   const [objSaving, setObjSaving] = useState(false);
 
   const resetObjective = () => {
+    setEditingObjectiveId(null);
     setObjLevel("COMPANY");
     setObjTitle("");
     setObjDesc("");
@@ -164,6 +178,9 @@ export default function OkrCycles() {
     setObjValue("");
     setObjEffortHours("");
   };
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteObjectiveId, setDeleteObjectiveId] = useState<string | null>(null);
 
   const [krOpen, setKrOpen] = useState(false);
   const [krObjectiveId, setKrObjectiveId] = useState<string | null>(null);
@@ -252,7 +269,7 @@ export default function OkrCycles() {
                 <Wand2 className="ml-2 h-4 w-4" />
               </Link>
             </Button>
-            {canEdit ? (
+            {isAdminish ? (
               <Button
                 className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                 onClick={() => {
@@ -311,7 +328,7 @@ export default function OkrCycles() {
             </p>
           </div>
 
-          {canEdit ? (
+          {isAdminish ? (
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
               disabled={!selected}
@@ -333,6 +350,8 @@ export default function OkrCycles() {
             objectives.map((o) => {
               const owner = byUserId.get(o.owner_user_id)?.name ?? "—";
               const st = objectiveStats.get(o.id) ?? { count: 0, pct: null };
+              const canWriteObjective = user.id === o.owner_user_id || isAdminish;
+
               return (
                 <div
                   key={o.id}
@@ -374,17 +393,62 @@ export default function OkrCycles() {
                   </div>
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                    <Button
-                      variant="outline"
-                      className="h-11 rounded-xl"
-                      onClick={() => {
-                        resetKr();
-                        setKrObjectiveId(o.id);
-                        setKrOpen(true);
-                      }}
-                    >
-                      + KR
-                    </Button>
+                    {canWriteObjective ? (
+                      <Button
+                        variant="outline"
+                        className="h-11 rounded-xl"
+                        onClick={() => {
+                          setEditingObjectiveId(o.id);
+                          setObjLevel(o.level);
+                          setObjTitle(o.title);
+                          setObjDesc(o.description ?? "");
+                          setObjReason(o.strategic_reason ?? "");
+                          setObjOwner(o.owner_user_id);
+                          setObjDept(o.department_id);
+                          setObjParent(o.parent_objective_id);
+                          setObjFund(o.linked_fundamental);
+                          setObjFundText(o.linked_fundamental_text ?? "");
+                          setObjExpected(typeof o.expected_attainment_pct === "number" ? String(o.expected_attainment_pct) : "80");
+                          setObjValue(typeof o.estimated_value_brl === "number" ? String(o.estimated_value_brl) : "");
+                          setObjEffortHours(typeof o.estimated_effort_hours === "number" ? String(o.estimated_effort_hours) : "");
+                          setObjOpen(true);
+                        }}
+                        title="Editar objetivo"
+                      >
+                        <Pencil className="mr-2 h-4 w-4" />
+                        Editar
+                      </Button>
+                    ) : null}
+
+                    {canWriteObjective ? (
+                      <Button
+                        variant="outline"
+                        className="h-11 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                        onClick={() => {
+                          setDeleteObjectiveId(o.id);
+                          setDeleteOpen(true);
+                        }}
+                        title="Excluir objetivo"
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Excluir
+                      </Button>
+                    ) : null}
+
+                    {canWriteObjective ? (
+                      <Button
+                        variant="outline"
+                        className="h-11 rounded-xl"
+                        onClick={() => {
+                          resetKr();
+                          setKrObjectiveId(o.id);
+                          setKrOpen(true);
+                        }}
+                      >
+                        + KR
+                      </Button>
+                    ) : null}
+
                     <Button
                       asChild
                       className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -524,7 +588,7 @@ export default function OkrCycles() {
       >
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Novo objetivo do ciclo</DialogTitle>
+            <DialogTitle>{editingObjectiveId ? "Editar objetivo" : "Novo objetivo do ciclo"}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4">
@@ -725,32 +789,54 @@ export default function OkrCycles() {
                 if (!selected || objSaving) return;
                 setObjSaving(true);
                 try {
-                  await createOkrObjective({
-                    company_id: cid,
-                    cycle_id: selected.id,
-                    parent_objective_id: objParent,
-                    level: objLevel,
-                    department_id: objDept,
-                    owner_user_id: objOwner,
-                    title: objTitle,
-                    description: objDesc,
-                    strategic_reason: objReason,
-                    linked_fundamental: objFund,
-                    linked_fundamental_text: objFundText,
-                    due_at: null,
-                    expected_attainment_pct: expectedAtt,
-                    estimated_value_brl: valueBRL,
-                    estimated_effort_hours: effortHours,
-                    estimated_cost_brl: costBRL !== null ? Number(costBRL.toFixed(2)) : null,
-                    estimated_roi_pct: roi !== null ? Number(roi.toFixed(2)) : null,
-                  });
+                  if (editingObjectiveId) {
+                    await updateOkrObjective(editingObjectiveId, {
+                      level: objLevel,
+                      parent_objective_id: objParent,
+                      department_id: objDept,
+                      owner_user_id: objOwner,
+                      title: objTitle,
+                      description: objDesc,
+                      strategic_reason: objReason,
+                      linked_fundamental: objFund,
+                      linked_fundamental_text: objFundText,
+                      due_at: null,
+                      expected_attainment_pct: expectedAtt,
+                      estimated_value_brl: valueBRL,
+                      estimated_effort_hours: effortHours,
+                      estimated_cost_brl: costBRL !== null ? Number(costBRL.toFixed(2)) : null,
+                      estimated_roi_pct: roi !== null ? Number(roi.toFixed(2)) : null,
+                    });
+                    toast({ title: "Objetivo atualizado" });
+                  } else {
+                    await createOkrObjective({
+                      company_id: cid,
+                      cycle_id: selected.id,
+                      parent_objective_id: objParent,
+                      level: objLevel,
+                      department_id: objDept,
+                      owner_user_id: objOwner,
+                      title: objTitle,
+                      description: objDesc,
+                      strategic_reason: objReason,
+                      linked_fundamental: objFund,
+                      linked_fundamental_text: objFundText,
+                      due_at: null,
+                      expected_attainment_pct: expectedAtt,
+                      estimated_value_brl: valueBRL,
+                      estimated_effort_hours: effortHours,
+                      estimated_cost_brl: costBRL !== null ? Number(costBRL.toFixed(2)) : null,
+                      estimated_roi_pct: roi !== null ? Number(roi.toFixed(2)) : null,
+                    });
+                    toast({ title: "Objetivo criado" });
+                  }
 
                   await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, cycleId] });
-                  toast({ title: "Objetivo criado" });
+                  await qc.invalidateQueries({ queryKey: ["okr-kr-stats", cid, cycleId] });
                   setObjOpen(false);
                 } catch (e) {
                   toast({
-                    title: "Não foi possível criar",
+                    title: "Não foi possível salvar",
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
@@ -759,11 +845,54 @@ export default function OkrCycles() {
                 }
               }}
             >
-              Criar
+              {editingObjectiveId ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(v) => {
+          setDeleteOpen(v);
+          if (!v) setDeleteObjectiveId(null);
+        }}
+      >
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir objetivo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso vai apagar também KRs, entregáveis e tarefas ligados a esse objetivo. Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteObjectiveId) return;
+                try {
+                  await deleteOkrObjectiveCascade(deleteObjectiveId);
+                  await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, cycleId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-kr-stats", cid, cycleId] });
+                  toast({ title: "Objetivo excluído" });
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível excluir",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setDeleteOpen(false);
+                  setDeleteObjectiveId(null);
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Dialog
         open={krOpen}

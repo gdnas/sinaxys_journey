@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Circle, Layers, Plus, Target } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Layers, Pencil, Plus, Target, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +31,7 @@ import { listProfilesByCompany } from "@/lib/profilesDb";
 import {
   createDeliverable,
   createTask,
+  deleteTask,
   getOkrObjective,
   krProgressPct,
   listDeliverablesByKeyResultIds,
@@ -139,6 +150,8 @@ export default function OkrObjectiveDetail() {
   const canWrite =
     !!objective && (user.id === objective.owner_user_id || user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN");
 
+  const canEditTask = (t: DbTask) => canWrite || t.owner_user_id === user.id;
+
   const [markOpen, setMarkOpen] = useState(false);
   const [markPct, setMarkPct] = useState<string>("");
   const [markSaving, setMarkSaving] = useState(false);
@@ -162,6 +175,8 @@ export default function OkrObjectiveDetail() {
   };
 
   const [taskOpen, setTaskOpen] = useState(false);
+  const [taskMode, setTaskMode] = useState<"create" | "edit">("create");
+  const [taskEditingId, setTaskEditingId] = useState<string | null>(null);
   const [taskDeliverableId, setTaskDeliverableId] = useState<string | null>(null);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
@@ -171,7 +186,12 @@ export default function OkrObjectiveDetail() {
   const [taskValue, setTaskValue] = useState<string>("");
   const [taskSaving, setTaskSaving] = useState(false);
 
+  const [taskDeleteOpen, setTaskDeleteOpen] = useState(false);
+  const [taskDeleteId, setTaskDeleteId] = useState<string | null>(null);
+
   const resetTask = () => {
+    setTaskMode("create");
+    setTaskEditingId(null);
     setTaskDeliverableId(null);
     setTaskTitle("");
     setTaskDesc("");
@@ -194,6 +214,11 @@ export default function OkrObjectiveDetail() {
     (!!taskValueBRL && taskValueBRL > 0 && !!taskMinutes && taskMinutes > 0 && !!taskOwnerMonthly && taskOwnerMonthly > 0 && taskCostBRL !== null && taskRoi !== null);
 
   const toggleTaskDone = async (t: DbTask) => {
+    if (!canEditTask(t)) {
+      toast({ title: "Sem permissão", description: "Somente o dono da tarefa (ou o dono do objetivo/admin) pode editar." });
+      return;
+    }
+
     try {
       const next: WorkStatus = t.status === "DONE" ? "TODO" : "DONE";
       await updateTask(t.id, { status: next });
@@ -352,6 +377,7 @@ export default function OkrObjectiveDetail() {
               tasksByDeliverableId={tasksByDeliverableId}
               byUserId={byUserId}
               canWrite={canWrite}
+              canEditTask={canEditTask}
               onToggleDeliverableKr={() => toggleDeliverableKr(kr)}
               onAddDeliverable={() => {
                 resetDeliverable();
@@ -360,8 +386,26 @@ export default function OkrObjectiveDetail() {
               }}
               onAddTask={(deliverableId) => {
                 resetTask();
+                setTaskMode("create");
                 setTaskDeliverableId(deliverableId);
                 setTaskOpen(true);
+              }}
+              onEditTask={(t) => {
+                resetTask();
+                setTaskMode("edit");
+                setTaskEditingId(t.id);
+                setTaskDeliverableId(t.deliverable_id);
+                setTaskTitle(t.title);
+                setTaskDesc(t.description ?? "");
+                setTaskOwner(t.owner_user_id);
+                setTaskDue(t.due_date ?? "");
+                setTaskEstimate(typeof t.estimate_minutes === "number" ? String(t.estimate_minutes) : "");
+                setTaskValue(typeof t.estimated_value_brl === "number" ? String(t.estimated_value_brl) : "");
+                setTaskOpen(true);
+              }}
+              onDeleteTask={(t) => {
+                setTaskDeleteId(t.id);
+                setTaskDeleteOpen(true);
               }}
               onToggleTask={toggleTaskDone}
             />
@@ -552,7 +596,7 @@ export default function OkrObjectiveDetail() {
       >
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Nova tarefa</DialogTitle>
+            <DialogTitle>{taskMode === "edit" ? "Editar tarefa" : "Nova tarefa"}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4">
@@ -569,7 +613,7 @@ export default function OkrObjectiveDetail() {
             <div className="grid gap-2 md:grid-cols-2">
               <div className="grid gap-2">
                 <Label>Responsável</Label>
-                <Select value={taskOwner} onValueChange={(v) => setTaskOwner(v)}>
+                <Select value={taskOwner} onValueChange={(v) => setTaskOwner(v)} disabled={taskMode === "edit" && !canWrite}>
                   <SelectTrigger className="h-11 rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
@@ -581,6 +625,9 @@ export default function OkrObjectiveDetail() {
                     ))}
                   </SelectContent>
                 </Select>
+                {taskMode === "edit" && !canWrite ? (
+                  <div className="text-xs text-muted-foreground">Somente o dono do objetivo/admin pode reatribuir tarefas.</div>
+                ) : null}
               </div>
 
               <div className="grid gap-2">
@@ -630,12 +677,43 @@ export default function OkrObjectiveDetail() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!canWrite || !taskDeliverableId || taskTitle.trim().length < 4 || !taskBusinessOk || taskSaving}
+              disabled={
+                (!canWrite && taskMode === "create") ||
+                !taskDeliverableId ||
+                taskTitle.trim().length < 4 ||
+                !taskBusinessOk ||
+                taskSaving ||
+                (taskMode === "edit" && (!taskEditingId || !(canWrite || taskOwner === user.id)))
+              }
               onClick={async () => {
-                if (!taskDeliverableId || !canWrite || taskSaving) return;
+                if (!taskDeliverableId || taskSaving) return;
+
                 setTaskSaving(true);
                 try {
                   const n = Number(taskEstimate.trim());
+                  if (taskMode === "edit" && taskEditingId) {
+                    const patch: Parameters<typeof updateTask>[1] = {
+                      title: taskTitle,
+                      description: taskDesc,
+                      due_date: taskDue.trim() || null,
+                      estimate_minutes: Number.isFinite(n) ? n : null,
+                      checklist: null,
+                      estimated_value_brl: taskValueBRL,
+                      estimated_cost_brl: taskCostBRL !== null ? Number(taskCostBRL.toFixed(2)) : null,
+                      estimated_roi_pct: taskRoi !== null ? Number(taskRoi.toFixed(2)) : null,
+                    };
+
+                    if (canWrite) patch.owner_user_id = taskOwner;
+
+                    await updateTask(taskEditingId, patch);
+                    await qc.invalidateQueries({ queryKey: ["okr-tasks-for-objective", objectiveId] });
+                    toast({ title: "Tarefa atualizada" });
+                    setTaskOpen(false);
+                    return;
+                  }
+
+                  if (!canWrite) return;
+
                   await createTask({
                     deliverable_id: taskDeliverableId,
                     title: taskTitle,
@@ -654,7 +732,7 @@ export default function OkrObjectiveDetail() {
                   setTaskOpen(false);
                 } catch (e) {
                   toast({
-                    title: "Não foi possível criar",
+                    title: "Não foi possível salvar",
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
@@ -663,11 +741,51 @@ export default function OkrObjectiveDetail() {
                 }
               }}
             >
-              Criar
+              {taskMode === "edit" ? "Salvar" : "Criar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={taskDeleteOpen}
+        onOpenChange={(v) => {
+          setTaskDeleteOpen(v);
+          if (!v) setTaskDeleteId(null);
+        }}
+      >
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
+            <AlertDialogDescription>Essa ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!taskDeleteId) return;
+                try {
+                  await deleteTask(taskDeleteId);
+                  await qc.invalidateQueries({ queryKey: ["okr-tasks-for-objective", objectiveId] });
+                  toast({ title: "Tarefa excluída" });
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível excluir",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setTaskDeleteOpen(false);
+                  setTaskDeleteId(null);
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -678,9 +796,12 @@ function KrCard({
   tasksByDeliverableId,
   byUserId,
   canWrite,
+  canEditTask,
   onToggleDeliverableKr,
   onAddDeliverable,
   onAddTask,
+  onEditTask,
+  onDeleteTask,
   onToggleTask,
 }: {
   kr: DbOkrKeyResult;
@@ -688,9 +809,12 @@ function KrCard({
   tasksByDeliverableId: Map<string, DbTask[]>;
   byUserId: Map<string, string>;
   canWrite: boolean;
+  canEditTask: (t: DbTask) => boolean;
   onToggleDeliverableKr: () => void;
   onAddDeliverable: () => void;
   onAddTask: (deliverableId: string) => void;
+  onEditTask: (t: DbTask) => void;
+  onDeleteTask: (t: DbTask) => void;
   onToggleTask: (t: DbTask) => void;
 }) {
   const pct = krProgressPct(kr);
@@ -799,26 +923,74 @@ function KrCard({
 
               <div className="mt-4 grid gap-2">
                 {(tasksByDeliverableId.get(d.id) ?? []).length ? (
-                  (tasksByDeliverableId.get(d.id) ?? []).map((t) => (
-                    <button
-                      key={t.id}
-                      type="button"
-                      className="flex w-full items-start gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left transition hover:bg-[color:var(--sinaxys-tint)]/40"
-                      onClick={() => onToggleTask(t)}
-                      title={t.status === "DONE" ? `Concluída em ${fmtDate(t.completed_at) ?? "—"}` : "Clique para alternar concluído"}
-                    >
-                      <div className="mt-0.5 text-[color:var(--sinaxys-primary)]">
-                        {t.status === "DONE" ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
-                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{statusLabel(t.status)}</Badge>
+                  (tasksByDeliverableId.get(d.id) ?? []).map((t) => {
+                    const editable = canEditTask(t);
+                    return (
+                      <div
+                        key={t.id}
+                        role={editable ? "button" : undefined}
+                        tabIndex={editable ? 0 : -1}
+                        className={
+                          "group flex w-full items-start gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left transition" +
+                          (editable ? " cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/40" : " opacity-80")
+                        }
+                        onClick={() => {
+                          if (!editable) return;
+                          onToggleTask(t);
+                        }}
+                        title={
+                          t.status === "DONE"
+                            ? `Concluída em ${fmtDate(t.completed_at) ?? "—"}`
+                            : editable
+                              ? "Clique para alternar concluído"
+                              : "Sem permissão para editar esta tarefa"
+                        }
+                      >
+                        <div className="mt-0.5 text-[color:var(--sinaxys-primary)]">
+                          {t.status === "DONE" ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground">Resp.: {byUserId.get(t.owner_user_id) ?? "—"}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
+                            <div className="flex items-center gap-2">
+                              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{statusLabel(t.status)}</Badge>
+                              {editable ? (
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onEditTask(t);
+                                    }}
+                                    title="Editar tarefa"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeleteTask(t);
+                                    }}
+                                    title="Excluir tarefa"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">Resp.: {byUserId.get(t.owner_user_id) ?? "—"}</div>
+                        </div>
                       </div>
-                    </button>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="rounded-2xl bg-white p-3 text-sm text-muted-foreground">Sem tarefas ainda.</div>
                 )}
