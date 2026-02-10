@@ -28,7 +28,14 @@ import { useCompany } from "@/lib/company";
 import { computeProgress } from "@/lib/sinaxys";
 import { getAssignmentsForUser } from "@/lib/journeyDb";
 import { fetchLeaderboard } from "@/lib/pointsDb";
-import { listTasksForUser } from "@/lib/okrDb";
+import {
+  listOkrCycles,
+  listOkrObjectives,
+  listTasksForCompany,
+  listTasksForDepartment,
+  listTasksForUser,
+  type DbTaskWithContext,
+} from "@/lib/okrDb";
 
 function formatPts(n: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(n));
@@ -114,6 +121,57 @@ function ShortcutCard({
   );
 }
 
+function RiskList({
+  title,
+  subtitle,
+  tasks,
+  to,
+}: {
+  title: string;
+  subtitle: string;
+  tasks: DbTaskWithContext[];
+  to: string;
+}) {
+  return (
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{title}</div>
+          <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
+        </div>
+        <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
+          <Link to={to}>
+            Abrir OKRs
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
+
+      <Separator className="my-5" />
+
+      <div className="grid gap-3">
+        {tasks.length ? (
+          tasks.slice(0, 5).map((t) => (
+            <div key={t.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">Objetivo: {t.objective_title}</div>
+                </div>
+                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                  {t.due_date ? String(t.due_date).slice(0, 10).split("-").reverse().join("/") : "sem prazo"}
+                </Badge>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum item crítico por aqui.</div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 export default function AppDashboard() {
   const { user } = useAuth();
   const { company } = useCompany();
@@ -121,6 +179,10 @@ export default function AppDashboard() {
   if (!user) return null;
 
   const companyId = user.companyId ?? null;
+
+  const isCollaborator = user.role === "COLABORADOR";
+  const isHead = user.role === "HEAD";
+  const isAdmin = user.role === "ADMIN";
 
   const { data: assignments = [], isLoading: loadingAssignments } = useQuery({
     queryKey: ["assignments-for-user", user.id],
@@ -136,17 +198,63 @@ export default function AppDashboard() {
 
   const today = new Date();
   const todayLabel = format(today, "EEEE, d 'de' MMMM", { locale: ptBR });
+  const todayIso = format(today, "yyyy-MM-dd");
   const weekFrom = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
   const weekTo = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
+  // My tasks (always useful)
   const { data: myWeekTasks = [] } = useQuery({
     queryKey: ["okr-my-tasks", companyId, user.id, weekFrom, weekTo],
     enabled: !!companyId,
     queryFn: () => listTasksForUser(companyId as string, user.id, { from: weekFrom, to: weekTo }),
   });
 
-  const openTasks = useMemo(() => myWeekTasks.filter((t) => t.status !== "DONE"), [myWeekTasks]);
+  const myOpenTasks = useMemo(() => myWeekTasks.filter((t) => t.status !== "DONE"), [myWeekTasks]);
 
+  // Team/company tasks (for HEAD/ADMIN)
+  const { data: scopeTasks = [] } = useQuery({
+    queryKey: ["okr-scope-tasks", companyId, user.role, user.departmentId, weekFrom, weekTo],
+    enabled: !!companyId && ((isHead && !!user.departmentId) || isAdmin),
+    queryFn: () => {
+      if (isAdmin) return listTasksForCompany(companyId as string, { from: weekFrom, to: weekTo });
+      return listTasksForDepartment(companyId as string, user.departmentId as string, { from: weekFrom, to: weekTo });
+    },
+  });
+
+  const scopeOpenTasks = useMemo(() => scopeTasks.filter((t) => t.status !== "DONE"), [scopeTasks]);
+  const scopeOverdueTasks = useMemo(
+    () => scopeOpenTasks.filter((t) => t.due_date && String(t.due_date) < todayIso),
+    [scopeOpenTasks, todayIso],
+  );
+
+  // Active quarter objectives (for HEAD/ADMIN)
+  const { data: cycles = [] } = useQuery({
+    queryKey: ["okr-cycles", companyId],
+    enabled: !!companyId && (isHead || isAdmin),
+    queryFn: () => listOkrCycles(companyId as string),
+  });
+
+  const activeQuarter = cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE") ?? null;
+
+  const { data: quarterObjectives = [] } = useQuery({
+    queryKey: ["okr-objectives", companyId, activeQuarter?.id],
+    enabled: !!companyId && !!activeQuarter?.id && (isHead || isAdmin),
+    queryFn: () => listOkrObjectives(companyId as string, String(activeQuarter?.id)),
+  });
+
+  const scopedObjectives = useMemo(() => {
+    if (isAdmin) return quarterObjectives;
+    if (isHead) return quarterObjectives.filter((o) => o.department_id === user.departmentId);
+    return [];
+  }, [quarterObjectives, isAdmin, isHead, user.departmentId]);
+
+  const objectivesByLevel = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const o of scopedObjectives) m.set(o.level, (m.get(o.level) ?? 0) + 1);
+    return m;
+  }, [scopedObjectives]);
+
+  // Points (lightweight identity/engagement)
   const { data: leaderboard = [] } = useQuery({
     queryKey: ["points", "leaderboard", companyId],
     enabled: !!companyId,
@@ -159,7 +267,11 @@ export default function AppDashboard() {
     return { myPoints: mine?.total_points ?? 0, myRank: idx >= 0 ? idx + 1 : null };
   }, [leaderboard, user.id]);
 
-  const isAdminish = user.role === "ADMIN" || user.role === "HEAD";
+  const subtitle = isAdmin
+    ? "Visão executiva: saúde do trimestre, execução crítica e atalhos de gestão."
+    : isHead
+      ? "Visão do time: o que está em risco e o que destrava a semana."
+      : "Seus principais atalhos: execução (OKRs), evolução (trilhas) e reconhecimento (Points).";
 
   return (
     <div className="grid gap-6">
@@ -179,9 +291,7 @@ export default function AppDashboard() {
             <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-3xl">
               {company?.name ? company.name : "Sua área"}
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              {todayLabel}. Aqui estão seus principais atalhos: execução (OKRs), evolução (trilhas) e reconhecimento (Points).
-            </p>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{todayLabel}. {subtitle}</p>
           </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -205,9 +315,9 @@ export default function AppDashboard() {
             )}
 
             <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-              <Link to="/profile">
-                Minha área
-                <ArrowRight className="ml-2 h-4 w-4" />
+              <Link to={isCollaborator ? "/okr/hoje" : "/okr/ciclos"}>
+                {isCollaborator ? "Minhas tarefas" : "Ver OKRs"}
+                <Target className="ml-2 h-4 w-4" />
               </Link>
             </Button>
           </div>
@@ -216,27 +326,61 @@ export default function AppDashboard() {
         <Separator className="my-5" />
 
         <div className="grid gap-4 lg:grid-cols-3">
-          <StatPill
-            label="OKRs — tarefas abertas"
-            value={`${openTasks.length}`}
-            hint="na sua semana"
-            icon={<Target className="h-5 w-5" />}
-            to="/okr/hoje"
-          />
-          <StatPill
-            label="Sinaxys Points"
-            value={formatPts(myPoints)}
-            hint={myRank ? `posição #${myRank} (Top 50)` : "entre no ranking"}
-            icon={<Trophy className="h-5 w-5" />}
-            to="/rankings"
-          />
-          <StatPill
-            label="Trilhas"
-            value={loadingAssignments ? "…" : `${inProgress.length}`}
-            hint={loadingAssignments ? "carregando" : inProgress.length ? "em andamento" : `${completed.length} concluídas`}
-            icon={<CheckCircle2 className="h-5 w-5" />}
-            to={inProgress.length ? "/app" : "/tracks"}
-          />
+          {isCollaborator ? (
+            <>
+              <StatPill
+                label="OKRs — tarefas abertas"
+                value={`${myOpenTasks.length}`}
+                hint="na sua semana"
+                icon={<Target className="h-5 w-5" />}
+                to="/okr/hoje"
+              />
+              <StatPill
+                label="Sinaxys Points"
+                value={formatPts(myPoints)}
+                hint={myRank ? `posição #${myRank} (Top 50)` : "entre no ranking"}
+                icon={<Trophy className="h-5 w-5" />}
+                to="/rankings"
+              />
+              <StatPill
+                label="Trilhas"
+                value={loadingAssignments ? "…" : `${inProgress.length}`}
+                hint={loadingAssignments ? "carregando" : inProgress.length ? "em andamento" : `${completed.length} concluídas`}
+                icon={<CheckCircle2 className="h-5 w-5" />}
+                to={inProgress.length ? "/app" : "/tracks"}
+              />
+            </>
+          ) : (
+            <>
+              <StatPill
+                label={isAdmin ? "Empresa — tarefas abertas" : "Time — tarefas abertas"}
+                value={`${scopeOpenTasks.length}`}
+                hint={`janela ${weekFrom.split("-").reverse().join("/")} → ${weekTo.split("-").reverse().join("/")}`}
+                icon={<Target className="h-5 w-5" />}
+                to="/okr/hoje"
+              />
+              <StatPill
+                label="Em risco (atrasadas)"
+                value={`${scopeOverdueTasks.length}`}
+                hint="priorize estas primeiro"
+                icon={<MapPinned className="h-5 w-5" />}
+                to="/okr/hoje"
+              />
+              <StatPill
+                label="Objetivos do trimestre"
+                value={activeQuarter ? `${scopedObjectives.length}` : "—"}
+                hint={
+                  activeQuarter
+                    ? isAdmin
+                      ? `Empresa: COMPANY ${objectivesByLevel.get("COMPANY") ?? 0} • DEPT ${objectivesByLevel.get("DEPARTMENT") ?? 0}`
+                      : `Seu depto: ${scopedObjectives.length}`
+                    : "Nenhum ciclo trimestral ativo"
+                }
+                icon={<CheckCircle2 className="h-5 w-5" />}
+                to="/okr/ciclos"
+              />
+            </>
+          )}
         </div>
 
         {next ? (
@@ -264,31 +408,31 @@ export default function AppDashboard() {
         <div className="mt-4 grid gap-6 md:grid-cols-2">
           <ShortcutCard
             title="OKRs"
-            desc="Prioridades do dia, mapa estratégico e ciclos do trimestre."
+            desc={isAdmin ? "Saúde do trimestre: objetivos, KRs, entregáveis e tarefas." : isHead ? "OKRs do seu departamento e execução do time." : "Suas prioridades do dia e da semana."}
             icon={<MapPinned className="h-5 w-5" />}
-            to="/okr"
+            to={isCollaborator ? "/okr/hoje" : "/okr/ciclos"}
             badge="execução"
             img="/placeholder.svg"
           />
           <ShortcutCard
             title="Trilhas"
-            desc="Aprendizado em sequência: onboarding, trilhas estratégicas e módulos."
+            desc={isHead ? "Acompanhe trilhas do time e delegações." : "Aprendizado em sequência: onboarding e trilhas estratégicas."}
             icon={<BookOpen className="h-5 w-5" />}
-            to="/tracks"
+            to={isHead ? "/head/tracks" : "/tracks"}
             badge="evolução"
             img="/placeholder.svg"
           />
           <ShortcutCard
             title="Sinaxys Points"
-            desc="Ranking, tiers e recompensas. Veja sua evolução na empresa."
+            desc={isAdmin ? "Engajamento e regras de pontuação." : "Ranking, tiers e recompensas."}
             icon={<Sparkles className="h-5 w-5" />}
-            to="/rankings"
+            to={isAdmin ? "/rankings?tab=rules" : "/rankings"}
             badge="reconhecimento"
             img="/placeholder.svg"
           />
           <ShortcutCard
-            title="Empresa"
-            desc="Organograma e contexto da sua organização."
+            title={isAdmin ? "Empresa" : isHead ? "Time" : "Empresa"}
+            desc={isHead ? "Organograma e pessoas do seu contexto." : "Organograma e contexto da sua organização."}
             icon={<Network className="h-5 w-5" />}
             to="/org"
             badge="contexto"
@@ -297,7 +441,31 @@ export default function AppDashboard() {
         </div>
       </div>
 
-      {isAdminish ? (
+      {isHead || isAdmin ? (
+        <RiskList
+          title={isAdmin ? "Execução crítica (empresa)" : "Execução crítica (time)"}
+          subtitle={isAdmin ? "Tarefas atrasadas nesta semana — priorize e reatribua." : "Tarefas atrasadas do seu depto — destrave o time."}
+          tasks={scopeOverdueTasks}
+          to="/okr/hoje"
+        />
+      ) : (
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Seus certificados</div>
+              <p className="mt-1 text-sm text-muted-foreground">O histórico do que você concluiu (e o que vale mostrar).</p>
+            </div>
+            <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
+              <Link to="/app/certificates">
+                Abrir certificados
+                <Award className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {(isAdmin || isHead) ? (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -312,7 +480,7 @@ export default function AppDashboard() {
           <Separator className="my-5" />
 
           <div className="grid gap-4 md:grid-cols-3">
-            {user.role === "ADMIN" ? (
+            {isAdmin ? (
               <>
                 <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
                   <Link to="/admin/users">
@@ -372,22 +540,7 @@ export default function AppDashboard() {
             </Button>
           </div>
         </Card>
-      ) : (
-        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Seus certificados</div>
-              <p className="mt-1 text-sm text-muted-foreground">O histórico do que você concluiu (e o que vale mostrar).</p>
-            </div>
-            <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-              <Link to="/app/certificates">
-                Abrir certificados
-                <Award className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </Card>
-      )}
+      ) : null}
     </div>
   );
 }

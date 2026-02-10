@@ -590,3 +590,31 @@ export function krProgressPct(kr: Pick<DbOkrKeyResult, "kind" | "start_value" | 
   const clamped = Math.max(0, Math.min(100, pct));
   return Math.round(clamped);
 }
+
+export type DbTaskWithContext = DbTask & {
+  objective_id: string;
+  objective_title: string;
+  objective_level: ObjectiveLevel;
+  department_id: string | null;
+};
+
+export async function listTasksForCompany(companyId: string, opts?: { from?: string; to?: string }) {
+  const { data, error } = await supabase.rpc("okr_tasks_for_company", {
+    p_company_id: companyId,
+    p_from: opts?.from ?? null,
+    p_to: opts?.to ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as unknown as DbTaskWithContext[];
+}
+
+export async function listTasksForDepartment(companyId: string, departmentId: string, opts?: { from?: string; to?: string }) {
+  const { data, error } = await supabase.rpc("okr_tasks_for_department", {
+    p_company_id: companyId,
+    p_department_id: departmentId,
+    p_from: opts?.from ?? null,
+    p_to: opts?.to ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as unknown as DbTaskWithContext[];
+}
