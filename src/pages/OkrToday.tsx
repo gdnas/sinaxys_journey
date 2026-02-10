@@ -58,7 +58,10 @@ export default function OkrToday() {
   const { user } = useAuth();
   const { companyId } = useCompany();
 
-  if (!user || !companyId) return null;
+  if (!user) return null;
+
+  const cid = companyId ?? "";
+  const hasCompany = !!companyId;
 
   const today = new Date();
   const todayIso = format(today, "yyyy-MM-dd");
@@ -66,8 +69,9 @@ export default function OkrToday() {
   const weekTo = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ["okr-my-tasks", companyId, user.id, weekFrom, weekTo],
-    queryFn: () => listTasksForUser(companyId, user.id, { from: weekFrom, to: weekTo }),
+    queryKey: ["okr-my-tasks", cid, user.id, weekFrom, weekTo],
+    enabled: hasCompany,
+    queryFn: () => listTasksForUser(cid, user.id, { from: weekFrom, to: weekTo }),
   });
 
   const groups = useMemo(() => {
@@ -95,7 +99,7 @@ export default function OkrToday() {
     try {
       const next = t.status === "DONE" ? "TODO" : "DONE";
       await updateTask(t.id, { status: next });
-      await qc.invalidateQueries({ queryKey: ["okr-my-tasks", companyId, user.id, weekFrom, weekTo] });
+      await qc.invalidateQueries({ queryKey: ["okr-my-tasks", cid, user.id, weekFrom, weekTo] });
     } catch (e) {
       toast({
         title: "Não foi possível atualizar",
@@ -106,6 +110,17 @@ export default function OkrToday() {
   };
 
   const totalOpen = groups.overdue.length + groups.todayList.length + groups.week.length;
+
+  if (!hasCompany) {
+    return (
+      <div className="grid gap-6">
+        <OkrPageHeader title="Rotina diária" subtitle="Carregando contexto da empresa…" icon={<ListChecks className="h-5 w-5" />} />
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">

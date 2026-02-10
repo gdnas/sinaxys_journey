@@ -24,29 +24,49 @@ export default function OkrHome() {
   const { user } = useAuth();
   const { companyId } = useCompany();
 
-  if (!user || !companyId) return null;
+  if (!user) return null;
+
+  const cid = companyId ?? "";
+  const hasCompany = !!companyId;
 
   const { data: fundamentals } = useQuery({
-    queryKey: ["okr-fundamentals", companyId],
-    queryFn: () => getCompanyFundamentals(companyId),
+    queryKey: ["okr-fundamentals", cid],
+    enabled: hasCompany,
+    queryFn: () => getCompanyFundamentals(cid),
   });
 
   const { data: cycles = [] } = useQuery({
-    queryKey: ["okr-cycles", companyId],
-    queryFn: () => listOkrCycles(companyId),
+    queryKey: ["okr-cycles", cid],
+    enabled: hasCompany,
+    queryFn: () => listOkrCycles(cid),
   });
 
   const activeQuarter = cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE") ?? null;
 
   const { data: activeObjectives = [] } = useQuery({
-    queryKey: ["okr-objectives", companyId, activeQuarter?.id],
-    enabled: !!activeQuarter?.id,
-    queryFn: () => listOkrObjectives(companyId, String(activeQuarter?.id)),
+    queryKey: ["okr-objectives", cid, activeQuarter?.id],
+    enabled: hasCompany && !!activeQuarter?.id,
+    queryFn: () => listOkrObjectives(cid, String(activeQuarter?.id)),
   });
 
   const hasFundamentals =
     !!fundamentals &&
     [fundamentals.purpose, fundamentals.vision, fundamentals.mission, fundamentals.strategic_north].some((t) => !!t?.trim());
+
+  if (!hasCompany) {
+    return (
+      <div className="grid gap-6">
+        <OkrPageHeader
+          title="OKRs — Sinaxys"
+          subtitle="Carregando contexto da empresa…"
+          icon={<Target className="h-5 w-5" />}
+        />
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">

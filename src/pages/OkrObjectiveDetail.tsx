@@ -46,7 +46,10 @@ export default function OkrObjectiveDetail() {
   const { user } = useAuth();
   const { companyId } = useCompany();
 
-  if (!objectiveId || !user || !companyId) return null;
+  if (!objectiveId || !user) return null;
+
+  const cid = companyId ?? "";
+  const hasCompany = !!companyId;
 
   const { data: objective, isLoading: loadingObjective } = useQuery({
     queryKey: ["okr-objective", objectiveId],
@@ -55,7 +58,6 @@ export default function OkrObjectiveDetail() {
 
   const { data: krs = [] } = useQuery({
     queryKey: ["okr-krs", objectiveId],
-    enabled: !!objectiveId,
     queryFn: () => listKeyResults(objectiveId),
   });
 
@@ -76,8 +78,9 @@ export default function OkrObjectiveDetail() {
   });
 
   const { data: profiles = [] } = useQuery({
-    queryKey: ["profiles", companyId],
-    queryFn: () => listProfilesByCompany(companyId),
+    queryKey: ["profiles", cid],
+    enabled: hasCompany,
+    queryFn: () => listProfilesByCompany(cid),
   });
 
   const byUserId = useMemo(() => {
@@ -106,7 +109,8 @@ export default function OkrObjectiveDetail() {
     return m;
   }, [tasks]);
 
-  const canWrite = !!objective && (user.id === objective.owner_user_id || user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN");
+  const canWrite =
+    !!objective && (user.id === objective.owner_user_id || user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN");
 
   const [delOpen, setDelOpen] = useState(false);
   const [delKrId, setDelKrId] = useState<string | null>(null);
@@ -153,6 +157,29 @@ export default function OkrObjectiveDetail() {
       });
     }
   };
+
+  if (!hasCompany) {
+    return (
+      <div className="grid gap-6">
+        <OkrPageHeader
+          title="Objetivo"
+          subtitle="Carregando contexto da empresa…"
+          icon={<Target className="h-5 w-5" />}
+          actions={
+            <Button asChild variant="outline" className="h-11 rounded-xl">
+              <Link to="/okr/ciclos">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Voltar
+              </Link>
+            </Button>
+          }
+        />
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">
@@ -475,12 +502,7 @@ function KrCard({
         </div>
 
         {canWrite ? (
-          <Button
-            variant="outline"
-            className="h-11 rounded-xl"
-            onClick={onAddDeliverable}
-            title="Criar entregável (Tier I/II)"
-          >
+          <Button variant="outline" className="h-11 rounded-xl" onClick={onAddDeliverable} title="Criar entregável (Tier I/II)">
             <Plus className="mr-2 h-4 w-4" />
             Entregável
           </Button>
@@ -539,9 +561,7 @@ function KrCard({
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
-                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                            {statusLabel(t.status)}
-                          </Badge>
+                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{statusLabel(t.status)}</Badge>
                         </div>
                         <div className="mt-1 text-xs text-muted-foreground">Resp.: {byUserId.get(t.owner_user_id) ?? "—"}</div>
                       </div>

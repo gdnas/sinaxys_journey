@@ -33,13 +33,17 @@ export default function OkrFundamentals() {
   const { user } = useAuth();
   const { companyId } = useCompany();
 
-  const canEdit = !!user && (user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN");
+  if (!user) return null;
 
-  if (!user || !companyId) return null;
+  const cid = companyId ?? "";
+  const hasCompany = !!companyId;
+
+  const canEdit = user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN";
 
   const { data: fundamentals, isLoading } = useQuery({
-    queryKey: ["okr-fundamentals", companyId],
-    queryFn: () => getCompanyFundamentals(companyId),
+    queryKey: ["okr-fundamentals", cid],
+    enabled: hasCompany,
+    queryFn: () => getCompanyFundamentals(cid),
   });
 
   const [open, setOpen] = useState(false);
@@ -76,6 +80,21 @@ export default function OkrFundamentals() {
     [fundamentals.mission, fundamentals.vision, fundamentals.purpose, fundamentals.values, fundamentals.culture, fundamentals.strategic_north].some(
       (t) => !!t?.trim(),
     );
+
+  if (!hasCompany) {
+    return (
+      <div className="grid gap-6">
+        <OkrPageHeader
+          title="Fundamentos da empresa"
+          subtitle="Carregando contexto da empresa…"
+          icon={<BookOpenText className="h-5 w-5" />}
+        />
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">
@@ -215,7 +234,7 @@ export default function OkrFundamentals() {
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
               onClick={async () => {
                 try {
-                  await upsertCompanyFundamentals(companyId, {
+                  await upsertCompanyFundamentals(cid, {
                     mission,
                     vision,
                     purpose,
@@ -223,7 +242,7 @@ export default function OkrFundamentals() {
                     culture,
                     strategic_north: north,
                   });
-                  await qc.invalidateQueries({ queryKey: ["okr-fundamentals", companyId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-fundamentals", cid] });
                   toast({ title: "Fundamentos salvos" });
                   setOpen(false);
                 } catch (e) {

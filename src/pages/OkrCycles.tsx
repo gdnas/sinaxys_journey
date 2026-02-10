@@ -54,18 +54,23 @@ export default function OkrCycles() {
   const { user } = useAuth();
   const { companyId } = useCompany();
 
-  if (!user || !companyId) return null;
+  if (!user) return null;
+
+  const cid = companyId ?? "";
+  const hasCompany = !!companyId;
 
   const canEdit = user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN";
 
   const { data: fundamentals } = useQuery({
-    queryKey: ["okr-fundamentals", companyId],
-    queryFn: () => getCompanyFundamentals(companyId),
+    queryKey: ["okr-fundamentals", cid],
+    enabled: hasCompany,
+    queryFn: () => getCompanyFundamentals(cid),
   });
 
   const { data: cycles = [] } = useQuery({
-    queryKey: ["okr-cycles", companyId],
-    queryFn: () => listOkrCycles(companyId),
+    queryKey: ["okr-cycles", cid],
+    enabled: hasCompany,
+    queryFn: () => listOkrCycles(cid),
   });
 
   const defaultCycleId = cycles.find((c) => c.status === "ACTIVE" && c.type === "QUARTERLY")?.id ?? cycles[0]?.id ?? null;
@@ -82,19 +87,21 @@ export default function OkrCycles() {
   const selected = cycles.find((c) => c.id === cycleId) ?? null;
 
   const { data: objectives = [] } = useQuery({
-    queryKey: ["okr-objectives", companyId, cycleId],
-    enabled: !!cycleId,
-    queryFn: () => listOkrObjectives(companyId, String(cycleId)),
+    queryKey: ["okr-objectives", cid, cycleId],
+    enabled: hasCompany && !!cycleId,
+    queryFn: () => listOkrObjectives(cid, String(cycleId)),
   });
 
   const { data: departments = [] } = useQuery({
-    queryKey: ["departments", companyId],
-    queryFn: () => listDepartments(companyId),
+    queryKey: ["departments", cid],
+    enabled: hasCompany,
+    queryFn: () => listDepartments(cid),
   });
 
   const { data: profiles = [] } = useQuery({
-    queryKey: ["profiles", companyId],
-    queryFn: () => listProfilesByCompany(companyId),
+    queryKey: ["profiles", cid],
+    enabled: hasCompany,
+    queryFn: () => listProfilesByCompany(cid),
   });
 
   const byUserId = useMemo(() => {
@@ -161,8 +168,8 @@ export default function OkrCycles() {
   };
 
   const { data: krCounts = new Map<string, number>() } = useQuery({
-    queryKey: ["okr-kr-counts", companyId, cycleId, objectives.map((o) => o.id).join(",")],
-    enabled: !!cycleId && objectives.length > 0,
+    queryKey: ["okr-kr-counts", cid, cycleId, objectives.map((o) => o.id).join(",")],
+    enabled: hasCompany && !!cycleId && objectives.length > 0,
     queryFn: async () => {
       const m = new Map<string, number>();
       await Promise.all(
@@ -174,6 +181,21 @@ export default function OkrCycles() {
       return m;
     },
   });
+
+  if (!hasCompany) {
+    return (
+      <div className="grid gap-6">
+        <OkrPageHeader
+          title="Ciclos & OKRs"
+          subtitle="Carregando contexto da empresa…"
+          icon={<Target className="h-5 w-5" />}
+        />
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">
@@ -404,7 +426,7 @@ export default function OkrCycles() {
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
               onClick={async () => {
                 try {
-                  const c = await createOkrCycle(companyId, {
+                  const c = await createOkrCycle(cid, {
                     type: cycleType,
                     year: cycleYear,
                     quarter: cycleType === "QUARTERLY" ? cycleQuarter : null,
@@ -413,7 +435,7 @@ export default function OkrCycles() {
                     status: cycleStatus,
                     name: cycleName.trim() || null,
                   });
-                  await qc.invalidateQueries({ queryKey: ["okr-cycles", companyId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
                   setCycleId(c.id);
                   toast({ title: "Ciclo criado" });
                   setCycleOpen(false);
@@ -576,7 +598,7 @@ export default function OkrCycles() {
                 if (!selected) return;
                 try {
                   await createOkrObjective({
-                    company_id: companyId,
+                    company_id: cid,
                     cycle_id: selected.id,
                     parent_objective_id: objParent,
                     level: objLevel,
@@ -590,7 +612,7 @@ export default function OkrCycles() {
                     due_at: null,
                   });
 
-                  await qc.invalidateQueries({ queryKey: ["okr-objectives", companyId, cycleId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, cycleId] });
                   toast({ title: "Objetivo criado" });
                   setObjOpen(false);
                 } catch (e) {
@@ -694,7 +716,7 @@ export default function OkrCycles() {
                     confidence: krConfidence,
                   });
 
-                  await qc.invalidateQueries({ queryKey: ["okr-kr-counts", companyId, cycleId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-kr-counts", cid, cycleId] });
                   toast({ title: "KR criado" });
                   setKrOpen(false);
                 } catch (e) {

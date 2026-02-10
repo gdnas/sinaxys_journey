@@ -38,31 +38,37 @@ export default function OkrMap() {
   const { user } = useAuth();
   const { companyId } = useCompany();
 
-  if (!user || !companyId) return null;
+  if (!user) return null;
+
+  const cid = companyId ?? "";
+  const hasCompany = !!companyId;
 
   const canEdit = user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN";
 
   const { data: fundamentals } = useQuery({
-    queryKey: ["okr-fundamentals", companyId],
-    queryFn: () => getCompanyFundamentals(companyId),
+    queryKey: ["okr-fundamentals", cid],
+    enabled: hasCompany,
+    queryFn: () => getCompanyFundamentals(cid),
   });
 
   const { data: strategy = [] } = useQuery({
-    queryKey: ["okr-strategy", companyId],
-    queryFn: () => listStrategyObjectives(companyId),
+    queryKey: ["okr-strategy", cid],
+    enabled: hasCompany,
+    queryFn: () => listStrategyObjectives(cid),
   });
 
   const { data: cycles = [] } = useQuery({
-    queryKey: ["okr-cycles", companyId],
-    queryFn: () => listOkrCycles(companyId),
+    queryKey: ["okr-cycles", cid],
+    enabled: hasCompany,
+    queryFn: () => listOkrCycles(cid),
   });
 
   const activeQuarter = cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE") ?? null;
 
   const { data: quarterObjectives = [] } = useQuery({
-    queryKey: ["okr-quarter-objectives", companyId, activeQuarter?.id],
-    enabled: !!activeQuarter?.id,
-    queryFn: () => listOkrObjectives(companyId, String(activeQuarter?.id)),
+    queryKey: ["okr-quarter-objectives", cid, activeQuarter?.id],
+    enabled: hasCompany && !!activeQuarter?.id,
+    queryFn: () => listOkrObjectives(cid, String(activeQuarter?.id)),
   });
 
   const groupedStrategy = useMemo(() => {
@@ -83,6 +89,21 @@ export default function OkrMap() {
     setTitle("");
     setDescription("");
   };
+
+  if (!hasCompany) {
+    return (
+      <div className="grid gap-6">
+        <OkrPageHeader
+          title="Mapa Estratégico Sinaxys"
+          subtitle="Carregando contexto da empresa…"
+          icon={<MapPinned className="h-5 w-5" />}
+        />
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">
@@ -220,7 +241,7 @@ export default function OkrMap() {
           </div>
         ) : (
           <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-            Nenhum ciclo trimestral ativo. Crie um em “Ciclos & OKRs”.
+            Nenhum ciclo trimestral ativo. Crie um em "Ciclos & OKRs".
           </div>
         )}
       </Card>
@@ -285,13 +306,13 @@ export default function OkrMap() {
               onClick={async () => {
                 try {
                   await createStrategyObjective({
-                    company_id: companyId,
+                    company_id: cid,
                     horizon_years: horizon,
                     title,
                     description,
                     created_by_user_id: user.id,
                   });
-                  await qc.invalidateQueries({ queryKey: ["okr-strategy", companyId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
                   toast({ title: "Objetivo criado" });
                   setOpen(false);
                 } catch (e) {

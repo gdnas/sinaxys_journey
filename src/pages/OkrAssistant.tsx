@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Check, Sparkles, Target } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -17,6 +17,7 @@ import {
   createDeliverable,
   createKeyResult,
   createOkrObjective,
+  createTask,
   getCompanyFundamentals,
   listOkrCycles,
   listOkrObjectives,
@@ -25,7 +26,6 @@ import {
   type DeliverableTier,
   type ObjectiveLevel,
 } from "@/lib/okrDb";
-import { createTask } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 
 function looksLikeVerbPt(text: string) {
@@ -48,27 +48,38 @@ export default function OkrAssistant() {
   const { user } = useAuth();
   const { companyId } = useCompany();
 
-  if (!user || !companyId) return null;
+  if (!user) return null;
+
+  const cid = companyId ?? "";
+  const hasCompany = !!companyId;
 
   const { data: fundamentals } = useQuery({
-    queryKey: ["okr-fundamentals", companyId],
-    queryFn: () => getCompanyFundamentals(companyId),
+    queryKey: ["okr-fundamentals", cid],
+    enabled: hasCompany,
+    queryFn: () => getCompanyFundamentals(cid),
   });
 
   const { data: cycles = [] } = useQuery({
-    queryKey: ["okr-cycles", companyId],
-    queryFn: () => listOkrCycles(companyId),
+    queryKey: ["okr-cycles", cid],
+    enabled: hasCompany,
+    queryFn: () => listOkrCycles(cid),
   });
 
   const activeQuarterId = cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE")?.id ?? null;
 
-  const [cycleId, setCycleId] = useState<string>(activeQuarterId ?? "");
+  const [cycleId, setCycleId] = useState<string>("");
+  useEffect(() => {
+    if (cycleId) return;
+    if (!activeQuarterId) return;
+    setCycleId(activeQuarterId);
+  }, [activeQuarterId, cycleId]);
+
   const [level, setLevel] = useState<ObjectiveLevel>("INDIVIDUAL");
 
   const { data: cycleObjectives = [] } = useQuery({
-    queryKey: ["okr-objectives", companyId, cycleId],
-    enabled: !!cycleId,
-    queryFn: () => listOkrObjectives(companyId, cycleId),
+    queryKey: ["okr-objectives", cid, cycleId],
+    enabled: hasCompany && !!cycleId,
+    queryFn: () => listOkrObjectives(cid, cycleId),
   });
 
   const companyObjectives = useMemo(() => cycleObjectives.filter((o) => o.level === "COMPANY"), [cycleObjectives]);
@@ -115,6 +126,7 @@ export default function OkrAssistant() {
   }, [krTitle, krStart, krTarget]);
 
   const canSubmit =
+    hasCompany &&
     !!cycleId &&
     objectiveQuality.ok &&
     !!fund &&
@@ -122,6 +134,21 @@ export default function OkrAssistant() {
     krQuality.ok &&
     deliverableTitle.trim().length >= 4 &&
     tasks.length >= 1;
+
+  if (!hasCompany) {
+    return (
+      <div className="grid gap-6">
+        <OkrPageHeader
+          title="Assistente de criação de OKRs"
+          subtitle="Carregando contexto da empresa…"
+          icon={<Sparkles className="h-5 w-5" />}
+        />
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-6">
@@ -275,7 +302,12 @@ export default function OkrAssistant() {
 
             <div className="grid gap-2">
               <Label>KR</Label>
-              <Input className="h-11 rounded-xl" value={krTitle} onChange={(e) => setKrTitle(e.target.value)} placeholder="Ex.: Reduzir lead time médio de 12 para 7 dias" />
+              <Input
+                className="h-11 rounded-xl"
+                value={krTitle}
+                onChange={(e) => setKrTitle(e.target.value)}
+                placeholder="Ex.: Reduzir lead time médio de 12 para 7 dias"
+              />
               <div className={`text-xs ${krQuality.ok ? "text-[color:var(--sinaxys-ink)]" : "text-muted-foreground"}`}>{krQuality.msg}</div>
             </div>
 
@@ -341,7 +373,12 @@ export default function OkrAssistant() {
 
               <div className="grid gap-2">
                 <Label>Entregável</Label>
-                <Input className="h-11 rounded-xl" value={deliverableTitle} onChange={(e) => setDeliverableTitle(e.target.value)} placeholder="Ex.: Checklist de QA do onboarding" />
+                <Input
+                  className="h-11 rounded-xl"
+                  value={deliverableTitle}
+                  onChange={(e) => setDeliverableTitle(e.target.value)}
+                  placeholder="Ex.: Checklist de QA do onboarding"
+                />
               </div>
 
               <div className="grid gap-2">
@@ -354,7 +391,12 @@ export default function OkrAssistant() {
                 <p className="mt-1 text-sm text-muted-foreground">Inclua pelo menos 1 tarefa para sair com execução pronta.</p>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-[1fr_180px_auto]">
-                  <Input className="h-11 rounded-xl" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Ex.: Mapear etapas do fluxo" />
+                  <Input
+                    className="h-11 rounded-xl"
+                    value={taskTitle}
+                    onChange={(e) => setTaskTitle(e.target.value)}
+                    placeholder="Ex.: Mapear etapas do fluxo"
+                  />
                   <Input className="h-11 rounded-xl" type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} />
                   <Button
                     type="button"
@@ -411,7 +453,7 @@ export default function OkrAssistant() {
                     const target = Number(String(krTarget).replace(",", "."));
 
                     const obj = await createOkrObjective({
-                      company_id: companyId,
+                      company_id: cid,
                       cycle_id: cycleId,
                       parent_objective_id: parentId || null,
                       level,
