@@ -1,4 +1,4 @@
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Building2,
@@ -22,33 +22,49 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 
-type NavItem = {
+type Role = "MASTERADMIN" | "ADMIN" | "HEAD" | "COLABORADOR";
+
+type NavLinkItem = {
+  type: "link";
   to: string;
   label: string;
   icon: React.ReactNode;
-  roles: ("MASTERADMIN" | "ADMIN" | "HEAD" | "COLABORADOR")[];
+  roles: Role[];
 };
+
+type NavGroupItem = {
+  type: "group";
+  label: string;
+  icon: React.ReactNode;
+  children: NavLinkItem[];
+};
+
+type NavItem = NavLinkItem | NavGroupItem;
 
 const nav: NavItem[] = [
   // Master admin
   {
+    type: "link",
     to: "/master/overview",
     label: "Visão geral",
     icon: <BarChart3 className="h-4 w-4" />,
     roles: ["MASTERADMIN"],
   },
   {
+    type: "link",
     to: "/master/companies",
     label: "Empresas",
     icon: <Building2 className="h-4 w-4" />,
     roles: ["MASTERADMIN"],
   },
   {
+    type: "link",
     to: "/master/users",
     label: "Usuários",
     icon: <Shield className="h-4 w-4" />,
@@ -57,26 +73,39 @@ const nav: NavItem[] = [
 
   // Jornada
   {
+    type: "link",
     to: "/app",
     label: "Minha jornada",
     icon: <LayoutDashboard className="h-4 w-4" />,
     roles: ["COLABORADOR", "HEAD", "ADMIN"],
   },
+
+  // Sinaxys Points
   {
-    to: "/app/certificates",
-    label: "Certificados",
-    icon: <Award className="h-4 w-4" />,
-    roles: ["COLABORADOR", "HEAD", "ADMIN"],
-  },
-  {
-    to: "/rankings",
+    type: "group",
     label: "Sinaxys Points",
     icon: <Trophy className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR", "MASTERADMIN"],
+    children: [
+      {
+        type: "link",
+        to: "/rankings",
+        label: "Ranking",
+        icon: <Trophy className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR", "MASTERADMIN"],
+      },
+      {
+        type: "link",
+        to: "/app/certificates",
+        label: "Certificados",
+        icon: <Award className="h-4 w-4" />,
+        roles: ["COLABORADOR", "HEAD", "ADMIN"],
+      },
+    ],
   },
 
   // OKRs
   {
+    type: "link",
     to: "/okr",
     label: "OKRs",
     icon: <Target className="h-4 w-4" />,
@@ -85,74 +114,115 @@ const nav: NavItem[] = [
 
   // Empresa
   {
-    to: "/org",
-    label: "Organograma",
-    icon: <Network className="h-4 w-4" />,
-    roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+    type: "group",
+    label: "Empresa",
+    icon: <Building2 className="h-4 w-4" />,
+    children: [
+      {
+        type: "link",
+        to: "/org",
+        label: "Organograma",
+        icon: <Network className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+      },
+      {
+        type: "link",
+        to: "/admin/departments",
+        label: "Departamentos",
+        icon: <Layers className="h-4 w-4" />,
+        roles: ["ADMIN"],
+      },
+      {
+        type: "link",
+        to: "/admin/brand",
+        label: "Marca",
+        icon: <Palette className="h-4 w-4" />,
+        roles: ["ADMIN"],
+      },
+    ],
   },
+
+  // Trilhas
   {
-    to: "/tracks",
+    type: "group",
     label: "Trilhas",
     icon: <GraduationCap className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR"],
+    children: [
+      {
+        type: "link",
+        to: "/tracks",
+        label: "Trilhas",
+        icon: <GraduationCap className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+      },
+      {
+        type: "link",
+        to: "/admin/tracks",
+        label: "Montar trilhas",
+        icon: <GraduationCap className="h-4 w-4" />,
+        roles: ["ADMIN"],
+      },
+      {
+        type: "link",
+        to: "/head/tracks",
+        label: "Head — Trilhas",
+        icon: <GraduationCap className="h-4 w-4" />,
+        roles: ["HEAD"],
+      },
+    ],
   },
+
+  // Usuários (admin)
   {
-    to: "/head/tracks",
-    label: "Head — Trilhas",
-    icon: <GraduationCap className="h-4 w-4" />,
-    roles: ["HEAD"],
+    type: "group",
+    label: "Usuários",
+    icon: <Shield className="h-4 w-4" />,
+    children: [
+      {
+        type: "link",
+        to: "/admin/users",
+        label: "Usuários",
+        icon: <Shield className="h-4 w-4" />,
+        roles: ["ADMIN", "MASTERADMIN"],
+      },
+      {
+        type: "link",
+        to: "/admin/import",
+        label: "Importar usuários",
+        icon: <UploadCloud className="h-4 w-4" />,
+        roles: ["ADMIN"],
+      },
+    ],
   },
+
+  // Head
   {
+    type: "link",
     to: "/head/users",
     label: "Head — Usuários",
     icon: <Shield className="h-4 w-4" />,
     roles: ["HEAD"],
   },
   {
+    type: "link",
     to: "/head/costs",
     label: "Head — Custos",
     icon: <Wallet className="h-4 w-4" />,
     roles: ["HEAD"],
   },
 
-  // Admin
+  // Custos (admin)
   {
-    to: "/admin/users",
-    label: "Usuários",
-    icon: <Shield className="h-4 w-4" />,
-    roles: ["ADMIN"],
-  },
-  {
-    to: "/admin/import",
-    label: "Importar usuários",
-    icon: <UploadCloud className="h-4 w-4" />,
-    roles: ["ADMIN"],
-  },
-  {
+    type: "link",
     to: "/admin/costs",
     label: "Custos",
     icon: <Wallet className="h-4 w-4" />,
     roles: ["ADMIN"],
   },
+
+  // Minha área
   {
-    to: "/admin/tracks",
-    label: "Montar trilhas",
-    icon: <GraduationCap className="h-4 w-4" />,
-    roles: ["ADMIN"],
-  },
-  {
-    to: "/admin/departments",
-    label: "Departamentos",
-    icon: <Layers className="h-4 w-4" />,
-    roles: ["ADMIN"],
-  },
-  {
-    to: "/admin/brand",
-    label: "Empresa & marca",
-    icon: <Palette className="h-4 w-4" />,
-    roles: ["ADMIN"],
-  },
-  {
+    type: "link",
     to: "/profile",
     label: "Minha área",
     icon: <UserIcon className="h-4 w-4" />,
@@ -160,25 +230,81 @@ const nav: NavItem[] = [
   },
 ];
 
+function isLinkActive(pathname: string, to: string) {
+  if (to === "/") return pathname === "/";
+  return pathname === to || pathname.startsWith(to + "/");
+}
+
 function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
+  const { pathname } = useLocation();
+
+  const groups = items.filter((i): i is NavGroupItem => i.type === "group");
+  const defaultOpen = groups
+    .filter((g) => g.children.some((c) => isLinkActive(pathname, c.to)))
+    .map((g) => g.label);
+
   return (
     <nav className="flex flex-col gap-1">
-      {items.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          onClick={onNavigate}
-          className={({ isActive }) =>
-            cn(
-              "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition",
-              isActive ? "bg-[color:var(--sinaxys-tint)]" : "hover:bg-[color:var(--sinaxys-tint)]/70",
-            )
+      <Accordion type="multiple" defaultValue={defaultOpen} className="grid gap-1">
+        {items.map((item) => {
+          if (item.type === "link") {
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  cn(
+                    "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition",
+                    isActive ? "bg-[color:var(--sinaxys-tint)]" : "hover:bg-[color:var(--sinaxys-tint)]/70",
+                  )
+                }
+              >
+                <span className="text-[color:var(--sinaxys-primary)]">{item.icon}</span>
+                {item.label}
+              </NavLink>
+            );
           }
-        >
-          <span className="text-[color:var(--sinaxys-primary)]">{item.icon}</span>
-          {item.label}
-        </NavLink>
-      ))}
+
+          return (
+            <AccordionItem key={item.label} value={item.label} className="border-0">
+              <AccordionTrigger
+                className={cn(
+                  "rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] hover:no-underline",
+                  item.children.some((c) => isLinkActive(pathname, c.to))
+                    ? "bg-[color:var(--sinaxys-tint)]"
+                    : "hover:bg-[color:var(--sinaxys-tint)]/70",
+                )}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <span className="text-[color:var(--sinaxys-primary)]">{item.icon}</span>
+                  {item.label}
+                </span>
+              </AccordionTrigger>
+              <AccordionContent className="pb-1 pt-1">
+                <div className="grid gap-1">
+                  {item.children.map((child) => (
+                    <NavLink
+                      key={child.to}
+                      to={child.to}
+                      onClick={onNavigate}
+                      className={({ isActive }) =>
+                        cn(
+                          "ml-6 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition",
+                          isActive ? "bg-[color:var(--sinaxys-tint)]" : "hover:bg-[color:var(--sinaxys-tint)]/70",
+                        )
+                      }
+                    >
+                      <span className="text-[color:var(--sinaxys-primary)]">{child.icon}</span>
+                      {child.label}
+                    </NavLink>
+                  ))}
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
     </nav>
   );
 }
@@ -206,7 +332,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!user) return <>{children}</>;
 
-  const visible = nav.filter((n) => n.roles.includes(user.role));
+  const visible = nav
+    .map((item) => {
+      if (item.type === "link") {
+        return item.roles.includes(user.role) ? item : null;
+      }
+
+      const children = item.children.filter((c) => c.roles.includes(user.role));
+      if (!children.length) return null;
+      return { ...item, children };
+    })
+    .filter(Boolean) as NavItem[];
+
   const jobTitleLabel = user.jobTitle?.trim() || "Sem cargo";
 
   return (
