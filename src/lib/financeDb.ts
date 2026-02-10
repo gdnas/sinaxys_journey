@@ -1,8 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export type UserFinancialRecipientType = "PF" | "PJ" | (string & {});
+
 export type UserFinancialProfile = {
   user_id: string;
   company_id: string | null;
+  recipient_type: UserFinancialRecipientType;
   destination_account: string | null;
   pix_key: string | null;
   created_at: string;
@@ -64,6 +67,7 @@ export async function getUserFinancialProfile(userId: string) {
 export async function upsertUserFinancialProfile(params: {
   userId: string;
   companyId: string | null;
+  recipientType: UserFinancialRecipientType;
   destinationAccount: string | null;
   pixKey: string | null;
 }) {
@@ -73,6 +77,7 @@ export async function upsertUserFinancialProfile(params: {
       {
         user_id: params.userId,
         company_id: params.companyId,
+        recipient_type: params.recipientType,
         destination_account: params.destinationAccount,
         pix_key: params.pixKey,
         updated_at: new Date().toISOString(),

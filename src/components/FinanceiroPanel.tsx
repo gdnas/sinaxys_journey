@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useToast } from "@/hooks/use-toast";
 import {
   createInvoiceSignedUrl,
@@ -38,6 +39,7 @@ import {
   upsertUserFinancialProfile,
   uploadInvoiceFile,
   type CompanyFinanceSettings,
+  type UserFinancialRecipientType,
 } from "@/lib/financeDb";
 
 function formatBRL(v: number) {
@@ -125,20 +127,34 @@ export function FinanceiroPanel({
     enabled: !!companyId,
   });
 
+  const [recipientType, setRecipientType] = useState<UserFinancialRecipientType>(myFinance?.recipient_type ?? "PF");
   const [destinationAccount, setDestinationAccount] = useState(myFinance?.destination_account ?? "");
   const [pixKey, setPixKey] = useState(myFinance?.pix_key ?? "");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    setRecipientType((myFinance?.recipient_type ?? "PF") as UserFinancialRecipientType);
     setDestinationAccount(myFinance?.destination_account ?? "");
     setPixKey(myFinance?.pix_key ?? "");
   }, [myFinance?.user_id]);
 
+  const isPJ = String(recipientType).toUpperCase() === "PJ";
+
   const dirtyMy = useMemo(() => {
+    const baseType = (myFinance?.recipient_type ?? "PF") as UserFinancialRecipientType;
     const baseAcc = myFinance?.destination_account ?? "";
     const basePix = myFinance?.pix_key ?? "";
-    return destinationAccount.trim() !== baseAcc || pixKey.trim() !== basePix;
-  }, [destinationAccount, pixKey, myFinance?.destination_account, myFinance?.pix_key]);
+
+    const typeChanged = String(recipientType) !== String(baseType);
+
+    if (isPJ) {
+      // Se mudou pra PJ, limpamos dados PF salvos (não pedir 2x).
+      const needsCleanup = !!baseAcc.trim() || !!basePix.trim();
+      return typeChanged || needsCleanup;
+    }
+
+    return typeChanged || destinationAccount.trim() !== baseAcc || pixKey.trim() !== basePix;
+  }, [recipientType, isPJ, destinationAccount, pixKey, myFinance?.recipient_type, myFinance?.destination_account, myFinance?.pix_key]);
 
   // Dialog: enviar nota
   const [sendOpen, setSendOpen] = useState(false);
@@ -242,9 +258,11 @@ export function FinanceiroPanel({
             <div>
               <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
                 <Landmark className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                Seus dados para recebimento
+                Dados para recebimento
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">Conta de destino e chave Pix para depósitos.</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                {isPJ ? "Recebimento via conta PJ (dados da empresa ao lado)." : "Conta de destino e chave Pix para depósitos."}
+              </div>
             </div>
             <Button
               type="button"
@@ -256,11 +274,12 @@ export function FinanceiroPanel({
                   await upsertUserFinancialProfile({
                     userId,
                     companyId,
-                    destinationAccount: destinationAccount.trim() || null,
-                    pixKey: pixKey.trim() || null,
+                    recipientType,
+                    destinationAccount: isPJ ? null : destinationAccount.trim() || null,
+                    pixKey: isPJ ? null : pixKey.trim() || null,
                   });
                   await qc.invalidateQueries({ queryKey: ["user-financial", userId] });
-                  toast({ title: "Dados de recebimento salvos" });
+                  toast({ title: "Preferência de recebimento salva" });
                 } catch (e) {
                   toast({
                     title: "Não foi possível salvar",
@@ -281,31 +300,75 @@ export function FinanceiroPanel({
 
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label>Conta de destino</Label>
-              <Input
-                className="h-11 rounded-xl"
-                value={destinationAccount}
-                onChange={(e) => setDestinationAccount(e.target.value)}
-                placeholder="Ex.: Banco X • Ag 0001 • Cc 12345-6"
-                disabled={!companyId}
-              />
-              <div className="text-xs text-muted-foreground">Escreva de um jeito fácil de conferir pelo financeiro.</div>
+              <Label>Depósito em</Label>
+              <div className="inline-flex w-fit rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+                <ToggleGroup
+                  type="single"
+                  value={String(recipientType)}
+                  onValueChange={(v) => {
+                    if (!v) return;
+                    setRecipientType(v as UserFinancialRecipientType);
+                  }}
+                  className="gap-1"
+                >
+                  <ToggleGroupItem
+                    value="PF"
+                    className="h-10 rounded-xl border border-transparent bg-transparent px-4 text-sm data-[state=on]:border-[color:var(--sinaxys-border)] data-[state=on]:bg-white data-[state=on]:text-[color:var(--sinaxys-ink)]"
+                  >
+                    Conta PF
+                  </ToggleGroupItem>
+                  <ToggleGroupItem
+                    value="PJ"
+                    className="h-10 rounded-xl border border-transparent bg-transparent px-4 text-sm data-[state=on]:border-[color:var(--sinaxys-border)] data-[state=on]:bg-white data-[state=on]:text-[color:var(--sinaxys-ink)]"
+                  >
+                    Conta PJ
+                  </ToggleGroupItem>
+                </ToggleGroup>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Se for <span className="font-semibold">PJ</span>, usamos os dados da empresa e não pedimos duplicado.
+              </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label>Chave Pix</Label>
-              <Input
-                className="h-11 rounded-xl"
-                value={pixKey}
-                onChange={(e) => setPixKey(e.target.value)}
-                placeholder="Ex.: seuemail@dominio.com"
-                disabled={!companyId}
-              />
-            </div>
+            {isPJ ? (
+              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                O depósito será feito na <span className="font-semibold">conta PJ da empresa</span> (veja os dados no card ao lado).
+                {!companyFinance?.bank_name && !companyFinance?.pix_key ? (
+                  <div className="mt-2 text-xs">
+                    Atenção: os dados da empresa ainda não foram configurados. Peça para um <span className="font-semibold">ADMIN</span> preencher.
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <>
+                <div className="grid gap-2">
+                  <Label>Conta de destino</Label>
+                  <Input
+                    className="h-11 rounded-xl"
+                    value={destinationAccount}
+                    onChange={(e) => setDestinationAccount(e.target.value)}
+                    placeholder="Ex.: Banco X • Ag 0001 • Cc 12345-6"
+                    disabled={!companyId}
+                  />
+                  <div className="text-xs text-muted-foreground">Escreva de um jeito fácil de conferir pelo financeiro.</div>
+                </div>
 
-            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-              Estes dados ficam salvos no banco (tabela <span className="font-semibold">public.user_financial_profiles</span>).
-            </div>
+                <div className="grid gap-2">
+                  <Label>Chave Pix</Label>
+                  <Input
+                    className="h-11 rounded-xl"
+                    value={pixKey}
+                    onChange={(e) => setPixKey(e.target.value)}
+                    placeholder="Ex.: seuemail@dominio.com"
+                    disabled={!companyId}
+                  />
+                </div>
+
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+                  Estes dados ficam salvos no banco (tabela <span className="font-semibold">public.user_financial_profiles</span>).
+                </div>
+              </>
+            )}
           </div>
         </Card>
       </div>

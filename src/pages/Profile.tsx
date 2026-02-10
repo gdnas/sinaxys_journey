@@ -99,7 +99,7 @@ export default function Profile() {
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
 
-  // Address + extra (keep compact)
+  // Address (keep compact)
   const [addressZip, setAddressZip] = useState("");
   const [addressLine1, setAddressLine1] = useState("");
   const [addressLine2, setAddressLine2] = useState("");
@@ -107,8 +107,6 @@ export default function Profile() {
   const [addressCity, setAddressCity] = useState("");
   const [addressState, setAddressState] = useState("");
   const [addressCountry, setAddressCountry] = useState("Brasil");
-  const [emergencyName, setEmergencyName] = useState("");
-  const [emergencyPhone, setEmergencyPhone] = useState("");
 
   // Sensitive fields (view for everyone, edit for admin/master)
   const [jobTitle, setJobTitle] = useState(user.jobTitle ?? "");
@@ -130,8 +128,6 @@ export default function Profile() {
     setAddressCity(me.address_city ?? "");
     setAddressState(me.address_state ?? "");
     setAddressCountry(me.address_country ?? "Brasil");
-    setEmergencyName(me.emergency_contact_name ?? "");
-    setEmergencyPhone(me.emergency_contact_phone ?? "");
 
     setJobTitle(me.job_title ?? "");
     setMonthlyCost(typeof me.monthly_cost_brl === "number" ? String(me.monthly_cost_brl) : "");
@@ -157,8 +153,6 @@ export default function Profile() {
     const baseCity = me?.address_city ?? "";
     const baseState = me?.address_state ?? "";
     const baseCountry = me?.address_country ?? "Brasil";
-    const baseEN = me?.emergency_contact_name ?? "";
-    const baseEP = me?.emergency_contact_phone ?? "";
 
     return (
       name.trim() !== baseName ||
@@ -170,9 +164,7 @@ export default function Profile() {
       addressNeighborhood.trim() !== baseNb ||
       addressCity.trim() !== baseCity ||
       addressState.trim() !== baseState ||
-      addressCountry.trim() !== baseCountry ||
-      emergencyName.trim() !== baseEN ||
-      emergencyPhone.trim() !== baseEP
+      addressCountry.trim() !== baseCountry
     );
   }, [
     name,
@@ -185,8 +177,6 @@ export default function Profile() {
     addressCity,
     addressState,
     addressCountry,
-    emergencyName,
-    emergencyPhone,
     me,
     user.name,
   ]);
@@ -373,29 +363,6 @@ export default function Profile() {
                     </AccordionContent>
                   </AccordionItem>
 
-                  <AccordionItem value="emergencia" className="border-none">
-                    <AccordionTrigger className="rounded-2xl px-4 py-3 text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:no-underline">
-                      Contato de emergência
-                    </AccordionTrigger>
-                    <AccordionContent className="px-4 pb-4">
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="grid gap-2">
-                          <Label>Nome (opcional)</Label>
-                          <Input className="h-11 rounded-xl bg-white" value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} />
-                        </div>
-                        <div className="grid gap-2">
-                          <Label>Telefone (opcional)</Label>
-                          <Input
-                            className="h-11 rounded-xl bg-white"
-                            value={emergencyPhone}
-                            onChange={(e) => setEmergencyPhone(e.target.value)}
-                            placeholder="+55 11 9…"
-                          />
-                        </div>
-                      </div>
-                      <div className="mt-2 text-xs text-muted-foreground">Somente para uso interno em casos necessários.</div>
-                    </AccordionContent>
-                  </AccordionItem>
                 </Accordion>
               </div>
 
@@ -419,8 +386,6 @@ export default function Profile() {
                         address_city: addressCity.trim() || null,
                         address_state: addressState.trim() || null,
                         address_country: addressCountry.trim() || null,
-                        emergency_contact_name: emergencyName.trim() || null,
-                        emergency_contact_phone: emergencyPhone.trim() || null,
                       } as any);
 
                       await qc.invalidateQueries({ queryKey: ["profile", user.id] });
