@@ -10,10 +10,11 @@ export type DbProfilePublic = {
   active: boolean;
   manager_id: string | null;
   job_title: string | null;
+  joined_at: string | null;
   updated_at: string;
 };
 
-const baseSelect = "id,company_id,department_id,name,avatar_url,role,active,manager_id,job_title,updated_at";
+const baseSelect = "id,company_id,department_id,name,avatar_url,role,active,manager_id,job_title,joined_at,updated_at";
 
 export async function listPublicProfilesByCompany(companyId: string) {
   const { data, error } = await supabase

@@ -55,6 +55,11 @@ export type DbModuleProgress = {
   earned_xp: number | null;
 };
 
+export type XpLeaderboardRow = {
+  user_id: string;
+  total_xp: number;
+};
+
 export type AssignmentDetail = {
   assignment: DbAssignment;
   track: DbTrack;
@@ -493,4 +498,10 @@ export async function getTotalXpForUser(params: { companyId: string; userId: str
   }
 
   return Math.max(0, Math.floor(total));
+}
+
+export async function fetchXpLeaderboard(companyId: string, limit = 200) {
+  const { data, error } = await supabase.rpc("xp_leaderboard", { p_company_id: companyId, p_limit: limit });
+  if (error) throw error;
+  return (data ?? []) as XpLeaderboardRow[];
 }
