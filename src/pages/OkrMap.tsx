@@ -261,7 +261,7 @@ export default function OkrMap() {
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label>Horizonte</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {([3, 5, 10] as const).map((y) => (
                   <Button
                     key={y}

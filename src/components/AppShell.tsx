@@ -236,7 +236,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </SheetContent>
             </Sheet>
 
-            <Link to="/" className="flex items-center gap-3">
+            <Link to="/" className="flex min-w-0 items-center gap-3">
               <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-[color:var(--sinaxys-primary)]">
                 {company.logoDataUrl ? (
                   <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
@@ -244,8 +244,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <span className="text-sm font-semibold text-white">{initials(company.name || "SJ")}</span>
                 )}
               </div>
-              <div className="leading-tight">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{company.name}</div>
+              <div className="min-w-0 leading-tight">
+                <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] sm:max-w-[260px]">
+                  {company.name}
+                </div>
                 <div className="hidden text-xs text-muted-foreground sm:block">{company.tagline}</div>
               </div>
             </Link>
@@ -262,8 +264,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <AvatarImage src={user.avatarUrl} alt={user.name} />
                 <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">{initials(user.name)}</AvatarFallback>
               </Avatar>
-              <div className="hidden text-right sm:block">
-                <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">
+              <div className="hidden max-w-[42vw] min-w-0 text-right sm:block lg:max-w-[360px]">
+                <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">
                   {user.name} <span className="text-muted-foreground">— {jobTitleLabel}</span>
                 </div>
                 <div className="text-xs text-muted-foreground">{roleLabel(user.role)}</div>
