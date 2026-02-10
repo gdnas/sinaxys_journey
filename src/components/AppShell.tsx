@@ -16,7 +16,9 @@ import {
   UploadCloud,
   Trophy,
   Target,
+  Handshake,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -25,6 +27,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { isCompanyModuleEnabled } from "@/lib/modulesDb";
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 
@@ -78,6 +81,15 @@ const nav: NavItem[] = [
     label: "Minha jornada",
     icon: <LayoutDashboard className="h-4 w-4" />,
     roles: ["COLABORADOR", "HEAD", "ADMIN"],
+  },
+
+  // PDI & Performance
+  {
+    type: "link",
+    to: "/pdi-performance",
+    label: "PDI & Performance",
+    icon: <Handshake className="h-4 w-4" />,
+    roles: ["COLABORADOR", "HEAD", "ADMIN", "MASTERADMIN"],
   },
 
   // Sinaxys Points
@@ -327,18 +339,30 @@ function initials(name: string) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
-  const { company } = useCompany();
+  const { company, companyId } = useCompany();
   const navigate = useNavigate();
 
+  const { data: pdiEnabled = false } = useQuery({
+    queryKey: ["company-module", companyId, "PDI_PERFORMANCE"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "PDI_PERFORMANCE"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
+
   if (!user) return <>{children}</>;
+
+  const allowPdiLink = user.role === "MASTERADMIN" ? true : !!pdiEnabled;
 
   const visible = nav
     .map((item) => {
       if (item.type === "link") {
+        if (item.to === "/pdi-performance" && !allowPdiLink) return null;
         return item.roles.includes(user.role) ? item : null;
       }
 
-      const children = item.children.filter((c) => c.roles.includes(user.role));
+      const children = item.children.filter((c) => {
+        if (c.to === "/pdi-performance" && !allowPdiLink) return false;
+        return c.roles.includes(user.role);
+      });
       if (!children.length) return null;
       return { ...item, children };
     })

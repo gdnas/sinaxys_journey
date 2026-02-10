@@ -14,6 +14,7 @@ import {
   Trophy,
   Users,
   Wallet,
+  Handshake,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { format, endOfWeek, startOfWeek } from "date-fns";
@@ -25,6 +26,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { isCompanyModuleEnabled } from "@/lib/modulesDb";
 import { computeProgress } from "@/lib/sinaxys";
 import { getAssignmentsForUser } from "@/lib/journeyDb";
 import { fetchLeaderboard } from "@/lib/pointsDb";
@@ -196,6 +198,12 @@ export default function AppDashboard() {
   const isCollaborator = user.role === "COLABORADOR";
   const isHead = user.role === "HEAD";
   const isAdmin = user.role === "ADMIN";
+
+  const { data: pdiEnabled = false } = useQuery({
+    queryKey: ["company-module", companyId, "PDI_PERFORMANCE"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "PDI_PERFORMANCE"),
+    enabled: !!companyId,
+  });
 
   const { data: assignments = [], isLoading: loadingAssignments } = useQuery({
     queryKey: ["assignments-for-user", user.id],
@@ -419,6 +427,16 @@ export default function AppDashboard() {
         <p className="mt-1 text-sm text-muted-foreground">Acesse rápido os módulos que mais destravam o seu dia.</p>
 
         <div className="mt-4 grid gap-6 md:grid-cols-2">
+          {pdiEnabled ? (
+            <ShortcutCard
+              title="PDI & Performance"
+              desc={isAdmin ? "Acompanhe pessoas: check-ins, 1:1 e alertas leves." : isHead ? "Ritmo do time: check-ins, 1:1 e evolução." : "Seu PDI, seus check-ins e seu histórico de evolução."}
+              icon={<Handshake className="h-5 w-5" />}
+              to="/pdi-performance"
+              badge="pessoas"
+              img="/placeholder.svg"
+            />
+          ) : null}
           <ShortcutCard
             title="OKRs"
             desc={isAdmin ? "Saúde do trimestre: objetivos, KRs, entregáveis e tarefas." : isHead ? "OKRs do seu departamento e execução do time." : "Suas prioridades do dia e da semana."}
@@ -478,7 +496,7 @@ export default function AppDashboard() {
         </Card>
       )}
 
-      {(isAdmin || isHead) ? (
+      {isAdmin || isHead ? (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>

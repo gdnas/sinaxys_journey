@@ -39,6 +39,7 @@ import OkrMap from "./pages/OkrMap";
 import OkrCycles from "./pages/OkrCycles";
 import OkrAssistant from "./pages/OkrAssistant";
 import OkrObjectiveDetail from "./pages/OkrObjectiveDetail";
+import PdiPerformance from "./pages/PdiPerformance";
 import { AuthProvider } from "@/lib/auth";
 import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
@@ -63,6 +64,16 @@ const App = () => (
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                       <ChangePassword />
+                    </RequireAuth>
+                  }
+                />
+
+                {/* PDI & Performance */}
+                <Route
+                  path="/pdi-performance"
+                  element={
+                    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <PdiPerformance />
                     </RequireAuth>
                   }
                 />

@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
-import { ImageIcon, Palette, RotateCcw, Save, Trash2 } from "lucide-react";
+import { ImageIcon, Palette, RotateCcw, Save, Trash2, Handshake } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/hooks/use-toast";
 import { loadCompanySettings, useCompany } from "@/lib/company";
+import { isCompanyModuleEnabled, setCompanyModuleEnabled } from "@/lib/modulesDb";
 import type { CompanyColors } from "@/lib/domain";
 
 function normalizeHexOrEmpty(v: string) {
@@ -56,7 +59,7 @@ function ColorField({
 
 export default function AdminBrand() {
   const { toast } = useToast();
-  const { company, setCompany, resetCompany } = useCompany();
+  const { company, setCompany, resetCompany, companyId } = useCompany();
 
   const [name, setName] = useState(company.name);
   const [tagline, setTagline] = useState(company.tagline);
@@ -71,6 +74,12 @@ export default function AdminBrand() {
       JSON.stringify(colors) !== JSON.stringify(company.colors)
     );
   }, [name, tagline, logoDataUrl, colors, company]);
+
+  const { data: pdiEnabled = false, refetch: refetchModules } = useQuery({
+    queryKey: ["company-module", companyId, "PDI_PERFORMANCE"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "PDI_PERFORMANCE"),
+    enabled: !!companyId,
+  });
 
   return (
     <div className="grid gap-6">
@@ -239,18 +248,8 @@ export default function AdminBrand() {
               value={colors.primary}
               onChange={(v) => setColors((c) => ({ ...c, primary: v }))}
             />
-            <ColorField
-              id="cInk"
-              label="Texto / Ink"
-              value={colors.ink}
-              onChange={(v) => setColors((c) => ({ ...c, ink: v }))}
-            />
-            <ColorField
-              id="cBg"
-              label="Fundo"
-              value={colors.bg}
-              onChange={(v) => setColors((c) => ({ ...c, bg: v }))}
-            />
+            <ColorField id="cInk" label="Texto / Ink" value={colors.ink} onChange={(v) => setColors((c) => ({ ...c, ink: v }))} />
+            <ColorField id="cBg" label="Fundo" value={colors.bg} onChange={(v) => setColors((c) => ({ ...c, bg: v }))} />
             <ColorField
               id="cTint"
               label="Tint (cards e chips)"
@@ -266,6 +265,41 @@ export default function AdminBrand() {
           </div>
         </Card>
       </div>
+
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulos (ativação por empresa)</div>
+        <p className="mt-1 text-sm text-muted-foreground">Ative/desative recursos para este tenant. Isso controla o menu e o acesso.</p>
+
+        <Separator className="my-5" />
+
+        <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 grid h-10 w-10 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
+              <Handshake className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">PDI & Performance</div>
+              <div className="mt-1 text-sm text-muted-foreground">Check-ins, 1:1, feedback contínuo e histórico profissional.</div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{pdiEnabled ? "ativo" : "inativo"}</div>
+            <Switch
+              checked={pdiEnabled}
+              onCheckedChange={async (v) => {
+                if (!companyId) return;
+                await setCompanyModuleEnabled(companyId, "PDI_PERFORMANCE", v);
+                await refetchModules();
+                toast({
+                  title: v ? "Módulo ativado" : "Módulo desativado",
+                  description: "O menu será atualizado automaticamente.",
+                });
+              }}
+            />
+          </div>
+        </div>
+      </Card>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Preview rápido</div>
