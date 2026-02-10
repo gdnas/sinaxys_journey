@@ -19,8 +19,17 @@ import {
   listOkrCycles,
   listOkrObjectives,
   listStrategyObjectives,
+  type DbStrategyObjective,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+
+type StrategyColumnKey = "y1" | "y3" | "y5" | "y10";
+
+type StrategyColumn = {
+  label: string;
+  key: StrategyColumnKey;
+  items: DbStrategyObjective[];
+};
 
 function MiniCard({ title, text }: { title: string; text?: string | null }) {
   const t = text?.trim();
@@ -82,17 +91,15 @@ export default function OkrMap() {
 
   const [showTenYears, setShowTenYears] = useState(() => groupedStrategy.y10.length > 0);
 
-  const columns = useMemo(() => {
-    const base = [
-      { label: "1 ano", key: "y1" as const, items: groupedStrategy.y1 },
-      { label: "3 anos", key: "y3" as const, items: groupedStrategy.y3 },
-      { label: "5 anos", key: "y5" as const, items: groupedStrategy.y5 },
+  const columns = useMemo<StrategyColumn[]>(() => {
+    const base: StrategyColumn[] = [
+      { label: "1 ano", key: "y1", items: groupedStrategy.y1 },
+      { label: "3 anos", key: "y3", items: groupedStrategy.y3 },
+      { label: "5 anos", key: "y5", items: groupedStrategy.y5 },
     ];
 
     const includeTen = showTenYears || groupedStrategy.y10.length > 0;
-    return includeTen
-      ? ([...base, { label: "10 anos", key: "y10" as const, items: groupedStrategy.y10 }] as const)
-      : (base as const);
+    return includeTen ? [...base, { label: "10 anos", key: "y10", items: groupedStrategy.y10 }] : base;
   }, [groupedStrategy.y1, groupedStrategy.y3, groupedStrategy.y5, groupedStrategy.y10, showTenYears]);
 
   const [open, setOpen] = useState(false);
