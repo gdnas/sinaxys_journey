@@ -29,8 +29,24 @@ export type DbProfile = {
   updated_at: string | null;
 };
 
+export type DbProfilePublic = {
+  id: string;
+  company_id: string;
+  department_id: string | null;
+  name: string;
+  avatar_url: string | null;
+  role: string;
+  active: boolean;
+  updated_at: string;
+  manager_id: string | null;
+  job_title: string | null;
+  joined_at: string | null;
+};
+
 const baseSelect =
   "id,email,name,role,company_id,department_id,active,must_change_password,avatar_url,phone,job_title,contract_url,monthly_cost_brl,joined_at,manager_id,address_zip,address_line1,address_line2,address_neighborhood,address_city,address_state,address_country,emergency_contact_name,emergency_contact_phone,created_at,updated_at";
+
+const publicSelect = "id,company_id,department_id,name,avatar_url,role,active,updated_at,manager_id,job_title,joined_at";
 
 export async function getMyProfile() {
   const { data: u } = await supabase.auth.getUser();
@@ -47,12 +63,21 @@ export async function getProfile(id: string) {
 
 export async function listProfilesByCompany(companyId: string) {
   const { data, error } = await supabase
-    .from("profiles")
-    .select(baseSelect)
+    .from("profiles")[
+      // NOTE: profiles contém dados sensíveis; o acesso é protegido por RLS.
+      // Use profile_public quando você precisar apenas de dados públicos para listagem.
+      "select"
+    ](baseSelect)
     .eq("company_id", companyId)
     .order("name", { ascending: true, nullsFirst: false });
   if (error) throw error;
   return (data ?? []) as DbProfile[];
+}
+
+export async function listProfilePublicByCompany(companyId: string) {
+  const { data, error } = await supabase.from("profile_public").select(publicSelect).eq("company_id", companyId).order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as DbProfilePublic[];
 }
 
 export async function listAllProfiles() {

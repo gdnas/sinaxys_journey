@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { BookOpenText, CalendarClock, Search, Send, Users } from "lucide-react";
+import { BookOpenText, CalendarClock, Search, Send, Shield, Users } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
-import { listProfilesByCompany } from "@/lib/profilesDb";
+import { listProfilePublicByCompany, listProfilesByCompany } from "@/lib/profilesDb";
 import { assignTrack, getTracksByCompany } from "@/lib/journeyDb";
 import { formatShortDate } from "@/lib/sinaxys";
 
@@ -33,6 +33,21 @@ function toDueIso(dateInput: string) {
   return d.toISOString();
 }
 
+function roleLabel(role?: string | null) {
+  switch (role) {
+    case "ADMIN":
+      return "Admin";
+    case "HEAD":
+      return "Head";
+    case "COLABORADOR":
+      return "Colaborador";
+    case "MASTERADMIN":
+      return "Master";
+    default:
+      return role || "—";
+  }
+}
+
 export default function TrackLibrary() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -43,7 +58,8 @@ export default function TrackLibrary() {
   if (user.role === "MASTERADMIN") return null;
 
   const companyId = user.companyId;
-  const canDelegate = user.role === "ADMIN";
+  // Agora qualquer pessoa da empresa pode delegar trilhas para qualquer pessoa da empresa.
+  const canDelegate = true;
 
   const [query, setQuery] = useState("");
 
@@ -57,9 +73,10 @@ export default function TrackLibrary() {
     queryFn: () => getTracksByCompany(companyId),
   });
 
+  // Admins conseguem acessar a tabela profiles (com e-mail). Para os demais, usamos profile_public.
   const { data: profiles = [] } = useQuery({
-    queryKey: ["profiles", companyId],
-    queryFn: () => listProfilesByCompany(companyId),
+    queryKey: ["delegate-profiles", companyId, user.role],
+    queryFn: () => (user.role === "ADMIN" ? listProfilesByCompany(companyId) : listProfilePublicByCompany(companyId)),
   });
 
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d] as const)), [departments]);
@@ -93,27 +110,33 @@ export default function TrackLibrary() {
     return visibleTracks.find((t) => t.id === delegateTrackId) ?? null;
   }, [delegateTrackId, visibleTracks]);
 
-  const collaborators = useMemo(() => {
-    return profiles
+  const people = useMemo(() => {
+    return (profiles as any[])
       .filter((p) => p.active)
-      .filter((p) => p.role === "COLABORADOR")
+      .filter((p) => p.role !== "MASTERADMIN")
       .map((p) => ({
         id: p.id,
-        name: p.name ?? p.email,
-        email: p.email,
-        department_id: p.department_id,
+        name: p.name ?? ("email" in p ? p.email : ""),
+        email: "email" in p ? (p.email as string) : null,
+        role: p.role as string,
+        department_id: p.department_id as string | null,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [profiles]);
 
   const assignees = useMemo(() => {
     const q = delegateUserQuery.trim().toLowerCase();
-    if (!q) return collaborators;
-    return collaborators.filter((u) => {
+    if (!q) return people;
+    return people.filter((u) => {
       const deptName = u.department_id ? deptById.get(u.department_id)?.name ?? "" : "";
-      return u.name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || deptName.toLowerCase().includes(q);
+      return (
+        u.name.toLowerCase().includes(q) ||
+        (u.email ? u.email.toLowerCase().includes(q) : false) ||
+        deptName.toLowerCase().includes(q) ||
+        roleLabel(u.role).toLowerCase().includes(q)
+      );
     });
-  }, [collaborators, delegateUserQuery, deptById]);
+  }, [people, delegateUserQuery, deptById]);
 
   return (
     <div className="grid gap-6">
@@ -121,9 +144,7 @@ export default function TrackLibrary() {
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Biblioteca de trilhas</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Catálogo por departamento. {canDelegate ? "Delegue trilhas para colaboradores com prazo." : "Acesse apenas trilhas publicadas."}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Catálogo por departamento. Delegue trilhas para pessoas da sua empresa com prazo.</p>
           </div>
 
           <div className="flex w-full flex-col gap-2 md:w-auto">
@@ -292,7 +313,7 @@ export default function TrackLibrary() {
                   <Input
                     value={delegateUserQuery}
                     onChange={(e) => setDelegateUserQuery(e.target.value)}
-                    placeholder="Buscar por nome, e-mail ou departamento…"
+                    placeholder="Buscar por nome, e-mail (se disponível), papel ou departamento…"
                     className="h-11 rounded-xl pl-9"
                   />
                 </div>
@@ -327,9 +348,15 @@ export default function TrackLibrary() {
                           >
                             <Checkbox checked={checked} onCheckedChange={() => {}} />
                             <div className="min-w-0 flex-1">
-                              <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">{u.name}</div>
+                              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                                <div className="min-w-0 truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">{u.name}</div>
+                                <span className="inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
+                                  <Shield className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
+                                  {roleLabel(u.role)}
+                                </span>
+                              </div>
                               <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                <span className="truncate">{u.email}</span>
+                                {u.email ? <span className="truncate">{u.email}</span> : null}
                                 {deptName ? (
                                   <span className="rounded-full bg-white px-2 py-0.5 font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
                                     {deptName}
@@ -346,7 +373,7 @@ export default function TrackLibrary() {
                   </ScrollArea>
                 </div>
 
-                <div className="text-xs text-muted-foreground">A delegação cria uma atribuição na "Minha jornada" do colaborador.</div>
+                <div className="text-xs text-muted-foreground">A delegação cria uma atribuição na "Minha jornada" da pessoa selecionada.</div>
               </div>
 
               <Separator />
