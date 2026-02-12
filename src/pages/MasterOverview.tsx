@@ -25,7 +25,7 @@ export default function MasterOverview() {
 
   return (
     <div className="grid gap-6">
-      <div className="rounded-3xl border bg-white p-6">
+      <div data-tour="master-overview-hero" className="rounded-3xl border bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Master Admin — Visão geral</div>

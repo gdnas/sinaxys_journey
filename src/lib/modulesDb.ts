@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type ModuleKey = "PDI_PERFORMANCE" | (string & {});
+export type ModuleKey = "PDI_PERFORMANCE" | "OKR" | "TRACKS" | "POINTS" | "ORG" | "PROFILE" | "ADMIN" | "MASTER" | (string & {});
 
 export type DbCompanyModule = {
   company_id: string;
@@ -20,6 +20,16 @@ export async function getCompanyModule(companyId: string, moduleKey: ModuleKey) 
 
   if (error) throw error;
   return (data ?? null) as DbCompanyModule | null;
+}
+
+export async function listCompanyModules(companyId: string) {
+  const { data, error } = await supabase
+    .from("company_modules")
+    .select("company_id,module_key,enabled,created_at,updated_at")
+    .eq("company_id", companyId);
+
+  if (error) throw error;
+  return (data ?? []) as DbCompanyModule[];
 }
 
 export async function isCompanyModuleEnabled(companyId: string, moduleKey: ModuleKey) {

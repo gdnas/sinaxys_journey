@@ -49,16 +49,18 @@ function StatPill({
   icon,
   to,
   hint,
+  tourId,
 }: {
   label: string;
   value: string;
   icon: React.ReactNode;
   to: string;
   hint?: string;
+  tourId?: string;
 }) {
   return (
     <Card className="group rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5 transition hover:bg-[color:var(--sinaxys-tint)]/30">
-      <Link to={to} className="block">
+      <Link to={to} className="block" data-tour={tourId}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
@@ -81,6 +83,7 @@ function ShortcutCard({
   to,
   badge,
   img,
+  tourId,
 }: {
   title: string;
   desc: string;
@@ -88,6 +91,7 @@ function ShortcutCard({
   to: string;
   badge?: string;
   img?: string;
+  tourId?: string;
 }) {
   return (
     <Card className="group relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white">
@@ -96,7 +100,7 @@ function ShortcutCard({
           <img src={img} alt="" className="h-full w-full object-cover" />
         </div>
       ) : null}
-      <Link to={to} className="relative block p-6">
+      <Link to={to} className="relative block p-6" data-tour={tourId}>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -296,7 +300,7 @@ export default function AppDashboard() {
 
   return (
     <div className="grid gap-6">
-      <Card className="relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+      <Card data-tour="dash-hero" className="relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="absolute inset-0 opacity-[0.16]">
           <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
         </div>
@@ -315,7 +319,7 @@ export default function AppDashboard() {
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{todayLabel}. {subtitle}</p>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center" data-tour="dash-next-action">
             {next ? (
               <Button
                 asChild
@@ -435,6 +439,7 @@ export default function AppDashboard() {
               to="/pdi-performance"
               badge="pessoas"
               img="/placeholder.svg"
+              tourId="dash-pdi"
             />
           ) : null}
           <ShortcutCard
@@ -444,6 +449,7 @@ export default function AppDashboard() {
             to={isCollaborator ? "/okr/hoje" : "/okr/ciclos"}
             badge="execução"
             img="/placeholder.svg"
+            tourId="dash-okr"
           />
           <ShortcutCard
             title="Trilhas"
@@ -452,6 +458,7 @@ export default function AppDashboard() {
             to={isHead ? "/head/tracks" : "/tracks"}
             badge="evolução"
             img="/placeholder.svg"
+            tourId="dash-trilhas"
           />
           <ShortcutCard
             title="Sinaxys Points"
@@ -460,6 +467,7 @@ export default function AppDashboard() {
             to={isAdmin ? "/rankings?tab=rules" : "/rankings"}
             badge="reconhecimento"
             img="/placeholder.svg"
+            tourId="dash-points"
           />
           <ShortcutCard
             title={isAdmin ? "Empresa" : isHead ? "Time" : "Empresa"}
@@ -468,6 +476,7 @@ export default function AppDashboard() {
             to="/org"
             badge="contexto"
             img="/placeholder.svg"
+            tourId="dash-org"
           />
         </div>
       </div>
@@ -497,7 +506,7 @@ export default function AppDashboard() {
       )}
 
       {isAdmin || isHead ? (
-        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <Card data-tour="dash-management" className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Atalhos de gestão</div>

@@ -13,7 +13,7 @@ export function OkrPageHeader({
   actions?: React.ReactNode;
 }) {
   return (
-    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+    <Card data-tour="okr-hero" className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex items-start gap-4">
           {icon ? (
