@@ -113,14 +113,17 @@ export default function AdminUsers() {
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d] as const)), [departments]);
 
   const [query, setQuery] = useState("");
+  const [hideInactive, setHideInactive] = useState(true);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return profiles;
-    return profiles.filter((p) => {
+    const base = hideInactive ? profiles.filter((p) => !!p.active) : profiles;
+    if (!q) return base;
+    return base.filter((p) => {
       const hay = `${p.name ?? ""} ${p.email}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [profiles, query]);
+  }, [profiles, query, hideInactive]);
 
   const emailQuery = query.trim().toLowerCase();
   const showAuthHint = !isLoading && !!emailQuery && emailQuery.includes("@") && filtered.length === 0;
@@ -193,7 +196,9 @@ export default function AdminUsers() {
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Base de usuários</div>
-            <p className="mt-1 text-sm text-muted-foreground">{isLoading ? "Carregando…" : `${profiles.length} usuários nesta empresa.`}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {isLoading ? "Carregando…" : `${profiles.length} usuários nesta empresa${hideInactive ? ` • ${filtered.length} ativos visíveis` : ""}.`}
+            </p>
           </div>
 
           <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
@@ -207,6 +212,11 @@ export default function AdminUsers() {
               <MailPlus className="mr-2 h-4 w-4" />
               Adicionar usuário
             </Button>
+
+            <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2 md:w-[260px]">
+              <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Ocultar inativos</div>
+              <Switch checked={hideInactive} onCheckedChange={setHideInactive} />
+            </div>
 
             <div className="relative w-full md:w-[360px]">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

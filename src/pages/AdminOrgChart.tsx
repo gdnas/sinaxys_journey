@@ -258,6 +258,14 @@ export default function AdminOrgChart() {
     queryFn: () => listDepartments(companyId),
   });
 
+  const { data: profilesAll = [] } = useQuery({
+    queryKey: ["profiles", companyId],
+    queryFn: () => listProfilesByCompany(companyId),
+  });
+
+  // Keep org chart clean: inactive users do not appear.
+  const profiles = useMemo(() => profilesAll.filter((p) => !!p.active), [profilesAll]);
+
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d.name] as const)), [departments]);
 
   const deptIndexById = useMemo(() => {
@@ -266,11 +274,6 @@ export default function AdminOrgChart() {
     sorted.forEach((d, idx) => m.set(d.id, idx));
     return m;
   }, [departments]);
-
-  const { data: profiles = [] } = useQuery({
-    queryKey: ["profiles", companyId],
-    queryFn: () => listProfilesByCompany(companyId),
-  });
 
   const visibleProfiles = useMemo(() => profiles.slice().sort((a, b) => displayName(a).localeCompare(displayName(b))), [profiles]);
 

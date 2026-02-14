@@ -8,8 +8,9 @@ export default function Index() {
 
   if (user.mustChangePassword) return <Navigate to="/password" replace />;
 
+  // Master Admin keeps the platform backoffice as the default landing.
   if (user.role === "MASTERADMIN") return <Navigate to="/master/overview" replace />;
-  if (user.role === "COLABORADOR") return <Navigate to="/app" replace />;
-  if (user.role === "HEAD") return <Navigate to="/head/tracks" replace />;
-  return <Navigate to="/admin/users" replace />;
+
+  // Everyone inside a company lands on "Minha jornada".
+  return <Navigate to="/app" replace />;
 }

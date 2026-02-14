@@ -297,39 +297,25 @@ function ListNode({
 
 export default function OrgChart() {
   const { user } = useAuth();
-  if (!user) return null;
+  if (!user || !user.companyId) return null;
 
   const companyId = user.companyId;
-
-  if (!companyId) {
-    return (
-      <div className="grid gap-6">
-        <div className="rounded-3xl border bg-white p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Organograma</div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Selecione uma empresa ativa (Master Admin → Empresas) para visualizar o organograma.
-              </p>
-            </div>
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-              <Network className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments", companyId],
     queryFn: () => listDepartments(companyId),
   });
 
-  const { data: profiles = [], isLoading } = useQuery({
-    queryKey: ["profile-public", companyId],
+  const { data: profiles = [], isLoading: isLoadingProfiles } = useQuery({
+    queryKey: ["profiles-public", companyId],
     queryFn: () => listPublicProfilesByCompany(companyId),
   });
+
+  // Requirement: inactive users should not appear in the company org chart.
+  const activeProfiles = useMemo(() => profiles.filter((p) => !!p.active), [profiles]);
+
+  // IMPORTANT: this file has multiple computations; we keep changes minimal by switching the main source.
+  const profilesSource = activeProfiles;
 
   const qPoints = useQuery({
     queryKey: ["points", "leaderboard", companyId],
@@ -345,6 +331,8 @@ export default function OrgChart() {
     queryKey: ["xp", "leaderboard", companyId],
     queryFn: () => fetchXpLeaderboard(companyId, 200),
   });
+
+  const isLoading = isLoadingProfiles || qPoints.isLoading || qTiers.isLoading || qXp.isLoading;
 
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d.name] as const)), [departments]);
 
@@ -376,20 +364,20 @@ export default function OrgChart() {
       return cur?.name ?? null;
     };
 
-    for (const p of profiles) {
+    for (const p of profilesSource) {
       const pts = pointsByUserId.get(p.id) ?? 0;
       m.set(p.id, getTier(pts));
     }
 
     return m;
-  }, [profiles, pointsByUserId, qTiers.data]);
+  }, [profilesSource, pointsByUserId, qTiers.data]);
 
   const [query, setQuery] = useState("");
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return profiles;
-    return profiles.filter((p) => `${p.name} ${p.role} ${p.job_title ?? ""}`.toLowerCase().includes(q));
-  }, [profiles, query]);
+    if (!q) return profilesSource;
+    return profilesSource.filter((p) => `${p.name} ${p.role} ${p.job_title ?? ""}`.toLowerCase().includes(q));
+  }, [profilesSource, query]);
 
   const tree = useMemo(() => buildTree(visible), [visible]);
 
@@ -429,7 +417,7 @@ export default function OrgChart() {
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Estrutura</div>
-            <p className="mt-1 text-sm text-muted-foreground">{isLoading ? "Carregando…" : `${profiles.length} pessoa(s) na empresa.`}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{isLoading ? "Carregando…" : `${profilesSource.length} pessoa(s) na empresa.`}</p>
           </div>
           <div className="relative w-full md:w-[360px]">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
