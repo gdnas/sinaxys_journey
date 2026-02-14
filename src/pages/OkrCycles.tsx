@@ -49,6 +49,7 @@ import {
   type ObjectiveLevel,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 
 const SELECT_NONE = "__none__";
 
@@ -58,14 +59,14 @@ function cycleLabel(c: { type: CycleType; year: number; quarter: number | null; 
 }
 
 function levelBadge(level: ObjectiveLevel) {
-  const map: Record<ObjectiveLevel, { label: string; cls: string }> = {
-    COMPANY: { label: "Empresa", cls: "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]" },
-    DEPARTMENT: { label: "Departamento", cls: "bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]" },
-    TEAM: { label: "Time", cls: "bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]" },
-    INDIVIDUAL: { label: "Individual", cls: "bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]" },
-  };
-  const s = map[level];
-  return <span className={`rounded-full px-3 py-1 text-[11px] font-semibold ${s.cls}`}>{s.label}</span>;
+  return (
+    <div className="flex items-center gap-2">
+      <span className={"rounded-full px-3 py-1 text-[11px] font-semibold " + objectiveTypeBadgeClass(level)}>{objectiveTypeLabel(level)}</span>
+      <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
+        {objectiveLevelLabel(level)}
+      </span>
+    </div>
+  );
 }
 
 export default function OkrCycles() {
