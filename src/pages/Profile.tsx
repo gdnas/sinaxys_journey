@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollableTabsList } from "@/components/ScrollableTabsList";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
@@ -291,13 +292,16 @@ export default function Profile() {
         <Separator className="my-5" />
 
         <Tabs defaultValue="perfil" className="w-full">
-          <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-            <TabsTrigger value="perfil" className="rounded-xl">Perfil</TabsTrigger>
-            <TabsTrigger value="trabalho" className="rounded-xl">Trabalho</TabsTrigger>
-            <TabsTrigger value="docs" className="rounded-xl">Documentos</TabsTrigger>
-            <TabsTrigger value="financeiro" className="rounded-xl">Financeiro</TabsTrigger>
-            <TabsTrigger value="ferias" className="rounded-xl">Férias</TabsTrigger>
-          </TabsList>
+          <ScrollableTabsList
+            listClassName="h-11 rounded-2xl bg-[color:var(--sinaxys-tint)] p-1"
+            containerClassName="-mx-1 px-1"
+          >
+            <TabsTrigger value="perfil" className="shrink-0 rounded-xl">Perfil</TabsTrigger>
+            <TabsTrigger value="trabalho" className="shrink-0 rounded-xl">Trabalho</TabsTrigger>
+            <TabsTrigger value="docs" className="shrink-0 rounded-xl">Documentos</TabsTrigger>
+            <TabsTrigger value="financeiro" className="shrink-0 rounded-xl">Financeiro</TabsTrigger>
+            <TabsTrigger value="ferias" className="shrink-0 rounded-xl">Férias</TabsTrigger>
+          </ScrollableTabsList>
 
           <TabsContent value="perfil" className="mt-5">
             <div className="grid gap-4">
@@ -688,10 +692,13 @@ export default function Profile() {
               </div>
 
               <Tabs defaultValue="meus" className="w-full">
-                <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-                  <TabsTrigger value="meus" className="rounded-xl">Meus pedidos</TabsTrigger>
-                  {canApproveVacation ? <TabsTrigger value="apro" className="rounded-xl">Aprovações</TabsTrigger> : null}
-                </TabsList>
+                <ScrollableTabsList
+                  listClassName="h-11 rounded-2xl bg-[color:var(--sinaxys-tint)] p-1"
+                  containerClassName="-mx-1 px-1"
+                >
+                  <TabsTrigger value="meus" className="shrink-0 rounded-xl">Meus pedidos</TabsTrigger>
+                  {canApproveVacation ? <TabsTrigger value="apro" className="shrink-0 rounded-xl">Aprovações</TabsTrigger> : null}
+                </ScrollableTabsList>
 
                 <TabsContent value="meus" className="mt-5">
                   <VacationRequests />

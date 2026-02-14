@@ -24,6 +24,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollableTabsList } from "@/components/ScrollableTabsList";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -598,24 +599,27 @@ export default function Rankings() {
             });
           }}
         >
-          <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-            <TabsTrigger value="ranking" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
+          <ScrollableTabsList
+            listClassName="h-11 rounded-2xl bg-[color:var(--sinaxys-tint)] p-1"
+            containerClassName="-mx-1 px-1"
+          >
+            <TabsTrigger value="ranking" className="shrink-0 rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
               Ranking
             </TabsTrigger>
-            <TabsTrigger value="activity" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
+            <TabsTrigger value="activity" className="shrink-0 rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
               Minha atividade
             </TabsTrigger>
             {user.role === "ADMIN" ? (
               <>
-                <TabsTrigger value="rules" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
+                <TabsTrigger value="rules" className="shrink-0 rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
                   Regras
                 </TabsTrigger>
-                <TabsTrigger value="tiers" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
+                <TabsTrigger value="tiers" className="shrink-0 rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
                   Tiers
                 </TabsTrigger>
               </>
             ) : null}
-          </TabsList>
+          </ScrollableTabsList>
 
           <TabsContent value="ranking" className="mt-4">
             {qProfiles.isLoading || qLeaderboard.isLoading ? (

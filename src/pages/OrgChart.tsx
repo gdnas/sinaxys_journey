@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollableTabsList } from "@/components/ScrollableTabsList";
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
@@ -439,14 +440,17 @@ export default function OrgChart() {
         <Separator className="my-5" />
 
         <Tabs defaultValue="list" className="w-full">
-          <TabsList className="w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-            <TabsTrigger value="list" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
+          <ScrollableTabsList
+            listClassName="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1"
+            containerClassName="-mx-1 px-1"
+          >
+            <TabsTrigger value="list" className="shrink-0 rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
               Lista
             </TabsTrigger>
-            <TabsTrigger value="tree" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
+            <TabsTrigger value="tree" className="shrink-0 rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
               Árvore
             </TabsTrigger>
-          </TabsList>
+          </ScrollableTabsList>
 
           <TabsContent value="list" className="mt-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
