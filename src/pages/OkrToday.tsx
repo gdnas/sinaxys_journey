@@ -29,6 +29,7 @@ import type { DbTaskWithContext } from "@/lib/okrDb";
 import { deleteTask, listTasksForUserWithContext, updateTask } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
+import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 
 function TaskRow({
   task,
@@ -66,14 +67,11 @@ function TaskRow({
                   <Target className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
                   <span className="truncate">{task.objective_title}</span>
                 </span>
+                <Badge className={"rounded-full " + objectiveTypeBadgeClass(task.objective_level)}>
+                  {objectiveTypeLabel(task.objective_level)}
+                </Badge>
                 <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                  {task.objective_level === "COMPANY"
-                    ? "Empresa"
-                    : task.objective_level === "DEPARTMENT"
-                      ? "Área"
-                      : task.objective_level === "TEAM"
-                        ? "Time"
-                        : "Individual"}
+                  {objectiveLevelLabel(task.objective_level)}
                 </Badge>
                 <Button
                   asChild

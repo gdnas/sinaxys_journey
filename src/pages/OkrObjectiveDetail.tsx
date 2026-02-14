@@ -49,6 +49,7 @@ import {
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrObjectiveCostItems } from "@/components/OkrObjectiveCostItems";
+import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 
 const SELECT_NONE = "__none__";
 
@@ -327,8 +328,11 @@ export default function OkrObjectiveDetail() {
               <div className="min-w-0">
                 <div className="text-lg font-semibold leading-tight text-[color:var(--sinaxys-ink)]">{objective.title}</div>
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                    {objective.level}
+                  <Badge className={"rounded-full " + objectiveTypeBadgeClass(objective.level)}>
+                    {objectiveTypeLabel(objective.level)}
+                  </Badge>
+                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                    {objectiveLevelLabel(objective.level)}
                   </Badge>
                   {objective.status === "ACHIEVED" ? (
                     <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">

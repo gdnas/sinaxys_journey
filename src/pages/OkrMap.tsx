@@ -22,6 +22,7 @@ import {
   type DbStrategyObjective,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import { objectiveLevelLabel, objectiveTypeLabel } from "@/lib/okrUi";
 
 type StrategyColumnKey = "y1" | "y3" | "y5" | "y10";
 
@@ -268,7 +269,11 @@ export default function OkrMap() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">Nível: {o.level}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
+                        <span className="mx-1">•</span>
+                        <span>{objectiveLevelLabel(o.level)}</span>
+                      </div>
                     </div>
                     <ArrowRight className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
                   </div>
