@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { brl, brlPerHourFromMonthly } from "@/lib/costs";
@@ -70,6 +71,7 @@ function levelBadge(level: ObjectiveLevel) {
 export default function OkrCycles() {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { enabled: okrRoiEnabled } = useCompanyModuleEnabled("OKR_ROI");
   const { user } = useAuth();
   const { companyId } = useCompany();
 
@@ -124,8 +126,8 @@ export default function OkrCycles() {
   });
 
   const byUserId = useMemo(() => {
-    const m = new Map<string, { name: string; role: string; monthlyCostBRL: number | null }>();
-    for (const p of profiles) m.set(p.id, { name: p.name ?? p.email, role: p.role, monthlyCostBRL: p.monthly_cost_brl });
+    const m = new Map<string, { name: string; monthlyCostBRL: number | null }>();
+    for (const p of profiles) m.set(p.id, { name: p.name ?? p.email, monthlyCostBRL: p.monthly_cost_brl });
     return m;
   }, [profiles]);
 
@@ -238,7 +240,9 @@ export default function OkrCycles() {
 
   const businessCaseOk =
     expectedAtt !== null && expectedAtt >= 0 && expectedAtt <= 100 &&
-    (!requiresBusinessCase || (!!valueBRL && valueBRL > 0 && !!effortHours && effortHours > 0 && !!ownerMonthly && ownerMonthly > 0 && costBRL !== null && roi !== null));
+    (!requiresBusinessCase ||
+      !okrRoiEnabled ||
+      (!!valueBRL && valueBRL > 0 && !!effortHours && effortHours > 0 && !!ownerMonthly && ownerMonthly > 0 && costBRL !== null && roi !== null));
 
   if (!hasCompany) {
     return (
@@ -676,7 +680,7 @@ export default function OkrCycles() {
               </div>
             </div>
 
-            {requiresBusinessCase ? (
+            {requiresBusinessCase && okrRoiEnabled ? (
               <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
                 <p className="mt-1 text-sm text-muted-foreground">

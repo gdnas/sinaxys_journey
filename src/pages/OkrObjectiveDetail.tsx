@@ -643,11 +643,12 @@ export default function OkrObjectiveDetail() {
             </div>
 
             <div className="grid gap-2">
-              <Label>Tempo estimado (min{requiresTaskBusinessCase ? ", obrigatório" : ", opcional"})</Label>
+              <Label>Tempo estimado (min)</Label>
               <Input className="h-11 rounded-xl" value={taskEstimate} onChange={(e) => setTaskEstimate(e.target.value)} placeholder="30" />
+              <div className="text-xs text-muted-foreground">Estimativa simples para planejamento e priorização.</div>
             </div>
 
-            {requiresTaskBusinessCase ? (
+            {okrRoiEnabled ? (
               <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
                 <p className="mt-1 text-sm text-muted-foreground">Estimativa rápida: impacto (R$) e ROI baseado no custo/h do responsável.</p>
