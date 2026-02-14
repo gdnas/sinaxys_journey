@@ -598,7 +598,7 @@ export default function Rankings() {
             });
           }}
         >
-          <TabsList className="h-11 rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+          <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
             <TabsTrigger value="ranking" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
               Ranking
             </TabsTrigger>

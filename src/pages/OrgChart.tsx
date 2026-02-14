@@ -183,7 +183,7 @@ function ListNode({
   onOpen: (p: DbProfilePublic) => void;
   pointsByUserId: Map<string, number>;
   xpByUserId: Map<string, number>;
-  tierByUserId: Map<string, string | null>;
+  tierByUserId: Map<string | null, string | null>;
 }) {
   const p = node.data;
   const deptName = p.department_id ? deptById.get(p.department_id) : undefined;
@@ -439,7 +439,7 @@ export default function OrgChart() {
         <Separator className="my-5" />
 
         <Tabs defaultValue="list" className="w-full">
-          <TabsList className="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+          <TabsList className="w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
             <TabsTrigger value="list" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
               Lista
             </TabsTrigger>

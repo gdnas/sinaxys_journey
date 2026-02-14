@@ -384,7 +384,7 @@ export default function AdminOrgChart() {
         <Separator className="my-5" />
 
         <Tabs defaultValue="list" className="w-full">
-          <TabsList className="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+          <TabsList className="w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
             <TabsTrigger value="list" className="rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
               Lista
             </TabsTrigger>

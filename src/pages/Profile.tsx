@@ -205,46 +205,50 @@ export default function Profile() {
 
   return (
     <div className="grid gap-6">
-      <div className="rounded-3xl border bg-white p-6">
+      <div className="rounded-3xl border bg-white p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className="min-w-0">
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minha área</div>
             <p className="mt-1 text-sm text-muted-foreground">Perfil, trabalho, documentos e financeiro.</p>
 
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+            <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap sm:gap-2">
+              <Badge className="w-fit max-w-full truncate rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                 {roleLabel(user.role)}
               </Badge>
               {company?.name ? (
-                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{company.name}</Badge>
+                <Badge className="w-fit max-w-full truncate rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                  {company.name}
+                </Badge>
               ) : null}
               {deptName ? (
-                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{deptName}</Badge>
+                <Badge className="w-fit max-w-full truncate rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                  {deptName}
+                </Badge>
               ) : null}
             </div>
           </div>
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
             <UserRound className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
           </div>
         </div>
       </div>
 
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16 ring-2 ring-[color:var(--sinaxys-border)]">
+          <div className="flex min-w-0 items-center gap-4">
+            <Avatar className="h-16 w-16 shrink-0 ring-2 ring-[color:var(--sinaxys-border)]">
               <AvatarImage src={avatarUrl || undefined} alt={name} />
               <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
                 {initials(name || user.email)}
               </AvatarFallback>
             </Avatar>
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{user.email}</div>
-              <div className="mt-1 text-xs text-muted-foreground">ID: {user.id}</div>
+            <div className="min-w-0">
+              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{user.email}</div>
+              <div className="mt-1 truncate text-xs text-muted-foreground">ID: {user.id}</div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2 sm:flex sm:flex-wrap sm:justify-end">
             <input
               ref={fileRef}
               type="file"
@@ -262,12 +266,12 @@ export default function Profile() {
                 reader.readAsDataURL(file);
               }}
             />
-            <Button variant="outline" className="rounded-xl" onClick={() => fileRef.current?.click()}>
+            <Button variant="outline" className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto" onClick={() => fileRef.current?.click()}>
               Enviar foto
             </Button>
             <Button
               variant="outline"
-              className="rounded-xl"
+              className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto"
               data-tour="profile-redo-onboarding"
               onClick={() => startTour()}
               title="Refazer o tour guiado"
@@ -275,7 +279,7 @@ export default function Profile() {
               <Sparkles className="mr-2 h-4 w-4" />
               Refazer onboarding
             </Button>
-            <Button asChild variant="outline" className="rounded-xl">
+            <Button asChild variant="outline" className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto">
               <Link to="/password">
                 <KeyRound className="mr-2 h-4 w-4" />
                 Alterar senha
@@ -287,7 +291,7 @@ export default function Profile() {
         <Separator className="my-5" />
 
         <Tabs defaultValue="perfil" className="w-full">
-          <TabsList className="h-11 rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+          <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
             <TabsTrigger value="perfil" className="rounded-xl">Perfil</TabsTrigger>
             <TabsTrigger value="trabalho" className="rounded-xl">Trabalho</TabsTrigger>
             <TabsTrigger value="docs" className="rounded-xl">Documentos</TabsTrigger>
@@ -684,7 +688,7 @@ export default function Profile() {
               </div>
 
               <Tabs defaultValue="meus" className="w-full">
-                <TabsList className="h-11 w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+                <TabsList className="h-11 w-full justify-start gap-1 overflow-x-auto whitespace-nowrap rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
                   <TabsTrigger value="meus" className="rounded-xl">Meus pedidos</TabsTrigger>
                   {canApproveVacation ? <TabsTrigger value="apro" className="rounded-xl">Aprovações</TabsTrigger> : null}
                 </TabsList>
