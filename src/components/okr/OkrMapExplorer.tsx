@@ -566,6 +566,15 @@ function Tree({
               onClick={() => ctx.select({ kind: "fundamental", id: `fund:${field}` as any, field })}
             />
           ))}
+
+          {/* Placeholder when nothing is filled yet */}
+          {fundamentalsFields.every(
+            ({ field }) => !(typeof (fundamentals as any)?.[field] === "string" && String((fundamentals as any)[field]).trim().length),
+          ) ? (
+            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+              Nenhum fundamento preenchido ainda. Clique em um item para preencher rapidamente.
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -606,8 +615,13 @@ function Tree({
             />
           ))}
           {!strategy.length ? (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-              Nenhum objetivo de longo prazo ainda.
+            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+              Nenhum objetivo de longo prazo ainda. Crie um para orientar as decisões do ano.
+              <div className="mt-3">
+                <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
+                  <Link to="/okr/mapa">Criar objetivo (use o botão no topo)</Link>
+                </Button>
+              </div>
             </div>
           ) : null}
         </div>
@@ -636,116 +650,138 @@ function Tree({
           <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anual</div>
             <div className="mt-2 grid gap-2">
-              {cycleGroups.annual.map((c) => {
-                const expanded = !!ctx.expanded[`c:${c.id}`];
-                const objs = objectivesByCycle.get(c.id) ?? [];
-                return (
-                  <div key={c.id} className="grid gap-2">
-                    <Row
-                      depth={1}
-                      active={ctx.activeId === `c:${c.id}`}
-                      expanded={expanded}
-                      canExpand
-                      icon={<CalendarClock className="h-4 w-4" />}
-                      title={cycleLabel(c)}
-                      subtitle={c.status}
-                      right={
-                        <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                          {expanded ? objs.length : "…"}
-                        </Badge>
-                      }
-                      onToggle={() => ctx.toggle(`c:${c.id}`)}
-                      onClick={() => ctx.select({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
-                    />
+              {cycleGroups.annual.length ? (
+                cycleGroups.annual.map((c) => {
+                  const expanded = !!ctx.expanded[`c:${c.id}`];
+                  const objs = objectivesByCycle.get(c.id) ?? [];
+                  return (
+                    <div key={c.id} className="grid gap-2">
+                      <Row
+                        depth={1}
+                        active={ctx.activeId === `c:${c.id}`}
+                        expanded={expanded}
+                        canExpand
+                        icon={<CalendarClock className="h-4 w-4" />}
+                        title={cycleLabel(c)}
+                        subtitle={c.status}
+                        right={
+                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                            {expanded ? objs.length : "…"}
+                          </Badge>
+                        }
+                        onToggle={() => ctx.toggle(`c:${c.id}`)}
+                        onClick={() => ctx.select({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
+                      />
 
-                    {expanded ? (
-                      <div className="grid gap-2 pl-3">
-                        {objs.length ? (
-                          objs.map((o) => (
-                            <Row
-                              key={o.id}
-                              depth={2}
-                              active={ctx.activeId === `o:${o.id}`}
-                              expanded={false}
-                              canExpand={false}
-                              icon={<Target className="h-4 w-4" />}
-                              title={o.title}
-                              subtitle={
-                                <span className="inline-flex items-center gap-2">
-                                  <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
-                                  <span>•</span>
-                                  <span>{objectiveLevelLabel(o.level)}</span>
-                                </span>
-                              }
-                              onClick={() => ctx.select({ kind: "objective", id: `o:${o.id}`, objectiveId: o.id })}
-                            />
-                          ))
-                        ) : (
-                          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">Sem objetivos ainda.</div>
-                        )}
-                      </div>
-                    ) : null}
+                      {expanded ? (
+                        <div className="grid gap-2 pl-3">
+                          {objs.length ? (
+                            objs.map((o) => (
+                              <Row
+                                key={o.id}
+                                depth={2}
+                                active={ctx.activeId === `o:${o.id}`}
+                                expanded={false}
+                                canExpand={false}
+                                icon={<Target className="h-4 w-4" />}
+                                title={o.title}
+                                subtitle={
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
+                                    <span>•</span>
+                                    <span>{objectiveLevelLabel(o.level)}</span>
+                                  </span>
+                                }
+                                onClick={() => ctx.select({ kind: "objective", id: `o:${o.id}`, objectiveId: o.id })}
+                              />
+                            ))
+                          ) : (
+                            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">Sem objetivos ainda.</div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
+                  Nenhum ciclo anual cadastrado.
+                  <div className="mt-3">
+                    <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
+                      <Link to="/okr/ciclos">Criar ciclo anual</Link>
+                    </Button>
                   </div>
-                );
-              })}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trimestral</div>
             <div className="mt-2 grid gap-2">
-              {cycleGroups.quarterly.slice(0, 8).map((c) => {
-                const expanded = !!ctx.expanded[`c:${c.id}`];
-                const objs = objectivesByCycle.get(c.id) ?? [];
-                return (
-                  <div key={c.id} className="grid gap-2">
-                    <Row
-                      depth={1}
-                      active={ctx.activeId === `c:${c.id}`}
-                      expanded={expanded}
-                      canExpand
-                      icon={<CalendarClock className="h-4 w-4" />}
-                      title={cycleLabel(c)}
-                      subtitle={c.status}
-                      right={
-                        <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                          {expanded ? objs.length : "…"}
-                        </Badge>
-                      }
-                      onToggle={() => ctx.toggle(`c:${c.id}`)}
-                      onClick={() => ctx.select({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
-                    />
+              {cycleGroups.quarterly.length ? (
+                cycleGroups.quarterly.slice(0, 8).map((c) => {
+                  const expanded = !!ctx.expanded[`c:${c.id}`];
+                  const objs = objectivesByCycle.get(c.id) ?? [];
+                  return (
+                    <div key={c.id} className="grid gap-2">
+                      <Row
+                        depth={1}
+                        active={ctx.activeId === `c:${c.id}`}
+                        expanded={expanded}
+                        canExpand
+                        icon={<CalendarClock className="h-4 w-4" />}
+                        title={cycleLabel(c)}
+                        subtitle={c.status}
+                        right={
+                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                            {expanded ? objs.length : "…"}
+                          </Badge>
+                        }
+                        onToggle={() => ctx.toggle(`c:${c.id}`)}
+                        onClick={() => ctx.select({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
+                      />
 
-                    {expanded ? (
-                      <div className="grid gap-2 pl-3">
-                        {objs.length ? (
-                          objs.map((o) => (
-                            <Row
-                              key={o.id}
-                              depth={2}
-                              active={ctx.activeId === `o:${o.id}`}
-                              expanded={false}
-                              canExpand={false}
-                              icon={<CircleDot className="h-4 w-4" />}
-                              title={o.title}
-                              subtitle={
-                                <span className="inline-flex items-center gap-2">
-                                  <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
-                                  <span>•</span>
-                                  <span>{objectiveLevelLabel(o.level)}</span>
-                                </span>
-                              }
-                              onClick={() => ctx.select({ kind: "objective", id: `o:${o.id}`, objectiveId: o.id })}
-                            />
-                          ))
-                        ) : (
-                          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">Sem objetivos ainda.</div>
-                        )}
-                      </div>
-                    ) : null}
+                      {expanded ? (
+                        <div className="grid gap-2 pl-3">
+                          {objs.length ? (
+                            objs.map((o) => (
+                              <Row
+                                key={o.id}
+                                depth={2}
+                                active={ctx.activeId === `o:${o.id}`}
+                                expanded={false}
+                                canExpand={false}
+                                icon={<CircleDot className="h-4 w-4" />}
+                                title={o.title}
+                                subtitle={
+                                  <span className="inline-flex items-center gap-2">
+                                    <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
+                                    <span>•</span>
+                                    <span>{objectiveLevelLabel(o.level)}</span>
+                                  </span>
+                                }
+                                onClick={() => ctx.select({ kind: "objective", id: `o:${o.id}`, objectiveId: o.id })}
+                              />
+                            ))
+                          ) : (
+                            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">Sem objetivos ainda.</div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
+                  Nenhum ciclo trimestral cadastrado.
+                  <div className="mt-3">
+                    <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
+                      <Link to="/okr/ciclos">Criar ciclo trimestral</Link>
+                    </Button>
                   </div>
-                );
-              })}
+                </div>
+              )}
 
               {cycleGroups.quarterly.length > 8 ? (
                 <div className="text-xs text-muted-foreground">Mostrando os 8 ciclos trimestrais mais recentes.</div>
@@ -858,40 +894,62 @@ function ListView({
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anual</div>
             <div className="mt-2 grid gap-2">
-              {annual.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
-                  onClick={() => onPick({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{cycleLabel(c)}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{c.status}</div>
+              {annual.length ? (
+                annual.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
+                    onClick={() => onPick({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{cycleLabel(c)}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{c.status}</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                  Nenhum ciclo anual ainda.
+                  <div className="mt-3">
+                    <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
+                      <Link to="/okr/ciclos">Criar ciclo anual</Link>
+                    </Button>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ))}
+                </div>
+              )}
             </div>
           </div>
 
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trimestral</div>
             <div className="mt-2 grid gap-2">
-              {quarterly.slice(0, 10).map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
-                  onClick={() => onPick({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{cycleLabel(c)}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{c.status}</div>
+              {quarterly.length ? (
+                quarterly.slice(0, 10).map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
+                    onClick={() => onPick({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{cycleLabel(c)}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{c.status}</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                  Nenhum ciclo trimestral ainda.
+                  <div className="mt-3">
+                    <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
+                      <Link to="/okr/ciclos">Criar ciclo trimestral</Link>
+                    </Button>
                   </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                </button>
-              ))}
+                </div>
+              )}
               {quarterly.length > 10 ? <div className="text-xs text-muted-foreground">Mostrando os 10 mais recentes.</div> : null}
             </div>
           </div>
