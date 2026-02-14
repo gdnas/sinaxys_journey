@@ -97,6 +97,37 @@ export async function createStrategyObjective(
   return data as DbStrategyObjective;
 }
 
+export async function updateStrategyObjective(
+  id: string,
+  patch: Partial<Pick<DbStrategyObjective, "title" | "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "horizon_years">>,
+) {
+  const update: Record<string, any> = {};
+  if ("title" in patch) update.title = patch.title?.trim();
+  if ("description" in patch) update.description = patch.description ?? null;
+  if ("growth_levers" in patch) update.growth_levers = patch.growth_levers ?? null;
+  if ("structuring_projects" in patch) update.structuring_projects = patch.structuring_projects ?? null;
+  if ("bets_and_expansions" in patch) update.bets_and_expansions = patch.bets_and_expansions ?? null;
+  if ("order_index" in patch) update.order_index = patch.order_index ?? 0;
+  if ("horizon_years" in patch) update.horizon_years = patch.horizon_years;
+
+  const { data, error } = await supabase
+    .from("strategy_objectives")
+    .update(update)
+    .eq("id", id)
+    .select(
+      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,created_at,updated_at",
+    )
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data ?? null) as DbStrategyObjective | null;
+}
+
+export async function deleteStrategyObjective(id: string) {
+  const { error } = await supabase.from("strategy_objectives").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export type CycleType = "ANNUAL" | "QUARTERLY";
 export type CycleStatus = "PLANNING" | "ACTIVE" | "CLOSED";
 
