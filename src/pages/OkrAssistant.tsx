@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { brl, brlPerHourFromMonthly } from "@/lib/costs";
 import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
 import {
@@ -130,6 +131,7 @@ export default function OkrAssistant() {
 
   const requiresBusinessCase = !!user.departmentId;
   const myMonthly = user.monthlyCostBRL ?? null;
+  const { enabled: okrRoiEnabled } = useCompanyModuleEnabled("OKR_ROI");
 
   const expectedAtt = parsePtNumber(objectiveExpected);
   const objectiveValueBRL = parsePtNumber(objectiveValue);
@@ -330,7 +332,7 @@ export default function OkrAssistant() {
               <Textarea className="min-h-[88px] rounded-2xl" value={objectiveReason} onChange={(e) => setObjectiveReason(e.target.value)} />
             </div>
 
-            {requiresBusinessCase ? (
+            {requiresBusinessCase && okrRoiEnabled ? (
               <div className="mt-4 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
                 <p className="mt-1 text-sm text-muted-foreground">Como esse objetivo retorna dinheiro — e qual o ROI, baseado no seu custo/hora.</p>

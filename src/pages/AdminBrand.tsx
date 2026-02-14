@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ImageIcon, Palette, RotateCcw, Save, Trash2, Handshake } from "lucide-react";
+import { ImageIcon, Palette, RotateCcw, Save, Trash2, Handshake, Target, Trophy, GraduationCap, Wallet, BarChart3 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -57,6 +57,46 @@ function ColorField({
   );
 }
 
+function ModuleToggle({
+  icon,
+  title,
+  description,
+  checked,
+  locked,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  checked: boolean;
+  locked?: boolean;
+  onChange: (next: boolean) => void;
+}) {
+  return (
+    <div
+      className={
+        "flex flex-col gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 sm:flex-row sm:items-center sm:justify-between " +
+        (locked ? "opacity-90" : "")
+      }
+    >
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 grid h-10 w-10 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
+          {icon}
+        </div>
+        <div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{title}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{description}</div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{checked ? "ativo" : "inativo"}</div>
+        <Switch checked={checked} disabled={locked} onCheckedChange={onChange} />
+      </div>
+    </div>
+  );
+}
+
 export default function AdminBrand() {
   const { toast } = useToast();
   const { company, setCompany, resetCompany, companyId } = useCompany();
@@ -75,19 +115,51 @@ export default function AdminBrand() {
     );
   }, [name, tagline, logoDataUrl, colors, company]);
 
-  const { data: pdiEnabled = false, refetch: refetchModules } = useQuery({
+  const queryEnabled = !!companyId;
+
+  const { data: okrEnabled = true, refetch: refetchOkr } = useQuery({
+    queryKey: ["company-module", companyId, "OKR"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "OKR"),
+    enabled: queryEnabled,
+  });
+
+  const { data: okrRoiEnabled = true, refetch: refetchOkrRoi } = useQuery({
+    queryKey: ["company-module", companyId, "OKR_ROI"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "OKR_ROI"),
+    enabled: queryEnabled,
+  });
+
+  const { data: pdiEnabled = true, refetch: refetchPdi } = useQuery({
     queryKey: ["company-module", companyId, "PDI_PERFORMANCE"],
     queryFn: () => isCompanyModuleEnabled(String(companyId), "PDI_PERFORMANCE"),
-    enabled: !!companyId,
+    enabled: queryEnabled,
+  });
+
+  const { data: tracksEnabled = true, refetch: refetchTracks } = useQuery({
+    queryKey: ["company-module", companyId, "TRACKS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "TRACKS"),
+    enabled: queryEnabled,
+  });
+
+  const { data: pointsEnabled = true, refetch: refetchPoints } = useQuery({
+    queryKey: ["company-module", companyId, "POINTS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "POINTS"),
+    enabled: queryEnabled,
+  });
+
+  const { data: costsEnabled = true, refetch: refetchCosts } = useQuery({
+    queryKey: ["company-module", companyId, "COSTS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "COSTS"),
+    enabled: queryEnabled,
   });
 
   return (
     <div className="grid gap-6">
       <div className="flex flex-col justify-between gap-3 rounded-3xl border bg-white p-6 md:flex-row md:items-center">
         <div>
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Empresa & Marca</div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Empresa, marca e módulos</div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Ajuste o nome, o logo e o esquema de cores. As mudanças são aplicadas na hora e ficam salvas no ambiente desta empresa.
+            Defina como a sua empresa aparece e quais módulos ficam visíveis para o time. (No futuro, o Master Admin controla o que cada empresa pode ativar.)
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -144,7 +216,7 @@ export default function AdminBrand() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Identidade</div>
-              <p className="mt-1 text-sm text-muted-foreground">Nome, tagline e logo que aparecem na navegação e em telas-chave.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Nome, proposta (tagline) e logo que aparecem no topo e no login.</p>
             </div>
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
               <ImageIcon className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -159,7 +231,7 @@ export default function AdminBrand() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="h-11 rounded-xl"
-                placeholder="Ex.: Acme University"
+                placeholder="Ex.: Journey — Acme"
               />
             </div>
             <div className="grid gap-2">
@@ -169,7 +241,7 @@ export default function AdminBrand() {
                 value={tagline}
                 onChange={(e) => setTagline(e.target.value)}
                 className="h-11 rounded-xl"
-                placeholder="Ex.: Onboarding e evolução com ritmo"
+                placeholder="Ex.: estratégia em execução, desenvolvimento e reconhecimento"
               />
             </div>
 
@@ -267,37 +339,94 @@ export default function AdminBrand() {
       </div>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulos (ativação por empresa)</div>
-        <p className="mt-1 text-sm text-muted-foreground">Ative/desative recursos para este tenant. Isso controla o menu e o acesso.</p>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulos (visibilidade por empresa)</div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              OKRs é o módulo primário. Os demais podem ser ocultados conforme a estratégia da empresa.
+            </p>
+          </div>
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+            <BarChart3 className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+          </div>
+        </div>
 
         <Separator className="my-5" />
 
-        <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 grid h-10 w-10 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
-              <Handshake className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">PDI & Performance</div>
-              <div className="mt-1 text-sm text-muted-foreground">Check-ins, 1:1, feedback contínuo e histórico profissional.</div>
-            </div>
-          </div>
+        <div className="grid gap-3">
+          <ModuleToggle
+            icon={<Target className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+            title="OKRs (primário)"
+            description="Foco e execução: ciclos, objetivos, KRs, entregáveis e tarefas."
+            checked={okrEnabled}
+            locked
+            onChange={() => null}
+          />
 
-          <div className="flex items-center gap-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{pdiEnabled ? "ativo" : "inativo"}</div>
-            <Switch
-              checked={pdiEnabled}
-              onCheckedChange={async (v) => {
-                if (!companyId) return;
-                await setCompanyModuleEnabled(companyId, "PDI_PERFORMANCE", v);
-                await refetchModules();
-                toast({
-                  title: v ? "Módulo ativado" : "Módulo desativado",
-                  description: "O menu será atualizado automaticamente.",
-                });
-              }}
-            />
-          </div>
+          <ModuleToggle
+            icon={<Handshake className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+            title="PDI & Performance"
+            description="Check-ins, 1:1, feedback contínuo e histórico profissional."
+            checked={pdiEnabled}
+            onChange={async (v) => {
+              if (!companyId) return;
+              await setCompanyModuleEnabled(companyId, "PDI_PERFORMANCE", v);
+              await refetchPdi();
+              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+            }}
+          />
+
+          <ModuleToggle
+            icon={<GraduationCap className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+            title="Trilhas"
+            description="Onboarding e aprendizagem contínua em sequência (conteúdo, checkpoints e quiz)."
+            checked={tracksEnabled}
+            onChange={async (v) => {
+              if (!companyId) return;
+              await setCompanyModuleEnabled(companyId, "TRACKS", v);
+              await refetchTracks();
+              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+            }}
+          />
+
+          <ModuleToggle
+            icon={<Trophy className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+            title="Points"
+            description="Reconhecimento: ranking, regras, tiers e recompensas."
+            checked={pointsEnabled}
+            onChange={async (v) => {
+              if (!companyId) return;
+              await setCompanyModuleEnabled(companyId, "POINTS", v);
+              await refetchPoints();
+              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+            }}
+          />
+
+          <ModuleToggle
+            icon={<Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+            title="Custos"
+            description="Custos mensais por pessoa para apoiar decisões e (opcionalmente) cálculos de ROI."
+            checked={costsEnabled}
+            onChange={async (v) => {
+              if (!companyId) return;
+              await setCompanyModuleEnabled(companyId, "COSTS", v);
+              await refetchCosts();
+              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+            }}
+          />
+
+          <ModuleToggle
+            icon={<Target className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+            title="ROI dentro de OKR (opcional)"
+            description="Habilita a seção de impacto financeiro e ROI em objetivos/tarefas."
+            checked={okrRoiEnabled}
+            onChange={async (v) => {
+              if (!companyId) return;
+              await setCompanyModuleEnabled(companyId, "OKR_ROI", v);
+              await refetchOkrRoi();
+              toast({ title: v ? "ROI ativado" : "ROI ocultado", description: "As telas de OKR serão atualizadas automaticamente." });
+            }}
+          />
         </div>
       </Card>
 
@@ -312,7 +441,7 @@ export default function AdminBrand() {
                 {logoDataUrl ? (
                   <img src={logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
                 ) : (
-                  <span className="text-sm font-semibold text-white">{(name.trim()[0] ?? "S").toUpperCase()}</span>
+                  <span className="text-sm font-semibold text-white">{(name.trim()[0] ?? "J").toUpperCase()}</span>
                 )}
               </div>
               <div className="min-w-0">

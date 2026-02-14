@@ -1,6 +1,38 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type ModuleKey = "PDI_PERFORMANCE" | "OKR" | "TRACKS" | "POINTS" | "ORG" | "PROFILE" | "ADMIN" | "MASTER" | (string & {});
+// NOTE:
+// - `company_modules` rows are optional. If a row doesn't exist, we treat the module as enabled by default.
+// - This keeps all modules "liberados" for new companies unless explicitly disabled.
+
+export type ModuleKey =
+  | "PDI_PERFORMANCE"
+  | "OKR"
+  | "OKR_ROI"
+  | "TRACKS"
+  | "POINTS"
+  | "COSTS"
+  | "ORG"
+  | "PROFILE"
+  | "ADMIN"
+  | "MASTER"
+  | (string & {});
+
+const DEFAULT_ENABLED: Record<string, boolean> = {
+  PDI_PERFORMANCE: true,
+  OKR: true,
+  OKR_ROI: true,
+  TRACKS: true,
+  POINTS: true,
+  COSTS: true,
+  ORG: true,
+  PROFILE: true,
+  ADMIN: true,
+  MASTER: true,
+};
+
+export function getDefaultModuleEnabled(moduleKey: ModuleKey) {
+  return DEFAULT_ENABLED[String(moduleKey)] ?? true;
+}
 
 export type DbCompanyModule = {
   company_id: string;
@@ -34,7 +66,8 @@ export async function listCompanyModules(companyId: string) {
 
 export async function isCompanyModuleEnabled(companyId: string, moduleKey: ModuleKey) {
   const row = await getCompanyModule(companyId, moduleKey);
-  return !!row?.enabled;
+  if (!row) return getDefaultModuleEnabled(moduleKey);
+  return !!row.enabled;
 }
 
 export async function setCompanyModuleEnabled(companyId: string, moduleKey: ModuleKey, enabled: boolean) {

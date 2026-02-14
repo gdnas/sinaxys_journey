@@ -41,6 +41,7 @@ type NavLinkItem = {
   label: string;
   icon: React.ReactNode;
   roles: Role[];
+  moduleKey?: string;
 };
 
 type NavGroupItem = {
@@ -48,6 +49,7 @@ type NavGroupItem = {
   label: string;
   icon: React.ReactNode;
   children: NavLinkItem[];
+  moduleKey?: string;
 };
 
 type NavItem = NavLinkItem | NavGroupItem;
@@ -92,13 +94,15 @@ const nav: NavItem[] = [
     label: "PDI & Performance",
     icon: <Handshake className="h-4 w-4" />,
     roles: ["COLABORADOR", "HEAD", "ADMIN", "MASTERADMIN"],
+    moduleKey: "PDI_PERFORMANCE",
   },
 
-  // Sinaxys Points
+  // Points
   {
     type: "group",
-    label: "Sinaxys Points",
+    label: "Points",
     icon: <Trophy className="h-4 w-4" />,
+    moduleKey: "POINTS",
     children: [
       {
         type: "link",
@@ -106,6 +110,7 @@ const nav: NavItem[] = [
         label: "Ranking",
         icon: <Trophy className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR", "MASTERADMIN"],
+        moduleKey: "POINTS",
       },
       {
         type: "link",
@@ -113,6 +118,7 @@ const nav: NavItem[] = [
         label: "Certificados",
         icon: <Award className="h-4 w-4" />,
         roles: ["COLABORADOR", "HEAD", "ADMIN"],
+        moduleKey: "TRACKS",
       },
     ],
   },
@@ -124,6 +130,7 @@ const nav: NavItem[] = [
     label: "OKRs",
     icon: <Target className="h-4 w-4" />,
     roles: ["ADMIN", "HEAD", "COLABORADOR", "MASTERADMIN"],
+    moduleKey: "OKR",
   },
 
   // Empresa
@@ -138,6 +145,7 @@ const nav: NavItem[] = [
         label: "Organograma",
         icon: <Network className="h-4 w-4" />,
         roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "ORG",
       },
       {
         type: "link",
@@ -149,7 +157,7 @@ const nav: NavItem[] = [
       {
         type: "link",
         to: "/admin/brand",
-        label: "Marca",
+        label: "Marca & Módulos",
         icon: <Palette className="h-4 w-4" />,
         roles: ["ADMIN"],
       },
@@ -161,6 +169,7 @@ const nav: NavItem[] = [
     type: "group",
     label: "Trilhas",
     icon: <GraduationCap className="h-4 w-4" />,
+    moduleKey: "TRACKS",
     children: [
       {
         type: "link",
@@ -168,6 +177,7 @@ const nav: NavItem[] = [
         label: "Trilhas",
         icon: <GraduationCap className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "TRACKS",
       },
       {
         type: "link",
@@ -175,6 +185,7 @@ const nav: NavItem[] = [
         label: "Montar trilhas",
         icon: <GraduationCap className="h-4 w-4" />,
         roles: ["ADMIN"],
+        moduleKey: "TRACKS",
       },
       {
         type: "link",
@@ -182,6 +193,7 @@ const nav: NavItem[] = [
         label: "Head — Trilhas",
         icon: <GraduationCap className="h-4 w-4" />,
         roles: ["HEAD"],
+        moduleKey: "TRACKS",
       },
     ],
   },
@@ -223,6 +235,7 @@ const nav: NavItem[] = [
     label: "Head — Custos",
     icon: <Wallet className="h-4 w-4" />,
     roles: ["HEAD"],
+    moduleKey: "COSTS",
   },
 
   // Custos (admin)
@@ -232,6 +245,7 @@ const nav: NavItem[] = [
     label: "Custos",
     icon: <Wallet className="h-4 w-4" />,
     roles: ["ADMIN"],
+    moduleKey: "COSTS",
   },
 
   // Minha área
@@ -344,25 +358,70 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { company, companyId } = useCompany();
   const navigate = useNavigate();
 
-  const { data: pdiEnabled = false } = useQuery({
+  // Module flags
+  const { data: pdiEnabled = true } = useQuery({
     queryKey: ["company-module", companyId, "PDI_PERFORMANCE"],
     queryFn: () => isCompanyModuleEnabled(String(companyId), "PDI_PERFORMANCE"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
+  const { data: tracksEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "TRACKS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "TRACKS"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
+  const { data: pointsEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "POINTS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "POINTS"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
+  const { data: costsEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "COSTS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "COSTS"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
+  const { data: okrEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "OKR"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "OKR"),
     enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
   });
 
   if (!user) return <>{children}</>;
 
   const allowPdiLink = user.role === "MASTERADMIN" ? true : !!pdiEnabled;
+  const allowTracks = user.role === "MASTERADMIN" ? true : !!tracksEnabled;
+  const allowPoints = user.role === "MASTERADMIN" ? true : !!pointsEnabled;
+  const allowCosts = user.role === "MASTERADMIN" ? true : !!costsEnabled;
+  const allowOkr = user.role === "MASTERADMIN" ? true : !!okrEnabled;
+
+  const moduleAllowed = (key?: string) => {
+    if (!key) return true;
+    switch (key) {
+      case "PDI_PERFORMANCE":
+        return allowPdiLink;
+      case "TRACKS":
+        return allowTracks;
+      case "POINTS":
+        return allowPoints;
+      case "COSTS":
+        return allowCosts;
+      case "OKR":
+        return allowOkr;
+      default:
+        return true;
+    }
+  };
 
   const visible = nav
     .map((item) => {
       if (item.type === "link") {
-        if (item.to === "/pdi-performance" && !allowPdiLink) return null;
+        if (!moduleAllowed(item.moduleKey)) return null;
         return item.roles.includes(user.role) ? item : null;
       }
 
+      if (!moduleAllowed(item.moduleKey)) return null;
+
       const children = item.children.filter((c) => {
-        if (c.to === "/pdi-performance" && !allowPdiLink) return false;
+        if (!moduleAllowed(c.moduleKey)) return false;
         return c.roles.includes(user.role);
       });
       if (!children.length) return null;
