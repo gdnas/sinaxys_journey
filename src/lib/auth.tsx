@@ -163,10 +163,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     hydrateFromSession();
 
-    const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-      const nextId = session?.user?.id ?? null;
-      if (sessionUserIdRef.current === nextId) return;
-      sessionUserIdRef.current = nextId;
+    const { data } = supabase.auth.onAuthStateChange((_event, _session) => {
+      // We intentionally re-hydrate on every auth event (token refresh, user updated, etc.).
+      // This keeps profile-derived flags (e.g., profiles.active) authoritative.
       hydrateFromSession();
     });
 
@@ -195,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!e.includes("@")) return { ok: false as const, message: "Informe um e-mail válido." };
         if (!p.trim()) return { ok: false as const, message: "Informe a senha." };
 
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email: e,
           password: p,
         });
@@ -204,14 +203,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return { ok: false as const, message: error.message };
         }
 
+        const uid = data.user?.id ?? null;
+        if (!uid) {
+          return { ok: false as const, message: "Não foi possível validar seu acesso. Tente novamente." };
+        }
+
+        // Enforce profile access rules *immediately* after auth.
+        // This prevents inactive users from "logging in" and only then being kicked out.
+        const prof = await fetchMyProfile(uid);
+        if (!prof) {
+          await supabase.auth.signOut();
+          return { ok: false as const, message: "Seu acesso ainda não foi provisionado. Solicite ao administrador da sua empresa." };
+        }
+
+        if (!prof.active) {
+          await supabase.auth.signOut();
+          return { ok: false as const, message: "Usuário inativo. Solicite reativação ao administrador." };
+        }
+
         await hydrateFromSession();
 
-        const { data: uData } = await supabase.auth.getUser();
-        const uid = uData.user?.id;
-        if (!uid) return { ok: true as const, mustChangePassword: false };
-
-        const prof = await fetchMyProfile(uid);
-        return { ok: true as const, mustChangePassword: !!prof?.must_change_password };
+        return { ok: true as const, mustChangePassword: !!prof.must_change_password };
       },
       async logout() {
         await supabase.auth.signOut();
