@@ -47,12 +47,14 @@ export default function VacationApprovals() {
   const [decisionNote, setDecisionNote] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const allowed = !!user && !!companyId && (user.role === "ADMIN" || user.role === "HEAD");
-  if (!allowed) return null;
+  // IMPORTANT: do not early-return before hooks below.
+  // companyId can be null briefly on first render, which would otherwise change hook order.
+  const allowedRole = user?.role === "ADMIN" || user?.role === "HEAD";
+  const enabled = !!user && !!companyId && allowedRole;
 
   const { data: people = [] } = useQuery({
     queryKey: ["profiles-public", companyId],
-    enabled: !!companyId,
+    enabled,
     queryFn: () => listPublicProfilesByCompany(String(companyId)),
   });
 
@@ -64,7 +66,7 @@ export default function VacationApprovals() {
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["vacation", "approver", companyId],
-    enabled: !!companyId,
+    enabled,
     queryFn: () => listVacationRequestsForApprover(String(companyId)),
   });
 
@@ -77,6 +79,28 @@ export default function VacationApprovals() {
   }, [rows, statusFilter, personFilter]);
 
   const pendingCount = useMemo(() => rows.filter((r) => r.status === "PENDING").length, [rows]);
+
+  if (!allowedRole) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Acesso restrito</div>
+          <p className="mt-1 text-sm text-muted-foreground">Apenas Admin e Head podem acessar aprovações de férias.</p>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!companyId) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Férias • Aprovações</div>
+          <p className="mt-1 text-sm text-muted-foreground">Carregando contexto da empresa…</p>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -261,18 +285,17 @@ export default function VacationApprovals() {
                 disabled={busy || !decisionTarget}
                 className={cn(
                   "rounded-2xl text-white",
-                  decisionKind === "APPROVED"
-                    ? "bg-emerald-600 hover:bg-emerald-600/90"
-                    : "bg-rose-600 hover:bg-rose-600/90",
+                  decisionKind === "APPROVED" ? "bg-emerald-600 hover:bg-emerald-600/90" : "bg-rose-600 hover:bg-rose-600/90",
                 )}
                 onClick={async () => {
-                  if (!decisionTarget) return;
+                  const userId = user?.id;
+                  if (!decisionTarget || !userId) return;
                   setBusy(true);
                   try {
                     await decideVacationRequest({
                       id: decisionTarget.id,
                       status: decisionKind,
-                      decidedByUserId: user!.id,
+                      decidedByUserId: userId,
                       decisionNote,
                     });
                     toast({
