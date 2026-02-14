@@ -30,6 +30,7 @@ import { isCompanyModuleEnabled } from "@/lib/modulesDb";
 import { computeProgress } from "@/lib/sinaxys";
 import { getAssignmentsForUser } from "@/lib/journeyDb";
 import { fetchLeaderboard } from "@/lib/pointsDb";
+import { VacationSummaryCard } from "@/components/VacationSummaryCard";
 import {
   listOkrCycles,
   listOkrObjectives,
@@ -478,6 +479,7 @@ export default function AppDashboard() {
             img="/placeholder.svg"
             tourId="dash-org"
           />
+          {isAdmin || isHead ? <VacationSummaryCard /> : null}
         </div>
       </div>
 

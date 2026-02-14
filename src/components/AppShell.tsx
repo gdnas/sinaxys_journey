@@ -17,6 +17,7 @@ import {
   Trophy,
   Target,
   Handshake,
+  CalendarCheck2,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -91,6 +92,29 @@ const nav: NavItem[] = [
     label: "PDI & Performance",
     icon: <Handshake className="h-4 w-4" />,
     roles: ["COLABORADOR", "HEAD", "ADMIN", "MASTERADMIN"],
+  },
+
+  // Férias
+  {
+    type: "group",
+    label: "Férias",
+    icon: <CalendarCheck2 className="h-4 w-4" />,
+    children: [
+      {
+        type: "link",
+        to: "/vacation",
+        label: "Meus pedidos",
+        icon: <CalendarCheck2 className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+      },
+      {
+        type: "link",
+        to: "/vacation/approvals",
+        label: "Aprovações",
+        icon: <Shield className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD"],
+      },
+    ],
   },
 
   // Sinaxys Points

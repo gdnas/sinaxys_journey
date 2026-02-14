@@ -40,6 +40,8 @@ import OkrCycles from "./pages/OkrCycles";
 import OkrAssistant from "./pages/OkrAssistant";
 import OkrObjectiveDetail from "./pages/OkrObjectiveDetail";
 import PdiPerformance from "./pages/PdiPerformance";
+import VacationRequests from "./pages/VacationRequests";
+import VacationApprovals from "./pages/VacationApprovals";
 import { AuthProvider } from "@/lib/auth";
 import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
@@ -64,6 +66,24 @@ const App = () => (
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                       <ChangePassword />
+                    </RequireAuth>
+                  }
+                />
+
+                {/* Férias */}
+                <Route
+                  path="/vacation"
+                  element={
+                    <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                      <VacationRequests />
+                    </RequireAuth>
+                  }
+                />
+                <Route
+                  path="/vacation/approvals"
+                  element={
+                    <RequireAuth roles={["ADMIN", "HEAD"]}>
+                      <VacationApprovals />
                     </RequireAuth>
                   }
                 />
@@ -360,7 +380,6 @@ const App = () => (
                   }
                 />
 
-                {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </AppShell>
