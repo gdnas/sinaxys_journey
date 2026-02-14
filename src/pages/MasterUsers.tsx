@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/ResponsiveTable";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -200,84 +201,77 @@ export default function MasterUsers() {
           </div>
         ) : null}
 
-        <div className="max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
-          <Table className="min-w-[1240px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Papel</TableHead>
-                <TableHead>Empresa</TableHead>
-                <TableHead className="text-right">Acessos</TableHead>
-                <TableHead className="text-right">Último acesso</TableHead>
-                <TableHead className="text-right">Ativo</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((p) => {
-                const companyName = p.company_id ? companyById.get(p.company_id)?.name ?? p.company_id : "—";
-                const stat = statsByUserId.get(p.id);
+        <ResponsiveTable minWidth="1240px">
+          <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+            <Table className="min-w-[1240px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Papel</TableHead>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead className="text-right">Acessos</TableHead>
+                  <TableHead className="text-right">Último acesso</TableHead>
+                  <TableHead className="text-right">Ativo</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((p) => {
+                  const companyName = p.company_id ? companyById.get(p.company_id)?.name ?? p.company_id : "—";
+                  const stat = statsByUserId.get(p.id);
 
-                return (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{p.name ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{p.email}</TableCell>
-                    <TableCell>
-                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                        {roleLabel(p.role as any)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{companyName}</TableCell>
-                    <TableCell className="text-right font-medium text-[color:var(--sinaxys-ink)]">{stat ? stat.access_count : "—"}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end">
-                        <Switch
-                          checked={!!p.active}
-                          onCheckedChange={async (v) => {
-                            try {
-                              await updateProfile(p.id, { active: v });
-                              await qc.invalidateQueries({ queryKey: ["profiles-all"] });
-                            } catch (e) {
-                              toast({
-                                title: "Não foi possível atualizar",
-                                description: e instanceof Error ? e.message : "Erro inesperado.",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                        />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9 rounded-xl"
-                          title="Resetar senha (temporária)"
-                          onClick={() => openReset(p)}
-                        >
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
-                        <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" title="Editar" onClick={() => openEdit(p)}>
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{p.name ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{p.email}</TableCell>
+                      <TableCell>
+                        <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                          {roleLabel(p.role as any)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{companyName}</TableCell>
+                      <TableCell className="text-right font-medium text-[color:var(--sinaxys-ink)]">{stat ? stat.access_count : "—"}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end">
+                          <Switch
+                            checked={!!p.active}
+                            onCheckedChange={async (v) => {
+                              try {
+                                await updateProfile(p.id, { active: v });
+                                await qc.invalidateQueries({ queryKey: ["profiles-all"] });
+                              } catch (e) {
+                                toast({
+                                  title: "Não foi possível atualizar",
+                                  description: e instanceof Error ? e.message : "Erro inesperado.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => openEdit(p)}>
                           <Pencil className="h-4 w-4" />
                         </Button>
-                      </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+
+                {!isLoading && !filtered.length ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                      Nenhum usuário encontrado.
                     </TableCell>
                   </TableRow>
-                );
-              })}
-
-              {!isLoading && !filtered.length ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">Nenhum usuário encontrado.</TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </div>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </ResponsiveTable>
       </Card>
 
       {/* Reset password */}

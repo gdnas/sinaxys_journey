@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/ResponsiveTable";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
@@ -375,52 +376,54 @@ export default function AdminImportUsers() {
             Faça upload da planilha para ver a compatibilidade.
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
-            <Table className="min-w-[980px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Linha</TableHead>
-                  <TableHead>E-mail</TableHead>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Departamento</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Mensagens</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.slice(0, 25).map((r) => {
-                  const c = checks.find((x) => x.rowNumber === r.rowNumber);
-                  const ok = !!c?.ok;
-                  return (
-                    <TableRow key={r.rowNumber} className={!ok ? "bg-rose-50/60" : undefined}>
-                      <TableCell className="text-muted-foreground">{r.rowNumber}</TableCell>
-                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{r.email || "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{r.name ?? "—"}</TableCell>
-                      <TableCell className="text-muted-foreground">{r.role}</TableCell>
-                      <TableCell className="text-muted-foreground">{r.department ?? "—"}</TableCell>
-                      <TableCell>
-                        {ok ? (
-                          <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">OK</Badge>
-                        ) : (
-                          <Badge className="rounded-full bg-rose-100 text-rose-900 hover:bg-rose-100">Erro</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{c?.messages.join(" ") || "—"}</TableCell>
-                    </TableRow>
-                  );
-                })}
-
-                {rows.length > 25 ? (
+          <ResponsiveTable minWidth="980px">
+            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+              <Table className="min-w-[980px]">
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={7} className="py-4 text-center text-sm text-muted-foreground">
-                      Mostrando 25 de {rows.length} linhas.
-                    </TableCell>
+                    <TableHead>Linha</TableHead>
+                    <TableHead>E-mail</TableHead>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Departamento</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Mensagens</TableHead>
                   </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-          </div>
+                </TableHeader>
+                <TableBody>
+                  {rows.slice(0, 25).map((r) => {
+                    const c = checks.find((x) => x.rowNumber === r.rowNumber);
+                    const ok = !!c?.ok;
+                    return (
+                      <TableRow key={r.rowNumber} className={!ok ? "bg-rose-50/60" : undefined}>
+                        <TableCell className="text-muted-foreground">{r.rowNumber}</TableCell>
+                        <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{r.email || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.name ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.role}</TableCell>
+                        <TableCell className="text-muted-foreground">{r.department ?? "—"}</TableCell>
+                        <TableCell>
+                          {ok ? (
+                            <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">OK</Badge>
+                          ) : (
+                            <Badge className="rounded-full bg-rose-100 text-rose-900 hover:bg-rose-100">Erro</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{c?.messages.join(" ") || "—"}</TableCell>
+                      </TableRow>
+                    );
+                  })}
+
+                  {rows.length > 25 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="py-4 text-center text-sm text-muted-foreground">
+                        Mostrando 25 de {rows.length} linhas.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
+                </TableBody>
+              </Table>
+            </div>
+          </ResponsiveTable>
         )}
 
         <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -542,34 +545,36 @@ export default function AdminImportUsers() {
               </span>
             </div>
 
-            <div className="mt-4 overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
-              <Table className="min-w-[880px]">
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Linha</TableHead>
-                    <TableHead>E-mail</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Mensagem</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {results.map((r, idx) => (
-                    <TableRow key={idx}>
-                      <TableCell className="text-muted-foreground">{r.rowNumber}</TableCell>
-                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{r.email}</TableCell>
-                      <TableCell>
-                        {r.ok ? (
-                          <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">OK</Badge>
-                        ) : (
-                          <Badge className="rounded-full bg-rose-100 text-rose-900 hover:bg-rose-100">Falha</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{r.ok ? r.message : r.message}</TableCell>
+            <ResponsiveTable className="mt-4" minWidth="880px">
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+                <Table className="min-w-[880px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Linha</TableHead>
+                      <TableHead>E-mail</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Mensagem</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {results.map((r, idx) => (
+                      <TableRow key={idx}>
+                        <TableCell className="text-muted-foreground">{r.rowNumber}</TableCell>
+                        <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{r.email}</TableCell>
+                        <TableCell>
+                          {r.ok ? (
+                            <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">OK</Badge>
+                          ) : (
+                            <Badge className="rounded-full bg-rose-100 text-rose-900 hover:bg-rose-100">Falha</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{r.ok ? r.message : r.message}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </ResponsiveTable>
           </>
         ) : null}
       </Card>

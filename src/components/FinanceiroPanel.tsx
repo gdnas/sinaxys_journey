@@ -24,6 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/ResponsiveTable";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useToast } from "@/hooks/use-toast";
@@ -260,26 +261,27 @@ export function FinanceiroPanel({
                 <Landmark className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
                 Dados para recebimento
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {isPJ ? "Recebimento via conta PJ (dados da empresa ao lado)." : "Conta de destino e chave Pix para depósitos."}
-              </div>
+              <div className="mt-1 text-xs text-muted-foreground">Suas informações financeiras (para pagamentos).</div>
             </div>
+
             <Button
               type="button"
               className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!companyId || saving || !dirtyMy}
+              disabled={!dirtyMy || saving}
               onClick={async () => {
                 try {
                   setSaving(true);
+
                   await upsertUserFinancialProfile({
                     userId,
-                    companyId,
+                    companyId: companyId ?? null,
                     recipientType,
-                    destinationAccount: isPJ ? null : destinationAccount.trim() || null,
-                    pixKey: isPJ ? null : pixKey.trim() || null,
+                    destinationAccount: isPJ ? "" : destinationAccount,
+                    pixKey: isPJ ? "" : pixKey,
                   });
+
                   await qc.invalidateQueries({ queryKey: ["user-financial", userId] });
-                  toast({ title: "Preferência de recebimento salva" });
+                  toast({ title: "Dados salvos" });
                 } catch (e) {
                   toast({
                     title: "Não foi possível salvar",
@@ -292,83 +294,49 @@ export function FinanceiroPanel({
               }}
             >
               <Save className="mr-2 h-4 w-4" />
-              {saving ? "Salvando…" : "Salvar"}
+              Salvar
             </Button>
           </div>
 
           <Separator className="my-4" />
 
           <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Depósito em</Label>
-              <div className="inline-flex w-fit rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-                <ToggleGroup
-                  type="single"
-                  value={String(recipientType)}
-                  onValueChange={(v) => {
-                    if (!v) return;
-                    setRecipientType(v as UserFinancialRecipientType);
-                  }}
-                  className="gap-1"
-                >
-                  <ToggleGroupItem
-                    value="PF"
-                    className="h-10 rounded-xl border border-transparent bg-transparent px-4 text-sm data-[state=on]:border-[color:var(--sinaxys-border)] data-[state=on]:bg-white data-[state=on]:text-[color:var(--sinaxys-ink)]"
-                  >
-                    Conta PF
-                  </ToggleGroupItem>
-                  <ToggleGroupItem
-                    value="PJ"
-                    className="h-10 rounded-xl border border-transparent bg-transparent px-4 text-sm data-[state=on]:border-[color:var(--sinaxys-border)] data-[state=on]:bg-white data-[state=on]:text-[color:var(--sinaxys-ink)]"
-                  >
-                    Conta PJ
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Se for <span className="font-semibold">PJ</span>, usamos os dados da empresa e não pedimos duplicado.
-              </div>
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipo</div>
+              <ToggleGroup
+                type="single"
+                value={recipientType}
+                onValueChange={(v) => v && setRecipientType(v as any)}
+                className="mt-3 w-full justify-start"
+              >
+                <ToggleGroupItem value="PF" className="rounded-xl px-4">Pessoa física</ToggleGroupItem>
+                <ToggleGroupItem value="PJ" className="rounded-xl px-4">Pessoa jurídica</ToggleGroupItem>
+              </ToggleGroup>
+
+              {isPJ ? (
+                <div className="mt-3 text-xs text-muted-foreground">
+                  Para PJ, os dados de recebimento são tratados no contrato/empresa. Você pode deixar em branco.
+                </div>
+              ) : null}
             </div>
 
-            {isPJ ? (
-              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                O depósito será feito na <span className="font-semibold">conta PJ da empresa</span> (veja os dados no card ao lado).
-                {!companyFinance?.bank_name && !companyFinance?.pix_key ? (
-                  <div className="mt-2 text-xs">
-                    Atenção: os dados da empresa ainda não foram configurados. Peça para um <span className="font-semibold">ADMIN</span> preencher.
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <>
+            {!isPJ ? (
+              <div className="grid gap-3">
                 <div className="grid gap-2">
-                  <Label>Conta de destino</Label>
-                  <Input
-                    className="h-11 rounded-xl"
+                  <Label>Dados bancários (opcional)</Label>
+                  <Textarea
                     value={destinationAccount}
                     onChange={(e) => setDestinationAccount(e.target.value)}
-                    placeholder="Ex.: Banco X • Ag 0001 • Cc 12345-6"
-                    disabled={!companyId}
+                    className="min-h-[90px] rounded-2xl"
+                    placeholder="Banco, agência, conta, titular…"
                   />
-                  <div className="text-xs text-muted-foreground">Escreva de um jeito fácil de conferir pelo financeiro.</div>
                 </div>
-
                 <div className="grid gap-2">
-                  <Label>Chave Pix</Label>
-                  <Input
-                    className="h-11 rounded-xl"
-                    value={pixKey}
-                    onChange={(e) => setPixKey(e.target.value)}
-                    placeholder="Ex.: seuemail@dominio.com"
-                    disabled={!companyId}
-                  />
+                  <Label>Chave Pix (opcional)</Label>
+                  <Input value={pixKey} onChange={(e) => setPixKey(e.target.value)} className="h-11 rounded-2xl" placeholder="CPF, e-mail, chave aleatória…" />
                 </div>
-
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-                  Estes dados ficam salvos no banco (tabela <span className="font-semibold">public.user_financial_profiles</span>).
-                </div>
-              </>
-            )}
+              </div>
+            ) : null}
           </div>
         </Card>
       </div>
@@ -410,103 +378,105 @@ export function FinanceiroPanel({
         {!companyId ? (
           <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Você ainda não está vinculado a uma empresa.</div>
         ) : invoices.length ? (
-          <div className="overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)]">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-[color:var(--sinaxys-tint)]">
-                  <TableHead className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Nota</TableHead>
-                  <TableHead className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Data</TableHead>
-                  <TableHead className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Valor</TableHead>
-                  <TableHead className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Status</TableHead>
-                  <TableHead className="text-right text-xs font-semibold text-[color:var(--sinaxys-ink)]">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((inv) => {
-                  const b = statusBadge(inv.status);
-                  return (
-                    <TableRow key={inv.id} className="hover:bg-[color:var(--sinaxys-tint)]/40">
-                      <TableCell className="py-3">
-                        <div className="flex items-start gap-3">
-                          <div className="mt-0.5 grid h-9 w-9 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                            <FileText className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                          </div>
-                          <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                              {inv.invoice_number?.trim() ? `NF ${inv.invoice_number}` : inv.file_name || "Nota fiscal"}
+          <ResponsiveTable minWidth="860px">
+            <div className="overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+              <Table className="min-w-[860px]">
+                <TableHeader>
+                  <TableRow className="bg-[color:var(--sinaxys-tint)]">
+                    <TableHead className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Nota</TableHead>
+                    <TableHead className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Data</TableHead>
+                    <TableHead className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Valor</TableHead>
+                    <TableHead className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Status</TableHead>
+                    <TableHead className="text-right text-xs font-semibold text-[color:var(--sinaxys-ink)]">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((inv) => {
+                    const b = statusBadge(inv.status);
+                    return (
+                      <TableRow key={inv.id} className="hover:bg-[color:var(--sinaxys-tint)]/40">
+                        <TableCell className="py-3">
+                          <div className="flex items-start gap-3">
+                            <div className="mt-0.5 grid h-9 w-9 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                              <FileText className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
                             </div>
-                            {inv.description?.trim() ? (
-                              <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{inv.description}</div>
-                            ) : null}
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                                {inv.invoice_number?.trim() ? `NF ${inv.invoice_number}` : inv.file_name || "Nota fiscal"}
+                              </div>
+                              {inv.description?.trim() ? (
+                                <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{inv.description}</div>
+                              ) : null}
+                            </div>
                           </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="inline-flex items-center gap-2 text-sm text-[color:var(--sinaxys-ink)]">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          {inv.issue_date || "—"}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                          {typeof inv.amount_brl === "number" ? formatBRL(inv.amount_brl) : "—"}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <Badge className={`rounded-full ${b.className}`}>{b.label}</Badge>
-                      </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-10 rounded-xl"
-                            onClick={async () => {
-                              try {
-                                const url = await createInvoiceSignedUrl(inv.file_path, 60);
-                                window.open(url, "_blank", "noopener,noreferrer");
-                              } catch (e) {
-                                toast({
-                                  title: "Não foi possível abrir",
-                                  description: e instanceof Error ? e.message : "Erro inesperado.",
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
-                          >
-                            <FileDown className="mr-2 h-4 w-4" />
-                            Abrir
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            className="h-10 rounded-xl"
-                            onClick={async () => {
-                              try {
-                                // Remove primeiro o arquivo para evitar lixo.
-                                await removeInvoiceFile(inv.file_path);
-                                await deleteUserInvoice(inv.id);
-                                await qc.invalidateQueries({ queryKey: ["user-invoices", companyId, userId] });
-                                toast({ title: "Nota removida" });
-                              } catch (e) {
-                                toast({
-                                  title: "Não foi possível remover",
-                                  description: e instanceof Error ? e.message : "Erro inesperado.",
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </div>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <div className="inline-flex items-center gap-2 text-sm text-[color:var(--sinaxys-ink)]">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            {inv.issue_date || "—"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                            {typeof inv.amount_brl === "number" ? formatBRL(inv.amount_brl) : "—"}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <Badge className={`rounded-full ${b.className}`}>{b.label}</Badge>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-10 rounded-xl"
+                              onClick={async () => {
+                                try {
+                                  const url = await createInvoiceSignedUrl(inv.file_path, 60);
+                                  window.open(url, "_blank", "noopener,noreferrer");
+                                } catch (e) {
+                                  toast({
+                                    title: "Não foi possível abrir",
+                                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                                    variant: "destructive",
+                                  });
+                                }
+                              }}
+                            >
+                              <FileDown className="mr-2 h-4 w-4" />
+                              Abrir
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              className="h-10 rounded-xl"
+                              onClick={async () => {
+                                try {
+                                  // Remove primeiro o arquivo para evitar lixo.
+                                  await removeInvoiceFile(inv.file_path);
+                                  await deleteUserInvoice(inv.id);
+                                  await qc.invalidateQueries({ queryKey: ["user-invoices", companyId, userId] });
+                                  toast({ title: "Nota removida" });
+                                } catch (e) {
+                                  toast({
+                                    title: "Não foi possível remover",
+                                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                                    variant: "destructive",
+                                  });
+                                }
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </ResponsiveTable>
         ) : (
           <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhuma nota enviada ainda.</div>
         )}
@@ -519,42 +489,35 @@ export function FinanceiroPanel({
             <DialogTitle>Enviar nota fiscal</DialogTitle>
           </DialogHeader>
 
-          <div className="grid gap-4">
-            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-              Envie PDF ou imagem. O arquivo vai para o Storage (bucket <span className="font-semibold">finance-invoices</span>).
+          <div className="grid gap-3">
+            <div className="grid gap-2">
+              <Label>Número da nota (opcional)</Label>
+              <Input className="h-11 rounded-2xl" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Ex.: 12345" />
             </div>
 
             <div className="grid gap-2">
-              <Label>Número da nota (opcional)</Label>
-              <Input className="h-11 rounded-xl" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Ex.: 12345" />
+              <Label>Data de emissão</Label>
+              <Input className="h-11 rounded-2xl" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>Data de emissão (opcional)</Label>
-                <Input className="h-11 rounded-xl" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} placeholder="YYYY-MM-DD" />
-              </div>
-              <div className="grid gap-2">
-                <Label>Valor (BRL) (opcional)</Label>
-                <Input className="h-11 rounded-xl" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Ex.: 1500,00" inputMode="decimal" />
-                <div className="text-xs text-muted-foreground">{amountNumber ? formatBRL(amountNumber) : "—"}</div>
-              </div>
+            <div className="grid gap-2">
+              <Label>Valor (R$)</Label>
+              <Input className="h-11 rounded-2xl" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Ex.: 4500" inputMode="decimal" />
             </div>
 
             <div className="grid gap-2">
               <Label>Descrição (opcional)</Label>
-              <Textarea className="min-h-20 rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Reembolso de despesas" />
+              <Textarea className="min-h-[90px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Prestação de serviços — Jan/2026" />
             </div>
 
             <div className="grid gap-2">
-              <Label>Arquivo</Label>
+              <Label>Arquivo (PDF ou imagem)</Label>
               <Input
-                className="h-11 rounded-xl"
                 type="file"
+                className="h-11 rounded-2xl"
                 accept="application/pdf,image/*"
                 onChange={(e) => setFile(e.target.files?.[0] ?? null)}
               />
-              <div className="text-xs text-muted-foreground">{file ? `${file.name} • ${(file.size / 1024 / 1024).toFixed(2)} MB` : "Selecione um arquivo."}</div>
             </div>
           </div>
 
@@ -564,30 +527,44 @@ export function FinanceiroPanel({
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!companyId || sending || !file}
+              disabled={sending || !companyId || !issueDate || !amountNumber || !file}
               onClick={async () => {
-                if (!companyId || !file) return;
-                try {
-                  setSending(true);
-                  const invoiceId = crypto.randomUUID();
+                if (!companyId) return;
+                if (!file) return;
+                if (!issueDate) return;
+                if (!amountNumber) return;
 
-                  const uploaded = await uploadInvoiceFile({ userId, invoiceId, file });
+                setSending(true);
+                try {
+                  const invoiceId = crypto.randomUUID();
+                  const { path, fileName, mimeType } = await uploadInvoiceFile({
+                    userId,
+                    invoiceId,
+                    file,
+                  });
+
                   await createUserInvoice({
                     id: invoiceId,
-                    userId,
                     companyId,
+                    userId,
                     invoiceNumber: invoiceNumber.trim() || null,
-                    issueDate: issueDate.trim() || null,
+                    issueDate,
                     amountBRL: amountNumber,
                     description: description.trim() || null,
-                    filePath: uploaded.path,
-                    fileName: uploaded.fileName,
-                    mimeType: uploaded.mimeType,
+                    filePath: path,
+                    fileName,
+                    mimeType,
                   });
 
                   await qc.invalidateQueries({ queryKey: ["user-invoices", companyId, userId] });
+
                   toast({ title: "Nota enviada" });
                   setSendOpen(false);
+                  setInvoiceNumber("");
+                  setIssueDate("");
+                  setAmount("");
+                  setDescription("");
+                  setFile(null);
                 } catch (e) {
                   toast({
                     title: "Não foi possível enviar",
@@ -599,14 +576,14 @@ export function FinanceiroPanel({
                 }
               }}
             >
-              <Receipt className="mr-2 h-4 w-4" />
-              {sending ? "Enviando…" : "Enviar"}
+              <Upload className="mr-2 h-4 w-4" />
+              Enviar
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Dialog: Dados da empresa */}
+      {/* Dialog: editar empresa */}
       <Dialog open={companyOpen} onOpenChange={setCompanyOpen}>
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>

@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/ResponsiveTable";
 import { useAuth } from "@/lib/auth";
 import { brl, brlPerHourFromMonthly } from "@/lib/costs";
 import { listDepartments } from "@/lib/departmentsDb";
@@ -277,51 +278,53 @@ export default function AdminCosts() {
 
         <Separator className="my-5" />
 
-        <div className="overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
-          <Table className="min-w-[720px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Departamento</TableHead>
-                <TableHead className="text-right">Pessoas</TableHead>
-                <TableHead className="text-right">Custo mensal</TableHead>
-                <TableHead className="text-right">Custo/h</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {byDept.map((d) => {
-                const isMine = !!user.departmentId && d.deptId === user.departmentId;
-                return (
-                  <TableRow
-                    key={d.deptId}
-                    className={(isMine ? "bg-[color:var(--sinaxys-tint)]/50 " : "") + "cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/40"}
-                    onClick={() => {
-                      setSelectedDeptId(d.deptId);
-                      setOpenDept(true);
-                    }}
-                  >
-                    <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
-                      <div className="flex items-center justify-between gap-3">
-                        <span>{d.deptName}</span>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">{d.people}</TableCell>
-                    <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{brl(d.total)}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{brlPerHourFromMonthly(d.total)}</TableCell>
-                  </TableRow>
-                );
-              })}
-
-              {!byDept.length ? (
+        <ResponsiveTable minWidth="720px">
+          <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+            <Table className="min-w-[720px]">
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
-                    Nenhum custo cadastrado ainda. Edite usuários e preencha "custo mensal".
-                  </TableCell>
+                  <TableHead>Departamento</TableHead>
+                  <TableHead className="text-right">Pessoas</TableHead>
+                  <TableHead className="text-right">Custo mensal</TableHead>
+                  <TableHead className="text-right">Custo/h</TableHead>
                 </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {byDept.map((d) => {
+                  const isMine = !!user.departmentId && d.deptId === user.departmentId;
+                  return (
+                    <TableRow
+                      key={d.deptId}
+                      className={(isMine ? "bg-[color:var(--sinaxys-tint)]/50 " : "") + "cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/40"}
+                      onClick={() => {
+                        setSelectedDeptId(d.deptId);
+                        setOpenDept(true);
+                      }}
+                    >
+                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
+                        <div className="flex items-center justify-between gap-3">
+                          <span>{d.deptName}</span>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right text-muted-foreground">{d.people}</TableCell>
+                      <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{brl(d.total)}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{brlPerHourFromMonthly(d.total)}</TableCell>
+                    </TableRow>
+                  );
+                })}
+
+                {!byDept.length ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                      Nenhum custo cadastrado ainda. Edite usuários e preencha "custo mensal".
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </ResponsiveTable>
       </Card>
 
       <Sheet

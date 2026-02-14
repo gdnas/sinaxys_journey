@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/ResponsiveTable";
 import { useAuth } from "@/lib/auth";
 import { brl, brlPerHourFromMonthly } from "@/lib/costs";
 import { listDepartments } from "@/lib/departmentsDb";
@@ -117,44 +118,46 @@ export default function HeadCosts() {
 
         <Separator className="my-5" />
 
-        <div className="overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
-          <Table className="min-w-[760px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Cargo</TableHead>
-                <TableHead className="text-right">Custo mensal</TableHead>
-                <TableHead className="text-right">Custo/h</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {people.map((p) => (
-                <TableRow key={p.id} className="hover:bg-[color:var(--sinaxys-tint)]/40">
-                  <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
-                    <div className="flex items-center justify-between gap-3">
-                      <span>{p.name}</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{p.job_title?.trim() ? p.job_title.trim() : "—"}</TableCell>
-                  <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{brl(n(p.monthly_cost_brl))}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">{brlPerHourFromMonthly(n(p.monthly_cost_brl))}</TableCell>
-                </TableRow>
-              ))}
-
-              {!people.length && !isLoading ? (
+        <ResponsiveTable minWidth="760px">
+          <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+            <Table className="min-w-[760px]">
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
-                    Nenhum custo cadastrado no seu departamento.
-                  </TableCell>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Cargo</TableHead>
+                  <TableHead className="text-right">Custo mensal</TableHead>
+                  <TableHead className="text-right">Custo/h</TableHead>
                 </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </div>
+              </TableHeader>
+              <TableBody>
+                {people.map((p) => (
+                  <TableRow key={p.id} className="hover:bg-[color:var(--sinaxys-tint)]/40">
+                    <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <span>{p.name}</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{p.job_title?.trim() ? p.job_title.trim() : "—"}</TableCell>
+                    <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{brl(n(p.monthly_cost_brl))}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{brlPerHourFromMonthly(n(p.monthly_cost_brl))}</TableCell>
+                  </TableRow>
+                ))}
+
+                {!people.length && !isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                      Nenhum custo cadastrado no seu departamento.
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </ResponsiveTable>
 
         <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-          Se algum valor estiver faltando, peça ao Admin para preencher o campo “custo mensal”.
+          Se algum valor estiver faltando, peça ao Admin para preencher o campo "custo mensal".
         </div>
 
         <div className="mt-4">

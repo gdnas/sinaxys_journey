@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/ResponsiveTable";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany } from "@/lib/profilesDb";
@@ -81,59 +82,61 @@ export default function HeadUsers() {
 
         <Separator className="my-5" />
 
-        <div className="max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
-          <Table className="min-w-[1120px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>E-mail</TableHead>
-                <TableHead>Papel</TableHead>
-                <TableHead>Departamento</TableHead>
-                <TableHead className="text-right">Acessos</TableHead>
-                <TableHead className="text-right">Último acesso</TableHead>
-                <TableHead className="text-right">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((p) => {
-                const dept = p.department_id ? deptById.get(p.department_id)?.name : "—";
-                const stat = statsByUserId.get(p.id);
-                return (
-                  <TableRow key={p.id}>
-                    <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{p.name ?? "—"}</TableCell>
-                    <TableCell className="text-muted-foreground">{p.email}</TableCell>
-                    <TableCell>
-                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                        {roleLabel(p.role as any)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{dept ?? "—"}</TableCell>
-                    <TableCell className="text-right font-medium text-[color:var(--sinaxys-ink)]">{stat ? stat.access_count : "—"}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
-                    <TableCell className="text-right">
-                      {p.active ? (
-                        <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Ativo</Badge>
-                      ) : (
-                        <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Inativo</Badge>
-                      )}
+        <ResponsiveTable minWidth="1120px">
+          <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+            <Table className="min-w-[1120px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Papel</TableHead>
+                  <TableHead>Departamento</TableHead>
+                  <TableHead className="text-right">Acessos</TableHead>
+                  <TableHead className="text-right">Último acesso</TableHead>
+                  <TableHead className="text-right">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((p) => {
+                  const dept = p.department_id ? deptById.get(p.department_id)?.name : "—";
+                  const stat = statsByUserId.get(p.id);
+                  return (
+                    <TableRow key={p.id}>
+                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{p.name ?? "—"}</TableCell>
+                      <TableCell className="text-muted-foreground">{p.email}</TableCell>
+                      <TableCell>
+                        <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                          {roleLabel(p.role as any)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{dept ?? "—"}</TableCell>
+                      <TableCell className="text-right font-medium text-[color:var(--sinaxys-ink)]">{stat ? stat.access_count : "—"}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
+                      <TableCell className="text-right">
+                        {p.active ? (
+                          <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Ativo</Badge>
+                        ) : (
+                          <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Inativo</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+
+                {!isLoading && !filtered.length ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      Nenhum usuário encontrado.
                     </TableCell>
                   </TableRow>
-                );
-              })}
-
-              {!isLoading && !filtered.length ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                    Nenhum usuário encontrado.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </div>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </ResponsiveTable>
 
         <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-          Acessos são registrados quando a pessoa entra no sistema (inclui recarregar a aplicação). Se alguém nunca entrou, os campos aparecem como “—”.
+          Acessos são registrados quando a pessoa entra no sistema (inclui recarregar a aplicação). Se alguém nunca entrou, os campos aparecem como "—".
         </div>
       </Card>
     </div>

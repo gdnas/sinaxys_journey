@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ResponsiveTable } from "@/components/ResponsiveTable";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -144,101 +145,103 @@ export default function AdminDepartments() {
 
         <Separator className="my-5" />
 
-        <div className="max-w-full overflow-x-auto rounded-2xl border border-[color:var(--sinaxys-border)]">
-          <Table className="min-w-[920px]">
-            <TableHeader>
-              <TableRow>
-                <TableHead>Departamento</TableHead>
-                <TableHead className="text-right">Pessoas</TableHead>
-                <TableHead className="text-right">Trilhas</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((d) => {
-                const usage = usageByDepartmentId.get(d.id) ?? { users: 0, tracks: 0 };
-                const busy = usage.users > 0 || usage.tracks > 0;
+        <ResponsiveTable minWidth="920px">
+          <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+            <Table className="min-w-[920px]">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Departamento</TableHead>
+                  <TableHead className="text-right">Pessoas</TableHead>
+                  <TableHead className="text-right">Trilhas</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((d) => {
+                  const usage = usageByDepartmentId.get(d.id) ?? { users: 0, tracks: 0 };
+                  const busy = usage.users > 0 || usage.tracks > 0;
 
-                return (
-                  <TableRow key={d.id}>
-                    <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{d.name}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{usage.users}</TableCell>
-                    <TableCell className="text-right text-muted-foreground">{usage.tracks}</TableCell>
-                    <TableCell className="text-right">
-                      <div className="inline-flex items-center justify-end gap-2">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9 rounded-xl"
-                          onClick={() => {
-                            setEditId(d.id);
-                            setEditName(d.name);
-                            setEditOpen(true);
-                          }}
-                          aria-label="Editar"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
+                  return (
+                    <TableRow key={d.id}>
+                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{d.name}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{usage.users}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{usage.tracks}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="inline-flex items-center justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 rounded-xl"
+                            onClick={() => {
+                              setEditId(d.id);
+                              setEditName(d.name);
+                              setEditOpen(true);
+                            }}
+                            aria-label="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
 
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="icon"
-                              className="h-9 w-9 rounded-xl"
-                              disabled={busy}
-                              aria-label="Remover"
-                              title={busy ? "Não é possível remover: departamento em uso" : "Remover"}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl">
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remover departamento?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Só é possível remover se não houver usuários nem trilhas vinculadas.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
-                              <AlertDialogAction
-                                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                                onClick={async () => {
-                                  try {
-                                    await deleteDepartment(d.id);
-                                    await qc.invalidateQueries({ queryKey: ["departments", companyId] });
-                                    toast({ title: "Departamento removido" });
-                                  } catch (e) {
-                                    toast({
-                                      title: "Não foi possível remover",
-                                      description: e instanceof Error ? e.message : "Erro inesperado.",
-                                      variant: "destructive",
-                                    });
-                                  }
-                                }}
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-9 w-9 rounded-xl"
+                                disabled={busy}
+                                aria-label="Remover"
+                                title={busy ? "Não é possível remover: departamento em uso" : "Remover"}
                               >
-                                Remover
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Remover departamento?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Só é possível remover se não houver usuários nem trilhas vinculadas.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+                                <AlertDialogAction
+                                  className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                                  onClick={async () => {
+                                    try {
+                                      await deleteDepartment(d.id);
+                                      await qc.invalidateQueries({ queryKey: ["departments", companyId] });
+                                      toast({ title: "Departamento removido" });
+                                    } catch (e) {
+                                      toast({
+                                        title: "Não foi possível remover",
+                                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                                        variant: "destructive",
+                                      });
+                                    }
+                                  }}
+                                >
+                                  Remover
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+
+                {!filtered.length ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
+                      Nenhum departamento encontrado.
                     </TableCell>
                   </TableRow>
-                );
-              })}
-
-              {!isLoading && !filtered.length ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
-                    Nenhum departamento encontrado.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
-        </div>
+                ) : null}
+              </TableBody>
+            </Table>
+          </div>
+        </ResponsiveTable>
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
