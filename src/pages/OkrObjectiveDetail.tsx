@@ -25,8 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { brl, brlPerHourFromMonthly } from "@/lib/costs";
-import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
+import { parsePtNumber } from "@/lib/roi";
 import { listProfilesByCompany } from "@/lib/profilesDb";
 import {
   createDeliverable,
@@ -47,6 +46,7 @@ import {
   type WorkStatus,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import { OkrObjectiveCostItems } from "@/components/OkrObjectiveCostItems";
 
 const SELECT_NONE = "__none__";
 
@@ -183,7 +183,6 @@ export default function OkrObjectiveDetail() {
   const [taskOwner, setTaskOwner] = useState<string>(user.id);
   const [taskDue, setTaskDue] = useState<string>("");
   const [taskEstimate, setTaskEstimate] = useState<string>("");
-  const [taskValue, setTaskValue] = useState<string>("");
   const [taskSaving, setTaskSaving] = useState(false);
 
   const [taskDeleteOpen, setTaskDeleteOpen] = useState(false);
@@ -198,20 +197,10 @@ export default function OkrObjectiveDetail() {
     setTaskOwner(user.id);
     setTaskDue("");
     setTaskEstimate("");
-    setTaskValue("");
   };
 
-  const requiresTaskBusinessCase = !!objective?.department_id;
-  const taskOwnerMonthly = profileById.get(taskOwner)?.monthlyCostBRL ?? null;
-  const taskMinutes = parsePtNumber(taskEstimate);
-  const taskHours = taskMinutes !== null ? taskMinutes / 60 : null;
-  const taskValueBRL = parsePtNumber(taskValue);
-  const taskCostBRL = laborCostFromMonthly(taskOwnerMonthly, taskHours);
-  const taskRoi = roiPct(taskValueBRL, taskCostBRL);
-
-  const taskBusinessOk =
-    !requiresTaskBusinessCase ||
-    (!!taskValueBRL && taskValueBRL > 0 && !!taskMinutes && taskMinutes > 0 && !!taskOwnerMonthly && taskOwnerMonthly > 0 && taskCostBRL !== null && taskRoi !== null);
+  // Tasks should NOT require ROI. Keep only a simple optional time estimate.
+  const taskBusinessOk = true;
 
   const toggleTaskDone = async (t: DbTask) => {
     if (!canEditTask(t)) {
@@ -282,6 +271,22 @@ export default function OkrObjectiveDetail() {
         title="Objetivo"
         subtitle="KRs → entregáveis → tarefas. Uma linha reta até a execução."
         icon={<Target className="h-5 w-5" />}
+        help={{
+          title: "Como ler essa tela",
+          body: (
+            <div className="grid gap-2">
+              <div>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">KRs</span> mostram o progresso mensurável.
+              </div>
+              <div>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">Entregáveis</span> viram pacotes de entrega (Tier).
+              </div>
+              <div>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">Tarefas</span> são o dia a dia (sem ROI aqui).
+              </div>
+            </div>
+          ),
+        }}
         actions={
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Button asChild variant="outline" className="h-11 rounded-xl">
@@ -367,6 +372,8 @@ export default function OkrObjectiveDetail() {
         )}
       </Card>
 
+      {objective ? <OkrObjectiveCostItems objectiveId={objective.id} canWrite={canWrite} /> : null}
+
       <div className="grid gap-6">
         {krs.length ? (
           krs.map((kr) => (
@@ -400,7 +407,6 @@ export default function OkrObjectiveDetail() {
                 setTaskOwner(t.owner_user_id);
                 setTaskDue(t.due_date ?? "");
                 setTaskEstimate(typeof t.estimate_minutes === "number" ? String(t.estimate_minutes) : "");
-                setTaskValue(typeof t.estimated_value_brl === "number" ? String(t.estimated_value_brl) : "");
                 setTaskOpen(true);
               }}
               onDeleteTask={(t) => {

@@ -28,6 +28,7 @@ import { useCompany } from "@/lib/company";
 import type { DbTaskWithContext } from "@/lib/okrDb";
 import { deleteTask, listTasksForUserWithContext, updateTask } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import { OkrSubnav } from "@/components/OkrSubnav";
 
 function TaskRow({
   task,
@@ -232,12 +233,27 @@ export default function OkrToday() {
         title="Rotina diária"
         subtitle="Prioridades do dia e da semana — com contexto do objetivo, sem caça ao tesouro."
         icon={<ListChecks className="h-5 w-5" />}
+        help={{
+          title: "O que é isso?",
+          body: (
+            <div className="grid gap-2">
+              <div>
+                Aqui aparecem suas <span className="font-semibold text-[color:var(--sinaxys-ink)]">tarefas</span> ligadas a OKRs.
+              </div>
+              <div className="text-muted-foreground">
+                Se você não entende por que uma tarefa existe, clique em <span className="font-semibold">Ver objetivo</span>.
+              </div>
+            </div>
+          ),
+        }}
         actions={
           <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
             {isLoading ? "Carregando…" : `${totalOpen} abertas`}
           </Badge>
         }
       />
+
+      <OkrSubnav />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="grid gap-6">

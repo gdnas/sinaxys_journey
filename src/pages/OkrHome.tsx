@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { getCompanyFundamentals, listOkrCycles, listOkrObjectives } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import { OkrSubnav } from "@/components/OkrSubnav";
 
 function Pill({ label, value }: { label: string; value?: string | null }) {
   if (!value?.trim()) return null;
@@ -68,12 +69,54 @@ export default function OkrHome() {
     );
   }
 
+  const isAdminish = user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN";
+
+  const recommended = !activeQuarter
+    ? {
+        title: "Comece criando o trimestre",
+        desc: "Sem um ciclo ativo, fica impossível desdobrar objetivos e gerar tarefas do dia.",
+        cta: "Criar / ativar ciclo",
+        to: "/okr/ciclos",
+      }
+    : !hasFundamentals && isAdminish
+      ? {
+          title: "Defina fundamentos (10 min)",
+          desc: "Fundamentos dão contexto. Sem eles, objetivos viram lista solta.",
+          cta: "Preencher fundamentos",
+          to: "/okr/fundamentos",
+        }
+      : {
+          title: "Execute o que importa hoje",
+          desc: "Sua rotina semanal com contexto de objetivo e foco em entrega.",
+          cta: "Abrir rotina diária",
+          to: "/okr/hoje",
+        };
+
   return (
     <div className="grid gap-6">
       <OkrPageHeader
         title="OKRs — Sinaxys"
         subtitle="Estratégia → execução: visão clara, prioridades reais e tarefas do dia em um só lugar."
         icon={<Target className="h-5 w-5" />}
+        help={{
+          title: "Modelo mental em 15s",
+          body: (
+            <div className="grid gap-2">
+              <div>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">Objetivo</span> = resultado que queremos.
+              </div>
+              <div>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">KR</span> = prova mensurável de que estamos chegando lá.
+              </div>
+              <div>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">Entregável</span> = pacote de entrega (Tier I/II).
+              </div>
+              <div>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">Tarefas</span> = execução diária (aparece em "Hoje").
+              </div>
+            </div>
+          ),
+        }}
         actions={
           <Button
             asChild
@@ -86,6 +129,26 @@ export default function OkrHome() {
           </Button>
         }
       />
+
+      <OkrSubnav />
+
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Recomendado agora</div>
+            <p className="mt-1 text-sm text-muted-foreground">Um próximo passo claro (sem precisar entender tudo antes).</p>
+          </div>
+          <Button asChild className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+            <Link to={recommended.to}>
+              {recommended.cta}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+        <Separator className="my-5" />
+        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{recommended.title}</div>
+        <div className="mt-1 text-sm text-muted-foreground">{recommended.desc}</div>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
