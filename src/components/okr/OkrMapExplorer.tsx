@@ -92,9 +92,8 @@ function cycleLabel(c: DbOkrCycle) {
   return c.name?.trim() ? `${c.name} · ${base}` : base;
 }
 
-function indentCls(depth: number) {
-  if (depth <= 0) return "";
-  return `pl-${Math.min(10, depth * 3)}`;
+function rowIndentStyle(depth: number) {
+  return { paddingLeft: depth <= 0 ? 0 : Math.min(32, depth * 12) } as const;
 }
 
 function Row({
@@ -123,16 +122,16 @@ function Row({
   return (
     <button
       type="button"
+      style={rowIndentStyle(depth)}
       className={cn(
         "group flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left transition",
         active
           ? "border-[color:var(--sinaxys-primary)]/40 bg-[color:var(--sinaxys-tint)]/55"
           : "border-[color:var(--sinaxys-border)] bg-white hover:bg-[color:var(--sinaxys-tint)]/35",
-        indentCls(depth),
       )}
       onClick={onClick}
     >
-      <span className="grid h-8 w-8 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+      <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
         {icon}
       </span>
 
@@ -148,7 +147,7 @@ function Row({
       {canExpand ? (
         <span
           className={cn(
-            "ml-1 grid h-8 w-8 place-items-center rounded-xl text-muted-foreground transition group-hover:bg-white",
+            "ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-xl text-muted-foreground transition group-hover:bg-white",
             active ? "bg-white" : "bg-transparent",
           )}
           onClick={(e) => {
@@ -310,9 +309,7 @@ function KrInlineEditor({ kr, canEdit, onSaved }: { kr: DbOkrKeyResult; canEdit:
   );
 }
 
-function DetailsPanel({
-  open,
-  onOpenChange,
+function DetailsBody({
   node,
   cid,
   canEdit,
@@ -323,8 +320,6 @@ function DetailsPanel({
   cycleById,
   onInvalidate,
 }: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
   node: Node;
   cid: string;
   canEdit: boolean;
@@ -338,15 +333,6 @@ function DetailsPanel({
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  const title = useMemo(() => {
-    if (node.kind === "fundamental") return nodeTitle(node);
-    if (node.kind === "cycle") return cycleLabel(cycleById.get(node.cycleId)!);
-    if (node.kind === "objective") return objectiveById.get(node.objectiveId)?.title ?? "Objetivo";
-    if (node.kind === "strategyObjective") return strategy.find((s) => s.id === node.soId)?.title ?? "Objetivo longo prazo";
-    if (node.kind === "kr") return "KR";
-    return nodeTitle(node);
-  }, [node, cycleById, objectiveById, strategy]);
-
   const qKrs = useQuery({
     queryKey: ["okr-krs", node.kind === "objective" ? node.objectiveId : null],
     enabled: node.kind === "objective",
@@ -358,7 +344,7 @@ function DetailsPanel({
     return averageObjectivePct(qKrs.data ?? []);
   }, [node.kind, qKrs.data]);
 
-  const base = (
+  return (
     <div className="grid gap-4">
       {node.kind === "fundamental" ? (
         <FundamentalEditor
@@ -414,328 +400,71 @@ function DetailsPanel({
             await Promise.all([
               qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid] }),
               qc.invalidateQueries({ queryKey: ["okr-objectives", cid] }),
-              qc.invalidateQueries({ queryKey: ["okr-objectives", cid, cycleById.get(objectiveById.get(node.objectiveId)?.cycle_id ?? "")?.id] }),
               qc.invalidateQueries({ queryKey: ["okr-krs", node.objectiveId] }),
             ]);
             await onInvalidate();
           }}
         />
       ) : null}
+
+      {(node.kind === "fundamentals" || node.kind === "strategy" || node.kind === "cycles" || node.kind === "root") && (
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+          <div className="text-sm text-muted-foreground">
+            Selecione um item na árvore/lista para ver detalhes, editar e acompanhar andamento.
+          </div>
+        </Card>
+      )}
     </div>
   );
-
-  // Mobile: sheet. Desktop: inline (parent decides).
-  return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full max-w-xl rounded-l-3xl p-0">
-        <SheetHeader className="border-b border-[color:var(--sinaxys-border)] p-5">
-          <SheetTitle className="text-[color:var(--sinaxys-ink)]">{title}</SheetTitle>
-        </SheetHeader>
-        <ScrollArea className="h-[calc(100vh-76px)] p-5">{base}</ScrollArea>
-      </SheetContent>
-    </Sheet>
-  );
 }
 
-function FundamentalEditor({
+function DetailsShell({
+  node,
   cid,
   canEdit,
-  field,
   fundamentals,
-  onSaved,
+  strategy,
+  cycles,
+  objectiveById,
+  cycleById,
+  onInvalidate,
 }: {
+  node: Node;
   cid: string;
   canEdit: boolean;
-  field: keyof DbCompanyFundamentals;
   fundamentals: DbCompanyFundamentals | null;
-  onSaved: () => Promise<void>;
+  strategy: DbStrategyObjective[];
+  cycles: DbOkrCycle[];
+  objectiveById: Map<string, DbOkrObjective>;
+  cycleById: Map<string, DbOkrCycle>;
+  onInvalidate: () => Promise<void>;
 }) {
-  const { toast } = useToast();
-  const [value, setValue] = useState<string>(() => String((fundamentals as any)?.[field] ?? ""));
-  const [saving, setSaving] = useState(false);
+  const title = useMemo(() => {
+    if (node.kind === "fundamental") return nodeTitle(node);
+    if (node.kind === "cycle") return cycleLabel(cycleById.get(node.cycleId)!);
+    if (node.kind === "objective") return objectiveById.get(node.objectiveId)?.title ?? "Objetivo";
+    if (node.kind === "strategyObjective") return strategy.find((s) => s.id === node.soId)?.title ?? "Objetivo longo prazo";
+    return nodeTitle(node);
+  }, [node, cycleById, objectiveById, strategy]);
 
   return (
-    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{nodeTitle({ kind: "fundamental", id: `fund:${field}` as any, field })}</div>
-          <div className="mt-1 text-sm text-muted-foreground">Texto base (visível para todos no módulo OKR).</div>
-        </div>
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-          <Route className="h-5 w-5" />
-        </div>
+    <div className="overflow-hidden rounded-3xl border border-[color:var(--sinaxys-border)] bg-white">
+      <div className="border-b border-[color:var(--sinaxys-border)] p-5">
+        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{title}</div>
       </div>
-
-      <Separator className="my-4" />
-
-      <div className="grid gap-2">
-        <Label>Conteúdo</Label>
-        <Textarea className="min-h-[140px] rounded-2xl" value={value} onChange={(e) => setValue(e.target.value)} disabled={!canEdit || saving} />
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
-          <Link to="/okr/fundamentos">Editar tudo</Link>
-        </Button>
-        {canEdit ? (
-          <Button
-            className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-            disabled={saving}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await upsertCompanyFundamentals(cid, { [field]: value } as any);
-                await onSaved();
-              } catch (e) {
-                toast({
-                  title: "Não foi possível salvar",
-                  description: e instanceof Error ? e.message : "Erro inesperado.",
-                  variant: "destructive",
-                });
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            <Save className="mr-2 h-4 w-4" />
-            Salvar
-          </Button>
-        ) : null}
-      </div>
-    </Card>
-  );
-}
-
-function StrategyObjectiveEditor({
-  canEdit,
-  so,
-  onSaved,
-}: {
-  canEdit: boolean;
-  so: DbStrategyObjective | null;
-  onSaved: () => Promise<void>;
-}) {
-  const { toast } = useToast();
-  const [title, setTitle] = useState(so?.title ?? "");
-  const [description, setDescription] = useState(so?.description ?? "");
-  const [saving, setSaving] = useState(false);
-
-  if (!so) {
-    return (
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="text-sm text-muted-foreground">Objetivo não encontrado.</div>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivo ({so.horizon_years} anos)</div>
-          <div className="mt-1 text-sm text-muted-foreground">Aposta de longo prazo que orienta decisões do ano.</div>
-        </div>
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-          <Flag className="h-5 w-5" />
-        </div>
-      </div>
-
-      <Separator className="my-4" />
-
-      <div className="grid gap-3">
-        <div className="grid gap-2">
-          <Label>Título</Label>
-          <Input className="h-11 rounded-xl" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit || saving} />
-        </div>
-        <div className="grid gap-2">
-          <Label>Descrição</Label>
-          <Textarea className="min-h-[120px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit || saving} />
-        </div>
-      </div>
-
-      {canEdit ? (
-        <div className="mt-4 flex justify-end">
-          <Button
-            className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-            disabled={saving || title.trim().length < 6}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await updateStrategyObjective(so.id, { title, description });
-                await onSaved();
-              } catch (e) {
-                toast({
-                  title: "Não foi possível salvar",
-                  description: e instanceof Error ? e.message : "Erro inesperado.",
-                  variant: "destructive",
-                });
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            <Save className="mr-2 h-4 w-4" />
-            Salvar
-          </Button>
-        </div>
-      ) : null}
-    </Card>
-  );
-}
-
-function ObjectiveEditor({
-  canEdit,
-  objective,
-  pct,
-  krs,
-  loadingKrs,
-  onSaved,
-}: {
-  canEdit: boolean;
-  objective: DbOkrObjective | null;
-  pct: number | null;
-  krs: DbOkrKeyResult[];
-  loadingKrs: boolean;
-  onSaved: () => Promise<void>;
-}) {
-  const { toast } = useToast();
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const [title, setTitle] = useState(objective?.title ?? "");
-  const [description, setDescription] = useState(objective?.description ?? "");
-  const [reason, setReason] = useState(objective?.strategic_reason ?? "");
-
-  if (!objective) {
-    return (
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="text-sm text-muted-foreground">Objetivo não encontrado.</div>
-      </Card>
-    );
-  }
-
-  const canEditThis = canEdit; // minimal rule for now
-
-  return (
-    <div className="grid gap-4">
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{objective.title}</div>
-            <div className="mt-2">
-              <ObjectiveMeta o={objective} />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
-              <Link to={`/okr/objetivos/${objective.id}`}>Abrir</Link>
-            </Button>
-            {canEditThis ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 rounded-xl bg-white"
-                onClick={() => setEditing((v) => !v)}
-              >
-                <Edit3 className="mr-2 h-4 w-4" />
-                {editing ? "Fechar" : "Editar"}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
-        {typeof pct === "number" ? (
-          <div className="mt-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Andamento (média dos KRs)</span>
-              <span className="font-semibold text-[color:var(--sinaxys-ink)]">{pct}%</span>
-            </div>
-            <Progress value={pct} className="mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
-          </div>
-        ) : null}
-
-        {editing ? (
-          <div className="mt-4 grid gap-3">
-            <div className="grid gap-2">
-              <Label>Título</Label>
-              <Input className="h-11 rounded-xl" value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Descrição</Label>
-              <Textarea className="min-h-[96px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} disabled={saving} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Motivo estratégico</Label>
-              <Textarea className="min-h-[96px] rounded-2xl" value={reason} onChange={(e) => setReason(e.target.value)} disabled={saving} />
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                disabled={saving || title.trim().length < 6}
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    await updateOkrObjective(objective.id, {
-                      title,
-                      description,
-                      strategic_reason: reason,
-                    });
-                    toast({ title: "Objetivo atualizado" });
-                    await onSaved();
-                    setEditing(false);
-                  } catch (e) {
-                    toast({
-                      title: "Não foi possível salvar",
-                      description: e instanceof Error ? e.message : "Erro inesperado.",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                <Save className="mr-2 h-4 w-4" />
-                Salvar
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Card>
-
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Key Results</div>
-            <div className="mt-1 text-sm text-muted-foreground">Atualize andamento e ajuste KRs sem sair do mapa.</div>
-          </div>
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-            <Target className="h-5 w-5" />
-          </div>
-        </div>
-
-        <Separator className="my-4" />
-
-        {loadingKrs ? (
-          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Carregando KRs…</div>
-        ) : krs.length ? (
-          <div className="grid gap-3">
-            {krs.map((kr) => (
-              <KrInlineEditor
-                key={kr.id}
-                kr={kr}
-                canEdit={canEditThis}
-                onSaved={async () => {
-                  await onSaved();
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem KRs ainda.</div>
-        )}
-      </Card>
+      <ScrollArea className="h-[calc(100vh-220px)] p-5">
+        <DetailsBody
+          node={node}
+          cid={cid}
+          canEdit={canEdit}
+          fundamentals={fundamentals}
+          strategy={strategy}
+          cycles={cycles}
+          objectiveById={objectiveById}
+          cycleById={cycleById}
+          onInvalidate={onInvalidate}
+        />
+      </ScrollArea>
     </div>
   );
 }
@@ -1172,6 +901,309 @@ function ListView({
   );
 }
 
+function FundamentalEditor({
+  cid,
+  canEdit,
+  field,
+  fundamentals,
+  onSaved,
+}: {
+  cid: string;
+  canEdit: boolean;
+  field: keyof DbCompanyFundamentals;
+  fundamentals: DbCompanyFundamentals | null;
+  onSaved: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [value, setValue] = useState<string>(() => String((fundamentals as any)?.[field] ?? ""));
+  const [saving, setSaving] = useState(false);
+
+  return (
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{nodeTitle({ kind: "fundamental", id: `fund:${field}` as any, field })}</div>
+          <div className="mt-1 text-sm text-muted-foreground">Texto base (visível para todos no módulo OKR).</div>
+        </div>
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+          <Route className="h-5 w-5" />
+        </div>
+      </div>
+
+      <Separator className="my-4" />
+
+      <div className="grid gap-2">
+        <Label>Conteúdo</Label>
+        <Textarea className="min-h-[140px] rounded-2xl" value={value} onChange={(e) => setValue(e.target.value)} disabled={!canEdit || saving} />
+      </div>
+
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
+          <Link to="/okr/fundamentos">Editar tudo</Link>
+        </Button>
+        {canEdit ? (
+          <Button
+            className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await upsertCompanyFundamentals(cid, { [field]: value } as any);
+                await onSaved();
+              } catch (e) {
+                toast({
+                  title: "Não foi possível salvar",
+                  description: e instanceof Error ? e.message : "Erro inesperado.",
+                  variant: "destructive",
+                });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Salvar
+          </Button>
+        ) : null}
+      </div>
+    </Card>
+  );
+}
+
+function StrategyObjectiveEditor({
+  canEdit,
+  so,
+  onSaved,
+}: {
+  canEdit: boolean;
+  so: DbStrategyObjective | null;
+  onSaved: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [title, setTitle] = useState(so?.title ?? "");
+  const [description, setDescription] = useState(so?.description ?? "");
+  const [saving, setSaving] = useState(false);
+
+  if (!so) {
+    return (
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="text-sm text-muted-foreground">Objetivo não encontrado.</div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivo ({so.horizon_years} anos)</div>
+          <div className="mt-1 text-sm text-muted-foreground">Aposta de longo prazo que orienta decisões do ano.</div>
+        </div>
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+          <Flag className="h-5 w-5" />
+        </div>
+      </div>
+
+      <Separator className="my-4" />
+
+      <div className="grid gap-3">
+        <div className="grid gap-2">
+          <Label>Título</Label>
+          <Input className="h-11 rounded-xl" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit || saving} />
+        </div>
+        <div className="grid gap-2">
+          <Label>Descrição</Label>
+          <Textarea className="min-h-[120px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit || saving} />
+        </div>
+      </div>
+
+      {canEdit ? (
+        <div className="mt-4 flex justify-end">
+          <Button
+            className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+            disabled={saving || title.trim().length < 6}
+            onClick={async () => {
+              setSaving(true);
+              try {
+                await updateStrategyObjective(so.id, { title, description });
+                await onSaved();
+              } catch (e) {
+                toast({
+                  title: "Não foi possível salvar",
+                  description: e instanceof Error ? e.message : "Erro inesperado.",
+                  variant: "destructive",
+                });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Salvar
+          </Button>
+        </div>
+      ) : null}
+    </Card>
+  );
+}
+
+function ObjectiveEditor({
+  canEdit,
+  objective,
+  pct,
+  krs,
+  loadingKrs,
+  onSaved,
+}: {
+  canEdit: boolean;
+  objective: DbOkrObjective | null;
+  pct: number | null;
+  krs: DbOkrKeyResult[];
+  loadingKrs: boolean;
+  onSaved: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const [title, setTitle] = useState(objective?.title ?? "");
+  const [description, setDescription] = useState(objective?.description ?? "");
+  const [reason, setReason] = useState(objective?.strategic_reason ?? "");
+
+  if (!objective) {
+    return (
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="text-sm text-muted-foreground">Objetivo não encontrado.</div>
+      </Card>
+    );
+  }
+
+  const canEditThis = canEdit; // minimal rule for now
+
+  return (
+    <div className="grid gap-4">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{objective.title}</div>
+            <div className="mt-2">
+              <ObjectiveMeta o={objective} />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
+              <Link to={`/okr/objetivos/${objective.id}`}>Abrir</Link>
+            </Button>
+            {canEditThis ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 rounded-xl bg-white"
+                onClick={() => setEditing((v) => !v)}
+              >
+                <Edit3 className="mr-2 h-4 w-4" />
+                {editing ? "Fechar" : "Editar"}
+              </Button>
+            ) : null}
+          </div>
+        </div>
+
+        {typeof pct === "number" ? (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Andamento (média dos KRs)</span>
+              <span className="font-semibold text-[color:var(--sinaxys-ink)]">{pct}%</span>
+            </div>
+            <Progress value={pct} className="mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
+          </div>
+        ) : null}
+
+        {editing ? (
+          <div className="mt-4 grid gap-3">
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input className="h-11 rounded-xl" value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Descrição</Label>
+              <Textarea className="min-h-[96px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} disabled={saving} />
+            </div>
+            <div className="grid gap-2">
+              <Label>Motivo estratégico</Label>
+              <Textarea className="min-h-[96px] rounded-2xl" value={reason} onChange={(e) => setReason(e.target.value)} disabled={saving} />
+            </div>
+
+            <div className="flex justify-end">
+              <Button
+                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={saving || title.trim().length < 6}
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    await updateOkrObjective(objective.id, {
+                      title,
+                      description,
+                      strategic_reason: reason,
+                    });
+                    toast({ title: "Objetivo atualizado" });
+                    await onSaved();
+                    setEditing(false);
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível salvar",
+                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Salvar
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Card>
+
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Key Results</div>
+            <div className="mt-1 text-sm text-muted-foreground">Atualize andamento e ajuste KRs sem sair do mapa.</div>
+          </div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+            <Target className="h-5 w-5" />
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        {loadingKrs ? (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Carregando KRs…</div>
+        ) : krs.length ? (
+          <div className="grid gap-3">
+            {krs.map((kr) => (
+              <KrInlineEditor
+                key={kr.id}
+                kr={kr}
+                canEdit={canEditThis}
+                onSaved={async () => {
+                  await onSaved();
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem KRs ainda.</div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 export function OkrMapExplorer({ companyId }: { companyId: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1250,42 +1282,6 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
     canEdit,
   };
 
-  const left = (
-    <div className="grid gap-4">
-      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão conectada</div>
-            <div className="mt-1 text-sm text-muted-foreground">Fundamentos → longo prazo → ciclos → objetivos → KRs.</div>
-          </div>
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-            <ListTree className="h-5 w-5" />
-          </div>
-        </div>
-      </div>
-
-      <Tabs defaultValue="tree" className="w-full">
-        <TabsList className="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-          <TabsTrigger value="tree" className="rounded-xl data-[state=active]:bg-white">Árvore</TabsTrigger>
-          <TabsTrigger value="list" className="rounded-xl data-[state=active]:bg-white">Lista</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="tree" className="mt-4">
-          <Tree ctx={ctx} fundamentals={fundamentals} strategy={strategy} cycles={cycles} />
-        </TabsContent>
-
-        <TabsContent value="list" className="mt-4">
-          <ListView
-            fundamentals={fundamentals}
-            strategy={strategy}
-            cycles={cycles}
-            onPick={(n) => ctx.select(n)}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-
   const onInvalidate = async () => {
     await Promise.all([
       qc.invalidateQueries({ queryKey: ["okr-fundamentals", companyId] }),
@@ -1294,70 +1290,111 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
     ]);
   };
 
-  const right = (
-    <div className="grid gap-4">
-      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Detalhes</div>
-        <div className="mt-1 text-sm text-muted-foreground">Clique em qualquer item para abrir um card e editar.</div>
-      </div>
-
-      <div className="hidden lg:block">
-        <DetailsPanel
-          open={true}
-          onOpenChange={() => void 0}
-          node={selected}
-          cid={companyId}
-          canEdit={!!canEdit}
-          fundamentals={fundamentals}
-          strategy={strategy}
-          cycles={cycles}
-          objectiveById={objectiveById}
-          cycleById={cycleById}
-          onInvalidate={onInvalidate}
-        />
-      </div>
-
-      {/* Mobile sheet */}
-      <div className="lg:hidden">
-        <DetailsPanel
-          open={sheetOpen}
-          onOpenChange={setSheetOpen}
-          node={selected}
-          cid={companyId}
-          canEdit={!!canEdit}
-          fundamentals={fundamentals}
-          strategy={strategy}
-          cycles={cycles}
-          objectiveById={objectiveById}
-          cycleById={cycleById}
-          onInvalidate={onInvalidate}
-        />
-      </div>
-
-      {(qFundamentals.isLoading || qStrategy.isLoading || qCycles.isLoading) && (
-        <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-sm text-muted-foreground">Carregando dados…</div>
-      )}
-
-      {(qFundamentals.error || qStrategy.error || qCycles.error) && (
-        <div className="rounded-3xl border border-destructive/30 bg-white p-5 text-sm text-destructive">
-          Não foi possível carregar o mapa. {String((qFundamentals.error ?? qStrategy.error ?? qCycles.error) as any)}
-        </div>
-      )}
-
-      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 text-sm text-muted-foreground">
-        <div className="font-semibold text-[color:var(--sinaxys-ink)]">Nota</div>
-        <div className="mt-1">
-          Hoje o sistema não possui um vínculo formal entre objetivos de longo prazo e OKRs do ano. O mapa mostra tudo em sequência e permite navegar/editar.
-          Se você quiser, a gente adiciona um campo de vínculo (bem simples) para ficar 100% “conectado” por dado.
-        </div>
-      </div>
-    </div>
-  );
-
   return (
-    <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-      <div>{left}</div>
-      <div>{right}</div>
-    </div>
+    <>
+      <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
+        <div className="grid gap-4">
+          <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão conectada</div>
+                <div className="mt-1 text-sm text-muted-foreground">Fundamentos → longo prazo → ciclos → objetivos → KRs.</div>
+              </div>
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                <ListTree className="h-5 w-5" />
+              </div>
+            </div>
+          </div>
+
+          <Tabs defaultValue="tree" className="w-full">
+            <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+              <TabsTrigger value="tree" className="shrink-0 rounded-xl data-[state=active]:bg-white">
+                Árvore
+              </TabsTrigger>
+              <TabsTrigger value="list" className="shrink-0 rounded-xl data-[state=active]:bg-white">
+                Lista
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="tree" className="mt-4">
+              <Tree ctx={ctx} fundamentals={fundamentals} strategy={strategy} cycles={cycles} />
+            </TabsContent>
+
+            <TabsContent value="list" className="mt-4">
+              <ListView fundamentals={fundamentals} strategy={strategy} cycles={cycles} onPick={(n) => ctx.select(n)} />
+            </TabsContent>
+          </Tabs>
+
+          {(qFundamentals.isLoading || qStrategy.isLoading || qCycles.isLoading) && (
+            <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-sm text-muted-foreground">Carregando dados…</div>
+          )}
+
+          {(qFundamentals.error || qStrategy.error || qCycles.error) && (
+            <div className="rounded-3xl border border-destructive/30 bg-white p-5 text-sm text-destructive">
+              Não foi possível carregar o mapa. {String((qFundamentals.error ?? qStrategy.error ?? qCycles.error) as any)}
+            </div>
+          )}
+        </div>
+
+        {/* Desktop details */}
+        <div className="hidden lg:block">
+          <div className="grid gap-4">
+            <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Detalhes</div>
+              <div className="mt-1 text-sm text-muted-foreground">Clique em qualquer item para abrir um card e editar.</div>
+            </div>
+
+            <DetailsShell
+              node={selected}
+              cid={companyId}
+              canEdit={!!canEdit}
+              fundamentals={fundamentals}
+              strategy={strategy}
+              cycles={cycles}
+              objectiveById={objectiveById}
+              cycleById={cycleById}
+              onInvalidate={onInvalidate}
+            />
+
+            <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 text-sm text-muted-foreground">
+              <div className="font-semibold text-[color:var(--sinaxys-ink)]">Nota</div>
+              <div className="mt-1">
+                Hoje o sistema não possui um vínculo formal entre objetivos de longo prazo e OKRs do ano. O mapa mostra tudo em sequência e permite
+                navegar/editar. Se você quiser, a gente adiciona um campo de vínculo (bem simples) para ficar 100% "conectado" por dado.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile details sheet */}
+      <div className="lg:hidden">
+        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+          <SheetContent side="bottom" className="h-[88vh] w-full rounded-t-3xl p-0">
+            <SheetHeader className="border-b border-[color:var(--sinaxys-border)] p-5">
+              <SheetTitle className="text-[color:var(--sinaxys-ink)]">Detalhes</SheetTitle>
+            </SheetHeader>
+            <ScrollArea className="h-[calc(88vh-76px)] p-5">
+              <DetailsBody
+                node={selected}
+                cid={companyId}
+                canEdit={!!canEdit}
+                fundamentals={fundamentals}
+                strategy={strategy}
+                cycles={cycles}
+                objectiveById={objectiveById}
+                cycleById={cycleById}
+                onInvalidate={onInvalidate}
+              />
+            </ScrollArea>
+          </SheetContent>
+        </Sheet>
+
+        <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 text-sm text-muted-foreground">
+          <div className="font-semibold text-[color:var(--sinaxys-ink)]">Dica</div>
+          <div className="mt-1">Toque em um item para abrir os detalhes (e editar quando disponível).</div>
+        </div>
+      </div>
+    </>
   );
 }
