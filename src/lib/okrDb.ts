@@ -618,3 +618,13 @@ export async function listTasksForDepartment(companyId: string, departmentId: st
   if (error) throw error;
   return (data ?? []) as unknown as DbTaskWithContext[];
 }
+
+export async function listTasksForUserWithContext(userId: string, opts?: { from?: string; to?: string }) {
+  const { data, error } = await supabase.rpc("okr_tasks_for_user", {
+    p_user_id: userId,
+    p_from: opts?.from ?? null,
+    p_to: opts?.to ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as unknown as DbTaskWithContext[];
+}
