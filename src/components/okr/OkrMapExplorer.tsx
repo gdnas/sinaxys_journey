@@ -13,11 +13,13 @@ import {
   Flag,
   Route,
   CalendarClock,
+  Network,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -26,6 +28,7 @@ import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import {
@@ -884,44 +887,14 @@ function ListView({
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Ciclos</div>
-            <div className="mt-1 text-sm text-muted-foreground">Anual e trimestral (clique para abrir).</div>
+            <div className="mt-1 text-sm text-muted-foreground">Trimestral e anual (clique para abrir).</div>
           </div>
           <Layers className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
         </div>
         <Separator className="my-4" />
 
         <div className="grid gap-3">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anual</div>
-            <div className="mt-2 grid gap-2">
-              {annual.length ? (
-                annual.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
-                    onClick={() => onPick({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{cycleLabel(c)}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{c.status}</div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                ))
-              ) : (
-                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-                  Nenhum ciclo anual ainda.
-                  <div className="mt-3">
-                    <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
-                      <Link to="/okr/ciclos">Criar ciclo anual</Link>
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
+          {/* Ordem pedida: Trimestral primeiro */}
           <div>
             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trimestral</div>
             <div className="mt-2 grid gap-2">
@@ -951,6 +924,37 @@ function ListView({
                 </div>
               )}
               {quarterly.length > 10 ? <div className="text-xs text-muted-foreground">Mostrando os 10 mais recentes.</div> : null}
+            </div>
+          </div>
+
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anual</div>
+            <div className="mt-2 grid gap-2">
+              {annual.length ? (
+                annual.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
+                    onClick={() => onPick({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
+                  >
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{cycleLabel(c)}</div>
+                      <div className="mt-1 text-xs text-muted-foreground">{c.status}</div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                ))
+              ) : (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                  Nenhum ciclo anual ainda.
+                  <div className="mt-3">
+                    <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
+                      <Link to="/okr/ciclos">Criar ciclo anual</Link>
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1262,6 +1266,342 @@ function ObjectiveEditor({
   );
 }
 
+type TreePayload = {
+  objectivesByCycle: Record<string, DbOkrObjective[]>;
+  krsByObjective: Record<string, DbOkrKeyResult[]>;
+};
+
+type TreeItem = {
+  kind: "group" | "fundamentals" | "fundamental" | "strategy" | "strategyObjective" | "cycles" | "cycle" | "objective" | "kr";
+  title: string;
+  subtitle?: string;
+  pill?: string;
+  tone: "fund" | "strategy" | "cycles" | "objective";
+  pick?: Node;
+  activeKey?: NodeId;
+  href?: string;
+};
+
+function toneClass(t: TreeItem["tone"]) {
+  if (t === "fund") return "bg-sky-50 text-sky-900 ring-sky-200";
+  if (t === "strategy") return "bg-violet-50 text-violet-900 ring-violet-200";
+  if (t === "cycles") return "bg-emerald-50 text-emerald-900 ring-emerald-200";
+  return "bg-amber-50 text-amber-950 ring-amber-200";
+}
+
+function TreeNodeCard({
+  item,
+  active,
+  onPick,
+}: {
+  item: TreeItem;
+  active: boolean;
+  onPick: (n: Node) => void;
+}) {
+  const shell = (
+    <div
+      className={cn(
+        "min-w-[210px] max-w-[260px] rounded-3xl border bg-white px-4 py-3 text-left shadow-sm transition",
+        active
+          ? "border-[color:var(--sinaxys-primary)]/40 ring-2 ring-[color:var(--sinaxys-primary)]/15"
+          : "border-[color:var(--sinaxys-border)] hover:bg-[color:var(--sinaxys-tint)]/20",
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{item.title}</div>
+          {item.subtitle ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.subtitle}</div> : null}
+        </div>
+        {item.pill ? (
+          <span className={cn("shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ring-1", toneClass(item.tone))}>
+            {item.pill}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+
+  if (item.href) {
+    return (
+      <Link to={item.href} className="block focus:outline-none">
+        {shell}
+      </Link>
+    );
+  }
+
+  if (!item.pick) return <div>{shell}</div>;
+
+  return (
+    <button type="button" className="block focus:outline-none" onClick={() => onPick(item.pick!)}>
+      {shell}
+    </button>
+  );
+}
+
+function OkrMapTreeCanvas({
+  cid,
+  fundamentals,
+  strategy,
+  cycles,
+  activeId,
+  onPick,
+  objectiveById,
+}: {
+  cid: string;
+  fundamentals: DbCompanyFundamentals | null;
+  strategy: DbStrategyObjective[];
+  cycles: DbOkrCycle[];
+  activeId: NodeId;
+  onPick: (n: Node) => void;
+  objectiveById: Map<string, DbOkrObjective>;
+}) {
+  const cycleGroups = useMemo(() => {
+    const annual = cycles.filter((c) => c.type === "ANNUAL").sort((a, b) => b.year - a.year);
+    const quarterly = cycles.filter((c) => c.type === "QUARTERLY").sort((a, b) => (b.year - a.year) || ((b.quarter ?? 0) - (a.quarter ?? 0)));
+    return { annual, quarterly };
+  }, [cycles]);
+
+  const cyclesKey = useMemo(
+    () => [...cycleGroups.quarterly.map((c) => c.id), ...cycleGroups.annual.map((c) => c.id)].join(","),
+    [cycleGroups.annual, cycleGroups.quarterly],
+  );
+
+  const qTree = useQuery<TreePayload>({
+    queryKey: ["okr-map-tree", cid, cyclesKey],
+    enabled: cycles.length > 0,
+    queryFn: async () => {
+      const objectivesByCycle: Record<string, DbOkrObjective[]> = {};
+      const krsByObjective: Record<string, DbOkrKeyResult[]> = {};
+
+      // Carrega tudo para permitir "linkar" a estratégia até o KR na mesma tela.
+      await Promise.all(
+        cycles.map(async (c) => {
+          const objs = await listOkrObjectives(cid, c.id);
+          objectivesByCycle[c.id] = objs;
+          for (const o of objs) objectiveById.set(o.id, o);
+
+          await Promise.all(
+            objs.map(async (o) => {
+              const krs = await listKeyResults(o.id);
+              krsByObjective[o.id] = krs;
+            }),
+          );
+        }),
+      );
+
+      return { objectivesByCycle, krsByObjective };
+    },
+    staleTime: 20_000,
+  });
+
+  const fundamentalsFields: Array<{ field: keyof DbCompanyFundamentals; label: string }> = [
+    { field: "purpose", label: "Propósito" },
+    { field: "vision", label: "Visão" },
+    { field: "mission", label: "Missão" },
+    { field: "values", label: "Valores" },
+    { field: "culture", label: "Cultura" },
+    { field: "strategic_north", label: "Norte estratégico" },
+  ];
+
+  const roots = useMemo((): OrgNode<TreeItem>[] => {
+    const data = qTree.data;
+
+    const fundamentalsNode: OrgNode<TreeItem> = {
+      id: "fundamentals",
+      data: {
+        kind: "fundamentals",
+        title: "Fundamentos",
+        subtitle: "Missão, visão, valores e cultura",
+        pill: "Base",
+        tone: "fund",
+        pick: { kind: "fundamentals", id: "fundamentals" },
+        activeKey: "fundamentals",
+      },
+      children: fundamentalsFields.map((f) => ({
+        id: `fund:${String(f.field)}`,
+        data: {
+          kind: "fundamental",
+          title: f.label,
+          subtitle:
+            typeof (fundamentals as any)?.[f.field] === "string" && String((fundamentals as any)[f.field]).trim().length
+              ? String((fundamentals as any)[f.field]).trim()
+              : "—",
+          tone: "fund",
+          pick: { kind: "fundamental", id: `fund:${f.field}` as any, field: f.field },
+          activeKey: `fund:${f.field}` as any,
+        },
+        children: [],
+      })),
+    };
+
+    const strategyNode: OrgNode<TreeItem> = {
+      id: "strategy",
+      data: {
+        kind: "strategy",
+        title: "Objetivos de longo prazo",
+        subtitle: "1–10 anos",
+        pill: String(strategy.length),
+        tone: "strategy",
+        pick: { kind: "strategy", id: "strategy" },
+        activeKey: "strategy",
+      },
+      children: strategy.map((so) => ({
+        id: `so:${so.id}`,
+        data: {
+          kind: "strategyObjective",
+          title: so.title,
+          subtitle: so.description?.trim() ? so.description.trim() : `${so.horizon_years} anos`,
+          pill: `${so.horizon_years}a`,
+          tone: "strategy",
+          pick: { kind: "strategyObjective", id: `so:${so.id}`, soId: so.id },
+          activeKey: `so:${so.id}`,
+        },
+        children: [],
+      })),
+    };
+
+    const cycleNodes = (list: DbOkrCycle[]): OrgNode<TreeItem>[] => {
+      return list.map((c) => {
+        const objs = data?.objectivesByCycle?.[c.id] ?? [];
+        const objectiveChildren: OrgNode<TreeItem>[] = objs.map((o) => {
+          const krs = data?.krsByObjective?.[o.id] ?? [];
+          const pct = averageObjectivePct(krs);
+          const krChildren: OrgNode<TreeItem>[] = krs.slice(0, 5).map((kr) => ({
+            id: `kr:${kr.id}`,
+            data: {
+              kind: "kr",
+              title: kr.title,
+              subtitle: kr.kind === "METRIC" ? `${kr.current_value ?? "—"} → ${kr.target_value ?? "—"} ${kr.metric_unit ?? ""}` : "Entregável",
+              pill: typeof krProgressPct(kr) === "number" ? `${krProgressPct(kr)}%` : "—",
+              tone: "objective",
+              pick: { kind: "objective", id: `o:${o.id}`, objectiveId: o.id },
+              activeKey: `o:${o.id}`,
+            },
+            children: [],
+          }));
+
+          if (krs.length > 5) {
+            krChildren.push({
+              id: `kr-more:${o.id}`,
+              data: {
+                kind: "kr",
+                title: `Ver todos os KRs (${krs.length})`,
+                subtitle: "Abrir o objetivo",
+                pill: "Abrir",
+                tone: "objective",
+                href: `/okr/objetivos/${o.id}`,
+              },
+              children: [],
+            });
+          }
+
+          return {
+            id: `o:${o.id}`,
+            data: {
+              kind: "objective",
+              title: o.title,
+              subtitle: `${objectiveTypeLabel(o.level)} • ${objectiveLevelLabel(o.level)}`,
+              pill: typeof pct === "number" ? `${pct}%` : "—",
+              tone: "objective",
+              pick: { kind: "objective", id: `o:${o.id}`, objectiveId: o.id },
+              activeKey: `o:${o.id}`,
+            },
+            children: krChildren,
+          };
+        });
+
+        return {
+          id: `c:${c.id}`,
+          data: {
+            kind: "cycle",
+            title: cycleLabel(c),
+            subtitle: c.status,
+            pill: String(objs.length),
+            tone: "cycles",
+            pick: { kind: "cycle", id: `c:${c.id}`, cycleId: c.id },
+            activeKey: `c:${c.id}`,
+          },
+          children: objectiveChildren,
+        };
+      });
+    };
+
+    // Ordem pedida: Trimestral primeiro.
+    const cyclesRoot: OrgNode<TreeItem> = {
+      id: "cycles",
+      data: {
+        kind: "cycles",
+        title: "OKRs (ciclos)",
+        subtitle: "Trimestre → ano",
+        pill: String(cycles.length),
+        tone: "cycles",
+        pick: { kind: "cycles", id: "cycles" },
+        activeKey: "cycles",
+      },
+      children: [
+        {
+          id: "cycles-quarterly",
+          data: {
+            kind: "group",
+            title: "Trimestral",
+            subtitle: "Execução do trimestre",
+            pill: String(cycleGroups.quarterly.length),
+            tone: "cycles",
+            pick: { kind: "cycles", id: "cycles" },
+            activeKey: "cycles",
+          },
+          children: cycleNodes(cycleGroups.quarterly),
+        },
+        {
+          id: "cycles-annual",
+          data: {
+            kind: "group",
+            title: "Anual",
+            subtitle: "Direção do ano",
+            pill: String(cycleGroups.annual.length),
+            tone: "cycles",
+            pick: { kind: "cycles", id: "cycles" },
+            activeKey: "cycles",
+          },
+          children: cycleNodes(cycleGroups.annual),
+        },
+      ],
+    };
+
+    return [fundamentalsNode, strategyNode, cyclesRoot];
+  }, [cycleGroups.annual, cycleGroups.quarterly, cycles.length, fundamentals, qTree.data, strategy, objectiveById]);
+
+  return (
+    <div className="grid gap-4">
+      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Árvore conectada (1 página)</div>
+            <div className="mt-1 text-sm text-muted-foreground">Estratégia → ciclos → objetivos → KRs. Clique em qualquer card para abrir detalhes.</div>
+          </div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+            <Network className="h-5 w-5" />
+          </div>
+        </div>
+      </div>
+
+      {qTree.isLoading ? (
+        <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-sm text-muted-foreground">Montando a árvore…</div>
+      ) : qTree.error ? (
+        <div className="rounded-3xl border border-destructive/30 bg-white p-5 text-sm text-destructive">Não foi possível montar a árvore.</div>
+      ) : (
+        <OrgChartTreeCanvas
+          roots={roots}
+          renderNode={(n) => (
+            <TreeNodeCard item={n.data} active={!!n.data.activeKey && n.data.activeKey === activeId} onPick={onPick} />
+          )}
+          className="[&_>div.relative]:h-[74vh]"
+        />
+      )}
+    </div>
+  );
+}
+
 export function OkrMapExplorer({ companyId }: { companyId: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -1288,12 +1628,6 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
   const strategy = qStrategy.data ?? [];
   const cycles = qCycles.data ?? [];
 
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({
-    fundamentals: true,
-    strategy: true,
-    cycles: true,
-  });
-
   const [selected, setSelected] = useState<Node>({ kind: "fundamentals", id: "fundamentals" });
 
   const objectiveById = useMemo(() => new Map<string, DbOkrObjective>(), []);
@@ -1303,41 +1637,19 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
     return m;
   }, [cycles]);
 
-  // Keep objectiveById warm when any cycle is expanded (only those objectives are loaded).
-  useQuery({
-    queryKey: ["okr-map-objectives-cache", companyId, Object.keys(expanded).filter((k) => k.startsWith("c:") && expanded[k]).join(",")],
-    enabled: Object.keys(expanded).some((k) => k.startsWith("c:") && expanded[k]),
-    queryFn: async () => {
-      const cycleIds = Object.keys(expanded)
-        .filter((k) => k.startsWith("c:") && expanded[k])
-        .map((k) => k.slice(2));
-
-      await Promise.all(
-        cycleIds.map(async (cycleId) => {
-          const objs = await listOkrObjectives(companyId, cycleId);
-          for (const o of objs) objectiveById.set(o.id, o);
-        }),
-      );
-
-      return true;
-    },
-  });
-
   const isMobile = typeof window !== "undefined" ? window.matchMedia("(max-width: 1024px)").matches : false;
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
-  const ctx: TreeCtx = {
-    cid: companyId,
-    activeId: selected.id,
-    expanded,
-    toggle(id) {
-      setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
-    },
-    select(n) {
-      setSelected(n);
-      if (isMobile) setSheetOpen(true);
-    },
-    canEdit,
+  const [view, setView] = useState<"list" | "tree">("list");
+
+  const pick = (n: Node) => {
+    setSelected(n);
+    if (isMobile) {
+      setSheetOpen(true);
+    } else if (view === "tree") {
+      setDialogOpen(true);
+    }
   };
 
   const onInvalidate = async () => {
@@ -1350,82 +1662,114 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
 
   return (
     <>
-      <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-        <div className="grid gap-4">
-          <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão conectada</div>
-                <div className="mt-1 text-sm text-muted-foreground">Fundamentos → longo prazo → ciclos → objetivos → KRs.</div>
+      <Tabs value={view} onValueChange={(v) => setView(v as any)} className="w-full">
+        <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+          <TabsTrigger value="list" className="shrink-0 rounded-xl data-[state=active]:bg-white">
+            Lista
+          </TabsTrigger>
+          <TabsTrigger value="tree" className="shrink-0 rounded-xl data-[state=active]:bg-white">
+            Árvore
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list" className="mt-5">
+          <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
+            <div className="grid gap-4">
+              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão conectada</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Fundamentos → longo prazo → ciclos (trimestre primeiro).</div>
+                  </div>
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                    <ListTree className="h-5 w-5" />
+                  </div>
+                </div>
               </div>
-              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                <ListTree className="h-5 w-5" />
-              </div>
-            </div>
-          </div>
 
-          <Tabs defaultValue="tree" className="w-full">
-            <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-              <TabsTrigger value="tree" className="shrink-0 rounded-xl data-[state=active]:bg-white">
-                Árvore
-              </TabsTrigger>
-              <TabsTrigger value="list" className="shrink-0 rounded-xl data-[state=active]:bg-white">
-                Lista
-              </TabsTrigger>
-            </TabsList>
+              <ListView fundamentals={fundamentals} strategy={strategy} cycles={cycles} onPick={(n) => pick(n)} />
 
-            <TabsContent value="tree" className="mt-4">
-              <Tree ctx={ctx} fundamentals={fundamentals} strategy={strategy} cycles={cycles} />
-            </TabsContent>
+              {(qFundamentals.isLoading || qStrategy.isLoading || qCycles.isLoading) && (
+                <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-sm text-muted-foreground">Carregando dados…</div>
+              )}
 
-            <TabsContent value="list" className="mt-4">
-              <ListView fundamentals={fundamentals} strategy={strategy} cycles={cycles} onPick={(n) => ctx.select(n)} />
-            </TabsContent>
-          </Tabs>
-
-          {(qFundamentals.isLoading || qStrategy.isLoading || qCycles.isLoading) && (
-            <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-sm text-muted-foreground">Carregando dados…</div>
-          )}
-
-          {(qFundamentals.error || qStrategy.error || qCycles.error) && (
-            <div className="rounded-3xl border border-destructive/30 bg-white p-5 text-sm text-destructive">
-              Não foi possível carregar o mapa. {String((qFundamentals.error ?? qStrategy.error ?? qCycles.error) as any)}
-            </div>
-          )}
-        </div>
-
-        {/* Desktop details */}
-        <div className="hidden lg:block">
-          <div className="grid gap-4">
-            <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Detalhes</div>
-              <div className="mt-1 text-sm text-muted-foreground">Clique em qualquer item para abrir um card e editar.</div>
+              {(qFundamentals.error || qStrategy.error || qCycles.error) && (
+                <div className="rounded-3xl border border-destructive/30 bg-white p-5 text-sm text-destructive">
+                  Não foi possível carregar o mapa. {String((qFundamentals.error ?? qStrategy.error ?? qCycles.error) as any)}
+                </div>
+              )}
             </div>
 
-            <DetailsShell
-              node={selected}
-              cid={companyId}
-              canEdit={!!canEdit}
-              fundamentals={fundamentals}
-              strategy={strategy}
-              cycles={cycles}
-              objectiveById={objectiveById}
-              cycleById={cycleById}
-              onInvalidate={onInvalidate}
-            />
+            {/* Desktop details */}
+            <div className="hidden lg:block">
+              <div className="grid gap-4">
+                <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Detalhes</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Clique em um item da lista para abrir um card e editar.</div>
+                </div>
 
-            <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 text-sm text-muted-foreground">
-              <div className="font-semibold text-[color:var(--sinaxys-ink)]">Nota</div>
-              <div className="mt-1">
-                Hoje o sistema não possui um vínculo formal entre objetivos de longo prazo e OKRs do ano. O mapa mostra tudo em sequência e permite
-                navegar/editar. Se você quiser, a gente adiciona um campo de vínculo (bem simples) para ficar 100% "conectado" por dado.
+                <DetailsShell
+                  node={selected}
+                  cid={companyId}
+                  canEdit={!!canEdit}
+                  fundamentals={fundamentals}
+                  strategy={strategy}
+                  cycles={cycles}
+                  objectiveById={objectiveById}
+                  cycleById={cycleById}
+                  onInvalidate={onInvalidate}
+                />
+
+                <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 text-sm text-muted-foreground">
+                  <div className="font-semibold text-[color:var(--sinaxys-ink)]">Nota</div>
+                  <div className="mt-1">
+                    Hoje o sistema não possui um vínculo formal entre objetivos de longo prazo e OKRs do ano. O mapa mostra tudo em sequência e permite
+                    navegar/editar. Se você quiser, a gente adiciona um campo de vínculo (bem simples) para ficar 100% "conectado" por dado.
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </TabsContent>
 
-      {/* Mobile details sheet */}
+        <TabsContent value="tree" className="mt-5">
+          <OkrMapTreeCanvas
+            cid={companyId}
+            fundamentals={fundamentals}
+            strategy={strategy}
+            cycles={cycles}
+            activeId={selected.id}
+            onPick={(n) => pick(n)}
+            objectiveById={objectiveById}
+          />
+
+          {/* Desktop dialog details for tree mode */}
+          <div className="hidden lg:block">
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-hidden rounded-3xl p-0 sm:max-w-2xl">
+                <DialogHeader className="border-b border-[color:var(--sinaxys-border)] p-5">
+                  <DialogTitle className="text-[color:var(--sinaxys-ink)]">Detalhes</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="h-[calc(88vh-76px)] p-5">
+                  <DetailsBody
+                    node={selected}
+                    cid={companyId}
+                    canEdit={!!canEdit}
+                    fundamentals={fundamentals}
+                    strategy={strategy}
+                    cycles={cycles}
+                    objectiveById={objectiveById}
+                    cycleById={cycleById}
+                    onInvalidate={onInvalidate}
+                  />
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* Mobile details sheet (list + tree) */}
       <div className="lg:hidden">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetContent side="bottom" className="h-[88vh] w-full rounded-t-3xl p-0">
