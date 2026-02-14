@@ -46,6 +46,7 @@ import { AuthProvider } from "@/lib/auth";
 import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
+import { RequireCompanyModule } from "@/components/RequireCompanyModule";
 
 const queryClient = new QueryClient();
 
@@ -93,7 +94,9 @@ const App = () => (
                   path="/pdi-performance"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <PdiPerformance />
+                      <RequireCompanyModule moduleKey="PDI_PERFORMANCE">
+                        <PdiPerformance />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -103,7 +106,9 @@ const App = () => (
                   path="/okr"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <OkrHome />
+                      <RequireCompanyModule moduleKey="OKR">
+                        <OkrHome />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -111,7 +116,9 @@ const App = () => (
                   path="/okr/hoje"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <OkrToday />
+                      <RequireCompanyModule moduleKey="OKR">
+                        <OkrToday />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -119,7 +126,9 @@ const App = () => (
                   path="/okr/fundamentos"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <OkrFundamentals />
+                      <RequireCompanyModule moduleKey="OKR">
+                        <OkrFundamentals />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -127,7 +136,9 @@ const App = () => (
                   path="/okr/mapa"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <OkrMap />
+                      <RequireCompanyModule moduleKey="OKR">
+                        <OkrMap />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -135,7 +146,9 @@ const App = () => (
                   path="/okr/ciclos"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <OkrCycles />
+                      <RequireCompanyModule moduleKey="OKR">
+                        <OkrCycles />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -143,7 +156,9 @@ const App = () => (
                   path="/okr/assistente"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <OkrAssistant />
+                      <RequireCompanyModule moduleKey="OKR">
+                        <OkrAssistant />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -151,7 +166,9 @@ const App = () => (
                   path="/okr/objetivos/:objectiveId"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <OkrObjectiveDetail />
+                      <RequireCompanyModule moduleKey="OKR">
+                        <OkrObjectiveDetail />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -186,7 +203,9 @@ const App = () => (
                   path="/profile"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <Profile />
+                      <RequireCompanyModule moduleKey="PROFILE">
+                        <Profile />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -195,7 +214,9 @@ const App = () => (
                   path="/rankings"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <Rankings />
+                      <RequireCompanyModule moduleKey="POINTS">
+                        <Rankings />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -205,7 +226,9 @@ const App = () => (
                   path="/org"
                   element={
                     <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                      <OrgChart />
+                      <RequireCompanyModule moduleKey="ORG">
+                        <OrgChart />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -217,7 +240,9 @@ const App = () => (
                   path="/tracks"
                   element={
                     <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                      <TrackLibrary />
+                      <RequireCompanyModule moduleKey="TRACKS">
+                        <TrackLibrary />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -225,7 +250,9 @@ const App = () => (
                   path="/tracks/:trackId"
                   element={
                     <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                      <TrackDetail />
+                      <RequireCompanyModule moduleKey="TRACKS">
+                        <TrackDetail />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -243,7 +270,9 @@ const App = () => (
                   path="/app/tracks/:assignmentId"
                   element={
                     <RequireAuth roles={["COLABORADOR", "HEAD", "ADMIN"]}>
-                      <TrackPlayer />
+                      <RequireCompanyModule moduleKey="TRACKS">
+                        <TrackPlayer />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -251,7 +280,9 @@ const App = () => (
                   path="/app/certificates"
                   element={
                     <RequireAuth roles={["COLABORADOR", "HEAD", "ADMIN"]}>
-                      <AppCertificates />
+                      <RequireCompanyModule moduleKey="TRACKS">
+                        <AppCertificates />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -259,7 +290,9 @@ const App = () => (
                   path="/app/certificates/:certificateId"
                   element={
                     <RequireAuth roles={["COLABORADOR", "HEAD", "ADMIN"]}>
-                      <CertificateView />
+                      <RequireCompanyModule moduleKey="TRACKS">
+                        <CertificateView />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -269,7 +302,9 @@ const App = () => (
                   path="/head/tracks"
                   element={
                     <RequireAuth roles={["HEAD"]}>
-                      <HeadTracks />
+                      <RequireCompanyModule moduleKey="TRACKS">
+                        <HeadTracks />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -277,7 +312,9 @@ const App = () => (
                   path="/head/tracks/:trackId/edit"
                   element={
                     <RequireAuth roles={["HEAD"]}>
-                      <HeadTrackEdit />
+                      <RequireCompanyModule moduleKey="TRACKS">
+                        <HeadTrackEdit />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -285,7 +322,9 @@ const App = () => (
                   path="/head/users"
                   element={
                     <RequireAuth roles={["HEAD"]}>
-                      <HeadUsers />
+                      <RequireCompanyModule moduleKey="ADMIN">
+                        <HeadUsers />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -293,7 +332,9 @@ const App = () => (
                   path="/head/costs"
                   element={
                     <RequireAuth roles={["HEAD"]}>
-                      <HeadCosts />
+                      <RequireCompanyModule moduleKey="COSTS">
+                        <HeadCosts />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -303,7 +344,9 @@ const App = () => (
                   path="/admin/users"
                   element={
                     <RequireAuth roles={["ADMIN", "MASTERADMIN"]}>
-                      <AdminUsers />
+                      <RequireCompanyModule moduleKey="ADMIN">
+                        <AdminUsers />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -311,7 +354,9 @@ const App = () => (
                   path="/admin/users/:userId"
                   element={
                     <RequireAuth roles={["ADMIN"]}>
-                      <AdminUserCard />
+                      <RequireCompanyModule moduleKey="ADMIN">
+                        <AdminUserCard />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -319,7 +364,9 @@ const App = () => (
                   path="/admin/rewards"
                   element={
                     <RequireAuth roles={["ADMIN"]}>
-                      <AdminRewards />
+                      <RequireCompanyModule moduleKey="POINTS">
+                        <AdminRewards />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -327,7 +374,9 @@ const App = () => (
                   path="/admin/import"
                   element={
                     <RequireAuth roles={["ADMIN"]}>
-                      <AdminImportUsers />
+                      <RequireCompanyModule moduleKey="ADMIN">
+                        <AdminImportUsers />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -335,7 +384,9 @@ const App = () => (
                   path="/admin/org"
                   element={
                     <RequireAuth roles={["ADMIN"]}>
-                      <AdminOrgChart />
+                      <RequireCompanyModule moduleKey="ORG">
+                        <AdminOrgChart />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -343,7 +394,9 @@ const App = () => (
                   path="/admin/costs"
                   element={
                     <RequireAuth roles={["ADMIN"]}>
-                      <AdminCosts />
+                      <RequireCompanyModule moduleKey="COSTS">
+                        <AdminCosts />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -351,7 +404,9 @@ const App = () => (
                   path="/admin/tracks"
                   element={
                     <RequireAuth roles={["ADMIN"]}>
-                      <AdminTracks />
+                      <RequireCompanyModule moduleKey="TRACKS">
+                        <AdminTracks />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -359,7 +414,9 @@ const App = () => (
                   path="/admin/tracks/:trackId/edit"
                   element={
                     <RequireAuth roles={["ADMIN"]}>
-                      <HeadTrackEdit />
+                      <RequireCompanyModule moduleKey="TRACKS">
+                        <HeadTrackEdit />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -367,7 +424,9 @@ const App = () => (
                   path="/admin/departments"
                   element={
                     <RequireAuth roles={["ADMIN"]}>
-                      <AdminDepartments />
+                      <RequireCompanyModule moduleKey="ADMIN">
+                        <AdminDepartments />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />
@@ -375,7 +434,9 @@ const App = () => (
                   path="/admin/brand"
                   element={
                     <RequireAuth roles={["ADMIN"]}>
-                      <AdminBrand />
+                      <RequireCompanyModule moduleKey="ADMIN">
+                        <AdminBrand />
+                      </RequireCompanyModule>
                     </RequireAuth>
                   }
                 />

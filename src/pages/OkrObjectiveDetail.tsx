@@ -23,8 +23,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { brl } from "@/lib/costs";
 import { parsePtNumber } from "@/lib/roi";
 import { listProfilesByCompany } from "@/lib/profilesDb";
 import {
@@ -69,6 +71,7 @@ export default function OkrObjectiveDetail() {
   const { objectiveId } = useParams();
   const { user } = useAuth();
   const { companyId } = useCompany();
+  const { enabled: okrRoiEnabled } = useCompanyModuleEnabled("OKR_ROI");
 
   if (!objectiveId || !user) return null;
 
@@ -264,6 +267,11 @@ export default function OkrObjectiveDetail() {
   }
 
   const expected = typeof objective?.expected_attainment_pct === "number" ? objective.expected_attainment_pct : null;
+  const showRoi =
+    okrRoiEnabled &&
+    !!objective &&
+    !!objective.department_id &&
+    (typeof objective.estimated_value_brl === "number" || typeof objective.estimated_cost_brl === "number" || typeof objective.estimated_roi_pct === "number");
 
   return (
     <div className="grid gap-6">
@@ -364,6 +372,34 @@ export default function OkrObjectiveDetail() {
               <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Motivo estratégico</div>
                 <div className="mt-2 whitespace-pre-wrap text-sm text-[color:var(--sinaxys-ink)]">{objective.strategic_reason}</div>
+              </div>
+            ) : null}
+
+            {showRoi ? (
+              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
+                <p className="mt-1 text-sm text-muted-foreground">Resumo do business case cadastrado no objetivo.</p>
+
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
+                    <div className="text-xs text-muted-foreground">Impacto (R$)</div>
+                    <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                      {typeof objective.estimated_value_brl === "number" ? brl(objective.estimated_value_brl) : "—"}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
+                    <div className="text-xs text-muted-foreground">Custo (R$)</div>
+                    <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                      {typeof objective.estimated_cost_brl === "number" ? brl(objective.estimated_cost_brl) : "—"}
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
+                    <div className="text-xs text-muted-foreground">ROI</div>
+                    <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                      {typeof objective.estimated_roi_pct === "number" ? `${objective.estimated_roi_pct.toFixed(1)}%` : "—"}
+                    </div>
+                  </div>
+                </div>
               </div>
             ) : null}
           </div>
@@ -648,34 +684,7 @@ export default function OkrObjectiveDetail() {
               <div className="text-xs text-muted-foreground">Estimativa simples para planejamento e priorização.</div>
             </div>
 
-            {okrRoiEnabled ? (
-              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
-                <p className="mt-1 text-sm text-muted-foreground">Estimativa rápida: impacto (R$) e ROI baseado no custo/h do responsável.</p>
-
-                <div className="mt-4 grid gap-2">
-                  <Label>Impacto estimado (R$)</Label>
-                  <Input className="h-11 rounded-xl" value={taskValue} onChange={(e) => setTaskValue(e.target.value)} placeholder="5000" />
-                </div>
-
-                <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                  <div className="text-xs text-muted-foreground">Custo/h do responsável: {brlPerHourFromMonthly(taskOwnerMonthly ?? 0)}</div>
-                  {!taskOwnerMonthly ? (
-                    <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]">
-                      Para calcular ROI, cadastre o custo mensal da pessoa em <span className="font-semibold">Custos</span>.
-                    </div>
-                  ) : null}
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Custo estimado:</span>
-                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{taskCostBRL !== null ? brl(taskCostBRL) : "—"}</span>
-                    <span className="text-muted-foreground">• ROI:</span>
-                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">
-                      {taskRoi !== null ? `${taskRoi.toFixed(1)}%` : "—"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ) : null}
+            {/* ROI não é coletado em tarefas. ROI é um atributo do OBJETIVO (quando OKR_ROI está habilitado). */}
           </div>
 
           <DialogFooter>
@@ -705,9 +714,6 @@ export default function OkrObjectiveDetail() {
                       due_date: taskDue.trim() || null,
                       estimate_minutes: Number.isFinite(n) ? n : null,
                       checklist: null,
-                      estimated_value_brl: taskValueBRL,
-                      estimated_cost_brl: taskCostBRL !== null ? Number(taskCostBRL.toFixed(2)) : null,
-                      estimated_roi_pct: taskRoi !== null ? Number(taskRoi.toFixed(2)) : null,
                     };
 
                     if (canWrite) patch.owner_user_id = taskOwner;
@@ -730,9 +736,9 @@ export default function OkrObjectiveDetail() {
                     due_date: taskDue.trim() || null,
                     estimate_minutes: Number.isFinite(n) ? n : null,
                     checklist: null,
-                    estimated_value_brl: taskValueBRL,
-                    estimated_cost_brl: taskCostBRL !== null ? Number(taskCostBRL.toFixed(2)) : null,
-                    estimated_roi_pct: taskRoi !== null ? Number(taskRoi.toFixed(2)) : null,
+                    estimated_value_brl: null,
+                    estimated_cost_brl: null,
+                    estimated_roi_pct: null,
                   });
                   await qc.invalidateQueries({ queryKey: ["okr-tasks-for-objective", objectiveId] });
                   toast({ title: "Tarefa criada" });
