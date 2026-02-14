@@ -29,6 +29,8 @@ import { getProfile, updateProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
 import { FinanceiroPanel } from "@/components/FinanceiroPanel";
 import { useOnboardingTour } from "@/components/OnboardingTour";
+import VacationRequests from "@/pages/VacationRequests";
+import VacationApprovals from "@/pages/VacationApprovals";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -61,6 +63,7 @@ export default function Profile() {
 
   const canEditSensitive = user.role === "ADMIN" || user.role === "MASTERADMIN";
   const canEditCompanyFinance = user.role === "ADMIN" || user.role === "MASTERADMIN";
+  const canApproveVacation = user.role === "ADMIN" || user.role === "HEAD";
 
   const { data: me } = useQuery({
     queryKey: ["profile", user.id],
@@ -289,6 +292,7 @@ export default function Profile() {
             <TabsTrigger value="trabalho" className="rounded-xl">Trabalho</TabsTrigger>
             <TabsTrigger value="docs" className="rounded-xl">Documentos</TabsTrigger>
             <TabsTrigger value="financeiro" className="rounded-xl">Financeiro</TabsTrigger>
+            <TabsTrigger value="ferias" className="rounded-xl">Férias</TabsTrigger>
           </TabsList>
 
           <TabsContent value="perfil" className="mt-5">
@@ -670,6 +674,32 @@ export default function Profile() {
 
           <TabsContent value="financeiro" className="mt-5">
             <FinanceiroPanel userId={user.id} companyId={user.companyId ?? null} canEditCompany={canEditCompanyFinance} />
+          </TabsContent>
+
+          <TabsContent value="ferias" className="mt-5">
+            <div className="grid gap-4">
+              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/60 p-5">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Férias</div>
+                <p className="mt-1 text-sm text-muted-foreground">Solicite férias e acompanhe aprovações — tudo aqui dentro da sua área.</p>
+              </div>
+
+              <Tabs defaultValue="meus" className="w-full">
+                <TabsList className="h-11 w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
+                  <TabsTrigger value="meus" className="rounded-xl">Meus pedidos</TabsTrigger>
+                  {canApproveVacation ? <TabsTrigger value="apro" className="rounded-xl">Aprovações</TabsTrigger> : null}
+                </TabsList>
+
+                <TabsContent value="meus" className="mt-5">
+                  <VacationRequests />
+                </TabsContent>
+
+                {canApproveVacation ? (
+                  <TabsContent value="apro" className="mt-5">
+                    <VacationApprovals />
+                  </TabsContent>
+                ) : null}
+              </Tabs>
+            </div>
           </TabsContent>
         </Tabs>
       </Card>

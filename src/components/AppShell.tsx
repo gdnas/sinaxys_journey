@@ -234,34 +234,13 @@ const nav: NavItem[] = [
     roles: ["ADMIN"],
   },
 
-  // Minha área (inclui Férias)
+  // Minha área
   {
-    type: "group",
+    type: "link",
+    to: "/profile",
     label: "Minha área",
     icon: <UserIcon className="h-4 w-4" />,
-    children: [
-      {
-        type: "link",
-        to: "/profile",
-        label: "Perfil",
-        icon: <UserIcon className="h-4 w-4" />,
-        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
-      },
-      {
-        type: "link",
-        to: "/vacation",
-        label: "Férias — Meus pedidos",
-        icon: <CalendarCheck2 className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-      },
-      {
-        type: "link",
-        to: "/vacation/approvals",
-        label: "Férias — Aprovações",
-        icon: <Shield className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD"],
-      },
-    ],
+    roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
   },
 ];
 
