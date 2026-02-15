@@ -52,7 +52,7 @@ export default function OkrHome() {
 
   const hasFundamentals =
     !!fundamentals &&
-    [fundamentals.purpose, fundamentals.vision, fundamentals.mission, fundamentals.strategic_north].some((t) => !!t?.trim());
+    [fundamentals.purpose, fundamentals.vision, fundamentals.mission, fundamentals.values, fundamentals.culture].some((t) => !!t?.trim());
 
   if (!hasCompany) {
     return (
@@ -221,7 +221,7 @@ export default function OkrHome() {
             <div>
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Fundamentos da empresa</div>
               <p className="mt-1 text-sm text-muted-foreground">
-                Missão, visão, propósito e norte estratégico — a origem de cada objetivo.
+                Missão, visão e propósito — a origem de cada objetivo.
               </p>
             </div>
             {hasFundamentals ? (
@@ -239,7 +239,6 @@ export default function OkrHome() {
             <Pill label="Propósito" value={fundamentals?.purpose} />
             <Pill label="Visão" value={fundamentals?.vision} />
             <Pill label="Missão" value={fundamentals?.mission} />
-            <Pill label="Norte estratégico" value={fundamentals?.strategic_north} />
           </div>
 
           <div className="mt-4">

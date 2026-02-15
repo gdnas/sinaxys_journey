@@ -1,51 +1,34 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpenText, Save, Plus, Trash2 } from "lucide-react";
+import { BookOpenText, Save } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { getCompanyFundamentals, upsertCompanyFundamentals, type DbCompanyFundamentals } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
-
-function parseListValue(v: string | null | undefined) {
-  if (!v?.trim()) return [];
-  return v
-    .split("\n")
-    .map((s) => s.trim())
-    .map((s) => s.replace(/^[-•]\s+/, ""))
-    .filter(Boolean);
-}
-
-function serializeListValue(items: string[]) {
-  return items
-    .map((s) => s.trim())
-    .filter(Boolean)
-    .join("\n");
-}
+import {
+  describedItemsToLines,
+  parseDescribedItems,
+  serializeDescribedItems,
+  textPreview,
+  type DescribedItem,
+} from "@/lib/fundamentalsFormat";
+import { DescribedItemsEditor } from "@/components/fundamentals/DescribedItemsEditor";
 
 function Block({ label, value }: { label: string; value?: string | null }) {
-  const items = useMemo(() => parseListValue(value), [value]);
+  const preview = useMemo(() => textPreview(value, 220), [value]);
 
   return (
     <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
       <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-      {items.length ? (
-        <ul className="mt-3 grid gap-2">
-          {items.slice(0, 6).map((it) => (
-            <li key={it} className="flex items-start gap-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
-              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sinaxys-primary)]/70" />
-              <span className="min-w-0">{it}</span>
-            </li>
-          ))}
-          {items.length > 6 ? <li className="text-xs text-muted-foreground">+{items.length - 6} itens</li> : null}
-        </ul>
+      {preview ? (
+        <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">{preview}</div>
       ) : (
         <div className="mt-2 text-sm text-muted-foreground">Ainda não definido.</div>
       )}
@@ -53,89 +36,41 @@ function Block({ label, value }: { label: string; value?: string | null }) {
   );
 }
 
-type FieldKey = "purpose" | "vision" | "mission" | "strategic_north" | "values" | "culture";
+type ItemsState = {
+  purpose: string;
+  vision: string;
+  mission: string;
+  values: DescribedItem[];
+  culture: DescribedItem[];
+};
 
-function FieldEditor({
+function BigTextEditor({
   label,
-  items,
-  draft,
-  setDraft,
-  setItems,
+  value,
+  setValue,
   disabled,
+  placeholder,
 }: {
   label: string;
-  items: string[];
-  draft: string;
-  setDraft: (v: string) => void;
-  setItems: (fn: (prev: string[]) => string[]) => void;
+  value: string;
+  setValue: (v: string) => void;
   disabled: boolean;
+  placeholder: string;
 }) {
   return (
     <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
       <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{label}</div>
-      <div className="mt-1 text-sm text-muted-foreground">Adicione itens (um por vez). Você pode reordenar apagando e inserindo de novo.</div>
+      <div className="mt-1 text-sm text-muted-foreground">Texto principal (pode ter parágrafos). Use para comunicar com clareza.</div>
 
       <Separator className="my-4" />
 
-      <div className="grid gap-3">
-        {items.length ? (
-          <div className="grid gap-2">
-            {items.map((it, idx) => (
-              <div key={idx} className="flex items-center gap-2">
-                <Input
-                  className="h-11 rounded-2xl"
-                  value={it}
-                  disabled={disabled}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setItems((prev) => prev.map((p, i) => (i === idx ? v : p)));
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-11 w-11 rounded-2xl bg-white"
-                  disabled={disabled}
-                  onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                  title="Remover"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum item ainda.</div>
-        )}
-
-        <div className="grid gap-2">
-          <Label>Adicionar</Label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              className="h-11 rounded-2xl"
-              value={draft}
-              disabled={disabled}
-              placeholder="Escreva um item…"
-              onChange={(e) => setDraft(e.target.value)}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 rounded-2xl bg-white"
-              disabled={disabled || draft.trim().length < 2}
-              onClick={() => {
-                const v = draft.trim();
-                setItems((prev) => [...prev, v]);
-                setDraft("");
-              }}
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Adicionar
-            </Button>
-          </div>
-        </div>
-      </div>
+      <Textarea
+        className="min-h-[160px] rounded-2xl"
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={(e) => setValue(e.target.value)}
+      />
     </div>
   );
 }
@@ -161,34 +96,23 @@ export default function OkrFundamentals() {
 
   const [open, setOpen] = useState(false);
 
-  const initial = useMemo(() => {
+  const initial = useMemo((): ItemsState => {
     const f = fundamentals;
     return {
-      purpose: parseListValue(f?.purpose),
-      vision: parseListValue(f?.vision),
-      mission: parseListValue(f?.mission),
-      strategic_north: parseListValue(f?.strategic_north),
-      values: parseListValue(f?.values),
-      culture: parseListValue(f?.culture),
-    } satisfies Record<FieldKey, string[]>;
+      purpose: String(f?.purpose ?? ""),
+      vision: String(f?.vision ?? ""),
+      mission: String(f?.mission ?? ""),
+      values: parseDescribedItems(f?.values),
+      culture: parseDescribedItems(f?.culture),
+    };
   }, [fundamentals]);
 
-  const [items, setItems] = useState<Record<FieldKey, string[]>>({
-    purpose: [],
-    vision: [],
-    mission: [],
-    strategic_north: [],
-    values: [],
-    culture: [],
-  });
-
-  const [drafts, setDrafts] = useState<Record<FieldKey, string>>({
+  const [items, setItems] = useState<ItemsState>({
     purpose: "",
     vision: "",
     mission: "",
-    strategic_north: "",
-    values: "",
-    culture: "",
+    values: [],
+    culture: [],
   });
 
   const [saving, setSaving] = useState(false);
@@ -196,22 +120,15 @@ export default function OkrFundamentals() {
   useEffect(() => {
     if (!open) return;
     setItems(initial);
-    setDrafts({
-      purpose: "",
-      vision: "",
-      mission: "",
-      strategic_north: "",
-      values: "",
-      culture: "",
-    });
     setSaving(false);
   }, [open, initial]);
 
+  const valuesLines = useMemo(() => describedItemsToLines(parseDescribedItems(fundamentals?.values)), [fundamentals?.values]);
+  const cultureLines = useMemo(() => describedItemsToLines(parseDescribedItems(fundamentals?.culture)), [fundamentals?.culture]);
+
   const hasAny =
     !!fundamentals &&
-    [fundamentals.mission, fundamentals.vision, fundamentals.purpose, fundamentals.values, fundamentals.culture, fundamentals.strategic_north].some(
-      (t) => !!t?.trim(),
-    );
+    [fundamentals.mission, fundamentals.vision, fundamentals.purpose, fundamentals.values, fundamentals.culture].some((t) => !!t?.trim());
 
   if (!hasCompany) {
     return (
@@ -232,7 +149,7 @@ export default function OkrFundamentals() {
     <div className="grid gap-6">
       <OkrPageHeader
         title="Fundamentos da empresa"
-        subtitle="Agora os fundamentos são compostos por itens — fica mais fácil conectar OKRs a uma frase específica."
+        subtitle="Propósito, visão e missão em texto. Valores e cultura em itens com descrição."
         icon={<BookOpenText className="h-5 w-5" />}
         actions={
           canEdit ? (
@@ -251,7 +168,7 @@ export default function OkrFundamentals() {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão inspiradora (rápido)</div>
-            <p className="mt-1 text-sm text-muted-foreground">Para qualquer pessoa entender para onde a empresa está indo.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Um norte fácil de entender — sem perder a profundidade (valores/cultura).</p>
           </div>
 
           {hasAny ? (
@@ -273,70 +190,101 @@ export default function OkrFundamentals() {
           <Block label="Propósito" value={fundamentals?.purpose} />
           <Block label="Visão" value={fundamentals?.vision} />
           <Block label="Missão" value={fundamentals?.mission} />
-          <Block label="Norte estratégico" value={fundamentals?.strategic_north} />
+          <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Valores</div>
+            {valuesLines.length ? (
+              <ul className="mt-3 grid gap-2">
+                {valuesLines.slice(0, 5).map((it) => (
+                  <li key={it} className="flex items-start gap-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
+                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sinaxys-primary)]/70" />
+                    <span className="min-w-0">{it}</span>
+                  </li>
+                ))}
+                {valuesLines.length > 5 ? <li className="text-xs text-muted-foreground">+{valuesLines.length - 5} itens</li> : null}
+              </ul>
+            ) : (
+              <div className="mt-2 text-sm text-muted-foreground">Ainda não definido.</div>
+            )}
+          </div>
         </div>
 
         <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <Block label="Valores" value={fundamentals?.values} />
-          <Block label="Cultura" value={fundamentals?.culture} />
+          <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Cultura</div>
+            {cultureLines.length ? (
+              <ul className="mt-3 grid gap-2">
+                {cultureLines.slice(0, 5).map((it) => (
+                  <li key={it} className="flex items-start gap-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
+                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sinaxys-primary)]/70" />
+                    <span className="min-w-0">{it}</span>
+                  </li>
+                ))}
+                {cultureLines.length > 5 ? <li className="text-xs text-muted-foreground">+{cultureLines.length - 5} itens</li> : null}
+              </ul>
+            ) : (
+              <div className="mt-2 text-sm text-muted-foreground">Ainda não definido.</div>
+            )}
+          </div>
+
+          <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5">
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Dica de preenchimento</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              Valores e cultura funcionam melhor quando cada item tem um <span className="font-semibold">nome</span> e um <span className="font-semibold">descritivo</span>.
+            </div>
+          </div>
         </div>
       </Card>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-hidden rounded-3xl sm:max-w-3xl">
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-hidden rounded-3xl sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Editar fundamentos (por itens)</DialogTitle>
+            <DialogTitle>Editar fundamentos</DialogTitle>
           </DialogHeader>
 
           <ScrollArea className="-mx-1 max-h-[62vh] px-1">
             <div className="grid gap-4 pr-3">
-              <FieldEditor
+              <BigTextEditor
                 label="Propósito"
-                items={items.purpose}
-                draft={drafts.purpose}
-                setDraft={(v) => setDrafts((p) => ({ ...p, purpose: v }))}
-                setItems={(fn) => setItems((p) => ({ ...p, purpose: fn(p.purpose) }))}
+                value={items.purpose}
+                setValue={(v) => setItems((p) => ({ ...p, purpose: v }))}
                 disabled={!canEdit || saving}
+                placeholder="Por que existimos? (uma frase forte + 1–2 parágrafos se necessário)"
               />
-              <FieldEditor
+
+              <BigTextEditor
                 label="Visão"
-                items={items.vision}
-                draft={drafts.vision}
-                setDraft={(v) => setDrafts((p) => ({ ...p, vision: v }))}
-                setItems={(fn) => setItems((p) => ({ ...p, vision: fn(p.vision) }))}
+                value={items.vision}
+                setValue={(v) => setItems((p) => ({ ...p, vision: v }))}
                 disabled={!canEdit || saving}
+                placeholder="Como o mundo fica melhor quando vencemos? (1–3 parágrafos)"
               />
-              <FieldEditor
+
+              <BigTextEditor
                 label="Missão"
-                items={items.mission}
-                draft={drafts.mission}
-                setDraft={(v) => setDrafts((p) => ({ ...p, mission: v }))}
-                setItems={(fn) => setItems((p) => ({ ...p, mission: fn(p.mission) }))}
+                value={items.mission}
+                setValue={(v) => setItems((p) => ({ ...p, mission: v }))}
                 disabled={!canEdit || saving}
+                placeholder="O que fazemos todos os dias para chegar lá? (1–3 parágrafos)"
               />
-              <FieldEditor
-                label="Norte estratégico"
-                items={items.strategic_north}
-                draft={drafts.strategic_north}
-                setDraft={(v) => setDrafts((p) => ({ ...p, strategic_north: v }))}
-                setItems={(fn) => setItems((p) => ({ ...p, strategic_north: fn(p.strategic_north) }))}
-                disabled={!canEdit || saving}
-              />
-              <FieldEditor
+
+              <DescribedItemsEditor
                 label="Valores"
+                hint="Cada valor tem um nome e um descritivo (comportamentos, exemplos, do/don't)."
                 items={items.values}
-                draft={drafts.values}
-                setDraft={(v) => setDrafts((p) => ({ ...p, values: v }))}
-                setItems={(fn) => setItems((p) => ({ ...p, values: fn(p.values) }))}
-                disabled={!canEdit || saving}
+                onChange={(next) => setItems((p) => ({ ...p, values: next }))}
+                canEdit={canEdit}
+                saving={saving}
+                addLabel="Adicionar valor"
               />
-              <FieldEditor
+
+              <DescribedItemsEditor
                 label="Cultura"
+                hint="Descreva como trabalhamos e decidimos aqui. Use itens com nome + descritivo."
                 items={items.culture}
-                draft={drafts.culture}
-                setDraft={(v) => setDrafts((p) => ({ ...p, culture: v }))}
-                setItems={(fn) => setItems((p) => ({ ...p, culture: fn(p.culture) }))}
-                disabled={!canEdit || saving}
+                onChange={(next) => setItems((p) => ({ ...p, culture: next }))}
+                canEdit={canEdit}
+                saving={saving}
+                addLabel="Adicionar item"
               />
             </div>
           </ScrollArea>
@@ -352,12 +300,11 @@ export default function OkrFundamentals() {
                 setSaving(true);
                 try {
                   const payload: Partial<DbCompanyFundamentals> = {
-                    purpose: serializeListValue(items.purpose),
-                    vision: serializeListValue(items.vision),
-                    mission: serializeListValue(items.mission),
-                    strategic_north: serializeListValue(items.strategic_north),
-                    values: serializeListValue(items.values),
-                    culture: serializeListValue(items.culture),
+                    purpose: items.purpose.trim() || null,
+                    vision: items.vision.trim() || null,
+                    mission: items.mission.trim() || null,
+                    values: serializeDescribedItems(items.values) || null,
+                    culture: serializeDescribedItems(items.culture) || null,
                   };
 
                   await upsertCompanyFundamentals(cid, payload);

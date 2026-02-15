@@ -55,6 +55,13 @@ import {
 import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profilePublicDb";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 import { cn } from "@/lib/utils";
+import {
+  describedItemsToLines,
+  parseDescribedItems,
+  serializeDescribedItems,
+  type DescribedItem,
+} from "@/lib/fundamentalsFormat";
+import { DescribedItemsEditor } from "@/components/fundamentals/DescribedItemsEditor";
 
 type NodeId = string;
 
@@ -110,7 +117,7 @@ function nodeTitle(n: Node) {
       purpose: "Propósito",
       values: "Valores",
       culture: "Cultura",
-      strategic_north: "Norte estratégico",
+      strategic_north: "(removido)",
       created_at: "Criado em",
       updated_at: "Atualizado em",
     };
@@ -255,13 +262,21 @@ function StrategyLinker({
         { key: "MISSION", label: "Missão", field: "mission" as const },
         { key: "VALUES", label: "Valores", field: "values" as const },
         { key: "CULTURE", label: "Cultura", field: "culture" as const },
-        { key: "NORTH", label: "Norte estratégico", field: "strategic_north" as const },
       ] as const,
     [],
   );
 
   const selectedFundamental = fundamentalOptions.find((o) => o.key === objective.linked_fundamental) ?? null;
-  const selectedFundamentalItems = selectedFundamental ? parseListValue((fundamentals as any)?.[selectedFundamental.field]) : [];
+  const selectedFundamentalItems = useMemo(() => {
+    if (!selectedFundamental) return [];
+    if (selectedFundamental.field === "values" || selectedFundamental.field === "culture") {
+      return describedItemsToLines(parseDescribedItems((fundamentals as any)?.[selectedFundamental.field]));
+    }
+    return String((fundamentals as any)?.[selectedFundamental.field] ?? "")
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }, [fundamentals, selectedFundamental]);
 
   return (
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
@@ -847,7 +862,6 @@ function Tree({
     { field: "mission", icon: <Route className="h-4 w-4" /> },
     { field: "values", icon: <Route className="h-4 w-4" /> },
     { field: "culture", icon: <Route className="h-4 w-4" /> },
-    { field: "strategic_north", icon: <Route className="h-4 w-4" /> },
   ];
 
   return (
@@ -1130,9 +1144,7 @@ function ListView({
 }) {
   const hasFundamentals =
     !!fundamentals &&
-    [fundamentals.mission, fundamentals.vision, fundamentals.purpose, fundamentals.values, fundamentals.culture, fundamentals.strategic_north].some(
-      (t) => !!t?.trim(),
-    );
+    [fundamentals.mission, fundamentals.vision, fundamentals.purpose, fundamentals.values, fundamentals.culture].some((t) => !!t?.trim());
 
   const quarterlyCount = cycles.filter((c) => c.type === "QUARTERLY").length;
   const annualCount = cycles.filter((c) => c.type === "ANNUAL").length;
@@ -1208,12 +1220,19 @@ function FundamentalEditor({
   onSaved: () => Promise<void>;
 }) {
   const { toast } = useToast();
-  const [items, setItems] = useState<string[]>(() => parseListValue(String((fundamentals as any)?.[field] ?? "")));
+  const [items, setItems] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const describedFields = field === "values" || field === "culture";
+  const [described, setDescribed] = useState<DescribedItem[]>([]);
+  const [text, setText] = useState("");
+
   useEffect(() => {
-    setItems(parseListValue(String((fundamentals as any)?.[field] ?? "")));
+    const raw = String((fundamentals as any)?.[field] ?? "");
+    setItems(raw.split("\n").map((s) => s.trim()).filter(Boolean));
+    setDescribed(parseDescribedItems(raw));
+    setText(raw);
     setDraft("");
     setSaving(false);
   }, [field, fundamentals?.updated_at]);
@@ -1225,7 +1244,11 @@ function FundamentalEditor({
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{label}</div>
-          <div className="mt-1 text-sm text-muted-foreground">Agora você adiciona itens (em vez de um texto corrido).</div>
+          <div className="mt-1 text-sm text-muted-foreground">
+            {describedFields
+              ? "Cadastre itens com nome + descritivo."
+              : "Use um texto claro (pode ter parágrafos)."}
+          </div>
         </div>
         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
           <Route className="h-5 w-5" />
@@ -1234,67 +1257,28 @@ function FundamentalEditor({
 
       <Separator className="my-4" />
 
-      <div className="grid gap-3">
-        <div className="grid gap-2">
-          <Label>Itens</Label>
-          {items.length ? (
-            <div className="grid gap-2">
-              {items.map((it, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <Input
-                    className="h-11 rounded-2xl"
-                    value={it}
-                    disabled={!canEdit || saving}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setItems((prev) => prev.map((p, i) => (i === idx ? next : p)));
-                    }}
-                  />
-                  {canEdit ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11 rounded-2xl bg-white"
-                      disabled={saving}
-                      onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                    >
-                      Remover
-                    </Button>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum item ainda.</div>
-          )}
+      {describedFields ? (
+        <DescribedItemsEditor
+          label={label}
+          hint={field === "values" ? "Valores com nome + descritivo." : "Cultura com nome + descritivo."}
+          items={described}
+          onChange={setDescribed}
+          canEdit={canEdit}
+          saving={saving}
+          addLabel={field === "values" ? "Adicionar valor" : "Adicionar item"}
+        />
+      ) : (
+        <div className="grid gap-3">
+          <Label className="text-sm">Texto</Label>
+          <Textarea
+            className="min-h-[180px] rounded-2xl"
+            value={text}
+            disabled={!canEdit || saving}
+            onChange={(e) => setText(e.target.value)}
+            placeholder={`Escreva ${label.toLowerCase()}…`}
+          />
         </div>
-
-        <div className="grid gap-2">
-          <Label>Adicionar novo</Label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              className="h-11 rounded-2xl"
-              value={draft}
-              disabled={!canEdit || saving}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder={`Digite e clique em "Adicionar"`}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 rounded-2xl bg-white"
-              disabled={!canEdit || saving || draft.trim().length < 2}
-              onClick={() => {
-                const v = draft.trim();
-                setItems((prev) => [...prev, v]);
-                setDraft("");
-              }}
-            >
-              Adicionar
-            </Button>
-          </div>
-        </div>
-      </div>
+      )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
@@ -1307,7 +1291,12 @@ function FundamentalEditor({
             onClick={async () => {
               setSaving(true);
               try {
-                await upsertCompanyFundamentals(cid, { [field]: serializeListValue(items) } as any);
+                const patch: Partial<DbCompanyFundamentals> =
+                  describedFields
+                    ? ({ [field]: serializeDescribedItems(described) || null } as any)
+                    : ({ [field]: text.trim() || null } as any);
+
+                await upsertCompanyFundamentals(cid, patch);
                 await onSaved();
               } catch (e) {
                 toast({
@@ -1771,7 +1760,6 @@ function OkrMapTreeCanvas({
     { field: "mission", label: "Missão" },
     { field: "values", label: "Valores" },
     { field: "culture", label: "Cultura" },
-    { field: "strategic_north", label: "Norte estratégico" },
   ];
 
   const roots = useMemo((): OrgNode<TreeItem>[] => {
@@ -2052,24 +2040,20 @@ function FundamentalsPicker({
         { label: "Missão", field: "mission" as const },
         { label: "Valores", field: "values" as const },
         { label: "Cultura", field: "culture" as const },
-        { label: "Norte estratégico", field: "strategic_north" as const },
       ] as const,
     [],
   );
 
   const [field, setField] = useState<(typeof options)[number]["field"]>("purpose");
 
-  useEffect(() => {
-    // Keep field stable, but refresh item list when fundamentals change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fundamentals?.updated_at]);
-
-  const [items, setItems] = useState<string[]>(() => parseListValue(String((fundamentals as any)?.[field] ?? "")));
-  const [draft, setDraft] = useState("");
+  const describedFields = field === "values" || field === "culture";
+  const [text, setText] = useState("");
+  const [described, setDescribed] = useState<DescribedItem[]>([]);
 
   useEffect(() => {
-    setItems(parseListValue(String((fundamentals as any)?.[field] ?? "")));
-    setDraft("");
+    const raw = String((fundamentals as any)?.[field] ?? "");
+    setText(raw);
+    setDescribed(parseDescribedItems(raw));
     setSaving(false);
   }, [field, fundamentals?.updated_at]);
 
@@ -2081,7 +2065,7 @@ function FundamentalsPicker({
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Fundamentos</div>
-            <div className="mt-1 text-sm text-muted-foreground">Escolha o fundamento e edite itens (adicionar/remover).</div>
+            <div className="mt-1 text-sm text-muted-foreground">Escolha o fundamento e edite (texto ou itens com descrição).</div>
           </div>
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
             <Route className="h-5 w-5" />
@@ -2111,98 +2095,67 @@ function FundamentalsPicker({
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{selectedLabel}</div>
-            <div className="mt-1 text-sm text-muted-foreground">Itens cadastrados</div>
+            <div className="mt-1 text-sm text-muted-foreground">{describedFields ? "Itens cadastrados" : "Texto"}</div>
           </div>
         </div>
 
         <Separator className="my-4" />
 
-        <div className="grid gap-3">
-          {items.length ? (
-            <div className="grid gap-2">
-              {items.map((it, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <Input
-                    className="h-11 rounded-2xl"
-                    value={it}
-                    disabled={!canEdit || saving}
-                    onChange={(e) => {
-                      const next = e.target.value;
-                      setItems((prev) => prev.map((p, i) => (i === idx ? next : p)));
-                    }}
-                  />
-                  {canEdit ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11 rounded-2xl bg-white"
-                      disabled={saving}
-                      onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                    >
-                      Remover
-                    </Button>
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum item ainda.</div>
-          )}
-
-          <div className="grid gap-2">
-            <Label>Adicionar</Label>
-            <div className="flex flex-col gap-2 sm:flex-row">
-              <Input
-                className="h-11 rounded-2xl"
-                value={draft}
-                disabled={!canEdit || saving}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder="Escreva um item…"
-              />
-              <Button
-                type="button"
-                variant="outline"
-                className="h-11 rounded-2xl bg-white"
-                disabled={!canEdit || saving || draft.trim().length < 2}
-                onClick={() => {
-                  const v = draft.trim();
-                  setItems((prev) => [...prev, v]);
-                  setDraft("");
-                }}
-              >
-                Adicionar
-              </Button>
-            </div>
+        {describedFields ? (
+          <DescribedItemsEditor
+            label={selectedLabel}
+            hint={field === "values" ? "Valores com nome + descritivo." : "Cultura com nome + descritivo."}
+            items={described}
+            onChange={setDescribed}
+            canEdit={canEdit}
+            saving={saving}
+            addLabel={field === "values" ? "Adicionar valor" : "Adicionar item"}
+          />
+        ) : (
+          <div className="grid gap-3">
+            <Label className="text-sm">Texto</Label>
+            <Textarea
+              className="min-h-[180px] rounded-2xl"
+              value={text}
+              disabled={!canEdit || saving}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={`Escreva ${selectedLabel.toLowerCase()}…`}
+            />
           </div>
+        )}
 
-          {canEdit ? (
-            <div className="flex justify-end">
-              <Button
-                className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                disabled={saving}
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    await upsertCompanyFundamentals(cid, { [field]: serializeListValue(items) } as any);
-                    toast({ title: "Fundamento salvo" });
-                    await onSaved();
-                  } catch (e) {
-                    toast({
-                      title: "Não foi possível salvar",
-                      description: e instanceof Error ? e.message : "Erro inesperado.",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                <Save className="mr-2 h-4 w-4" />
-                Salvar
-              </Button>
-            </div>
-          ) : null}
-        </div>
+        {canEdit ? (
+          <div className="mt-4 flex justify-end">
+            <Button
+              className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  const patch: Partial<DbCompanyFundamentals> =
+                    describedFields
+                      ? ({ [field]: serializeDescribedItems(described) || null } as any)
+                      : ({ [field]: text.trim() || null } as any);
+
+                  await upsertCompanyFundamentals(cid, patch);
+                  toast({ title: "Fundamento salvo" });
+                  await onSaved();
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível salvar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              Salvar
+            </Button>
+          </div>
+        ) : null}
       </Card>
     </div>
   );

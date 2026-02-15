@@ -382,7 +382,6 @@ export default function OkrAssistant() {
                   <SelectItem value="PURPOSE">Propósito</SelectItem>
                   <SelectItem value="VISION">Visão</SelectItem>
                   <SelectItem value="MISSION">Missão</SelectItem>
-                  <SelectItem value="NORTH">Norte estratégico</SelectItem>
                   <SelectItem value="VALUES">Valores</SelectItem>
                   <SelectItem value="CULTURE">Cultura</SelectItem>
                 </SelectContent>

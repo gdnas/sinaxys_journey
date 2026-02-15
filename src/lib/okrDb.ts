@@ -23,15 +23,23 @@ export async function getCompanyFundamentals(companyId: string) {
 }
 
 export async function upsertCompanyFundamentals(companyId: string, patch: Partial<DbCompanyFundamentals>) {
-  const payload = {
-    company_id: companyId,
-    mission: patch.mission ?? null,
-    vision: patch.vision ?? null,
-    purpose: patch.purpose ?? null,
-    values: patch.values ?? null,
-    culture: patch.culture ?? null,
-    strategic_north: patch.strategic_north ?? null,
-  };
+  // IMPORTANT: Only send fields that are present in `patch`.
+  // Otherwise, we would overwrite other columns with NULL when doing a partial update.
+  const payload: Record<string, any> = { company_id: companyId };
+  const keys: Array<keyof Pick<DbCompanyFundamentals, "mission" | "vision" | "purpose" | "values" | "culture" | "strategic_north">> = [
+    "mission",
+    "vision",
+    "purpose",
+    "values",
+    "culture",
+    "strategic_north",
+  ];
+
+  for (const k of keys) {
+    if (Object.prototype.hasOwnProperty.call(patch, k)) {
+      payload[k] = (patch as any)[k] ?? null;
+    }
+  }
 
   const { data, error } = await supabase
     .from("company_fundamentals")
