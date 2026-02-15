@@ -20,6 +20,14 @@ function clamp(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, n));
 }
 
+function isInteractiveTarget(target: EventTarget | null) {
+  if (!(target instanceof Element)) return false;
+  // If the user starts the gesture on something clickable/editable, let it behave normally.
+  return !!target.closest(
+    "button, a, input, textarea, select, option, label, [role='button'], [role='link'], [data-no-drag]",
+  );
+}
+
 export function OrgChartTreeCanvas<T>({ roots, renderNode, className }: Props<T>) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -98,7 +106,7 @@ export function OrgChartTreeCanvas<T>({ roots, renderNode, className }: Props<T>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex items-center gap-2 text-xs text-muted-foreground">
           <Move className="h-4 w-4" />
-          Visualização em árvore (arraste para mover, zoom para ajustar)
+          Visualização em árvore (arraste o fundo para mover, zoom para ajustar)
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -142,6 +150,7 @@ export function OrgChartTreeCanvas<T>({ roots, renderNode, className }: Props<T>
         ref={wrapRef}
         className="relative h-[70vh] touch-none overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/20"
         onPointerDown={(e) => {
+          if (isInteractiveTarget(e.target)) return;
           dragRef.current = { startX: e.clientX, startY: e.clientY, ox: offset.x, oy: offset.y };
           (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
         }}
