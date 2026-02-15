@@ -16,6 +16,7 @@ import {
   Network,
   Link2,
   UserRound,
+  Plus,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import {
+  createStrategyObjective,
   getCompanyFundamentals,
   getOkrObjective,
   listOkrCycles,
@@ -2172,6 +2174,9 @@ function StrategyPicker({
   strategy: DbStrategyObjective[];
   onSaved: () => Promise<void>;
 }) {
+  const { user } = useAuth();
+  const { toast } = useToast();
+
   const [soId, setSoId] = useState<string>(strategy[0]?.id ?? "");
 
   useEffect(() => {
@@ -2184,52 +2189,185 @@ function StrategyPicker({
 
   const so = strategy.find((s) => s.id === soId) ?? null;
 
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newYears, setNewYears] = useState<DbStrategyObjective["horizon_years"]>(3);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDesc, setNewDesc] = useState("");
+
+  useEffect(() => {
+    if (!createOpen) return;
+    setCreating(false);
+    setNewYears(3);
+    setNewTitle("");
+    setNewDesc("");
+  }, [createOpen]);
+
+  const canCreate = canEdit && !!user;
+
   return (
-    <div className="grid gap-4">
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos de longo prazo</div>
-            <div className="mt-1 text-sm text-muted-foreground">Selecione um objetivo para visualizar/editar.</div>
+    <>
+      <div className="grid gap-4">
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos de longo prazo</div>
+              <div className="mt-1 text-sm text-muted-foreground">Cadastre a visão de 1–10 anos (depois conecte os OKRs do ciclo).</div>
+            </div>
+            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+              <Flag className="h-5 w-5" />
+            </div>
           </div>
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-            <Flag className="h-5 w-5" />
+
+          <Separator className="my-4" />
+
+          {strategy.length ? (
+            <div className="grid gap-3">
+              <div className="grid gap-2">
+                <Label>Objetivo</Label>
+                <Select value={soId} onValueChange={setSoId}>
+                  <SelectTrigger className="h-11 rounded-2xl bg-white">
+                    <SelectValue placeholder="Selecione…" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    {strategy.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {canCreate ? (
+                <div className="flex justify-end">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-11 rounded-2xl bg-white"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Novo objetivo
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+              Nenhum objetivo de longo prazo ainda.
+              {canCreate ? (
+                <div className="mt-3">
+                  <Button
+                    type="button"
+                    className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                    onClick={() => setCreateOpen(true)}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Criar objetivo de longo prazo
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          )}
+        </Card>
+
+        {so ? (
+          <StrategyObjectiveEditor
+            canEdit={canEdit}
+            so={so}
+            onSaved={async () => {
+              await onSaved();
+            }}
+          />
+        ) : null}
+      </div>
+
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-hidden rounded-3xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Novo objetivo de longo prazo</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Horizonte</Label>
+              <Select value={String(newYears)} onValueChange={(v) => setNewYears(Number(v) as any)}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="1">1 ano</SelectItem>
+                  <SelectItem value="3">3 anos</SelectItem>
+                  <SelectItem value="5">5 anos</SelectItem>
+                  <SelectItem value="10">10 anos</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input
+                className="h-11 rounded-2xl"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                placeholder="Ex.: Ser a referência em experiência do paciente no Brasil"
+                disabled={creating}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Descrição (opcional)</Label>
+              <Textarea
+                className="min-h-[110px] rounded-2xl"
+                value={newDesc}
+                onChange={(e) => setNewDesc(e.target.value)}
+                placeholder="Contexto, hipóteses, como saberemos que vencemos, etc."
+                disabled={creating}
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateOpen(false)} disabled={creating}>
+                Cancelar
+              </Button>
+              <Button
+                className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={creating || !canCreate || newTitle.trim().length < 6}
+                onClick={async () => {
+                  if (!user) return;
+                  setCreating(true);
+                  try {
+                    const created = await createStrategyObjective({
+                      company_id: cid,
+                      horizon_years: newYears,
+                      title: newTitle,
+                      description: newDesc.trim() || null,
+                      created_by_user_id: user.id,
+                    });
+                    toast({ title: "Objetivo criado" });
+                    await onSaved();
+                    setSoId(created.id);
+                    setCreateOpen(false);
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível criar",
+                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Criar
+              </Button>
+            </div>
           </div>
-        </div>
-
-        <Separator className="my-4" />
-
-        {strategy.length ? (
-          <div className="grid gap-2">
-            <Label>Objetivo</Label>
-            <Select value={soId} onValueChange={setSoId}>
-              <SelectTrigger className="h-11 rounded-2xl bg-white">
-                <SelectValue placeholder="Selecione…" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl">
-                {strategy.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum objetivo de longo prazo ainda.</div>
-        )}
-      </Card>
-
-      {so ? (
-        <StrategyObjectiveEditor
-          canEdit={canEdit}
-          so={so}
-          onSaved={async () => {
-            await onSaved();
-          }}
-        />
-      ) : null}
-    </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
