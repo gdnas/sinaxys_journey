@@ -36,6 +36,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import {
   getCompanyFundamentals,
+  getOkrObjective,
   listOkrCycles,
   listOkrObjectives,
   listStrategyObjectives,
@@ -569,6 +570,7 @@ function DetailsBody({
   objectiveById,
   cycleById,
   onInvalidate,
+  onSelect,
 }: {
   node: Node;
   cid: string;
@@ -579,23 +581,108 @@ function DetailsBody({
   objectiveById: Map<string, DbOkrObjective>;
   cycleById: Map<string, DbOkrCycle>;
   onInvalidate: () => Promise<void>;
+  onSelect?: (n: Node) => void;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
 
+  const objectiveId = node.kind === "objective" ? node.objectiveId : null;
+
+  const qObjective = useQuery({
+    queryKey: ["okr-objective", objectiveId],
+    enabled: !!objectiveId && !objectiveById.has(objectiveId),
+    queryFn: () => getOkrObjective(objectiveId as string),
+    staleTime: 20_000,
+  });
+
+  useEffect(() => {
+    if (!objectiveId) return;
+    if (!qObjective.data) return;
+    objectiveById.set(objectiveId, qObjective.data);
+  }, [objectiveById, objectiveId, qObjective.data]);
+
+  const objective = objectiveId ? (objectiveById.get(objectiveId) ?? qObjective.data ?? null) : null;
+
   const qKrs = useQuery({
-    queryKey: ["okr-krs", node.kind === "objective" ? node.objectiveId : null],
-    enabled: node.kind === "objective",
-    queryFn: () => listKeyResults((node as any).objectiveId),
+    queryKey: ["okr-krs", objectiveId],
+    enabled: !!objectiveId,
+    queryFn: () => listKeyResults(objectiveId as string),
   });
 
   const pct = useMemo(() => {
-    if (node.kind !== "objective") return null;
+    if (!objectiveId) return null;
     return averageObjectivePct(qKrs.data ?? []);
-  }, [node.kind, qKrs.data]);
+  }, [objectiveId, qKrs.data]);
 
   return (
     <div className="grid gap-4">
+      {node.kind === "fundamentals" ? (
+        <FundamentalsPicker
+          cid={cid}
+          canEdit={canEdit}
+          fundamentals={fundamentals}
+          onSaved={async () => {
+            await qc.invalidateQueries({ queryKey: ["okr-fundamentals", cid] });
+            toast({ title: "Fundamentos atualizados" });
+            await onInvalidate();
+          }}
+        />
+      ) : null}
+
+      {node.kind === "strategy" ? (
+        <StrategyPicker
+          cid={cid}
+          canEdit={canEdit}
+          strategy={strategy}
+          onSaved={async () => {
+            await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
+            toast({ title: "Objetivo atualizado" });
+            await onInvalidate();
+          }}
+        />
+      ) : null}
+
+      {node.kind === "cycles" ? (
+        <CyclesPicker
+          cid={cid}
+          cycles={cycles}
+          onPickObjective={(objectiveId) => {
+            onSelect?.({ kind: "objective", id: `o:${objectiveId}`, objectiveId });
+          }}
+        />
+      ) : null}
+
+      {node.kind === "objective" ? (
+        objective ? (
+          <ObjectiveEditor
+            canEdit={canEdit}
+            objective={objective}
+            pct={pct}
+            krs={qKrs.data ?? []}
+            loadingKrs={qKrs.isLoading}
+            onSaved={async () => {
+              await Promise.all([
+                qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid] }),
+                qc.invalidateQueries({ queryKey: ["okr-objectives", cid] }),
+                qc.invalidateQueries({ queryKey: ["okr-krs", objectiveId] }),
+                qc.invalidateQueries({ queryKey: ["okr-cycle-objectives", cid] }),
+                qc.invalidateQueries({ queryKey: ["okr-map-cycle-objectives", cid] }),
+                qc.invalidateQueries({ queryKey: ["okr-objective", objectiveId] }),
+              ]);
+              await onInvalidate();
+            }}
+            companyId={cid}
+            strategy={strategy}
+            fundamentals={fundamentals}
+          />
+        ) : (
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+            <div className="text-sm text-muted-foreground">Carregando objetivo…</div>
+          </Card>
+        )
+      ) : null}
+
+      {/* Keep these paths for Tree mode direct clicks */}
       {node.kind === "fundamental" ? (
         <FundamentalEditor
           cid={cid}
@@ -639,35 +726,11 @@ function DetailsBody({
         </Card>
       ) : null}
 
-      {node.kind === "objective" ? (
-        <ObjectiveEditor
-          canEdit={canEdit}
-          objective={objectiveById.get(node.objectiveId) ?? null}
-          pct={pct}
-          krs={qKrs.data ?? []}
-          loadingKrs={qKrs.isLoading}
-          onSaved={async () => {
-            await Promise.all([
-              qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid] }),
-              qc.invalidateQueries({ queryKey: ["okr-objectives", cid] }),
-              qc.invalidateQueries({ queryKey: ["okr-krs", node.objectiveId] }),
-              qc.invalidateQueries({ queryKey: ["okr-cycle-objectives", cid] }),
-            ]);
-            await onInvalidate();
-          }}
-          companyId={cid}
-          strategy={strategy}
-          fundamentals={fundamentals}
-        />
-      ) : null}
-
-      {(node.kind === "fundamentals" || node.kind === "strategy" || node.kind === "cycles" || node.kind === "root") && (
+      {node.kind === "root" ? (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-          <div className="text-sm text-muted-foreground">
-            Selecione um item na árvore/lista para ver detalhes, editar e acompanhar andamento.
-          </div>
+          <div className="text-sm text-muted-foreground">Selecione um item para ver detalhes, editar e vincular.</div>
         </Card>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -682,6 +745,7 @@ function DetailsShell({
   objectiveById,
   cycleById,
   onInvalidate,
+  onSelect,
 }: {
   node: Node;
   cid: string;
@@ -692,12 +756,16 @@ function DetailsShell({
   objectiveById: Map<string, DbOkrObjective>;
   cycleById: Map<string, DbOkrCycle>;
   onInvalidate: () => Promise<void>;
+  onSelect?: (n: Node) => void;
 }) {
   const title = useMemo(() => {
     if (node.kind === "fundamental") return nodeTitle(node);
     if (node.kind === "cycle") return cycleLabel(cycleById.get(node.cycleId)!);
     if (node.kind === "objective") return objectiveById.get(node.objectiveId)?.title ?? "Objetivo";
     if (node.kind === "strategyObjective") return strategy.find((s) => s.id === node.soId)?.title ?? "Objetivo longo prazo";
+    if (node.kind === "fundamentals") return "Fundamentos";
+    if (node.kind === "strategy") return "Objetivos de longo prazo";
+    if (node.kind === "cycles") return "Ciclos";
     return nodeTitle(node);
   }, [node, cycleById, objectiveById, strategy]);
 
@@ -717,6 +785,7 @@ function DetailsShell({
           objectiveById={objectiveById}
           cycleById={cycleById}
           onInvalidate={onInvalidate}
+          onSelect={onSelect}
         />
       </ScrollArea>
     </div>
@@ -1059,157 +1128,68 @@ function ListView({
   cycles: DbOkrCycle[];
   onPick: (n: Node) => void;
 }) {
-  const fundamentalsFields: Array<{ field: keyof DbCompanyFundamentals; label: string }> = [
-    { field: "purpose", label: "Propósito" },
-    { field: "vision", label: "Visão" },
-    { field: "mission", label: "Missão" },
-    { field: "values", label: "Valores" },
-    { field: "culture", label: "Cultura" },
-    { field: "strategic_north", label: "Norte estratégico" },
-  ];
+  const hasFundamentals =
+    !!fundamentals &&
+    [fundamentals.mission, fundamentals.vision, fundamentals.purpose, fundamentals.values, fundamentals.culture, fundamentals.strategic_north].some(
+      (t) => !!t?.trim(),
+    );
 
-  const annual = cycles.filter((c) => c.type === "ANNUAL").sort((a, b) => b.year - a.year);
-  const quarterly = cycles.filter((c) => c.type === "QUARTERLY").sort((a, b) => (b.year - a.year) || ((b.quarter ?? 0) - (a.quarter ?? 0)));
+  const quarterlyCount = cycles.filter((c) => c.type === "QUARTERLY").length;
+  const annualCount = cycles.filter((c) => c.type === "ANNUAL").length;
 
   return (
-    <div className="grid gap-4">
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-center justify-between gap-3">
+    <div className="grid gap-3">
+      <button
+        type="button"
+        className="w-full rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-left hover:bg-[color:var(--sinaxys-tint)]/15"
+        onClick={() => onPick({ kind: "fundamentals", id: "fundamentals" })}
+      >
+        <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Fundamentos</div>
-            <div className="mt-1 text-sm text-muted-foreground">Clique para abrir e editar rapidamente.</div>
+            <div className="mt-1 text-sm text-muted-foreground">Selecione para editar itens (propósito, visão, missão…).</div>
           </div>
-          <Route className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-        </div>
-        <Separator className="my-4" />
-        <div className="grid gap-2">
-          {fundamentalsFields.map((f) => (
-            <button
-              key={f.field}
-              type="button"
-              className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
-              onClick={() => onPick({ kind: "fundamental", id: `fund:${f.field}` as any, field: f.field })}
-            >
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{f.label}</div>
-                <div className="mt-1 truncate text-xs text-muted-foreground">
-                  {String((fundamentals as any)?.[f.field] ?? "—")}
-                </div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-          ))}
-        </div>
-      </Card>
-
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos de longo prazo</div>
-            <div className="mt-1 text-sm text-muted-foreground">1–10 anos (clique para detalhes).</div>
-          </div>
-          <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-            {strategy.length}
+          <Badge className={cn("rounded-full", hasFundamentals ? "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]" : "bg-white ring-1 ring-[color:var(--sinaxys-border)]")}>
+            {hasFundamentals ? "OK" : "Setup"}
           </Badge>
         </div>
-        <Separator className="my-4" />
-        <div className="grid gap-2">
-          {strategy.map((so) => (
-            <button
-              key={so.id}
-              type="button"
-              className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
-              onClick={() => onPick({ kind: "strategyObjective", id: `so:${so.id}`, soId: so.id })}
-            >
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{so.title}</div>
-                <div className="mt-1 text-xs text-muted-foreground">{so.horizon_years} anos</div>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-          ))}
-          {!strategy.length ? (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum objetivo ainda.</div>
-          ) : null}
-        </div>
-      </Card>
+      </button>
 
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-center justify-between gap-3">
+      <button
+        type="button"
+        className="w-full rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-left hover:bg-[color:var(--sinaxys-tint)]/15"
+        onClick={() => onPick({ kind: "strategy", id: "strategy" })}
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos de longo prazo</div>
+            <div className="mt-1 text-sm text-muted-foreground">Selecione para escolher e editar.</div>
+          </div>
+          <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]">{strategy.length}</Badge>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        className="w-full rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-left hover:bg-[color:var(--sinaxys-tint)]/15"
+        onClick={() => onPick({ kind: "cycles", id: "cycles" })}
+      >
+        <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Ciclos</div>
-            <div className="mt-1 text-sm text-muted-foreground">Trimestral e anual (clique para abrir).</div>
+            <div className="mt-1 text-sm text-muted-foreground">Trimestral primeiro, depois anual.</div>
           </div>
-          <Layers className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-        </div>
-        <Separator className="my-4" />
-
-        <div className="grid gap-3">
-          {/* Ordem pedida: Trimestral primeiro */}
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trimestral</div>
-            <div className="mt-2 grid gap-2">
-              {quarterly.length ? (
-                quarterly.slice(0, 10).map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
-                    onClick={() => onPick({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{cycleLabel(c)}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{c.status}</div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                ))
-              ) : (
-                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-                  Nenhum ciclo trimestral ainda.
-                  <div className="mt-3">
-                    <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
-                      <Link to="/okr/ciclos">Criar ciclo trimestral</Link>
-                    </Button>
-                  </div>
-                </div>
-              )}
-              {quarterly.length > 10 ? <div className="text-xs text-muted-foreground">Mostrando os 10 mais recentes.</div> : null}
-            </div>
-          </div>
-
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Anual</div>
-            <div className="mt-2 grid gap-2">
-              {annual.length ? (
-                annual.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
-                    onClick={() => onPick({ kind: "cycle", id: `c:${c.id}`, cycleId: c.id })}
-                  >
-                    <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{cycleLabel(c)}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{c.status}</div>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                ))
-              ) : (
-                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-                  Nenhum ciclo anual ainda.
-                  <div className="mt-3">
-                    <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
-                      <Link to="/okr/ciclos">Criar ciclo anual</Link>
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="flex items-center gap-2">
+            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]">Q {quarterlyCount}</Badge>
+            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]">A {annualCount}</Badge>
           </div>
         </div>
-      </Card>
+      </button>
+
+      {/* Shortcut for power users: keep ability to jump to objective editor from a cycle picker on the right */}
+      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 text-sm text-muted-foreground">
+        Dica: escolha um item acima e use os seletores no painel da direita para navegar e editar.
+      </div>
     </div>
   );
 }
@@ -1277,7 +1257,6 @@ function FundamentalEditor({
                       className="h-11 rounded-2xl bg-white"
                       disabled={saving}
                       onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
-                      title="Remover"
                     >
                       Remover
                     </Button>
@@ -2051,6 +2030,367 @@ function OkrMapTreeCanvas({
   );
 }
 
+function FundamentalsPicker({
+  cid,
+  canEdit,
+  fundamentals,
+  onSaved,
+}: {
+  cid: string;
+  canEdit: boolean;
+  fundamentals: DbCompanyFundamentals | null;
+  onSaved: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+
+  const options = useMemo(
+    () =>
+      [
+        { label: "Propósito", field: "purpose" as const },
+        { label: "Visão", field: "vision" as const },
+        { label: "Missão", field: "mission" as const },
+        { label: "Valores", field: "values" as const },
+        { label: "Cultura", field: "culture" as const },
+        { label: "Norte estratégico", field: "strategic_north" as const },
+      ] as const,
+    [],
+  );
+
+  const [field, setField] = useState<(typeof options)[number]["field"]>("purpose");
+
+  useEffect(() => {
+    // Keep field stable, but refresh item list when fundamentals change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fundamentals?.updated_at]);
+
+  const [items, setItems] = useState<string[]>(() => parseListValue(String((fundamentals as any)?.[field] ?? "")));
+  const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    setItems(parseListValue(String((fundamentals as any)?.[field] ?? "")));
+    setDraft("");
+    setSaving(false);
+  }, [field, fundamentals?.updated_at]);
+
+  const selectedLabel = options.find((o) => o.field === field)?.label ?? "Fundamento";
+
+  return (
+    <div className="grid gap-4">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Fundamentos</div>
+            <div className="mt-1 text-sm text-muted-foreground">Escolha o fundamento e edite itens (adicionar/remover).</div>
+          </div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+            <Route className="h-5 w-5" />
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        <div className="grid gap-2">
+          <Label>Fundamento</Label>
+          <Select value={field} onValueChange={(v) => setField(v as any)}>
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
+              <SelectValue placeholder="Selecione…" />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl">
+              {options.map((o) => (
+                <SelectItem key={o.field} value={o.field}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </Card>
+
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{selectedLabel}</div>
+            <div className="mt-1 text-sm text-muted-foreground">Itens cadastrados</div>
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        <div className="grid gap-3">
+          {items.length ? (
+            <div className="grid gap-2">
+              {items.map((it, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input
+                    className="h-11 rounded-2xl"
+                    value={it}
+                    disabled={!canEdit || saving}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setItems((prev) => prev.map((p, i) => (i === idx ? next : p)));
+                    }}
+                  />
+                  {canEdit ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-2xl bg-white"
+                      disabled={saving}
+                      onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                    >
+                      Remover
+                    </Button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum item ainda.</div>
+          )}
+
+          <div className="grid gap-2">
+            <Label>Adicionar</Label>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Input
+                className="h-11 rounded-2xl"
+                value={draft}
+                disabled={!canEdit || saving}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Escreva um item…"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 rounded-2xl bg-white"
+                disabled={!canEdit || saving || draft.trim().length < 2}
+                onClick={() => {
+                  const v = draft.trim();
+                  setItems((prev) => [...prev, v]);
+                  setDraft("");
+                }}
+              >
+                Adicionar
+              </Button>
+            </div>
+          </div>
+
+          {canEdit ? (
+            <div className="flex justify-end">
+              <Button
+                className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    await upsertCompanyFundamentals(cid, { [field]: serializeListValue(items) } as any);
+                    toast({ title: "Fundamento salvo" });
+                    await onSaved();
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível salvar",
+                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                Salvar
+              </Button>
+            </div>
+          ) : null}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function StrategyPicker({
+  cid,
+  canEdit,
+  strategy,
+  onSaved,
+}: {
+  cid: string;
+  canEdit: boolean;
+  strategy: DbStrategyObjective[];
+  onSaved: () => Promise<void>;
+}) {
+  const [soId, setSoId] = useState<string>(strategy[0]?.id ?? "");
+
+  useEffect(() => {
+    if (!strategy.length) {
+      setSoId("");
+      return;
+    }
+    setSoId((prev) => (strategy.some((s) => s.id === prev) ? prev : strategy[0].id));
+  }, [strategy]);
+
+  const so = strategy.find((s) => s.id === soId) ?? null;
+
+  return (
+    <div className="grid gap-4">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos de longo prazo</div>
+            <div className="mt-1 text-sm text-muted-foreground">Selecione um objetivo para visualizar/editar.</div>
+          </div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+            <Flag className="h-5 w-5" />
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        {strategy.length ? (
+          <div className="grid gap-2">
+            <Label>Objetivo</Label>
+            <Select value={soId} onValueChange={setSoId}>
+              <SelectTrigger className="h-11 rounded-2xl bg-white">
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                {strategy.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum objetivo de longo prazo ainda.</div>
+        )}
+      </Card>
+
+      {so ? (
+        <StrategyObjectiveEditor
+          canEdit={canEdit}
+          so={so}
+          onSaved={async () => {
+            await onSaved();
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function CyclesPicker({
+  cid,
+  cycles,
+  onPickObjective,
+}: {
+  cid: string;
+  cycles: DbOkrCycle[];
+  onPickObjective: (id: string) => void;
+}) {
+  const cycleOptions = useMemo(() => {
+    const quarterly = cycles.filter((c) => c.type === "QUARTERLY").sort((a, b) => (b.year - a.year) || ((b.quarter ?? 0) - (a.quarter ?? 0)));
+    const annual = cycles.filter((c) => c.type === "ANNUAL").sort((a, b) => b.year - a.year);
+    return [...quarterly, ...annual];
+  }, [cycles]);
+
+  const [cycleId, setCycleId] = useState<string>(cycleOptions[0]?.id ?? "");
+
+  useEffect(() => {
+    setCycleId((prev) => (cycleOptions.some((c) => c.id === prev) ? prev : cycleOptions[0]?.id ?? ""));
+  }, [cycleOptions]);
+
+  const selected = cycleOptions.find((c) => c.id === cycleId) ?? null;
+
+  const qObjectives = useQuery({
+    queryKey: ["okr-map-cycle-objectives", cid, cycleId],
+    enabled: !!cycleId,
+    queryFn: () => listOkrObjectives(cid, cycleId),
+    staleTime: 20_000,
+  });
+
+  return (
+    <div className="grid gap-4">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Ciclos</div>
+            <div className="mt-1 text-sm text-muted-foreground">Selecione um ciclo e clique em um objetivo para abrir detalhes.</div>
+          </div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+            <Layers className="h-5 w-5" />
+          </div>
+        </div>
+
+        <Separator className="my-4" />
+
+        {cycleOptions.length ? (
+          <div className="grid gap-2">
+            <Label>Ciclo</Label>
+            <Select value={cycleId} onValueChange={setCycleId}>
+              <SelectTrigger className="h-11 rounded-2xl bg-white">
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                {cycleOptions.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {cycleLabel(c)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum ciclo ainda.</div>
+        )}
+
+        {selected ? (
+          <div className="mt-3 text-xs text-muted-foreground">
+            {selected.type === "QUARTERLY" ? "Trimestral" : "Anual"} • {selected.status}
+          </div>
+        ) : null}
+      </Card>
+
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos do ciclo</div>
+        <div className="mt-1 text-sm text-muted-foreground">Selecione para editar e vincular.</div>
+
+        <Separator className="my-4" />
+
+        {qObjectives.isLoading ? (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Carregando objetivos…</div>
+        ) : (qObjectives.data ?? []).length ? (
+          <div className="grid gap-2">
+            {(qObjectives.data ?? []).map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-left hover:bg-[color:var(--sinaxys-tint)]/35"
+                onClick={() => onPickObjective(o.id)}
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{objectiveTypeLabel(o.level)} • {objectiveLevelLabel(o.level)}</div>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem objetivos nesse ciclo.</div>
+        )}
+
+        <div className="mt-4">
+          <Button asChild variant="outline" className="h-11 rounded-2xl bg-white">
+            <Link to="/okr/ciclos">Gerenciar ciclos</Link>
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 export function OkrMapExplorer({ companyId }: { companyId: string }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -2134,13 +2474,13 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
         </TabsList>
 
         <TabsContent value="list" className="mt-5">
-          <div className="grid gap-6 lg:grid-cols-[420px_1fr]">
-            <div className="grid gap-4">
+          <div className="grid gap-6 lg:h-[calc(100vh-220px)] lg:grid-cols-[420px_1fr] lg:overflow-hidden">
+            <div className="grid gap-4 lg:overflow-hidden">
               <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão conectada</div>
-                    <div className="mt-1 text-sm text-muted-foreground">Fundamentos → longo prazo → ciclos (trimestre primeiro).</div>
+                    <div className="mt-1 text-sm text-muted-foreground">Selecione na esquerda. Edite à direita (painel fixo).</div>
                   </div>
                   <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
                     <ListTree className="h-5 w-5" />
@@ -2148,46 +2488,37 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
                 </div>
               </div>
 
-              <ListView fundamentals={fundamentals} strategy={strategy} cycles={cycles} onPick={(n) => pick(n)} />
+              <ScrollArea className="lg:h-[calc(100vh-320px)]">
+                <div className="grid gap-4 pr-3">
+                  <ListView fundamentals={fundamentals} strategy={strategy} cycles={cycles} onPick={(n) => pick(n)} />
 
-              {(qFundamentals.isLoading || qStrategy.isLoading || qCycles.isLoading) && (
-                <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-sm text-muted-foreground">Carregando dados…</div>
-              )}
+                  {(qFundamentals.isLoading || qStrategy.isLoading || qCycles.isLoading) && (
+                    <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-sm text-muted-foreground">Carregando dados…</div>
+                  )}
 
-              {(qFundamentals.error || qStrategy.error || qCycles.error) && (
-                <div className="rounded-3xl border border-destructive/30 bg-white p-5 text-sm text-destructive">
-                  Não foi possível carregar o mapa. {String((qFundamentals.error ?? qStrategy.error ?? qCycles.error) as any)}
+                  {(qFundamentals.error || qStrategy.error || qCycles.error) && (
+                    <div className="rounded-3xl border border-destructive/30 bg-white p-5 text-sm text-destructive">
+                      Não foi possível carregar o mapa. {String((qFundamentals.error ?? qStrategy.error ?? qCycles.error) as any)}
+                    </div>
+                  )}
                 </div>
-              )}
+              </ScrollArea>
             </div>
 
-            {/* Desktop details */}
-            <div className="hidden lg:block">
-              <div className="grid gap-4">
-                <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Detalhes</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Clique em um item da lista para abrir um card e editar.</div>
-                </div>
-
-                <DetailsShell
-                  node={selected}
-                  cid={companyId}
-                  canEdit={!!canEdit}
-                  fundamentals={fundamentals}
-                  strategy={strategy}
-                  cycles={cycles}
-                  objectiveById={objectiveById}
-                  cycleById={cycleById}
-                  onInvalidate={onInvalidate}
-                />
-
-                <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 text-sm text-muted-foreground">
-                  <div className="font-semibold text-[color:var(--sinaxys-ink)]">Nota</div>
-                  <div className="mt-1">
-                    Agora você já pode vincular objetivos a estratégia, fundamento e OKR pai — o mapa vai ficando cada vez mais "conectado".
-                  </div>
-                </div>
-              </div>
+            {/* Desktop details (sticky) */}
+            <div className="hidden lg:block lg:h-[calc(100vh-220px)]">
+              <DetailsShell
+                node={selected}
+                cid={companyId}
+                canEdit={!!canEdit}
+                fundamentals={fundamentals}
+                strategy={strategy}
+                cycles={cycles}
+                objectiveById={objectiveById}
+                cycleById={cycleById}
+                onInvalidate={onInvalidate}
+                onSelect={pick}
+              />
             </div>
           </div>
         </TabsContent>
@@ -2222,6 +2553,7 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
                     objectiveById={objectiveById}
                     cycleById={cycleById}
                     onInvalidate={onInvalidate}
+                    onSelect={pick}
                   />
                 </ScrollArea>
               </DialogContent>
@@ -2248,6 +2580,7 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
                 objectiveById={objectiveById}
                 cycleById={cycleById}
                 onInvalidate={onInvalidate}
+                onSelect={pick}
               />
             </ScrollArea>
           </SheetContent>
