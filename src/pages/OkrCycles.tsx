@@ -817,6 +817,7 @@ export default function OkrCycles() {
                       company_id: cid,
                       cycle_id: selected.id,
                       parent_objective_id: objParent,
+                      strategy_objective_id: null,
                       level: objLevel,
                       department_id: objDept,
                       owner_user_id: objOwner,

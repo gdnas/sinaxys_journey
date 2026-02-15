@@ -635,6 +635,7 @@ export default function OkrAssistant() {
                       company_id: cid,
                       cycle_id: cycleId,
                       parent_objective_id: parentId || null,
+                      strategy_objective_id: null,
                       level,
                       department_id: user.departmentId ?? null,
                       owner_user_id: user.id,
