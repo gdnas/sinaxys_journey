@@ -62,6 +62,7 @@ export type DbStrategyObjective = {
   bets_and_expansions: string | null;
   order_index: number;
   created_by_user_id: string | null;
+  owner_user_id: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -70,7 +71,7 @@ export async function listStrategyObjectives(companyId: string) {
   const { data, error } = await supabase
     .from("strategy_objectives")
     .select(
-      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,created_at,updated_at",
+      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
     )
     .eq("company_id", companyId)
     .order("horizon_years", { ascending: true })
@@ -82,7 +83,7 @@ export async function listStrategyObjectives(companyId: string) {
 
 export async function createStrategyObjective(
   payload: Pick<DbStrategyObjective, "company_id" | "horizon_years" | "title"> &
-    Partial<Pick<DbStrategyObjective, "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "created_by_user_id">>,
+    Partial<Pick<DbStrategyObjective, "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "created_by_user_id" | "owner_user_id">>,
 ) {
   const { data, error } = await supabase
     .from("strategy_objectives")
@@ -96,9 +97,10 @@ export async function createStrategyObjective(
       bets_and_expansions: payload.bets_and_expansions ?? null,
       order_index: payload.order_index ?? 0,
       created_by_user_id: payload.created_by_user_id ?? null,
+      owner_user_id: payload.owner_user_id ?? null,
     })
     .select(
-      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,created_at,updated_at",
+      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
     )
     .single();
   if (error) throw error;
@@ -107,7 +109,12 @@ export async function createStrategyObjective(
 
 export async function updateStrategyObjective(
   id: string,
-  patch: Partial<Pick<DbStrategyObjective, "title" | "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "horizon_years">>,
+  patch: Partial<
+    Pick<
+      DbStrategyObjective,
+      "title" | "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "horizon_years" | "owner_user_id"
+    >
+  >,
 ) {
   const update: Record<string, any> = {};
   if ("title" in patch) update.title = patch.title?.trim();
@@ -117,13 +124,14 @@ export async function updateStrategyObjective(
   if ("bets_and_expansions" in patch) update.bets_and_expansions = patch.bets_and_expansions ?? null;
   if ("order_index" in patch) update.order_index = patch.order_index ?? 0;
   if ("horizon_years" in patch) update.horizon_years = patch.horizon_years;
+  if ("owner_user_id" in patch) update.owner_user_id = patch.owner_user_id ?? null;
 
   const { data, error } = await supabase
     .from("strategy_objectives")
     .update(update)
     .eq("id", id)
     .select(
-      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,created_at,updated_at",
+      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
     )
     .maybeSingle();
 
@@ -670,4 +678,95 @@ export async function listTasksForUserWithContext(userId: string, opts?: { from?
   });
   if (error) throw error;
   return (data ?? []) as unknown as DbTaskWithContext[];
+}
+
+// --- Long-term KRs (Strategy) ---
+
+export type StrategyKrKind = "METRIC" | "DELIVERABLE";
+
+export type DbStrategyKeyResult = {
+  id: string;
+  objective_id: string;
+  title: string;
+  kind: StrategyKrKind;
+  metric_unit: string | null;
+  start_value: number | null;
+  target_value: number | null;
+  current_value: number | null;
+  due_at: string | null;
+  achieved: boolean;
+  achieved_at: string | null;
+  owner_user_id: string | null;
+  confidence: "ON_TRACK" | "AT_RISK" | "OFF_TRACK";
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+const strategyKrSelect =
+  "id,objective_id,title,kind,metric_unit,start_value,target_value,current_value,due_at,achieved,achieved_at,owner_user_id,confidence,created_at,updated_at";
+
+export async function listStrategyKeyResults(objectiveId: string) {
+  const { data, error } = await supabase
+    .from("strategy_key_results")
+    .select(strategyKrSelect)
+    .eq("objective_id", objectiveId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as DbStrategyKeyResult[];
+}
+
+export async function createStrategyKeyResult(
+  payload: Omit<DbStrategyKeyResult, "id" | "created_at" | "updated_at" | "achieved_at">,
+) {
+  const { data, error } = await supabase
+    .from("strategy_key_results")
+    .insert({
+      objective_id: payload.objective_id,
+      title: payload.title.trim(),
+      kind: payload.kind,
+      metric_unit: payload.metric_unit ?? null,
+      start_value: payload.start_value ?? null,
+      target_value: payload.target_value ?? null,
+      current_value: payload.current_value ?? null,
+      due_at: payload.due_at ?? null,
+      achieved: payload.achieved ?? false,
+      owner_user_id: payload.owner_user_id ?? null,
+      confidence: payload.confidence,
+    })
+    .select(strategyKrSelect)
+    .single();
+  if (error) throw error;
+  return data as DbStrategyKeyResult;
+}
+
+export async function updateStrategyKeyResult(
+  id: string,
+  patch: Partial<Pick<DbStrategyKeyResult, "title" | "metric_unit" | "start_value" | "target_value" | "current_value" | "due_at" | "achieved" | "achieved_at" | "owner_user_id" | "confidence" | "kind">>,
+) {
+  const update: Record<string, any> = {};
+  if ("title" in patch) update.title = patch.title?.trim();
+  if ("kind" in patch) update.kind = patch.kind;
+  if ("metric_unit" in patch) update.metric_unit = patch.metric_unit ?? null;
+  if ("start_value" in patch) update.start_value = patch.start_value ?? null;
+  if ("target_value" in patch) update.target_value = patch.target_value ?? null;
+  if ("current_value" in patch) update.current_value = patch.current_value ?? null;
+  if ("due_at" in patch) update.due_at = patch.due_at ?? null;
+  if ("achieved" in patch) update.achieved = !!patch.achieved;
+  if ("achieved_at" in patch) update.achieved_at = patch.achieved_at ?? null;
+  if ("owner_user_id" in patch) update.owner_user_id = patch.owner_user_id ?? null;
+  if ("confidence" in patch) update.confidence = patch.confidence;
+
+  const { data, error } = await supabase
+    .from("strategy_key_results")
+    .update(update)
+    .eq("id", id)
+    .select(strategyKrSelect)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as DbStrategyKeyResult | null;
+}
+
+export async function deleteStrategyKeyResult(id: string) {
+  const { error } = await supabase.from("strategy_key_results").delete().eq("id", id);
+  if (error) throw error;
 }
