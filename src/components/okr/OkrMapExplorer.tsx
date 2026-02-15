@@ -718,17 +718,19 @@ function DetailsBody({
         />
       ) : null}
 
-          {node.kind === "strategyObjective" ? (
-            <StrategyObjectiveEditor
-              canEdit={canEdit}
-              so={strategy.find((s) => s.id === node.soId) ?? null}
-              people={people}
-              onSaved={async () => {
-                await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
-                toast({ title: "Objetivo atualizado" });
-              }}
-            />
-          ) : null}
+      {node.kind === "strategyObjective" ? (
+        <StrategyObjectiveInlineCard
+          so={strategy.find((s) => s.id === node.soId) ?? null}
+          people={people}
+          canEdit={canEdit}
+          open={false}
+          onToggle={() => {}}
+          onSaved={async () => {
+            await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
+            toast({ title: "Objetivo atualizado" });
+          }}
+        />
+      ) : null}
 
       {node.kind === "cycle" ? (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
@@ -1329,872 +1331,160 @@ function FundamentalEditor({
   );
 }
 
-function StrategyObjectiveEditor({
-  canEdit,
+function StrategyObjectiveInlineCard({
   so,
   people,
+  canEdit,
+  open,
+  onToggle,
   onSaved,
 }: {
-  canEdit: boolean;
-  so: DbStrategyObjective | null;
+  so: DbStrategyObjective;
   people: DbProfilePublic[];
+  canEdit: boolean;
+  open: boolean;
+  onToggle: () => void;
   onSaved: () => Promise<void>;
 }) {
   const { toast } = useToast();
-  const [title, setTitle] = useState(so?.title ?? "");
-  const [description, setDescription] = useState(so?.description ?? "");
-  const [owner, setOwner] = useState<string | null>(so?.owner_user_id ?? null);
+
+  const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p] as const)), [people]);
+  const owner = so.owner_user_id ? peopleById.get(so.owner_user_id) ?? null : null;
+
+  const [title, setTitle] = useState(so.title);
+  const [description, setDescription] = useState(so.description ?? "");
+  const [ownerId, setOwnerId] = useState<string | null>(so.owner_user_id ?? null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setTitle(so?.title ?? "");
-    setDescription(so?.description ?? "");
-    setOwner(so?.owner_user_id ?? null);
+    setTitle(so.title);
+    setDescription(so.description ?? "");
+    setOwnerId(so.owner_user_id ?? null);
     setSaving(false);
-  }, [so?.id]);
+  }, [so.id, so.updated_at]);
 
   const peopleOptions = useMemo(() => people.filter((p) => p.active).sort((a, b) => a.name.localeCompare(b.name)), [people]);
 
-  if (!so) {
-    return (
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="text-sm text-muted-foreground">Objetivo não encontrado.</div>
-      </Card>
-    );
-  }
-
   return (
-    <div className="grid gap-4">
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivo ({so.horizon_years} anos)</div>
-            <div className="mt-1 text-sm text-muted-foreground">Aposta de longo prazo que orienta decisões do ano.</div>
-          </div>
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-            <Flag className="h-5 w-5" />
-          </div>
-        </div>
-
-        <Separator className="my-4" />
-
-        <div className="grid gap-3">
-          <div className="grid gap-2">
-            <Label>Título</Label>
-            <Input className="h-11 rounded-xl" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit || saving} />
-          </div>
-          <div className="grid gap-2">
-            <Label>Responsável</Label>
-            <Select value={owner ?? "__none__"} onValueChange={(v) => setOwner(v === "__none__" ? null : v)} disabled={!canEdit || saving}>
-              <SelectTrigger className="h-11 rounded-2xl bg-white">
-                <SelectValue placeholder="Selecione…" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl">
-                <SelectItem value="__none__">Sem responsável</SelectItem>
-                {peopleOptions.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label>Descrição</Label>
-            <Textarea className="min-h-[120px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit || saving} />
-          </div>
-        </div>
-
-        {canEdit ? (
-          <div className="mt-4 flex justify-end">
-            <Button
-              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={saving || title.trim().length < 6}
-              onClick={async () => {
-                setSaving(true);
-                try {
-                  await updateStrategyObjective(so.id, { title, description, owner_user_id: owner });
-                  await onSaved();
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível salvar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              Salvar
-            </Button>
-          </div>
-        ) : null}
-      </Card>
-
-      <StrategyKrsEditor objectiveId={so.id} canEdit={canEdit} people={people} />
-    </div>
-  );
-}
-
-function ObjectiveEditor({
-  canEdit,
-  objective,
-  pct,
-  krs,
-  loadingKrs,
-  onSaved,
-  companyId,
-  strategy,
-  fundamentals,
-}: {
-  canEdit: boolean;
-  objective: DbOkrObjective | null;
-  pct: number | null;
-  krs: DbOkrKeyResult[];
-  loadingKrs: boolean;
-  onSaved: () => Promise<void>;
-  companyId: string;
-  strategy: DbStrategyObjective[];
-  fundamentals: DbCompanyFundamentals | null;
-}) {
-  const { toast } = useToast();
-  const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  const [title, setTitle] = useState(objective?.title ?? "");
-  const [description, setDescription] = useState(objective?.description ?? "");
-  const [reason, setReason] = useState(objective?.strategic_reason ?? "");
-
-  useEffect(() => {
-    setEditing(false);
-    setSaving(false);
-    setTitle(objective?.title ?? "");
-    setDescription(objective?.description ?? "");
-    setReason(objective?.strategic_reason ?? "");
-  }, [objective?.id]);
-
-  const qCycleObjectives = useQuery({
-    queryKey: ["okr-cycle-objectives", companyId, objective?.cycle_id ?? null],
-    enabled: !!objective?.cycle_id,
-    queryFn: async () => listOkrObjectives(companyId, (objective as any).cycle_id),
-    staleTime: 15_000,
-  });
-
-  if (!objective) {
-    return (
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="text-sm text-muted-foreground">Objetivo não encontrado.</div>
-      </Card>
-    );
-  }
-
-  const canEditThis = canEdit; // minimal rule for now
-
-  return (
-    <div className="grid gap-4">
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{objective.title}</div>
-            <div className="mt-2">
-              <ObjectiveMeta o={objective} />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
-              <Link to={`/okr/objetivos/${objective.id}`}>Abrir</Link>
-            </Button>
-            {canEditThis ? (
-              <Button type="button" variant="outline" className="h-10 rounded-xl bg-white" onClick={() => setEditing((v) => !v)}>
-                <Edit3 className="mr-2 h-4 w-4" />
-                {editing ? "Fechar" : "Editar"}
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
-        {typeof pct === "number" ? (
-          <div className="mt-4">
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>Andamento (média dos KRs)</span>
-              <span className="font-semibold text-[color:var(--sinaxys-ink)]">{pct}%</span>
-            </div>
-            <Progress value={pct} className="mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
-          </div>
-        ) : null}
-
-        {editing ? (
-          <div className="mt-4 grid gap-3">
-            <div className="grid gap-2">
-              <Label>Título</Label>
-              <Input className="h-11 rounded-xl" value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Descrição</Label>
-              <Textarea className="min-h-[96px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} disabled={saving} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Motivo estratégico</Label>
-              <Textarea className="min-h-[96px] rounded-2xl" value={reason} onChange={(e) => setReason(e.target.value)} disabled={saving} />
-            </div>
-
-            <div className="flex justify-end">
-              <Button
-                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                disabled={saving || title.trim().length < 6}
-                onClick={async () => {
-                  setSaving(true);
-                  try {
-                    await updateOkrObjective(objective.id, {
-                      title,
-                      description,
-                      strategic_reason: reason,
-                    });
-                    toast({ title: "Objetivo atualizado" });
-                    await onSaved();
-                    setEditing(false);
-                  } catch (e) {
-                    toast({
-                      title: "Não foi possível salvar",
-                      description: e instanceof Error ? e.message : "Erro inesperado.",
-                      variant: "destructive",
-                    });
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                <Save className="mr-2 h-4 w-4" />
-                Salvar
-              </Button>
-            </div>
-          </div>
-        ) : null}
-      </Card>
-
-      <StrategyLinker
-        cid={companyId}
-        canEdit={canEditThis}
-        objective={objective}
-        fundamentals={fundamentals}
-        strategy={strategy}
-        objectivesInCycle={qCycleObjectives.data ?? []}
-        onSaved={onSaved}
-      />
-
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Key Results</div>
-            <div className="mt-1 text-sm text-muted-foreground">Atualize andamento e ajuste KRs sem sair do mapa.</div>
-          </div>
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-            <Target className="h-5 w-5" />
-          </div>
-        </div>
-
-        <Separator className="my-4" />
-
-        {loadingKrs ? (
-          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Carregando KRs…</div>
-        ) : krs.length ? (
-          <div className="grid gap-3">
-            {krs.map((kr) => (
-              <KrInlineEditor
-                key={kr.id}
-                kr={kr}
-                canEdit={canEditThis}
-                onSaved={async () => {
-                  await onSaved();
-                }}
-              />
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem KRs ainda.</div>
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          "flex w-full items-start justify-between gap-4 rounded-3xl px-5 py-4 text-left transition",
+          open ? "bg-[color:var(--sinaxys-tint)]/30" : "hover:bg-[color:var(--sinaxys-tint)]/20",
         )}
-      </Card>
-    </div>
-  );
-}
-
-type TreePayload = {
-  objectivesByCycle: Record<string, DbOkrObjective[]>;
-  krsByObjective: Record<string, DbOkrKeyResult[]>;
-};
-
-type TreeItem = {
-  kind: "group" | "fundamentals" | "fundamental" | "strategy" | "strategyObjective" | "cycles" | "cycle" | "objective" | "kr";
-  title: string;
-  subtitle?: string;
-  pill?: string;
-  tone: "fund" | "strategy" | "cycles" | "objective";
-  pick?: Node;
-  activeKey?: NodeId;
-  href?: string;
-  owner_user_id?: string | null;
-  accent_hue?: number;
-  accent_depth?: number;
-};
-
-function toneClass(t: TreeItem["tone"]) {
-  if (t === "fund") return "bg-sky-50 text-sky-900 ring-sky-200";
-  if (t === "strategy") return "bg-violet-50 text-violet-900 ring-violet-200";
-  if (t === "cycles") return "bg-emerald-50 text-emerald-900 ring-emerald-200";
-  return "bg-amber-50 text-amber-950 ring-amber-200";
-}
-
-function TreeNodeCard({
-  item,
-  active,
-  onPick,
-  peopleById,
-}: {
-  item: TreeItem;
-  active: boolean;
-  onPick: (n: Node) => void;
-  peopleById: Map<string, DbProfilePublic>;
-}) {
-  const person = item.owner_user_id ? peopleById.get(item.owner_user_id) ?? null : null;
-
-  const accentHue = typeof item.accent_hue === "number" ? item.accent_hue : null;
-  const accentDepth = item.accent_depth ?? 0;
-  const accentLightness = accentHue == null ? null : Math.max(42, Math.min(72, 46 + accentDepth * 10));
-  const accent = accentHue == null ? null : `hsl(${accentHue} 70% ${accentLightness}%)`;
-  const accentSoft = accentHue == null ? null : `hsl(${accentHue} 70% 97%)`;
-
-  const shell = (
-    <div
-      className={cn(
-        "relative min-w-[220px] max-w-[280px] overflow-hidden rounded-3xl border bg-white px-4 py-3 text-left shadow-sm transition",
-        active
-          ? "border-[color:var(--sinaxys-primary)]/40 ring-2 ring-[color:var(--sinaxys-primary)]/15"
-          : "border-[color:var(--sinaxys-border)] hover:bg-[color:var(--sinaxys-tint)]/10",
-      )}
-      style={
-        accent
-          ? {
-              borderColor: active ? undefined : `color-mix(in srgb, ${accent} 28%, var(--sinaxys-border))`,
-              backgroundColor: accentSoft,
-            }
-          : undefined
-      }
-    >
-      {accent ? <div className="absolute left-0 top-0 h-full w-1.5" style={{ background: accent }} /> : null}
-
-      <div className="flex items-start justify-between gap-3">
+      >
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{item.title}</div>
-          {item.subtitle ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.subtitle}</div> : null}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{so.title}</div>
+            <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+              {so.horizon_years}a
+            </Badge>
+          </div>
+          {so.description?.trim() ? (
+            <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{so.description.trim()}</div>
+          ) : (
+            <div className="mt-1 text-xs text-muted-foreground">Sem descrição.</div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
-          {person ? (
-            <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-2xl border bg-white" style={accent ? { borderColor: accent } : undefined}>
-              {person.avatar_url ? (
-                <img src={person.avatar_url} alt={person.name} className="h-full w-full object-cover" />
+          {owner ? (
+            <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+              {owner.avatar_url ? (
+                <img src={owner.avatar_url} alt={owner.name} className="h-full w-full object-cover" />
               ) : (
-                <span className="text-xs font-bold text-[color:var(--sinaxys-ink)]">{initials(person.name)}</span>
+                <span className="text-xs font-bold text-[color:var(--sinaxys-ink)]">{initials(owner.name)}</span>
               )}
             </div>
-          ) : item.kind === "objective" || item.kind === "kr" ? (
-            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-white text-[color:var(--sinaxys-primary)]">
+          ) : (
+            <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-white text-[color:var(--sinaxys-primary)]">
               <UserRound className="h-4 w-4" />
             </div>
-          ) : null}
+          )}
 
-          {item.pill ? (
-            <span className={cn("shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ring-1", accent ? "bg-white text-[color:var(--sinaxys-ink)]" : toneClass(item.tone))}>
-              {item.pill}
-            </span>
-          ) : null}
-        </div>
-      </div>
-    </div>
-  );
-
-  if (item.href) {
-    return (
-      <Link to={item.href} className="block focus:outline-none">
-        {shell}
-      </Link>
-    );
-  }
-
-  if (!item.pick) return <div>{shell}</div>;
-
-  return (
-    <button type="button" className="block focus:outline-none" onClick={() => onPick(item.pick!)}>
-      {shell}
-    </button>
-  );
-}
-
-function OkrMapTreeCanvas({
-  cid,
-  fundamentals,
-  strategy,
-  cycles,
-  activeId,
-  onPick,
-  objectiveById,
-  peopleById,
-}: {
-  cid: string;
-  fundamentals: DbCompanyFundamentals | null;
-  strategy: DbStrategyObjective[];
-  cycles: DbOkrCycle[];
-  activeId: NodeId;
-  onPick: (n: Node) => void;
-  objectiveById: Map<string, DbOkrObjective>;
-  peopleById: Map<string, DbProfilePublic>;
-}) {
-  const cycleGroups = useMemo(() => {
-    const annual = cycles.filter((c) => c.type === "ANNUAL").sort((a, b) => b.year - a.year);
-    const quarterly = cycles.filter((c) => c.type === "QUARTERLY").sort((a, b) => (b.year - a.year) || ((b.quarter ?? 0) - (a.quarter ?? 0)));
-    return { annual, quarterly };
-  }, [cycles]);
-
-  const cyclesKey = useMemo(
-    () => [...cycleGroups.quarterly.map((c) => c.id), ...cycleGroups.annual.map((c) => c.id)].join(","),
-    [cycleGroups.annual, cycleGroups.quarterly],
-  );
-
-  const qTree = useQuery<TreePayload>({
-    queryKey: ["okr-map-tree", cid, cyclesKey],
-    enabled: cycles.length > 0,
-    queryFn: async () => {
-      const objectivesByCycle: Record<string, DbOkrObjective[]> = {};
-      const krsByObjective: Record<string, DbOkrKeyResult[]> = {};
-
-      // Carrega tudo para permitir "linkar" a estratégia até o KR na mesma tela.
-      await Promise.all(
-        cycles.map(async (c) => {
-          const objs = await listOkrObjectives(cid, c.id);
-          objectivesByCycle[c.id] = objs;
-          for (const o of objs) objectiveById.set(o.id, o);
-
-          await Promise.all(
-            objs.map(async (o) => {
-              const krs = await listKeyResults(o.id);
-              krsByObjective[o.id] = krs;
-            }),
-          );
-        }),
-      );
-
-      return { objectivesByCycle, krsByObjective };
-    },
-    staleTime: 20_000,
-  });
-
-  const fundamentalsFields: Array<{ field: keyof DbCompanyFundamentals; label: string }> = [
-    { field: "purpose", label: "Propósito" },
-    { field: "vision", label: "Visão" },
-    { field: "mission", label: "Missão" },
-    { field: "values", label: "Valores" },
-    { field: "culture", label: "Cultura" },
-  ];
-
-  const roots = useMemo((): OrgNode<TreeItem>[] => {
-    const data = qTree.data;
-
-    const fundamentalsNode: OrgNode<TreeItem> = {
-      id: "fundamentals",
-      data: {
-        kind: "fundamentals",
-        title: "Fundamentos",
-        subtitle: "Missão, visão, valores e cultura",
-        pill: "Base",
-        tone: "fund",
-        pick: { kind: "fundamentals", id: "fundamentals" },
-        activeKey: "fundamentals",
-      },
-      children: fundamentalsFields.map((f) => ({
-        id: `fund:${String(f.field)}`,
-        data: {
-          kind: "fundamental",
-          title: f.label,
-          subtitle: parseListValue(String((fundamentals as any)?.[f.field] ?? "")).slice(0, 2).join(" • ") || "—",
-          tone: "fund",
-          pick: { kind: "fundamental", id: `fund:${f.field}` as any, field: f.field },
-          activeKey: `fund:${f.field}` as any,
-        },
-        children: [],
-      })),
-    };
-
-    const strategyNode: OrgNode<TreeItem> = {
-      id: "strategy",
-      data: {
-        kind: "strategy",
-        title: "Objetivos de longo prazo",
-        subtitle: "1–10 anos",
-        pill: String(strategy.length),
-        tone: "strategy",
-        pick: { kind: "strategy", id: "strategy" },
-        activeKey: "strategy",
-      },
-      children: strategy.map((so) => ({
-        id: `so:${so.id}`,
-        data: {
-          kind: "strategyObjective",
-          title: so.title,
-          subtitle: so.description?.trim() ? so.description.trim() : `${so.horizon_years} anos`,
-          pill: `${so.horizon_years}a`,
-          tone: "strategy",
-          pick: { kind: "strategyObjective", id: `so:${so.id}`, soId: so.id },
-          activeKey: `so:${so.id}`,
-        },
-        children: [],
-      })),
-    };
-
-    const buildObjectiveForest = (objs: DbOkrObjective[]) => {
-      const byId = new Map(objs.map((o) => [o.id, o] as const));
-      const childrenByParent = new Map<string, DbOkrObjective[]>();
-      const roots: DbOkrObjective[] = [];
-
-      for (const o of objs) {
-        if (o.parent_objective_id && byId.has(o.parent_objective_id)) {
-          const arr = childrenByParent.get(o.parent_objective_id) ?? [];
-          arr.push(o);
-          childrenByParent.set(o.parent_objective_id, arr);
-        } else {
-          roots.push(o);
-        }
-      }
-
-      const seen = new Set<string>();
-      const make = (o: DbOkrObjective, rootHue: number, depth: number): OrgNode<TreeItem> => {
-        // protect against cycles
-        if (seen.has(o.id)) {
-          return {
-            id: `o:${o.id}`,
-            data: {
-              kind: "objective",
-              title: o.title,
-              subtitle: `${objectiveTypeLabel(o.level)} • ${objectiveLevelLabel(o.level)}`,
-              pill: "—",
-              tone: "objective",
-              pick: { kind: "objective", id: `o:${o.id}`, objectiveId: o.id },
-              activeKey: `o:${o.id}`,
-              owner_user_id: o.owner_user_id,
-              accent_hue: rootHue,
-              accent_depth: depth,
-            },
-            children: [],
-          };
-        }
-        seen.add(o.id);
-
-        const krs = data?.krsByObjective?.[o.id] ?? [];
-        const pct = averageObjectivePct(krs);
-
-        const krChildren: OrgNode<TreeItem>[] = krs.slice(0, 5).map((kr) => ({
-          id: `kr:${kr.id}`,
-          data: {
-            kind: "kr",
-            title: kr.title,
-            subtitle: kr.kind === "METRIC" ? `${kr.current_value ?? "—"} → ${kr.target_value ?? "—"} ${kr.metric_unit ?? ""}` : "Entregável",
-            pill: typeof krProgressPct(kr) === "number" ? `${krProgressPct(kr)}%` : "—",
-            tone: "objective",
-            pick: { kind: "objective", id: `o:${o.id}`, objectiveId: o.id },
-            activeKey: `o:${o.id}`,
-            owner_user_id: (kr as any).owner_user_id ?? o.owner_user_id,
-            accent_hue: rootHue,
-            accent_depth: depth + 1,
-          },
-          children: [],
-        }));
-
-        if (krs.length > 5) {
-          krChildren.push({
-            id: `kr-more:${o.id}`,
-            data: {
-              kind: "kr",
-              title: `Ver todos os KRs (${krs.length})`,
-              subtitle: "Abrir o objetivo",
-              pill: "Abrir",
-              tone: "objective",
-              href: `/okr/objetivos/${o.id}`,
-              owner_user_id: o.owner_user_id,
-              accent_hue: rootHue,
-              accent_depth: depth + 1,
-            },
-            children: [],
-          });
-        }
-
-        const kids = (childrenByParent.get(o.id) ?? [])
-          .slice()
-          .sort((a, b) => a.title.localeCompare(b.title))
-          .map((child) => make(child, rootHue, depth + 1));
-
-        return {
-          id: `o:${o.id}`,
-          data: {
-            kind: "objective",
-            title: o.title,
-            subtitle: `${objectiveTypeLabel(o.level)} • ${objectiveLevelLabel(o.level)}`,
-            pill: typeof pct === "number" ? `${pct}%` : "—",
-            tone: "objective",
-            pick: { kind: "objective", id: `o:${o.id}`, objectiveId: o.id },
-            activeKey: `o:${o.id}`,
-            owner_user_id: o.owner_user_id,
-            accent_hue: rootHue,
-            accent_depth: depth,
-          },
-          children: [...kids, ...krChildren],
-        };
-      };
-
-      return roots
-        .slice()
-        .sort((a, b) => a.title.localeCompare(b.title))
-        .map((r) => make(r, hueFromId(r.id), 0));
-    };
-
-    const cycleNodes = (list: DbOkrCycle[]): OrgNode<TreeItem>[] => {
-      return list.map((c) => {
-        const objs = data?.objectivesByCycle?.[c.id] ?? [];
-        const objectiveChildren = buildObjectiveForest(objs);
-
-        return {
-          id: `c:${c.id}`,
-          data: {
-            kind: "cycle",
-            title: cycleLabel(c),
-            subtitle: c.status,
-            pill: String(objs.length),
-            tone: "cycles",
-            pick: { kind: "cycle", id: `c:${c.id}`, cycleId: c.id },
-            activeKey: `c:${c.id}`,
-          },
-          children: objectiveChildren,
-        };
-      });
-    };
-
-    // Ordem pedida: Trimestral primeiro.
-    const cyclesRoot: OrgNode<TreeItem> = {
-      id: "cycles",
-      data: {
-        kind: "cycles",
-        title: "OKRs (ciclos)",
-        subtitle: "Trimestre → ano",
-        pill: String(cycles.length),
-        tone: "cycles",
-        pick: { kind: "cycles", id: "cycles" },
-        activeKey: "cycles",
-      },
-      children: [
-        {
-          id: "cycles-quarterly",
-          data: {
-            kind: "group",
-            title: "Trimestral",
-            subtitle: "Execução do trimestre",
-            pill: String(cycleGroups.quarterly.length),
-            tone: "cycles",
-            pick: { kind: "cycles", id: "cycles" },
-            activeKey: "cycles",
-          },
-          children: cycleNodes(cycleGroups.quarterly),
-        },
-        {
-          id: "cycles-annual",
-          data: {
-            kind: "group",
-            title: "Anual",
-            subtitle: "Direção do ano",
-            pill: String(cycleGroups.annual.length),
-            tone: "cycles",
-            pick: { kind: "cycles", id: "cycles" },
-            activeKey: "cycles",
-          },
-          children: cycleNodes(cycleGroups.annual),
-        },
-      ],
-    };
-
-    return [fundamentalsNode, strategyNode, cyclesRoot];
-  }, [cycleGroups.annual, cycleGroups.quarterly, cycles.length, fundamentals, qTree.data, strategy]);
-
-  return (
-    <div className="grid gap-4">
-      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Árvore conectada (1 página)</div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              Estratégia → ciclos → objetivos. Quando Tier I/Tier II estão vinculados, eles aparecem no mesmo espectro de cor.
-            </div>
-          </div>
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-            <Network className="h-5 w-5" />
+          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white text-muted-foreground ring-1 ring-[color:var(--sinaxys-border)]">
+            {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
           </div>
         </div>
-      </div>
+      </button>
 
-      {qTree.isLoading ? (
-        <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-sm text-muted-foreground">Montando a árvore…</div>
-      ) : qTree.error ? (
-        <div className="rounded-3xl border border-destructive/30 bg-white p-5 text-sm text-destructive">Não foi possível montar a árvore.</div>
-      ) : (
-        <OrgChartTreeCanvas
-          roots={roots}
-          renderNode={(n) => <TreeNodeCard item={n.data} active={!!n.data.activeKey && n.data.activeKey === activeId} onPick={onPick} peopleById={peopleById} />}
-          className="[&_>div.relative]:h-[74vh]"
-        />
-      )}
-    </div>
-  );
-}
-
-function FundamentalsPicker({
-  cid,
-  canEdit,
-  fundamentals,
-  onSaved,
-}: {
-  cid: string;
-  canEdit: boolean;
-  fundamentals: DbCompanyFundamentals | null;
-  onSaved: () => Promise<void>;
-}) {
-  const { toast } = useToast();
-  const [saving, setSaving] = useState(false);
-
-  const options = useMemo(
-    () =>
-      [
-        { label: "Propósito", field: "purpose" as const },
-        { label: "Visão", field: "vision" as const },
-        { label: "Missão", field: "mission" as const },
-        { label: "Valores", field: "values" as const },
-        { label: "Cultura", field: "culture" as const },
-      ] as const,
-    [],
-  );
-
-  const [field, setField] = useState<(typeof options)[number]["field"]>("purpose");
-
-  const describedFields = field === "values" || field === "culture";
-  const [text, setText] = useState("");
-  const [described, setDescribed] = useState<DescribedItem[]>([]);
-
-  useEffect(() => {
-    const raw = String((fundamentals as any)?.[field] ?? "");
-    setText(raw);
-    setDescribed(parseDescribedItems(raw));
-    setSaving(false);
-  }, [field, fundamentals?.updated_at]);
-
-  const selectedLabel = options.find((o) => o.field === field)?.label ?? "Fundamento";
-
-  return (
-    <div className="grid gap-4">
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Fundamentos</div>
-            <div className="mt-1 text-sm text-muted-foreground">Escolha o fundamento e edite (texto ou itens com descrição).</div>
-          </div>
-          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-            <Route className="h-5 w-5" />
-          </div>
-        </div>
-
-        <Separator className="my-4" />
-
-        <div className="grid gap-2">
-          <Label>Fundamento</Label>
-          <Select value={field} onValueChange={(v) => setField(v as any)}>
-            <SelectTrigger className="h-11 rounded-2xl bg-white">
-              <SelectValue placeholder="Selecione…" />
-            </SelectTrigger>
-            <SelectContent className="rounded-2xl">
-              {options.map((o) => (
-                <SelectItem key={o.field} value={o.field}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </Card>
-
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{selectedLabel}</div>
-            <div className="mt-1 text-sm text-muted-foreground">{describedFields ? "Itens cadastrados" : "Texto"}</div>
-          </div>
-        </div>
-
-        <Separator className="my-4" />
-
-        {describedFields ? (
-          <DescribedItemsEditor
-            label={selectedLabel}
-            hint={field === "values" ? "Valores com nome + descritivo." : "Cultura com nome + descritivo."}
-            items={described}
-            onChange={setDescribed}
-            canEdit={canEdit}
-            saving={saving}
-            addLabel={field === "values" ? "Adicionar valor" : "Adicionar item"}
-          />
-        ) : (
+      {open ? (
+        <div className="border-t border-[color:var(--sinaxys-border)] px-5 py-5">
           <div className="grid gap-3">
-            <Label className="text-sm">Texto</Label>
-            <Textarea
-              className="min-h-[180px] rounded-2xl"
-              value={text}
-              disabled={!canEdit || saving}
-              onChange={(e) => setText(e.target.value)}
-              placeholder={`Escreva ${selectedLabel.toLowerCase()}…`}
-            />
-          </div>
-        )}
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input className="h-11 rounded-2xl" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit || saving} />
+            </div>
 
-        {canEdit ? (
-          <div className="mt-4 flex justify-end">
-            <Button
-              className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={saving}
-              onClick={async () => {
-                setSaving(true);
-                try {
-                  const patch: Partial<DbCompanyFundamentals> =
-                    describedFields
-                      ? ({ [field]: serializeDescribedItems(described) || null } as any)
-                      : ({ [field]: text.trim() || null } as any);
+            <div className="grid gap-2">
+              <Label>Responsável</Label>
+              <Select value={ownerId ?? "__none__"} onValueChange={(v) => setOwnerId(v === "__none__" ? null : v)} disabled={!canEdit || saving}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="__none__">Sem responsável</SelectItem>
+                  {peopleOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-                  await upsertCompanyFundamentals(cid, patch);
-                  toast({ title: "Fundamento salvo" });
-                  await onSaved();
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível salvar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setSaving(false);
-                }
-              }}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              Salvar
-            </Button>
+            <div className="grid gap-2">
+              <Label>Descrição</Label>
+              <Textarea
+                className="min-h-[120px] rounded-2xl"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                disabled={!canEdit || saving}
+                placeholder="Contexto, hipóteses, como saberemos que vencemos, etc."
+              />
+            </div>
+
+            {canEdit ? (
+              <div className="flex justify-end">
+                <Button
+                  className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={saving || title.trim().length < 6}
+                  onClick={async () => {
+                    setSaving(true);
+                    try {
+                      await updateStrategyObjective(so.id, {
+                        title,
+                        description: description.trim() || null,
+                        owner_user_id: ownerId,
+                      });
+                      toast({ title: "Objetivo atualizado" });
+                      await onSaved();
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível salvar",
+                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setSaving(false);
+                    }
+                  }}
+                >
+                  <Save className="mr-2 h-4 w-4" />
+                  Salvar
+                </Button>
+              </div>
+            ) : null}
           </div>
-        ) : null}
-      </Card>
-    </div>
+
+          <div className="mt-5">
+            <StrategyKrsEditor objectiveId={so.id} canEdit={canEdit} people={people} />
+          </div>
+        </div>
+      ) : null}
+    </Card>
   );
 }
 
@@ -2214,17 +1504,12 @@ function StrategyPicker({
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const [soId, setSoId] = useState<string>(strategy[0]?.id ?? "");
+  const [openSoId, setOpenSoId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!strategy.length) {
-      setSoId("");
-      return;
-    }
-    setSoId((prev) => (strategy.some((s) => s.id === prev) ? prev : strategy[0].id));
-  }, [strategy]);
-
-  const so = strategy.find((s) => s.id === soId) ?? null;
+    // If the open objective was removed, close it.
+    if (openSoId && !strategy.some((s) => s.id === openSoId)) setOpenSoId(null);
+  }, [strategy, openSoId]);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -2245,6 +1530,11 @@ function StrategyPicker({
   const canCreate = canEdit && !!user;
   const peopleOptions = useMemo(() => people.filter((p) => p.active).sort((a, b) => a.name.localeCompare(b.name)), [people]);
 
+  const ordered = useMemo(
+    () => strategy.slice().sort((a, b) => (a.horizon_years - b.horizon_years) || (a.order_index - b.order_index) || a.title.localeCompare(b.title)),
+    [strategy],
+  );
+
   return (
     <>
       <div className="grid gap-4">
@@ -2252,76 +1542,58 @@ function StrategyPicker({
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos de longo prazo</div>
-              <div className="mt-1 text-sm text-muted-foreground">Cadastre a visão de 1–10 anos (depois conecte os OKRs do ciclo).</div>
+              <div className="mt-1 text-sm text-muted-foreground">
+                Veja todos juntos. Clique em um objetivo para editar e adicionar KRs de longo prazo.
+              </div>
             </div>
-            <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-              <Flag className="h-5 w-5" />
+            <div className="flex items-center gap-2">
+              {canCreate ? (
+                <Button
+                  type="button"
+                  className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo objetivo
+                </Button>
+              ) : null}
             </div>
           </div>
-
-          <Separator className="my-4" />
-
-          {strategy.length ? (
-            <div className="grid gap-3">
-              <div className="grid gap-2">
-                <Label>Objetivo</Label>
-                <Select value={soId} onValueChange={setSoId}>
-                  <SelectTrigger className="h-11 rounded-2xl bg-white">
-                    <SelectValue placeholder="Selecione…" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-2xl">
-                    {strategy.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {canCreate ? (
-                <div className="flex justify-end">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-11 rounded-2xl bg-white"
-                    onClick={() => setCreateOpen(true)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Novo objetivo
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ) : (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-              Nenhum objetivo de longo prazo ainda.
-              {canCreate ? (
-                <div className="mt-3">
-                  <Button
-                    type="button"
-                    className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                    onClick={() => setCreateOpen(true)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Criar objetivo de longo prazo
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          )}
         </Card>
 
-        {so ? (
-          <StrategyObjectiveEditor
-            canEdit={canEdit}
-            so={so}
-            people={people}
-            onSaved={async () => {
-              await onSaved();
-            }}
-          />
-        ) : null}
+        {ordered.length ? (
+          <div className="grid gap-3">
+            {ordered.map((so) => (
+              <StrategyObjectiveInlineCard
+                key={so.id}
+                so={so}
+                people={people}
+                canEdit={canEdit}
+                open={openSoId === so.id}
+                onToggle={() => setOpenSoId((prev) => (prev === so.id ? null : so.id))}
+                onSaved={async () => {
+                  await onSaved();
+                }}
+              />
+            ))}
+          </div>
+        ) : (
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+            <div className="text-sm text-muted-foreground">Nenhum objetivo de longo prazo ainda.</div>
+            {canCreate ? (
+              <div className="mt-3">
+                <Button
+                  type="button"
+                  className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  onClick={() => setCreateOpen(true)}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Criar primeiro objetivo
+                </Button>
+              </div>
+            ) : null}
+          </Card>
+        )}
       </div>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -2406,7 +1678,7 @@ function StrategyPicker({
                     });
                     toast({ title: "Objetivo criado" });
                     await onSaved();
-                    setSoId(created.id);
+                    setOpenSoId(created.id);
                     setCreateOpen(false);
                   } catch (e) {
                     console.error("[okr] create strategy objective failed", e);
