@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { getCompanyFundamentals, upsertCompanyFundamentals, type DbCompanyFundamentals } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import { OkrSubnav } from "@/components/OkrSubnav";
 import {
   describedItemsToLines,
   parseDescribedItems,
@@ -138,6 +139,9 @@ export default function OkrFundamentals() {
           subtitle="Carregando contexto da empresa…"
           icon={<BookOpenText className="h-5 w-5" />}
         />
+
+        <OkrSubnav />
+
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
         </Card>
@@ -163,6 +167,8 @@ export default function OkrFundamentals() {
           ) : null
         }
       />
+
+      <OkrSubnav />
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

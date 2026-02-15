@@ -48,6 +48,7 @@ import {
   type WorkStatus,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import { OkrSubnav } from "@/components/OkrSubnav";
 import { OkrObjectiveCostItems } from "@/components/OkrObjectiveCostItems";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 
@@ -260,6 +261,9 @@ export default function OkrObjectiveDetail() {
             </Button>
           }
         />
+
+        <OkrSubnav />
+
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
         </Card>
@@ -318,6 +322,8 @@ export default function OkrObjectiveDetail() {
           </div>
         }
       />
+
+      <OkrSubnav />
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         {loadingObjective ? (

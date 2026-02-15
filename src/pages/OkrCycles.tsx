@@ -49,6 +49,7 @@ import {
   type ObjectiveLevel,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import { OkrSubnav } from "@/components/OkrSubnav";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 
 const SELECT_NONE = "__none__";
@@ -253,6 +254,9 @@ export default function OkrCycles() {
           subtitle="Carregando contexto da empresa…"
           icon={<Target className="h-5 w-5" />}
         />
+
+        <OkrSubnav />
+
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
         </Card>
@@ -264,31 +268,11 @@ export default function OkrCycles() {
     <div className="grid gap-6">
       <OkrPageHeader
         title="Ciclos & OKRs"
-        subtitle="Crie o trimestre, registre objetivos estratégicos e desdobre até o dia a dia."
+        subtitle="Crie e acompanhe ciclos trimestrais e anuais — com ROI opcional por departamento."
         icon={<Target className="h-5 w-5" />}
-        actions={
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" className="h-11 rounded-xl">
-              <Link to="/okr/assistente">
-                Assistente
-                <Wand2 className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            {isAdminish ? (
-              <Button
-                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                onClick={() => {
-                  resetCycle();
-                  setCycleOpen(true);
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Novo ciclo
-              </Button>
-            ) : null}
-          </div>
-        }
       />
+
+      <OkrSubnav />
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

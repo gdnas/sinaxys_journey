@@ -31,6 +31,7 @@ import {
   type ObjectiveLevel,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import { OkrSubnav } from "@/components/OkrSubnav";
 
 const SELECT_NONE = "__none__";
 
@@ -204,6 +205,9 @@ export default function OkrAssistant() {
           subtitle="Carregando contexto da empresa…"
           icon={<Sparkles className="h-5 w-5" />}
         />
+
+        <OkrSubnav />
+
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
         </Card>
@@ -223,6 +227,8 @@ export default function OkrAssistant() {
           </Button>
         }
       />
+
+      <OkrSubnav />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="grid gap-6">
