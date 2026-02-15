@@ -65,6 +65,7 @@ import {
 } from "@/lib/fundamentalsFormat";
 import { DescribedItemsEditor } from "@/components/fundamentals/DescribedItemsEditor";
 import { StrategyKrsEditor } from "@/components/okr/StrategyKrsEditor";
+import { getErrorMessage } from "@/lib/errorMessage";
 
 type NodeId = string;
 
@@ -2408,9 +2409,10 @@ function StrategyPicker({
                     setSoId(created.id);
                     setCreateOpen(false);
                   } catch (e) {
+                    console.error("[okr] create strategy objective failed", e);
                     toast({
                       title: "Não foi possível criar",
-                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      description: getErrorMessage(e),
                       variant: "destructive",
                     });
                   } finally {
