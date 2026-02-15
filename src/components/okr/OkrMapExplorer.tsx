@@ -64,6 +64,7 @@ import {
   type DescribedItem,
 } from "@/lib/fundamentalsFormat";
 import { DescribedItemsEditor } from "@/components/fundamentals/DescribedItemsEditor";
+import { StrategyKrsEditor } from "@/components/okr/StrategyKrsEditor";
 
 type NodeId = string;
 
@@ -588,6 +589,7 @@ function DetailsBody({
   cycleById,
   onInvalidate,
   onSelect,
+  people,
 }: {
   node: Node;
   cid: string;
@@ -599,6 +601,7 @@ function DetailsBody({
   cycleById: Map<string, DbOkrCycle>;
   onInvalidate: () => Promise<void>;
   onSelect?: (n: Node) => void;
+  people: DbProfilePublic[];
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -651,6 +654,7 @@ function DetailsBody({
           cid={cid}
           canEdit={canEdit}
           strategy={strategy}
+          people={people}
           onSaved={async () => {
             await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
             toast({ title: "Objetivo atualizado" });
@@ -713,16 +717,17 @@ function DetailsBody({
         />
       ) : null}
 
-      {node.kind === "strategyObjective" ? (
-        <StrategyObjectiveEditor
-          canEdit={canEdit}
-          so={strategy.find((s) => s.id === node.soId) ?? null}
-          onSaved={async () => {
-            await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
-            toast({ title: "Objetivo atualizado" });
-          }}
-        />
-      ) : null}
+          {node.kind === "strategyObjective" ? (
+            <StrategyObjectiveEditor
+              canEdit={canEdit}
+              so={strategy.find((s) => s.id === node.soId) ?? null}
+              people={people}
+              onSaved={async () => {
+                await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
+                toast({ title: "Objetivo atualizado" });
+              }}
+            />
+          ) : null}
 
       {node.kind === "cycle" ? (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
@@ -763,6 +768,7 @@ function DetailsShell({
   cycleById,
   onInvalidate,
   onSelect,
+  people,
 }: {
   node: Node;
   cid: string;
@@ -774,6 +780,7 @@ function DetailsShell({
   cycleById: Map<string, DbOkrCycle>;
   onInvalidate: () => Promise<void>;
   onSelect?: (n: Node) => void;
+  people: DbProfilePublic[];
 }) {
   const title = useMemo(() => {
     if (node.kind === "fundamental") return nodeTitle(node);
@@ -803,6 +810,7 @@ function DetailsShell({
           cycleById={cycleById}
           onInvalidate={onInvalidate}
           onSelect={onSelect}
+          people={people}
         />
       </ScrollArea>
     </div>
@@ -1323,22 +1331,28 @@ function FundamentalEditor({
 function StrategyObjectiveEditor({
   canEdit,
   so,
+  people,
   onSaved,
 }: {
   canEdit: boolean;
   so: DbStrategyObjective | null;
+  people: DbProfilePublic[];
   onSaved: () => Promise<void>;
 }) {
   const { toast } = useToast();
   const [title, setTitle] = useState(so?.title ?? "");
   const [description, setDescription] = useState(so?.description ?? "");
+  const [owner, setOwner] = useState<string | null>(so?.owner_user_id ?? null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setTitle(so?.title ?? "");
     setDescription(so?.description ?? "");
+    setOwner(so?.owner_user_id ?? null);
     setSaving(false);
   }, [so?.id]);
+
+  const peopleOptions = useMemo(() => people.filter((p) => p.active).sort((a, b) => a.name.localeCompare(b.name)), [people]);
 
   if (!so) {
     return (
@@ -1349,57 +1363,77 @@ function StrategyObjectiveEditor({
   }
 
   return (
-    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivo ({so.horizon_years} anos)</div>
-          <div className="mt-1 text-sm text-muted-foreground">Aposta de longo prazo que orienta decisões do ano.</div>
+    <div className="grid gap-4">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivo ({so.horizon_years} anos)</div>
+            <div className="mt-1 text-sm text-muted-foreground">Aposta de longo prazo que orienta decisões do ano.</div>
+          </div>
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+            <Flag className="h-5 w-5" />
+          </div>
         </div>
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-          <Flag className="h-5 w-5" />
-        </div>
-      </div>
 
-      <Separator className="my-4" />
+        <Separator className="my-4" />
 
-      <div className="grid gap-3">
-        <div className="grid gap-2">
-          <Label>Título</Label>
-          <Input className="h-11 rounded-xl" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit || saving} />
+        <div className="grid gap-3">
+          <div className="grid gap-2">
+            <Label>Título</Label>
+            <Input className="h-11 rounded-xl" value={title} onChange={(e) => setTitle(e.target.value)} disabled={!canEdit || saving} />
+          </div>
+          <div className="grid gap-2">
+            <Label>Responsável</Label>
+            <Select value={owner ?? "__none__"} onValueChange={(v) => setOwner(v === "__none__" ? null : v)} disabled={!canEdit || saving}>
+              <SelectTrigger className="h-11 rounded-2xl bg-white">
+                <SelectValue placeholder="Selecione…" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                <SelectItem value="__none__">Sem responsável</SelectItem>
+                {peopleOptions.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label>Descrição</Label>
+            <Textarea className="min-h-[120px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit || saving} />
+          </div>
         </div>
-        <div className="grid gap-2">
-          <Label>Descrição</Label>
-          <Textarea className="min-h-[120px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} disabled={!canEdit || saving} />
-        </div>
-      </div>
 
-      {canEdit ? (
-        <div className="mt-4 flex justify-end">
-          <Button
-            className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-            disabled={saving || title.trim().length < 6}
-            onClick={async () => {
-              setSaving(true);
-              try {
-                await updateStrategyObjective(so.id, { title, description });
-                await onSaved();
-              } catch (e) {
-                toast({
-                  title: "Não foi possível salvar",
-                  description: e instanceof Error ? e.message : "Erro inesperado.",
-                  variant: "destructive",
-                });
-              } finally {
-                setSaving(false);
-              }
-            }}
-          >
-            <Save className="mr-2 h-4 w-4" />
-            Salvar
-          </Button>
-        </div>
-      ) : null}
-    </Card>
+        {canEdit ? (
+          <div className="mt-4 flex justify-end">
+            <Button
+              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={saving || title.trim().length < 6}
+              onClick={async () => {
+                setSaving(true);
+                try {
+                  await updateStrategyObjective(so.id, { title, description, owner_user_id: owner });
+                  await onSaved();
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível salvar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              <Save className="mr-2 h-4 w-4" />
+              Salvar
+            </Button>
+          </div>
+        ) : null}
+      </Card>
+
+      <StrategyKrsEditor objectiveId={so.id} canEdit={canEdit} people={people} />
+    </div>
   );
 }
 
@@ -2168,11 +2202,13 @@ function StrategyPicker({
   canEdit,
   strategy,
   onSaved,
+  people,
 }: {
   cid: string;
   canEdit: boolean;
   strategy: DbStrategyObjective[];
   onSaved: () => Promise<void>;
+  people: DbProfilePublic[];
 }) {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -2194,6 +2230,7 @@ function StrategyPicker({
   const [newYears, setNewYears] = useState<DbStrategyObjective["horizon_years"]>(3);
   const [newTitle, setNewTitle] = useState("");
   const [newDesc, setNewDesc] = useState("");
+  const [newOwner, setNewOwner] = useState<string | null>(null);
 
   useEffect(() => {
     if (!createOpen) return;
@@ -2201,9 +2238,11 @@ function StrategyPicker({
     setNewYears(3);
     setNewTitle("");
     setNewDesc("");
+    setNewOwner(null);
   }, [createOpen]);
 
   const canCreate = canEdit && !!user;
+  const peopleOptions = useMemo(() => people.filter((p) => p.active).sort((a, b) => a.name.localeCompare(b.name)), [people]);
 
   return (
     <>
@@ -2276,6 +2315,7 @@ function StrategyPicker({
           <StrategyObjectiveEditor
             canEdit={canEdit}
             so={so}
+            people={people}
             onSaved={async () => {
               await onSaved();
             }}
@@ -2317,6 +2357,23 @@ function StrategyPicker({
             </div>
 
             <div className="grid gap-2">
+              <Label>Responsável</Label>
+              <Select value={newOwner ?? "__none__"} onValueChange={(v) => setNewOwner(v === "__none__" ? null : v)} disabled={creating}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="__none__">Sem responsável</SelectItem>
+                  {peopleOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
               <Label>Descrição (opcional)</Label>
               <Textarea
                 className="min-h-[110px] rounded-2xl"
@@ -2344,6 +2401,7 @@ function StrategyPicker({
                       title: newTitle,
                       description: newDesc.trim() || null,
                       created_by_user_id: user.id,
+                      owner_user_id: newOwner,
                     });
                     toast({ title: "Objetivo criado" });
                     await onSaved();
@@ -2609,6 +2667,7 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
                 cycleById={cycleById}
                 onInvalidate={onInvalidate}
                 onSelect={pick}
+                people={qPeople.data ?? []}
               />
             </div>
           </div>
@@ -2645,6 +2704,7 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
                     cycleById={cycleById}
                     onInvalidate={onInvalidate}
                     onSelect={pick}
+                    people={qPeople.data ?? []}
                   />
                 </ScrollArea>
               </DialogContent>
@@ -2672,6 +2732,7 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
                 cycleById={cycleById}
                 onInvalidate={onInvalidate}
                 onSelect={pick}
+                people={qPeople.data ?? []}
               />
             </ScrollArea>
           </SheetContent>
