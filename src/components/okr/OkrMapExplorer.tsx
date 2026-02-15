@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   ChevronDown,
@@ -15,6 +15,7 @@ import {
   CalendarClock,
   Network,
   Link2,
+  UserRound,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,7 @@ import {
   type DbOkrObjective,
   type DbStrategyObjective,
 } from "@/lib/okrDb";
+import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profilePublicDb";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 import { cn } from "@/lib/utils";
 
@@ -65,6 +67,36 @@ type Node =
   | { kind: "cycle"; id: `c:${string}`; cycleId: string }
   | { kind: "objective"; id: `o:${string}`; objectiveId: string }
   | { kind: "kr"; id: `kr:${string}`; krId: string };
+
+function parseListValue(v: string | null | undefined) {
+  if (!v?.trim()) return [];
+  return v
+    .split("\n")
+    .map((s) => s.trim())
+    .map((s) => s.replace(/^[-•]\s+/, ""))
+    .filter(Boolean);
+}
+
+function serializeListValue(items: string[]) {
+  return items
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
+  return (a + b).toUpperCase();
+}
+
+function hueFromId(id: string) {
+  // Deterministic hue (0..359)
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) % 360;
+  return h;
+}
 
 function nodeTitle(n: Node) {
   if (n.kind === "root") return "Mapa";
@@ -193,6 +225,7 @@ function StrategyLinker({
   cid,
   canEdit,
   objective,
+  fundamentals,
   strategy,
   objectivesInCycle,
   onSaved,
@@ -200,6 +233,7 @@ function StrategyLinker({
   cid: string;
   canEdit: boolean;
   objective: DbOkrObjective;
+  fundamentals: DbCompanyFundamentals | null;
   strategy: DbStrategyObjective[];
   objectivesInCycle: DbOkrObjective[];
   onSaved: () => Promise<void>;
@@ -212,12 +246,30 @@ function StrategyLinker({
     [objectivesInCycle, objective.id],
   );
 
+  const fundamentalOptions = useMemo(
+    () =>
+      [
+        { key: "PURPOSE", label: "Propósito", field: "purpose" as const },
+        { key: "VISION", label: "Visão", field: "vision" as const },
+        { key: "MISSION", label: "Missão", field: "mission" as const },
+        { key: "VALUES", label: "Valores", field: "values" as const },
+        { key: "CULTURE", label: "Cultura", field: "culture" as const },
+        { key: "NORTH", label: "Norte estratégico", field: "strategic_north" as const },
+      ] as const,
+    [],
+  );
+
+  const selectedFundamental = fundamentalOptions.find((o) => o.key === objective.linked_fundamental) ?? null;
+  const selectedFundamentalItems = selectedFundamental ? parseListValue((fundamentals as any)?.[selectedFundamental.field]) : [];
+
   return (
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Conexões</div>
-          <div className="mt-1 text-sm text-muted-foreground">Vincule este objetivo a um pai e/ou a uma estratégia da empresa.</div>
+          <div className="mt-1 text-sm text-muted-foreground">
+            Vincule este objetivo a um pai e/ou a uma estratégia da empresa (e também a um fundamento específico).
+          </div>
         </div>
         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
           <Link2 className="h-5 w-5" />
@@ -299,6 +351,84 @@ function StrategyLinker({
           </Select>
           <div className="text-[11px] text-muted-foreground">Mostra objetivos do mesmo ciclo (trimestre/ano).</div>
         </div>
+
+        <div className="grid gap-2">
+          <Label>Fundamento (missão/visão/valores etc.)</Label>
+          <Select
+            disabled={!canEdit || saving}
+            value={objective.linked_fundamental ?? "__none__"}
+            onValueChange={async (v) => {
+              setSaving(true);
+              try {
+                const next = v === "__none__" ? null : (v as DbOkrObjective["linked_fundamental"]);
+                await updateOkrObjective(objective.id, { linked_fundamental: next, linked_fundamental_text: null });
+                toast({ title: "Fundamento atualizado" });
+                await onSaved();
+              } catch (e) {
+                toast({
+                  title: "Não foi possível salvar",
+                  description: e instanceof Error ? e.message : "Erro inesperado.",
+                  variant: "destructive",
+                });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
+              <SelectValue placeholder="Selecione…" />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl">
+              <SelectItem value="__none__">Sem fundamento</SelectItem>
+              {fundamentalOptions.map((o) => (
+                <SelectItem key={o.key} value={o.key}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {objective.linked_fundamental ? (
+          <div className="grid gap-2">
+            <Label>Item do fundamento</Label>
+            <Select
+              disabled={!canEdit || saving}
+              value={objective.linked_fundamental_text ?? "__none__"}
+              onValueChange={async (v) => {
+                setSaving(true);
+                try {
+                  await updateOkrObjective(objective.id, { linked_fundamental_text: v === "__none__" ? null : v });
+                  toast({ title: "Item do fundamento atualizado" });
+                  await onSaved();
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível salvar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              <SelectTrigger className="h-11 rounded-2xl bg-white">
+                <SelectValue placeholder={selectedFundamentalItems.length ? "Selecione…" : "Sem itens cadastrados"} />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                <SelectItem value="__none__">Sem item</SelectItem>
+                {selectedFundamentalItems.map((it) => (
+                  <SelectItem key={it} value={it}>
+                    {it}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {!selectedFundamentalItems.length ? (
+              <div className="text-[11px] text-muted-foreground">Cadastre itens nesse fundamento para poder vincular.</div>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </Card>
   );
@@ -527,6 +657,7 @@ function DetailsBody({
           }}
           companyId={cid}
           strategy={strategy}
+          fundamentals={fundamentals}
         />
       ) : null}
 
@@ -1097,15 +1228,24 @@ function FundamentalEditor({
   onSaved: () => Promise<void>;
 }) {
   const { toast } = useToast();
-  const [value, setValue] = useState<string>(() => String((fundamentals as any)?.[field] ?? ""));
+  const [items, setItems] = useState<string[]>(() => parseListValue(String((fundamentals as any)?.[field] ?? "")));
+  const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setItems(parseListValue(String((fundamentals as any)?.[field] ?? "")));
+    setDraft("");
+    setSaving(false);
+  }, [field, fundamentals?.updated_at]);
+
+  const label = nodeTitle({ kind: "fundamental", id: `fund:${field}` as any, field });
 
   return (
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{nodeTitle({ kind: "fundamental", id: `fund:${field}` as any, field })}</div>
-          <div className="mt-1 text-sm text-muted-foreground">Texto base (visível para todos no módulo OKR).</div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{label}</div>
+          <div className="mt-1 text-sm text-muted-foreground">Agora você adiciona itens (em vez de um texto corrido).</div>
         </div>
         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
           <Route className="h-5 w-5" />
@@ -1114,9 +1254,67 @@ function FundamentalEditor({
 
       <Separator className="my-4" />
 
-      <div className="grid gap-2">
-        <Label>Conteúdo</Label>
-        <Textarea className="min-h-[140px] rounded-2xl" value={value} onChange={(e) => setValue(e.target.value)} disabled={!canEdit || saving} />
+      <div className="grid gap-3">
+        <div className="grid gap-2">
+          <Label>Itens</Label>
+          {items.length ? (
+            <div className="grid gap-2">
+              {items.map((it, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input
+                    className="h-11 rounded-2xl"
+                    value={it}
+                    disabled={!canEdit || saving}
+                    onChange={(e) => {
+                      const next = e.target.value;
+                      setItems((prev) => prev.map((p, i) => (i === idx ? next : p)));
+                    }}
+                  />
+                  {canEdit ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-2xl bg-white"
+                      disabled={saving}
+                      onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                      title="Remover"
+                    >
+                      Remover
+                    </Button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum item ainda.</div>
+          )}
+        </div>
+
+        <div className="grid gap-2">
+          <Label>Adicionar novo</Label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              className="h-11 rounded-2xl"
+              value={draft}
+              disabled={!canEdit || saving}
+              onChange={(e) => setDraft(e.target.value)}
+              placeholder={`Digite e clique em "Adicionar"`}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-2xl bg-white"
+              disabled={!canEdit || saving || draft.trim().length < 2}
+              onClick={() => {
+                const v = draft.trim();
+                setItems((prev) => [...prev, v]);
+                setDraft("");
+              }}
+            >
+              Adicionar
+            </Button>
+          </div>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1130,7 +1328,7 @@ function FundamentalEditor({
             onClick={async () => {
               setSaving(true);
               try {
-                await upsertCompanyFundamentals(cid, { [field]: value } as any);
+                await upsertCompanyFundamentals(cid, { [field]: serializeListValue(items) } as any);
                 await onSaved();
               } catch (e) {
                 toast({
@@ -1165,6 +1363,12 @@ function StrategyObjectiveEditor({
   const [title, setTitle] = useState(so?.title ?? "");
   const [description, setDescription] = useState(so?.description ?? "");
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setTitle(so?.title ?? "");
+    setDescription(so?.description ?? "");
+    setSaving(false);
+  }, [so?.id]);
 
   if (!so) {
     return (
@@ -1238,6 +1442,7 @@ function ObjectiveEditor({
   onSaved,
   companyId,
   strategy,
+  fundamentals,
 }: {
   canEdit: boolean;
   objective: DbOkrObjective | null;
@@ -1247,6 +1452,7 @@ function ObjectiveEditor({
   onSaved: () => Promise<void>;
   companyId: string;
   strategy: DbStrategyObjective[];
+  fundamentals: DbCompanyFundamentals | null;
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -1255,6 +1461,14 @@ function ObjectiveEditor({
   const [title, setTitle] = useState(objective?.title ?? "");
   const [description, setDescription] = useState(objective?.description ?? "");
   const [reason, setReason] = useState(objective?.strategic_reason ?? "");
+
+  useEffect(() => {
+    setEditing(false);
+    setSaving(false);
+    setTitle(objective?.title ?? "");
+    setDescription(objective?.description ?? "");
+    setReason(objective?.strategic_reason ?? "");
+  }, [objective?.id]);
 
   const qCycleObjectives = useQuery({
     queryKey: ["okr-cycle-objectives", companyId, objective?.cycle_id ?? null],
@@ -1360,6 +1574,7 @@ function ObjectiveEditor({
         cid={companyId}
         canEdit={canEditThis}
         objective={objective}
+        fundamentals={fundamentals}
         strategy={strategy}
         objectivesInCycle={qCycleObjectives.data ?? []}
         onSaved={onSaved}
@@ -1415,6 +1630,9 @@ type TreeItem = {
   pick?: Node;
   activeKey?: NodeId;
   href?: string;
+  owner_user_id?: string | null;
+  accent_hue?: number;
+  accent_depth?: number;
 };
 
 function toneClass(t: TreeItem["tone"]) {
@@ -1428,30 +1646,67 @@ function TreeNodeCard({
   item,
   active,
   onPick,
+  peopleById,
 }: {
   item: TreeItem;
   active: boolean;
   onPick: (n: Node) => void;
+  peopleById: Map<string, DbProfilePublic>;
 }) {
+  const person = item.owner_user_id ? peopleById.get(item.owner_user_id) ?? null : null;
+
+  const accentHue = typeof item.accent_hue === "number" ? item.accent_hue : null;
+  const accentDepth = item.accent_depth ?? 0;
+  const accentLightness = accentHue == null ? null : Math.max(42, Math.min(72, 46 + accentDepth * 10));
+  const accent = accentHue == null ? null : `hsl(${accentHue} 70% ${accentLightness}%)`;
+  const accentSoft = accentHue == null ? null : `hsl(${accentHue} 70% 97%)`;
+
   const shell = (
     <div
       className={cn(
-        "min-w-[210px] max-w-[260px] rounded-3xl border bg-white px-4 py-3 text-left shadow-sm transition",
+        "relative min-w-[220px] max-w-[280px] overflow-hidden rounded-3xl border bg-white px-4 py-3 text-left shadow-sm transition",
         active
           ? "border-[color:var(--sinaxys-primary)]/40 ring-2 ring-[color:var(--sinaxys-primary)]/15"
-          : "border-[color:var(--sinaxys-border)] hover:bg-[color:var(--sinaxys-tint)]/20",
+          : "border-[color:var(--sinaxys-border)] hover:bg-[color:var(--sinaxys-tint)]/10",
       )}
+      style={
+        accent
+          ? {
+              borderColor: active ? undefined : `color-mix(in srgb, ${accent} 28%, var(--sinaxys-border))`,
+              backgroundColor: accentSoft,
+            }
+          : undefined
+      }
     >
+      {accent ? <div className="absolute left-0 top-0 h-full w-1.5" style={{ background: accent }} /> : null}
+
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{item.title}</div>
           {item.subtitle ? <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{item.subtitle}</div> : null}
         </div>
-        {item.pill ? (
-          <span className={cn("shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ring-1", toneClass(item.tone))}>
-            {item.pill}
-          </span>
-        ) : null}
+
+        <div className="flex items-center gap-2">
+          {person ? (
+            <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-2xl border bg-white" style={accent ? { borderColor: accent } : undefined}>
+              {person.avatar_url ? (
+                <img src={person.avatar_url} alt={person.name} className="h-full w-full object-cover" />
+              ) : (
+                <span className="text-xs font-bold text-[color:var(--sinaxys-ink)]">{initials(person.name)}</span>
+              )}
+            </div>
+          ) : item.kind === "objective" || item.kind === "kr" ? (
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-white text-[color:var(--sinaxys-primary)]">
+              <UserRound className="h-4 w-4" />
+            </div>
+          ) : null}
+
+          {item.pill ? (
+            <span className={cn("shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ring-1", accent ? "bg-white text-[color:var(--sinaxys-ink)]" : toneClass(item.tone))}>
+              {item.pill}
+            </span>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -1481,6 +1736,7 @@ function OkrMapTreeCanvas({
   activeId,
   onPick,
   objectiveById,
+  peopleById,
 }: {
   cid: string;
   fundamentals: DbCompanyFundamentals | null;
@@ -1489,6 +1745,7 @@ function OkrMapTreeCanvas({
   activeId: NodeId;
   onPick: (n: Node) => void;
   objectiveById: Map<string, DbOkrObjective>;
+  peopleById: Map<string, DbProfilePublic>;
 }) {
   const cycleGroups = useMemo(() => {
     const annual = cycles.filter((c) => c.type === "ANNUAL").sort((a, b) => b.year - a.year);
@@ -1557,10 +1814,7 @@ function OkrMapTreeCanvas({
         data: {
           kind: "fundamental",
           title: f.label,
-          subtitle:
-            typeof (fundamentals as any)?.[f.field] === "string" && String((fundamentals as any)[f.field]).trim().length
-              ? String((fundamentals as any)[f.field]).trim()
-              : "—",
+          subtitle: parseListValue(String((fundamentals as any)?.[f.field] ?? "")).slice(0, 2).join(" • ") || "—",
           tone: "fund",
           pick: { kind: "fundamental", id: `fund:${f.field}` as any, field: f.field },
           activeKey: `fund:${f.field}` as any,
@@ -1595,55 +1849,115 @@ function OkrMapTreeCanvas({
       })),
     };
 
-    const cycleNodes = (list: DbOkrCycle[]): OrgNode<TreeItem>[] => {
-      return list.map((c) => {
-        const objs = data?.objectivesByCycle?.[c.id] ?? [];
-        const objectiveChildren: OrgNode<TreeItem>[] = objs.map((o) => {
-          const krs = data?.krsByObjective?.[o.id] ?? [];
-          const pct = averageObjectivePct(krs);
-          const krChildren: OrgNode<TreeItem>[] = krs.slice(0, 5).map((kr) => ({
-            id: `kr:${kr.id}`,
-            data: {
-              kind: "kr",
-              title: kr.title,
-              subtitle: kr.kind === "METRIC" ? `${kr.current_value ?? "—"} → ${kr.target_value ?? "—"} ${kr.metric_unit ?? ""}` : "Entregável",
-              pill: typeof krProgressPct(kr) === "number" ? `${krProgressPct(kr)}%` : "—",
-              tone: "objective",
-              pick: { kind: "objective", id: `o:${o.id}`, objectiveId: o.id },
-              activeKey: `o:${o.id}`,
-            },
-            children: [],
-          }));
+    const buildObjectiveForest = (objs: DbOkrObjective[]) => {
+      const byId = new Map(objs.map((o) => [o.id, o] as const));
+      const childrenByParent = new Map<string, DbOkrObjective[]>();
+      const roots: DbOkrObjective[] = [];
 
-          if (krs.length > 5) {
-            krChildren.push({
-              id: `kr-more:${o.id}`,
-              data: {
-                kind: "kr",
-                title: `Ver todos os KRs (${krs.length})`,
-                subtitle: "Abrir o objetivo",
-                pill: "Abrir",
-                tone: "objective",
-                href: `/okr/objetivos/${o.id}`,
-              },
-              children: [],
-            });
-          }
+      for (const o of objs) {
+        if (o.parent_objective_id && byId.has(o.parent_objective_id)) {
+          const arr = childrenByParent.get(o.parent_objective_id) ?? [];
+          arr.push(o);
+          childrenByParent.set(o.parent_objective_id, arr);
+        } else {
+          roots.push(o);
+        }
+      }
 
+      const seen = new Set<string>();
+      const make = (o: DbOkrObjective, rootHue: number, depth: number): OrgNode<TreeItem> => {
+        // protect against cycles
+        if (seen.has(o.id)) {
           return {
             id: `o:${o.id}`,
             data: {
               kind: "objective",
               title: o.title,
               subtitle: `${objectiveTypeLabel(o.level)} • ${objectiveLevelLabel(o.level)}`,
-              pill: typeof pct === "number" ? `${pct}%` : "—",
+              pill: "—",
               tone: "objective",
               pick: { kind: "objective", id: `o:${o.id}`, objectiveId: o.id },
               activeKey: `o:${o.id}`,
+              owner_user_id: o.owner_user_id,
+              accent_hue: rootHue,
+              accent_depth: depth,
             },
-            children: krChildren,
+            children: [],
           };
-        });
+        }
+        seen.add(o.id);
+
+        const krs = data?.krsByObjective?.[o.id] ?? [];
+        const pct = averageObjectivePct(krs);
+
+        const krChildren: OrgNode<TreeItem>[] = krs.slice(0, 5).map((kr) => ({
+          id: `kr:${kr.id}`,
+          data: {
+            kind: "kr",
+            title: kr.title,
+            subtitle: kr.kind === "METRIC" ? `${kr.current_value ?? "—"} → ${kr.target_value ?? "—"} ${kr.metric_unit ?? ""}` : "Entregável",
+            pill: typeof krProgressPct(kr) === "number" ? `${krProgressPct(kr)}%` : "—",
+            tone: "objective",
+            pick: { kind: "objective", id: `o:${o.id}`, objectiveId: o.id },
+            activeKey: `o:${o.id}`,
+            owner_user_id: (kr as any).owner_user_id ?? o.owner_user_id,
+            accent_hue: rootHue,
+            accent_depth: depth + 1,
+          },
+          children: [],
+        }));
+
+        if (krs.length > 5) {
+          krChildren.push({
+            id: `kr-more:${o.id}`,
+            data: {
+              kind: "kr",
+              title: `Ver todos os KRs (${krs.length})`,
+              subtitle: "Abrir o objetivo",
+              pill: "Abrir",
+              tone: "objective",
+              href: `/okr/objetivos/${o.id}`,
+              owner_user_id: o.owner_user_id,
+              accent_hue: rootHue,
+              accent_depth: depth + 1,
+            },
+            children: [],
+          });
+        }
+
+        const kids = (childrenByParent.get(o.id) ?? [])
+          .slice()
+          .sort((a, b) => a.title.localeCompare(b.title))
+          .map((child) => make(child, rootHue, depth + 1));
+
+        return {
+          id: `o:${o.id}`,
+          data: {
+            kind: "objective",
+            title: o.title,
+            subtitle: `${objectiveTypeLabel(o.level)} • ${objectiveLevelLabel(o.level)}`,
+            pill: typeof pct === "number" ? `${pct}%` : "—",
+            tone: "objective",
+            pick: { kind: "objective", id: `o:${o.id}`, objectiveId: o.id },
+            activeKey: `o:${o.id}`,
+            owner_user_id: o.owner_user_id,
+            accent_hue: rootHue,
+            accent_depth: depth,
+          },
+          children: [...kids, ...krChildren],
+        };
+      };
+
+      return roots
+        .slice()
+        .sort((a, b) => a.title.localeCompare(b.title))
+        .map((r) => make(r, hueFromId(r.id), 0));
+    };
+
+    const cycleNodes = (list: DbOkrCycle[]): OrgNode<TreeItem>[] => {
+      return list.map((c) => {
+        const objs = data?.objectivesByCycle?.[c.id] ?? [];
+        const objectiveChildren = buildObjectiveForest(objs);
 
         return {
           id: `c:${c.id}`,
@@ -1704,7 +2018,7 @@ function OkrMapTreeCanvas({
     };
 
     return [fundamentalsNode, strategyNode, cyclesRoot];
-  }, [cycleGroups.annual, cycleGroups.quarterly, cycles.length, fundamentals, qTree.data, strategy, objectiveById]);
+  }, [cycleGroups.annual, cycleGroups.quarterly, cycles.length, fundamentals, qTree.data, strategy]);
 
   return (
     <div className="grid gap-4">
@@ -1712,7 +2026,9 @@ function OkrMapTreeCanvas({
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Árvore conectada (1 página)</div>
-            <div className="mt-1 text-sm text-muted-foreground">Estratégia → ciclos → objetivos → KRs. Clique em qualquer card para abrir detalhes.</div>
+            <div className="mt-1 text-sm text-muted-foreground">
+              Estratégia → ciclos → objetivos. Quando Tier I/Tier II estão vinculados, eles aparecem no mesmo espectro de cor.
+            </div>
           </div>
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
             <Network className="h-5 w-5" />
@@ -1727,9 +2043,7 @@ function OkrMapTreeCanvas({
       ) : (
         <OrgChartTreeCanvas
           roots={roots}
-          renderNode={(n) => (
-            <TreeNodeCard item={n.data} active={!!n.data.activeKey && n.data.activeKey === activeId} onPick={onPick} />
-          )}
+          renderNode={(n) => <TreeNodeCard item={n.data} active={!!n.data.activeKey && n.data.activeKey === activeId} onPick={onPick} peopleById={peopleById} />}
           className="[&_>div.relative]:h-[74vh]"
         />
       )}
@@ -1759,9 +2073,21 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
     queryFn: () => listOkrCycles(companyId),
   });
 
+  const qPeople = useQuery({
+    queryKey: ["profile_public", companyId],
+    queryFn: () => listPublicProfilesByCompany(companyId),
+    staleTime: 60_000,
+  });
+
   const fundamentals = qFundamentals.data ?? null;
   const strategy = qStrategy.data ?? [];
   const cycles = qCycles.data ?? [];
+
+  const peopleById = useMemo(() => {
+    const m = new Map<string, DbProfilePublic>();
+    for (const p of qPeople.data ?? []) m.set(p.id, p);
+    return m;
+  }, [qPeople.data]);
 
   const [selected, setSelected] = useState<Node>({ kind: "fundamentals", id: "fundamentals" });
 
@@ -1858,8 +2184,7 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
                 <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 text-sm text-muted-foreground">
                   <div className="font-semibold text-[color:var(--sinaxys-ink)]">Nota</div>
                   <div className="mt-1">
-                    Hoje o sistema não possui um vínculo formal entre objetivos de longo prazo e OKRs do ano. O mapa mostra tudo em sequência e permite
-                    navegar/editar. Se você quiser, a gente adiciona um campo de vínculo (bem simples) para ficar 100% "conectado" por dado.
+                    Agora você já pode vincular objetivos a estratégia, fundamento e OKR pai — o mapa vai ficando cada vez mais "conectado".
                   </div>
                 </div>
               </div>
@@ -1876,6 +2201,7 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
             activeId={selected.id}
             onPick={(n) => pick(n)}
             objectiveById={objectiveById}
+            peopleById={peopleById}
           />
 
           {/* Desktop dialog details for tree mode */}

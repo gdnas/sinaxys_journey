@@ -1,29 +1,141 @@
-import { useMemo, useState } from "react";
-import { BookOpenText, Save } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BookOpenText, Save, Plus, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { getCompanyFundamentals, upsertCompanyFundamentals } from "@/lib/okrDb";
+import { getCompanyFundamentals, upsertCompanyFundamentals, type DbCompanyFundamentals } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 
+function parseListValue(v: string | null | undefined) {
+  if (!v?.trim()) return [];
+  return v
+    .split("\n")
+    .map((s) => s.trim())
+    .map((s) => s.replace(/^[-•]\s+/, ""))
+    .filter(Boolean);
+}
+
+function serializeListValue(items: string[]) {
+  return items
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
 function Block({ label, value }: { label: string; value?: string | null }) {
-  const v = value?.trim();
+  const items = useMemo(() => parseListValue(value), [value]);
+
   return (
     <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
       <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
-      {v ? (
-        <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">{v}</div>
+      {items.length ? (
+        <ul className="mt-3 grid gap-2">
+          {items.slice(0, 6).map((it) => (
+            <li key={it} className="flex items-start gap-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
+              <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sinaxys-primary)]/70" />
+              <span className="min-w-0">{it}</span>
+            </li>
+          ))}
+          {items.length > 6 ? <li className="text-xs text-muted-foreground">+{items.length - 6} itens</li> : null}
+        </ul>
       ) : (
         <div className="mt-2 text-sm text-muted-foreground">Ainda não definido.</div>
       )}
+    </div>
+  );
+}
+
+type FieldKey = "purpose" | "vision" | "mission" | "strategic_north" | "values" | "culture";
+
+function FieldEditor({
+  label,
+  items,
+  draft,
+  setDraft,
+  setItems,
+  disabled,
+}: {
+  label: string;
+  items: string[];
+  draft: string;
+  setDraft: (v: string) => void;
+  setItems: (fn: (prev: string[]) => string[]) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{label}</div>
+      <div className="mt-1 text-sm text-muted-foreground">Adicione itens (um por vez). Você pode reordenar apagando e inserindo de novo.</div>
+
+      <Separator className="my-4" />
+
+      <div className="grid gap-3">
+        {items.length ? (
+          <div className="grid gap-2">
+            {items.map((it, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <Input
+                  className="h-11 rounded-2xl"
+                  value={it}
+                  disabled={disabled}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setItems((prev) => prev.map((p, i) => (i === idx ? v : p)));
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-11 w-11 rounded-2xl bg-white"
+                  disabled={disabled}
+                  onClick={() => setItems((prev) => prev.filter((_, i) => i !== idx))}
+                  title="Remover"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum item ainda.</div>
+        )}
+
+        <div className="grid gap-2">
+          <Label>Adicionar</Label>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <Input
+              className="h-11 rounded-2xl"
+              value={draft}
+              disabled={disabled}
+              placeholder="Escreva um item…"
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 rounded-2xl bg-white"
+              disabled={disabled || draft.trim().length < 2}
+              onClick={() => {
+                const v = draft.trim();
+                setItems((prev) => [...prev, v]);
+                setDraft("");
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar
+            </Button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -50,31 +162,50 @@ export default function OkrFundamentals() {
   const [open, setOpen] = useState(false);
 
   const initial = useMemo(() => {
+    const f = fundamentals;
     return {
-      mission: fundamentals?.mission ?? "",
-      vision: fundamentals?.vision ?? "",
-      purpose: fundamentals?.purpose ?? "",
-      values: fundamentals?.values ?? "",
-      culture: fundamentals?.culture ?? "",
-      strategic_north: fundamentals?.strategic_north ?? "",
-    };
+      purpose: parseListValue(f?.purpose),
+      vision: parseListValue(f?.vision),
+      mission: parseListValue(f?.mission),
+      strategic_north: parseListValue(f?.strategic_north),
+      values: parseListValue(f?.values),
+      culture: parseListValue(f?.culture),
+    } satisfies Record<FieldKey, string[]>;
   }, [fundamentals]);
 
-  const [mission, setMission] = useState("");
-  const [vision, setVision] = useState("");
-  const [purpose, setPurpose] = useState("");
-  const [values, setValues] = useState("");
-  const [culture, setCulture] = useState("");
-  const [north, setNorth] = useState("");
+  const [items, setItems] = useState<Record<FieldKey, string[]>>({
+    purpose: [],
+    vision: [],
+    mission: [],
+    strategic_north: [],
+    values: [],
+    culture: [],
+  });
 
-  const syncFromInitial = () => {
-    setMission(initial.mission);
-    setVision(initial.vision);
-    setPurpose(initial.purpose);
-    setValues(initial.values);
-    setCulture(initial.culture);
-    setNorth(initial.strategic_north);
-  };
+  const [drafts, setDrafts] = useState<Record<FieldKey, string>>({
+    purpose: "",
+    vision: "",
+    mission: "",
+    strategic_north: "",
+    values: "",
+    culture: "",
+  });
+
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setItems(initial);
+    setDrafts({
+      purpose: "",
+      vision: "",
+      mission: "",
+      strategic_north: "",
+      values: "",
+      culture: "",
+    });
+    setSaving(false);
+  }, [open, initial]);
 
   const hasAny =
     !!fundamentals &&
@@ -101,16 +232,13 @@ export default function OkrFundamentals() {
     <div className="grid gap-6">
       <OkrPageHeader
         title="Fundamentos da empresa"
-        subtitle="Tudo começa aqui: missão, visão, propósito e norte estratégico. Cada OKR nasce conectado a esses fundamentos."
+        subtitle="Agora os fundamentos são compostos por itens — fica mais fácil conectar OKRs a uma frase específica."
         icon={<BookOpenText className="h-5 w-5" />}
         actions={
           canEdit ? (
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              onClick={() => {
-                syncFromInitial();
-                setOpen(true);
-              }}
+              onClick={() => setOpen(true)}
             >
               <Save className="mr-2 h-4 w-4" />
               Editar
@@ -154,78 +282,62 @@ export default function OkrFundamentals() {
         </div>
       </Card>
 
-      <Dialog
-        open={open}
-        onOpenChange={(v) => {
-          setOpen(v);
-          if (!v) syncFromInitial();
-        }}
-      >
-        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-hidden rounded-3xl sm:max-w-2xl">
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-hidden rounded-3xl sm:max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Editar fundamentos</DialogTitle>
+            <DialogTitle>Editar fundamentos (por itens)</DialogTitle>
           </DialogHeader>
 
           <ScrollArea className="-mx-1 max-h-[62vh] px-1">
             <div className="grid gap-4 pr-3">
-              <div className="grid gap-2">
-                <Label>Propósito</Label>
-                <Textarea
-                  value={purpose}
-                  onChange={(e) => setPurpose(e.target.value)}
-                  className="min-h-[88px] rounded-2xl"
-                  placeholder="Por que existimos? Qual impacto queremos no mundo?"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Visão</Label>
-                <Textarea
-                  value={vision}
-                  onChange={(e) => setVision(e.target.value)}
-                  className="min-h-[88px] rounded-2xl"
-                  placeholder="Como é o futuro quando a empresa vence?"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Missão</Label>
-                <Textarea
-                  value={mission}
-                  onChange={(e) => setMission(e.target.value)}
-                  className="min-h-[88px] rounded-2xl"
-                  placeholder="O que fazemos diariamente para chegar lá?"
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Norte estratégico</Label>
-                <Textarea
-                  value={north}
-                  onChange={(e) => setNorth(e.target.value)}
-                  className="min-h-[88px] rounded-2xl"
-                  placeholder="Uma frase ou princípio que orienta decisões difíceis."
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Valores</Label>
-                <Textarea
-                  value={values}
-                  onChange={(e) => setValues(e.target.value)}
-                  className="min-h-[88px] rounded-2xl"
-                  placeholder="O que não negociamos (em bullet points ou texto curto)."
-                />
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Cultura</Label>
-                <Textarea
-                  value={culture}
-                  onChange={(e) => setCulture(e.target.value)}
-                  className="min-h-[88px] rounded-2xl"
-                  placeholder="Como trabalhamos por aqui?"
-                />
-              </div>
+              <FieldEditor
+                label="Propósito"
+                items={items.purpose}
+                draft={drafts.purpose}
+                setDraft={(v) => setDrafts((p) => ({ ...p, purpose: v }))}
+                setItems={(fn) => setItems((p) => ({ ...p, purpose: fn(p.purpose) }))}
+                disabled={!canEdit || saving}
+              />
+              <FieldEditor
+                label="Visão"
+                items={items.vision}
+                draft={drafts.vision}
+                setDraft={(v) => setDrafts((p) => ({ ...p, vision: v }))}
+                setItems={(fn) => setItems((p) => ({ ...p, vision: fn(p.vision) }))}
+                disabled={!canEdit || saving}
+              />
+              <FieldEditor
+                label="Missão"
+                items={items.mission}
+                draft={drafts.mission}
+                setDraft={(v) => setDrafts((p) => ({ ...p, mission: v }))}
+                setItems={(fn) => setItems((p) => ({ ...p, mission: fn(p.mission) }))}
+                disabled={!canEdit || saving}
+              />
+              <FieldEditor
+                label="Norte estratégico"
+                items={items.strategic_north}
+                draft={drafts.strategic_north}
+                setDraft={(v) => setDrafts((p) => ({ ...p, strategic_north: v }))}
+                setItems={(fn) => setItems((p) => ({ ...p, strategic_north: fn(p.strategic_north) }))}
+                disabled={!canEdit || saving}
+              />
+              <FieldEditor
+                label="Valores"
+                items={items.values}
+                draft={drafts.values}
+                setDraft={(v) => setDrafts((p) => ({ ...p, values: v }))}
+                setItems={(fn) => setItems((p) => ({ ...p, values: fn(p.values) }))}
+                disabled={!canEdit || saving}
+              />
+              <FieldEditor
+                label="Cultura"
+                items={items.culture}
+                draft={drafts.culture}
+                setDraft={(v) => setDrafts((p) => ({ ...p, culture: v }))}
+                setItems={(fn) => setItems((p) => ({ ...p, culture: fn(p.culture) }))}
+                disabled={!canEdit || saving}
+              />
             </div>
           </ScrollArea>
 
@@ -235,16 +347,20 @@ export default function OkrFundamentals() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={!canEdit || saving}
               onClick={async () => {
+                setSaving(true);
                 try {
-                  await upsertCompanyFundamentals(cid, {
-                    mission,
-                    vision,
-                    purpose,
-                    values,
-                    culture,
-                    strategic_north: north,
-                  });
+                  const payload: Partial<DbCompanyFundamentals> = {
+                    purpose: serializeListValue(items.purpose),
+                    vision: serializeListValue(items.vision),
+                    mission: serializeListValue(items.mission),
+                    strategic_north: serializeListValue(items.strategic_north),
+                    values: serializeListValue(items.values),
+                    culture: serializeListValue(items.culture),
+                  };
+
+                  await upsertCompanyFundamentals(cid, payload);
                   await qc.invalidateQueries({ queryKey: ["okr-fundamentals", cid] });
                   toast({ title: "Fundamentos salvos" });
                   setOpen(false);
@@ -254,6 +370,8 @@ export default function OkrFundamentals() {
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
+                } finally {
+                  setSaving(false);
                 }
               }}
             >
