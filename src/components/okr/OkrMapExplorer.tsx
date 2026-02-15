@@ -14,6 +14,7 @@ import {
   Route,
   CalendarClock,
   Network,
+  Link2,
 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -29,6 +30,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import {
@@ -185,6 +187,121 @@ function averageObjectivePct(krs: DbOkrKeyResult[]) {
     .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   if (!pcts.length) return null;
   return Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+}
+
+function StrategyLinker({
+  cid,
+  canEdit,
+  objective,
+  strategy,
+  objectivesInCycle,
+  onSaved,
+}: {
+  cid: string;
+  canEdit: boolean;
+  objective: DbOkrObjective;
+  strategy: DbStrategyObjective[];
+  objectivesInCycle: DbOkrObjective[];
+  onSaved: () => Promise<void>;
+}) {
+  const { toast } = useToast();
+  const [saving, setSaving] = useState(false);
+
+  const otherObjectives = useMemo(
+    () => objectivesInCycle.filter((o) => o.id !== objective.id).sort((a, b) => a.title.localeCompare(b.title)),
+    [objectivesInCycle, objective.id],
+  );
+
+  return (
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Conexões</div>
+          <div className="mt-1 text-sm text-muted-foreground">Vincule este objetivo a um pai e/ou a uma estratégia da empresa.</div>
+        </div>
+        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+          <Link2 className="h-5 w-5" />
+        </div>
+      </div>
+
+      <Separator className="my-4" />
+
+      <div className="grid gap-4">
+        <div className="grid gap-2">
+          <Label>Estratégia (objetivo de longo prazo)</Label>
+          <Select
+            disabled={!canEdit || saving}
+            value={objective.strategy_objective_id ?? "__none__"}
+            onValueChange={async (v) => {
+              setSaving(true);
+              try {
+                await updateOkrObjective(objective.id, { strategy_objective_id: v === "__none__" ? null : v });
+                toast({ title: "Vínculo com estratégia atualizado" });
+                await onSaved();
+              } catch (e) {
+                toast({
+                  title: "Não foi possível salvar",
+                  description: e instanceof Error ? e.message : "Erro inesperado.",
+                  variant: "destructive",
+                });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
+              <SelectValue placeholder="Selecione…" />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl">
+              <SelectItem value="__none__">Sem vínculo</SelectItem>
+              {strategy.map((so) => (
+                <SelectItem key={so.id} value={so.id}>
+                  {so.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="grid gap-2">
+          <Label>OKR pai (objetivo pai)</Label>
+          <Select
+            disabled={!canEdit || saving}
+            value={objective.parent_objective_id ?? "__none__"}
+            onValueChange={async (v) => {
+              setSaving(true);
+              try {
+                await updateOkrObjective(objective.id, { parent_objective_id: v === "__none__" ? null : v });
+                toast({ title: "OKR pai atualizado" });
+                await onSaved();
+              } catch (e) {
+                toast({
+                  title: "Não foi possível salvar",
+                  description: e instanceof Error ? e.message : "Erro inesperado.",
+                  variant: "destructive",
+                });
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <SelectTrigger className="h-11 rounded-2xl bg-white">
+              <SelectValue placeholder="Selecione…" />
+            </SelectTrigger>
+            <SelectContent className="rounded-2xl">
+              <SelectItem value="__none__">Sem pai</SelectItem>
+              {otherObjectives.map((o) => (
+                <SelectItem key={o.id} value={o.id}>
+                  {o.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <div className="text-[11px] text-muted-foreground">Mostra objetivos do mesmo ciclo (trimestre/ano).</div>
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 function KrInlineEditor({ kr, canEdit, onSaved }: { kr: DbOkrKeyResult; canEdit: boolean; onSaved: () => void }) {
@@ -404,9 +521,12 @@ function DetailsBody({
               qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid] }),
               qc.invalidateQueries({ queryKey: ["okr-objectives", cid] }),
               qc.invalidateQueries({ queryKey: ["okr-krs", node.objectiveId] }),
+              qc.invalidateQueries({ queryKey: ["okr-cycle-objectives", cid] }),
             ]);
             await onInvalidate();
           }}
+          companyId={cid}
+          strategy={strategy}
         />
       ) : null}
 
@@ -1116,6 +1236,8 @@ function ObjectiveEditor({
   krs,
   loadingKrs,
   onSaved,
+  companyId,
+  strategy,
 }: {
   canEdit: boolean;
   objective: DbOkrObjective | null;
@@ -1123,6 +1245,8 @@ function ObjectiveEditor({
   krs: DbOkrKeyResult[];
   loadingKrs: boolean;
   onSaved: () => Promise<void>;
+  companyId: string;
+  strategy: DbStrategyObjective[];
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -1131,6 +1255,13 @@ function ObjectiveEditor({
   const [title, setTitle] = useState(objective?.title ?? "");
   const [description, setDescription] = useState(objective?.description ?? "");
   const [reason, setReason] = useState(objective?.strategic_reason ?? "");
+
+  const qCycleObjectives = useQuery({
+    queryKey: ["okr-cycle-objectives", companyId, objective?.cycle_id ?? null],
+    enabled: !!objective?.cycle_id,
+    queryFn: async () => listOkrObjectives(companyId, (objective as any).cycle_id),
+    staleTime: 15_000,
+  });
 
   if (!objective) {
     return (
@@ -1158,12 +1289,7 @@ function ObjectiveEditor({
               <Link to={`/okr/objetivos/${objective.id}`}>Abrir</Link>
             </Button>
             {canEditThis ? (
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 rounded-xl bg-white"
-                onClick={() => setEditing((v) => !v)}
-              >
+              <Button type="button" variant="outline" className="h-10 rounded-xl bg-white" onClick={() => setEditing((v) => !v)}>
                 <Edit3 className="mr-2 h-4 w-4" />
                 {editing ? "Fechar" : "Editar"}
               </Button>
@@ -1229,6 +1355,15 @@ function ObjectiveEditor({
           </div>
         ) : null}
       </Card>
+
+      <StrategyLinker
+        cid={companyId}
+        canEdit={canEditThis}
+        objective={objective}
+        strategy={strategy}
+        objectivesInCycle={qCycleObjectives.data ?? []}
+        onSaved={onSaved}
+      />
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
         <div className="flex items-start justify-between gap-4">
