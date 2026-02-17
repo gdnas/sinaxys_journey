@@ -29,7 +29,6 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -2194,13 +2193,11 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
   const [sheetOpen, setSheetOpen] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const [view, setView] = useState<"list" | "tree">("list");
-
   const pick = (n: Node) => {
     setSelected(n);
     if (isMobile) {
       setSheetOpen(true);
-    } else if (view === "tree") {
+    } else {
       setDialogOpen(true);
     }
   };
@@ -2215,51 +2212,27 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
 
   return (
     <>
-      <Tabs value={view} onValueChange={(v) => setView(v as any)} className="w-full">
-        <TabsList className="w-full justify-start gap-1 overflow-x-auto rounded-2xl bg-[color:var(--sinaxys-tint)] p-1">
-          <TabsTrigger value="list" className="shrink-0 rounded-xl data-[state=active]:bg-white">
-            Lista
-          </TabsTrigger>
-          <TabsTrigger value="tree" className="shrink-0 rounded-xl data-[state=active]:bg-white">
-            Árvore
-          </TabsTrigger>
-        </TabsList>
+      <OkrMapTreeCanvas
+        cid={companyId}
+        fundamentals={fundamentals}
+        strategy={strategy}
+        cycles={cycles}
+        activeId={selected.id}
+        onPick={(n) => pick(n)}
+        objectiveById={objectiveById}
+        peopleById={peopleById}
+        canEdit={canEdit}
+      />
 
-        <TabsContent value="list" className="mt-5">
-          <div className="grid gap-6 lg:h-[calc(100vh-220px)] lg:grid-cols-[420px_1fr] lg:overflow-hidden">
-            <div className="grid gap-4 lg:overflow-hidden">
-              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão conectada</div>
-                    <div className="mt-1 text-sm text-muted-foreground">Selecione na esquerda. Edite à direita (painel fixo).</div>
-                  </div>
-                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                    <ListTree className="h-5 w-5" />
-                  </div>
-                </div>
-              </div>
-
-              <ScrollArea className="lg:h-[calc(100vh-320px)]">
-                <div className="grid gap-4 pr-3">
-                  <ListView fundamentals={fundamentals} strategy={strategy} cycles={cycles} onPick={(n) => pick(n)} />
-
-                  {(qFundamentals.isLoading || qStrategy.isLoading || qCycles.isLoading) && (
-                    <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5 text-sm text-muted-foreground">Carregando dados…</div>
-                  )}
-
-                  {(qFundamentals.error || qStrategy.error || qCycles.error) && (
-                    <div className="rounded-3xl border border-destructive/30 bg-white p-5 text-sm text-destructive">
-                      Não foi possível carregar o mapa. {String((qFundamentals.error ?? qStrategy.error ?? qCycles.error) as any)}
-                    </div>
-                  )}
-                </div>
-              </ScrollArea>
-            </div>
-
-            {/* Desktop details (sticky) */}
-            <div className="hidden lg:block lg:h-[calc(100vh-220px)]">
-              <DetailsShell
+      {/* Desktop dialog details (tree mode) */}
+      <div className="hidden lg:block">
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-hidden rounded-3xl p-0 sm:max-w-2xl">
+            <DialogHeader className="border-b border-[color:var(--sinaxys-border)] p-5">
+              <DialogTitle className="text-[color:var(--sinaxys-ink)]">Detalhes</DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="h-[calc(88vh-76px)] p-5">
+              <DetailsBody
                 node={selected}
                 cid={companyId}
                 canEdit={!!canEdit}
@@ -2272,52 +2245,12 @@ export function OkrMapExplorer({ companyId }: { companyId: string }) {
                 onSelect={pick}
                 people={qPeople.data ?? []}
               />
-            </div>
-          </div>
-        </TabsContent>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      </div>
 
-        <TabsContent value="tree" className="mt-5">
-          <OkrMapTreeCanvas
-            cid={companyId}
-            fundamentals={fundamentals}
-            strategy={strategy}
-            cycles={cycles}
-            activeId={selected.id}
-            onPick={(n) => pick(n)}
-            objectiveById={objectiveById}
-            peopleById={peopleById}
-            canEdit={canEdit}
-          />
-
-          {/* Desktop dialog details for tree mode */}
-          <div className="hidden lg:block">
-            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-              <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-hidden rounded-3xl p-0 sm:max-w-2xl">
-                <DialogHeader className="border-b border-[color:var(--sinaxys-border)] p-5">
-                  <DialogTitle className="text-[color:var(--sinaxys-ink)]">Detalhes</DialogTitle>
-                </DialogHeader>
-                <ScrollArea className="h-[calc(88vh-76px)] p-5">
-                  <DetailsBody
-                    node={selected}
-                    cid={companyId}
-                    canEdit={!!canEdit}
-                    fundamentals={fundamentals}
-                    strategy={strategy}
-                    cycles={cycles}
-                    objectiveById={objectiveById}
-                    cycleById={cycleById}
-                    onInvalidate={onInvalidate}
-                    onSelect={pick}
-                    people={qPeople.data ?? []}
-                  />
-                </ScrollArea>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </TabsContent>
-      </Tabs>
-
-      {/* Mobile details sheet (list + tree) */}
+      {/* Mobile details sheet */}
       <div className="lg:hidden">
         <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
           <SheetContent side="bottom" className="h-[88vh] w-full rounded-t-3xl p-0">
