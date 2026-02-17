@@ -303,7 +303,7 @@ function Row(
                     color: tone.ink,
                     borderColor: tone.border,
                 }}
-                className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl border">
+                className="mt-0.5 grid h-8 min-w-8 shrink-0 place-items-center rounded-xl border px-2">
                 {icon}
             </span>
 
@@ -1331,6 +1331,15 @@ function Tree(
         cycles: DbOkrCycle[];
     }
 ) {
+    const cycleCode = (c: DbOkrCycle) => {
+        const yy = String(c.year).slice(-2);
+        if (c.type === "QUARTERLY")
+            return `y${yy}Q${c.quarter ?? "?"}`;
+        return `y${yy}`;
+    };
+
+    const objectiveCode = (c: DbOkrCycle, idx: number) => `${cycleCode(c)}O${idx + 1}`;
+
     const cycleGroups = useMemo(() => {
         const annual = cycles.filter(c => c.type === "ANNUAL").sort((a, b) => b.year - a.year);
         const quarterly = cycles.filter(c => c.type === "QUARTERLY").sort((a, b) => (b.year - a.year) || ((b.quarter ?? 0) - (a.quarter ?? 0)));
@@ -1625,7 +1634,7 @@ function Tree(
                                                 active={ctx.activeId === `c:${c.id}`}
                                                 expanded={open}
                                                 canExpand
-                                                icon={<CalendarClock className="h-4 w-4" />}
+                                                icon={<span className="text-[11px] font-bold tracking-tight">{cycleCode(c)}</span>}
                                                 title={cycleLabel(c)}
                                                 subtitle={c.status}
                                                 onToggle={() => ctx.toggle(`c:${c.id}`)}
@@ -1636,7 +1645,7 @@ function Tree(
                                             {open ? (
                                                 <div className="grid gap-2 pl-3">
                                                     {objs.length ? (
-                                                        objs.map(o => {
+                                                        objs.map((o, idx) => {
                                                             const openObjective = !!ctx.expanded[`o:${o.id}`];
                                                             const krs = krsByObjective.get(o.id) ?? [];
 
@@ -1647,10 +1656,11 @@ function Tree(
                                                                         active={ctx.activeId === `o:${o.id}`}
                                                                         expanded={openObjective}
                                                                         canExpand
-                                                                        icon={<Target className="h-4 w-4" />}
+                                                                        icon={<span className="font-mono text-[10px] font-semibold tracking-tight">{objectiveCode(c, idx)}</span>}
                                                                         title={o.title}
                                                                         subtitle={
-                                                                            <span className="inline-flex items-center gap-2">
+                                                                            <span className="inline-flex flex-wrap items-center gap-2">
+                                                                                <Target className="h-3.5 w-3.5" />
                                                                                 <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
                                                                                 <span>•</span>
                                                                                 <span>{objectiveLevelLabel(o.level)}</span>
@@ -1669,43 +1679,45 @@ function Tree(
                                                                     />
 
                                                                     {openObjective ? (
-                                                                        <div className="grid gap-2 pl-3">
-                                                                            {qKrsByObjective.isLoading ? (
-                                                                                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
-                                                                                    Carregando resultados-chave…
-                                                                                </div>
-                                                                            ) : krs.length ? (
-                                                                                krs.map(kr => {
-                                                                                    const pct = krProgressPct(kr);
-                                                                                    const kindLabel = kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico";
-                                                                                    const pctLabel = typeof pct === "number" ? `${pct}%` : "—";
+                                                                        <div className="rounded-2xl border border-[color:var(--map-objectives-border)] bg-[color:var(--map-objectives-bg)]/30 p-3">
+                                                                            <div className="grid gap-2">
+                                                                                {qKrsByObjective.isLoading ? (
+                                                                                    <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
+                                                                                        Carregando resultados-chave…
+                                                                                    </div>
+                                                                                ) : krs.length ? (
+                                                                                    krs.map(kr => {
+                                                                                        const pct = krProgressPct(kr);
+                                                                                        const kindLabel = kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico";
+                                                                                        const pctLabel = typeof pct === "number" ? `${pct}%` : "—";
 
-                                                                                    return (
-                                                                                        <Row
-                                                                                            key={kr.id}
-                                                                                            depth={3}
-                                                                                            active={false}
-                                                                                            expanded={false}
-                                                                                            canExpand={false}
-                                                                                            icon={kr.kind === "DELIVERABLE" ? <BadgeCheck className="h-4 w-4" /> : <Goal className="h-4 w-4" />}
-                                                                                            title={kr.title}
-                                                                                            subtitle={`${kindLabel} • ${pctLabel}`}
-                                                                                            onClick={() =>
-                                                                                                ctx.select({
-                                                                                                    kind: "objective",
-                                                                                                    id: `o:${o.id}`,
-                                                                                                    objectiveId: o.id,
-                                                                                                })
-                                                                                            }
-                                                                                            toneKind="kr"
-                                                                                        />
-                                                                                    );
-                                                                                })
-                                                                            ) : (
-                                                                                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
-                                                                                    Sem resultados-chave.
-                                                                                </div>
-                                                                            )}
+                                                                                        return (
+                                                                                            <Row
+                                                                                                key={kr.id}
+                                                                                                depth={3}
+                                                                                                active={false}
+                                                                                                expanded={false}
+                                                                                                canExpand={false}
+                                                                                                icon={<span className="font-mono text-[10px] font-semibold">KR</span>}
+                                                                                                title={kr.title}
+                                                                                                subtitle={`${kindLabel} • ${pctLabel}`}
+                                                                                                onClick={() =>
+                                                                                                    ctx.select({
+                                                                                                        kind: "objective",
+                                                                                                        id: `o:${o.id}`,
+                                                                                                        objectiveId: o.id,
+                                                                                                    })
+                                                                                                }
+                                                                                                toneKind="kr"
+                                                                                            />
+                                                                                        );
+                                                                                    })
+                                                                                ) : (
+                                                                                    <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
+                                                                                        Sem resultados-chave.
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                     ) : null}
                                                                 </div>
@@ -1747,7 +1759,7 @@ function Tree(
                                                 active={ctx.activeId === `c:${c.id}`}
                                                 expanded={open}
                                                 canExpand
-                                                icon={<CalendarClock className="h-4 w-4" />}
+                                                icon={<span className="text-[11px] font-bold tracking-tight">{cycleCode(c)}</span>}
                                                 title={cycleLabel(c)}
                                                 subtitle={c.status}
                                                 onToggle={() => ctx.toggle(`c:${c.id}`)}
@@ -1758,7 +1770,7 @@ function Tree(
                                             {open ? (
                                                 <div className="grid gap-2 pl-3">
                                                     {objs.length ? (
-                                                        objs.map(o => {
+                                                        objs.map((o, idx) => {
                                                             const openObjective = !!ctx.expanded[`o:${o.id}`];
                                                             const krs = krsByObjective.get(o.id) ?? [];
 
@@ -1769,10 +1781,11 @@ function Tree(
                                                                         active={ctx.activeId === `o:${o.id}`}
                                                                         expanded={openObjective}
                                                                         canExpand
-                                                                        icon={<CircleDot className="h-4 w-4" />}
+                                                                        icon={<span className="font-mono text-[10px] font-semibold tracking-tight">{objectiveCode(c, idx)}</span>}
                                                                         title={o.title}
                                                                         subtitle={
-                                                                            <span className="inline-flex items-center gap-2">
+                                                                            <span className="inline-flex flex-wrap items-center gap-2">
+                                                                                <CircleDot className="h-3.5 w-3.5" />
                                                                                 <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
                                                                                 <span>•</span>
                                                                                 <span>{objectiveLevelLabel(o.level)}</span>
@@ -1791,43 +1804,45 @@ function Tree(
                                                                     />
 
                                                                     {openObjective ? (
-                                                                        <div className="grid gap-2 pl-3">
-                                                                            {qKrsByObjective.isLoading ? (
-                                                                                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
-                                                                                    Carregando resultados-chave…
-                                                                                </div>
-                                                                            ) : krs.length ? (
-                                                                                krs.map(kr => {
-                                                                                    const pct = krProgressPct(kr);
-                                                                                    const kindLabel = kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico";
-                                                                                    const pctLabel = typeof pct === "number" ? `${pct}%` : "—";
+                                                                        <div className="rounded-2xl border border-[color:var(--map-objectives-border)] bg-[color:var(--map-objectives-bg)]/30 p-3">
+                                                                            <div className="grid gap-2">
+                                                                                {qKrsByObjective.isLoading ? (
+                                                                                    <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
+                                                                                        Carregando resultados-chave…
+                                                                                    </div>
+                                                                                ) : krs.length ? (
+                                                                                    krs.map(kr => {
+                                                                                        const pct = krProgressPct(kr);
+                                                                                        const kindLabel = kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico";
+                                                                                        const pctLabel = typeof pct === "number" ? `${pct}%` : "—";
 
-                                                                                    return (
-                                                                                        <Row
-                                                                                            key={kr.id}
-                                                                                            depth={3}
-                                                                                            active={false}
-                                                                                            expanded={false}
-                                                                                            canExpand={false}
-                                                                                            icon={kr.kind === "DELIVERABLE" ? <BadgeCheck className="h-4 w-4" /> : <Goal className="h-4 w-4" />}
-                                                                                            title={kr.title}
-                                                                                            subtitle={`${kindLabel} • ${pctLabel}`}
-                                                                                            onClick={() =>
-                                                                                                ctx.select({
-                                                                                                    kind: "objective",
-                                                                                                    id: `o:${o.id}`,
-                                                                                                    objectiveId: o.id,
-                                                                                                })
-                                                                                            }
-                                                                                            toneKind="kr"
-                                                                                        />
-                                                                                    );
-                                                                                })
-                                                                            ) : (
-                                                                                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
-                                                                                    Sem resultados-chave.
-                                                                                </div>
-                                                                            )}
+                                                                                        return (
+                                                                                            <Row
+                                                                                                key={kr.id}
+                                                                                                depth={3}
+                                                                                                active={false}
+                                                                                                expanded={false}
+                                                                                                canExpand={false}
+                                                                                                icon={<span className="font-mono text-[10px] font-semibold">KR</span>}
+                                                                                                title={kr.title}
+                                                                                                subtitle={`${kindLabel} • ${pctLabel}`}
+                                                                                                onClick={() =>
+                                                                                                    ctx.select({
+                                                                                                        kind: "objective",
+                                                                                                        id: `o:${o.id}`,
+                                                                                                        objectiveId: o.id,
+                                                                                                    })
+                                                                                                }
+                                                                                                toneKind="kr"
+                                                                                            />
+                                                                                        );
+                                                                                    })
+                                                                                ) : (
+                                                                                    <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
+                                                                                        Sem resultados-chave.
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
                                                                         </div>
                                                                     ) : null}
                                                                 </div>
