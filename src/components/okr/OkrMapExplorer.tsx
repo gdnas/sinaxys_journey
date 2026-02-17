@@ -78,6 +78,7 @@ import {
 import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profilePublicDb";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 import { cn } from "@/lib/utils";
+import { listDepartments, type DbDepartment } from "@/lib/departmentsDb";
 
 import {
     describedItemsToLines,
@@ -1318,19 +1319,136 @@ type TreeCtx = {
     canEdit: boolean;
 };
 
+function PersonPill({
+    name,
+}: {
+    name: string;
+}) {
+    return (
+        <span className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
+            <span className="truncate">{name}</span>
+        </span>
+    );
+}
+
+function TeamPill({
+    name,
+}: {
+    name: string;
+}) {
+    return (
+        <span className="inline-flex max-w-[14rem] items-center gap-1 rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
+            <span className="truncate">{name}</span>
+        </span>
+    );
+}
+
+function KrQuickEditor(
+    {
+        kr,
+        canEdit,
+        onSaved
+    }: {
+        kr: DbOkrKeyResult;
+        canEdit: boolean;
+        onSaved: () => Promise<void>;
+    }
+) {
+    const { toast } = useToast();
+    const [saving, setSaving] = useState(false);
+
+    const [cur, setCur] = useState(typeof kr.current_value === "number" ? String(kr.current_value) : "");
+
+    useEffect(() => {
+        setCur(typeof kr.current_value === "number" ? String(kr.current_value) : "");
+        setSaving(false);
+    }, [kr.id, kr.updated_at]);
+
+    if (!canEdit) {
+        return (
+            <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
+                Sem permissão para editar.
+            </div>
+        );
+    }
+
+    if (kr.kind !== "METRIC") {
+        return (
+            <div className="rounded-2xl bg-white/70 p-3 text-sm text-muted-foreground">
+                Edite este KR nos detalhes do objetivo.
+            </div>
+        );
+    }
+
+    return (
+        <div className="grid gap-2 rounded-2xl bg-white/70 p-3">
+            <div className="grid gap-2 sm:grid-cols-3">
+                <div className="sm:col-span-2">
+                    <Label className="text-xs">Valor atual</Label>
+                    <Input
+                        className="mt-1 h-10 rounded-xl bg-white"
+                        value={cur}
+                        onChange={e => setCur(e.target.value)}
+                        placeholder="Ex.: 42"
+                        disabled={saving}
+                    />
+                </div>
+                <div>
+                    <Label className="text-xs">Unidade</Label>
+                    <div className="mt-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                        {kr.metric_unit ?? "—"}
+                    </div>
+                </div>
+            </div>
+            <div className="flex justify-end">
+                <Button
+                    className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                    disabled={saving}
+                    onClick={async () => {
+                        setSaving(true);
+                        try {
+                            const parsed = cur.trim() ? Number(cur.replace(",", ".")) : null;
+                            await updateKeyResult(kr.id, {
+                                current_value: parsed,
+                            });
+                            toast({ title: "KR atualizado" });
+                            await onSaved();
+                        } catch (e) {
+                            toast({
+                                title: "Não foi possível salvar",
+                                description: e instanceof Error ? e.message : "Erro inesperado.",
+                                variant: "destructive",
+                            });
+                        } finally {
+                            setSaving(false);
+                        }
+                    }}>
+                    Salvar
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 function Tree(
     {
         ctx,
         fundamentals,
         strategy,
-        cycles
+        cycles,
+        peopleById,
+        departmentsById,
     }: {
         ctx: TreeCtx;
         fundamentals: DbCompanyFundamentals | null;
         strategy: DbStrategyObjective[];
         cycles: DbOkrCycle[];
+        peopleById: Map<string, DbProfilePublic>;
+        departmentsById: Map<string, DbDepartment>;
     }
 ) {
+    const qc = useQueryClient();
+
     const cycleCode = (c: DbOkrCycle) => {
         const yy = String(c.year).slice(-2);
         if (c.type === "QUARTERLY")
@@ -1339,6 +1457,16 @@ function Tree(
     };
 
     const objectiveCode = (c: DbOkrCycle, idx: number) => `${cycleCode(c)}O${idx + 1}`;
+
+    const objectiveTeamName = (o: DbOkrObjective) => {
+        if (o.department_id) return departmentsById.get(o.department_id)?.name ?? null;
+        if (o.level === "COMPANY") return "Empresa";
+        return null;
+    };
+
+    const objectiveOwnerName = (o: DbOkrObjective) => {
+        return peopleById.get(o.owner_user_id)?.name ?? "Responsável";
+    };
 
     const cycleGroups = useMemo(() => {
         const annual = cycles.filter(c => c.type === "ANNUAL").sort((a, b) => b.year - a.year);
@@ -1660,6 +1788,8 @@ function Tree(
                                                                         title={o.title}
                                                                         subtitle={
                                                                             <span className="inline-flex flex-wrap items-center gap-2">
+                                                                                {objectiveTeamName(o) ? <TeamPill name={objectiveTeamName(o)!} /> : null}
+                                                                                <PersonPill name={objectiveOwnerName(o)} />
                                                                                 <Target className="h-3.5 w-3.5" />
                                                                                 <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
                                                                                 <span>•</span>
@@ -1690,26 +1820,54 @@ function Tree(
                                                                                         const pct = krProgressPct(kr);
                                                                                         const kindLabel = kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico";
                                                                                         const pctLabel = typeof pct === "number" ? `${pct}%` : "—";
+                                                                                        const teamName = objectiveTeamName(o);
+                                                                                        const ownerName = (kr.owner_user_id ? peopleById.get(kr.owner_user_id)?.name : null) ?? objectiveOwnerName(o);
+                                                                                        const openKr = !!ctx.expanded[`kr:${kr.id}`];
 
                                                                                         return (
-                                                                                            <Row
-                                                                                                key={kr.id}
-                                                                                                depth={3}
-                                                                                                active={false}
-                                                                                                expanded={false}
-                                                                                                canExpand={false}
-                                                                                                icon={<span className="font-mono text-[10px] font-semibold">KR</span>}
-                                                                                                title={kr.title}
-                                                                                                subtitle={`${kindLabel} • ${pctLabel}`}
-                                                                                                onClick={() =>
-                                                                                                    ctx.select({
-                                                                                                        kind: "objective",
-                                                                                                        id: `o:${o.id}`,
-                                                                                                        objectiveId: o.id,
-                                                                                                    })
-                                                                                                }
-                                                                                                toneKind="kr"
-                                                                                            />
+                                                                                            <div key={kr.id} className="grid gap-2">
+                                                                                                <Row
+                                                                                                    depth={3}
+                                                                                                    active={false}
+                                                                                                    expanded={false}
+                                                                                                    canExpand={false}
+                                                                                                    icon={<span className="font-mono text-[10px] font-semibold">KR</span>}
+                                                                                                    title={kr.title}
+                                                                                                    subtitle={
+                                                                                                        <span className="inline-flex flex-wrap items-center gap-2">
+                                                                                                            {teamName ? <TeamPill name={teamName} /> : null}
+                                                                                                            <PersonPill name={ownerName} />
+                                                                                                            <span>{kindLabel}</span>
+                                                                                                            <span>•</span>
+                                                                                                            <span>{pctLabel}</span>
+                                                                                                        </span>
+                                                                                                    }
+                                                                                                    onClick={() => ctx.toggle(`kr:${kr.id}`)}
+                                                                                                    toneKind="kr"
+                                                                                                />
+
+                                                                                                {kr.kind === "METRIC" && typeof pct === "number" ? (
+                                                                                                    <div className="pl-3">
+                                                                                                        <Progress
+                                                                                                            value={pct}
+                                                                                                            className="h-2 rounded-full bg-white/60"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                ) : null}
+
+                                                                                                {openKr ? (
+                                                                                                    <div className="pl-3">
+                                                                                                        <KrQuickEditor
+                                                                                                            kr={kr}
+                                                                                                            canEdit={ctx.canEdit}
+                                                                                                            onSaved={async () => {
+                                                                                                                await qc.invalidateQueries({ queryKey: ["okr-map-krs", ctx.cid] });
+                                                                                                                await qc.invalidateQueries({ queryKey: ["okr-krs", o.id] });
+                                                                                                            }}
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                ) : null}
+                                                                                            </div>
                                                                                         );
                                                                                     })
                                                                                 ) : (
@@ -1785,6 +1943,8 @@ function Tree(
                                                                         title={o.title}
                                                                         subtitle={
                                                                             <span className="inline-flex flex-wrap items-center gap-2">
+                                                                                {objectiveTeamName(o) ? <TeamPill name={objectiveTeamName(o)!} /> : null}
+                                                                                <PersonPill name={objectiveOwnerName(o)} />
                                                                                 <CircleDot className="h-3.5 w-3.5" />
                                                                                 <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
                                                                                 <span>•</span>
@@ -1815,26 +1975,54 @@ function Tree(
                                                                                         const pct = krProgressPct(kr);
                                                                                         const kindLabel = kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico";
                                                                                         const pctLabel = typeof pct === "number" ? `${pct}%` : "—";
+                                                                                        const teamName = objectiveTeamName(o);
+                                                                                        const ownerName = (kr.owner_user_id ? peopleById.get(kr.owner_user_id)?.name : null) ?? objectiveOwnerName(o);
+                                                                                        const openKr = !!ctx.expanded[`kr:${kr.id}`];
 
                                                                                         return (
-                                                                                            <Row
-                                                                                                key={kr.id}
-                                                                                                depth={3}
-                                                                                                active={false}
-                                                                                                expanded={false}
-                                                                                                canExpand={false}
-                                                                                                icon={<span className="font-mono text-[10px] font-semibold">KR</span>}
-                                                                                                title={kr.title}
-                                                                                                subtitle={`${kindLabel} • ${pctLabel}`}
-                                                                                                onClick={() =>
-                                                                                                    ctx.select({
-                                                                                                        kind: "objective",
-                                                                                                        id: `o:${o.id}`,
-                                                                                                        objectiveId: o.id,
-                                                                                                    })
-                                                                                                }
-                                                                                                toneKind="kr"
-                                                                                            />
+                                                                                            <div key={kr.id} className="grid gap-2">
+                                                                                                <Row
+                                                                                                    depth={3}
+                                                                                                    active={false}
+                                                                                                    expanded={false}
+                                                                                                    canExpand={false}
+                                                                                                    icon={<span className="font-mono text-[10px] font-semibold">KR</span>}
+                                                                                                    title={kr.title}
+                                                                                                    subtitle={
+                                                                                                        <span className="inline-flex flex-wrap items-center gap-2">
+                                                                                                            {teamName ? <TeamPill name={teamName} /> : null}
+                                                                                                            <PersonPill name={ownerName} />
+                                                                                                            <span>{kindLabel}</span>
+                                                                                                            <span>•</span>
+                                                                                                            <span>{pctLabel}</span>
+                                                                                                        </span>
+                                                                                                    }
+                                                                                                    onClick={() => ctx.toggle(`kr:${kr.id}`)}
+                                                                                                    toneKind="kr"
+                                                                                                />
+
+                                                                                                {kr.kind === "METRIC" && typeof pct === "number" ? (
+                                                                                                    <div className="pl-3">
+                                                                                                        <Progress
+                                                                                                            value={pct}
+                                                                                                            className="h-2 rounded-full bg-white/60"
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                ) : null}
+
+                                                                                                {openKr ? (
+                                                                                                    <div className="pl-3">
+                                                                                                        <KrQuickEditor
+                                                                                                            kr={kr}
+                                                                                                            canEdit={ctx.canEdit}
+                                                                                                            onSaved={async () => {
+                                                                                                                await qc.invalidateQueries({ queryKey: ["okr-map-krs", ctx.cid] });
+                                                                                                                await qc.invalidateQueries({ queryKey: ["okr-krs", o.id] });
+                                                                                                            }}
+                                                                                                        />
+                                                                                                    </div>
+                                                                                                ) : null}
+                                                                                            </div>
                                                                                         );
                                                                                     })
                                                                                 ) : (
@@ -2463,7 +2651,9 @@ function OkrMapTreeCanvas(
         cycles,
         activeId,
         onPick,
-        canEdit
+        canEdit,
+        peopleById,
+        departmentsById,
     }: {
         cid: string;
         fundamentals: DbCompanyFundamentals | null;
@@ -2473,6 +2663,7 @@ function OkrMapTreeCanvas(
         onPick: (n: Node) => void;
         objectiveById: Map<string, DbOkrObjective>;
         peopleById: Map<string, DbProfilePublic>;
+        departmentsById: Map<string, DbDepartment>;
         canEdit?: boolean;
     }
 ) {
@@ -2510,7 +2701,14 @@ function OkrMapTreeCanvas(
             </div>
             <Separator className="my-4" />
             <div className="max-h-[70vh] overflow-auto pr-2">
-                <Tree ctx={ctx} fundamentals={fundamentals} strategy={strategy} cycles={cycles} />
+                <Tree
+                    ctx={ctx}
+                    fundamentals={fundamentals}
+                    strategy={strategy}
+                    cycles={cycles}
+                    peopleById={peopleById}
+                    departmentsById={departmentsById}
+                />
             </div>
         </Card>
     );
@@ -2555,6 +2753,12 @@ export function OkrMapExplorer(
         staleTime: 60_000
     });
 
+    const qDepartments = useQuery({
+        queryKey: ["departments", companyId],
+        queryFn: () => listDepartments(companyId),
+        staleTime: 60_000
+    });
+
     const fundamentals = qFundamentals.data ?? null;
     const strategy = qStrategy.data ?? [];
     const cycles = qCycles.data ?? [];
@@ -2567,6 +2771,13 @@ export function OkrMapExplorer(
 
         return m;
     }, [qPeople.data]);
+
+    const departmentsById = useMemo(() => {
+        const m = new Map<string, DbDepartment>();
+        for (const d of qDepartments.data ?? [])
+            m.set(d.id, d);
+        return m;
+    }, [qDepartments.data]);
 
     const [selected, setSelected] = useState<Node>({
         kind: "fundamentals",
@@ -2619,6 +2830,7 @@ export function OkrMapExplorer(
                 onPick={n => pick(n)}
                 objectiveById={objectiveById}
                 peopleById={peopleById}
+                departmentsById={departmentsById}
                 canEdit={canEdit} />
             {}
             <div className="hidden lg:block">
