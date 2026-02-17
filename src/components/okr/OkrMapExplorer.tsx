@@ -1368,6 +1368,33 @@ function Tree(
 
     const objectivesByCycle = q.data ?? new Map<string, DbOkrObjective[]>();
 
+    const qKrsByObjective = useQuery({
+        queryKey: [
+            "okr-map-krs",
+            ctx.cid,
+            "expanded-objectives",
+            Object.keys(ctx.expanded).filter(k => k.startsWith("o:") && ctx.expanded[k]).join(",")
+        ],
+        enabled: true,
+        queryFn: async () => {
+            const expandedObjectiveIds = Object.keys(ctx.expanded)
+                .filter(k => k.startsWith("o:") && ctx.expanded[k])
+                .map(k => k.slice(2));
+
+            const byObjective = new Map<string, DbOkrKeyResult[]>();
+
+            await Promise.all(expandedObjectiveIds.map(async objectiveId => {
+                const krs = await listKeyResults(objectiveId);
+                byObjective.set(objectiveId, krs);
+            }));
+
+            return byObjective;
+        },
+        staleTime: 20_000
+    });
+
+    const krsByObjective = qKrsByObjective.data ?? new Map<string, DbOkrKeyResult[]>();
+
     const fundamentalsFields: Array<{
         field: keyof DbCompanyFundamentals;
         icon: React.ReactNode;
@@ -1609,33 +1636,81 @@ function Tree(
                                             {open ? (
                                                 <div className="grid gap-2 pl-3">
                                                     {objs.length ? (
-                                                        objs.map(o => (
-                                                            <Row
-                                                                key={o.id}
-                                                                depth={2}
-                                                                active={ctx.activeId === `o:${o.id}`}
-                                                                expanded={false}
-                                                                canExpand={false}
-                                                                icon={<Target className="h-4 w-4" />}
-                                                                title={o.title}
-                                                                subtitle={
-                                                                    <span className="inline-flex items-center gap-2">
-                                                                        <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
-                                                                        <span>•</span>
-                                                                        <span>{objectiveLevelLabel(o.level)}</span>
-                                                                    </span>
-                                                                }
-                                                                onEdit={() => ctx.select({ kind: "objective", id: `o:${o.id}` as any, objectiveId: o.id })}
-                                                                onClick={() =>
-                                                                    ctx.select({
-                                                                        kind: "objective",
-                                                                        id: `o:${o.id}`,
-                                                                        objectiveId: o.id,
-                                                                    })
-                                                                }
-                                                                toneKind="objective"
-                                                            />
-                                                        ))
+                                                        objs.map(o => {
+                                                            const openObjective = !!ctx.expanded[`o:${o.id}`];
+                                                            const krs = krsByObjective.get(o.id) ?? [];
+
+                                                            return (
+                                                                <div key={o.id} className="grid gap-2">
+                                                                    <Row
+                                                                        depth={2}
+                                                                        active={ctx.activeId === `o:${o.id}`}
+                                                                        expanded={openObjective}
+                                                                        canExpand
+                                                                        icon={<Target className="h-4 w-4" />}
+                                                                        title={o.title}
+                                                                        subtitle={
+                                                                            <span className="inline-flex items-center gap-2">
+                                                                                <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
+                                                                                <span>•</span>
+                                                                                <span>{objectiveLevelLabel(o.level)}</span>
+                                                                            </span>
+                                                                        }
+                                                                        onToggle={() => ctx.toggle(`o:${o.id}`)}
+                                                                        onEdit={() => ctx.select({ kind: "objective", id: `o:${o.id}` as any, objectiveId: o.id })}
+                                                                        onClick={() =>
+                                                                            ctx.select({
+                                                                                kind: "objective",
+                                                                                id: `o:${o.id}`,
+                                                                                objectiveId: o.id,
+                                                                            })
+                                                                        }
+                                                                        toneKind="objective"
+                                                                    />
+
+                                                                    {openObjective ? (
+                                                                        <div className="grid gap-2 pl-3">
+                                                                            {qKrsByObjective.isLoading ? (
+                                                                                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
+                                                                                    Carregando resultados-chave…
+                                                                                </div>
+                                                                            ) : krs.length ? (
+                                                                                krs.map(kr => {
+                                                                                    const pct = krProgressPct(kr);
+                                                                                    const kindLabel = kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico";
+                                                                                    const pctLabel = typeof pct === "number" ? `${pct}%` : "—";
+
+                                                                                    return (
+                                                                                        <Row
+                                                                                            key={kr.id}
+                                                                                            depth={3}
+                                                                                            active={false}
+                                                                                            expanded={false}
+                                                                                            canExpand={false}
+                                                                                            icon={kr.kind === "DELIVERABLE" ? <BadgeCheck className="h-4 w-4" /> : <Goal className="h-4 w-4" />}
+                                                                                            title={kr.title}
+                                                                                            subtitle={`${kindLabel} • ${pctLabel}`}
+                                                                                            onClick={() =>
+                                                                                                ctx.select({
+                                                                                                    kind: "objective",
+                                                                                                    id: `o:${o.id}`,
+                                                                                                    objectiveId: o.id,
+                                                                                                })
+                                                                                            }
+                                                                                            toneKind="kr"
+                                                                                        />
+                                                                                    );
+                                                                                })
+                                                                            ) : (
+                                                                                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
+                                                                                    Sem resultados-chave.
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+                                                            );
+                                                        })
                                                     ) : (
                                                         <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">Sem objetivos ainda.</div>
                                                     )}
@@ -1683,33 +1758,81 @@ function Tree(
                                             {open ? (
                                                 <div className="grid gap-2 pl-3">
                                                     {objs.length ? (
-                                                        objs.map(o => (
-                                                            <Row
-                                                                key={o.id}
-                                                                depth={2}
-                                                                active={ctx.activeId === `o:${o.id}`}
-                                                                expanded={false}
-                                                                canExpand={false}
-                                                                icon={<CircleDot className="h-4 w-4" />}
-                                                                title={o.title}
-                                                                subtitle={
-                                                                    <span className="inline-flex items-center gap-2">
-                                                                        <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
-                                                                        <span>•</span>
-                                                                        <span>{objectiveLevelLabel(o.level)}</span>
-                                                                    </span>
-                                                                }
-                                                                onEdit={() => ctx.select({ kind: "objective", id: `o:${o.id}` as any, objectiveId: o.id })}
-                                                                onClick={() =>
-                                                                    ctx.select({
-                                                                        kind: "objective",
-                                                                        id: `o:${o.id}`,
-                                                                        objectiveId: o.id,
-                                                                    })
-                                                                }
-                                                                toneKind="objective"
-                                                            />
-                                                        ))
+                                                        objs.map(o => {
+                                                            const openObjective = !!ctx.expanded[`o:${o.id}`];
+                                                            const krs = krsByObjective.get(o.id) ?? [];
+
+                                                            return (
+                                                                <div key={o.id} className="grid gap-2">
+                                                                    <Row
+                                                                        depth={2}
+                                                                        active={ctx.activeId === `o:${o.id}`}
+                                                                        expanded={openObjective}
+                                                                        canExpand
+                                                                        icon={<CircleDot className="h-4 w-4" />}
+                                                                        title={o.title}
+                                                                        subtitle={
+                                                                            <span className="inline-flex items-center gap-2">
+                                                                                <span className="font-medium text-[color:var(--sinaxys-ink)]">{objectiveTypeLabel(o.level)}</span>
+                                                                                <span>•</span>
+                                                                                <span>{objectiveLevelLabel(o.level)}</span>
+                                                                            </span>
+                                                                        }
+                                                                        onToggle={() => ctx.toggle(`o:${o.id}`)}
+                                                                        onEdit={() => ctx.select({ kind: "objective", id: `o:${o.id}` as any, objectiveId: o.id })}
+                                                                        onClick={() =>
+                                                                            ctx.select({
+                                                                                kind: "objective",
+                                                                                id: `o:${o.id}`,
+                                                                                objectiveId: o.id,
+                                                                            })
+                                                                        }
+                                                                        toneKind="objective"
+                                                                    />
+
+                                                                    {openObjective ? (
+                                                                        <div className="grid gap-2 pl-3">
+                                                                            {qKrsByObjective.isLoading ? (
+                                                                                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
+                                                                                    Carregando resultados-chave…
+                                                                                </div>
+                                                                            ) : krs.length ? (
+                                                                                krs.map(kr => {
+                                                                                    const pct = krProgressPct(kr);
+                                                                                    const kindLabel = kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico";
+                                                                                    const pctLabel = typeof pct === "number" ? `${pct}%` : "—";
+
+                                                                                    return (
+                                                                                        <Row
+                                                                                            key={kr.id}
+                                                                                            depth={3}
+                                                                                            active={false}
+                                                                                            expanded={false}
+                                                                                            canExpand={false}
+                                                                                            icon={kr.kind === "DELIVERABLE" ? <BadgeCheck className="h-4 w-4" /> : <Goal className="h-4 w-4" />}
+                                                                                            title={kr.title}
+                                                                                            subtitle={`${kindLabel} • ${pctLabel}`}
+                                                                                            onClick={() =>
+                                                                                                ctx.select({
+                                                                                                    kind: "objective",
+                                                                                                    id: `o:${o.id}`,
+                                                                                                    objectiveId: o.id,
+                                                                                                })
+                                                                                            }
+                                                                                            toneKind="kr"
+                                                                                        />
+                                                                                    );
+                                                                                })
+                                                                            ) : (
+                                                                                <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
+                                                                                    Sem resultados-chave.
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    ) : null}
+                                                                </div>
+                                                            );
+                                                        })
                                                     ) : (
                                                         <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">Sem objetivos ainda.</div>
                                                     )}
