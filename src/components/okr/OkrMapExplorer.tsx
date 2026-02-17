@@ -293,7 +293,7 @@ function Row(
                 backgroundColor: active ? "color-mix(in srgb, " + tone.bg + " 70%, white 30%)" : "white",
             }}
             className={cn(
-                "group flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left transition",
+                "group flex w-full items-start gap-2 rounded-2xl border px-3 py-2 text-left transition",
                 "hover:[background-color:color-mix(in_srgb,var(--sinaxys-tint)_35%,white)]"
             )}
             onClick={onClick}>
@@ -303,51 +303,58 @@ function Row(
                     color: tone.ink,
                     borderColor: tone.border,
                 }}
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border">
+                className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl border">
                 {icon}
             </span>
+
             <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                    <span
-                        className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{title}</span>
+                <span className="block min-w-0">
+                    <span className="block min-w-0 text-sm font-semibold leading-tight text-[color:var(--sinaxys-ink)] line-clamp-2">
+                        {title}
+                    </span>
                     {subtitle ? (
-                        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{subtitle}</span>
+                        <span className="mt-1 block min-w-0 text-xs leading-snug text-muted-foreground line-clamp-2">
+                            {subtitle}
+                        </span>
                     ) : null}
                 </span>
             </span>
-            {right}
 
-            {onEdit ? (
-                <span
-                    className={cn(
-                        "ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-xl transition",
-                        "ring-1 ring-[color:var(--sinaxys-border)]",
-                        active ? "bg-white text-[color:var(--sinaxys-primary)]" : "bg-white text-muted-foreground"
-                    )}
-                    title="Editar"
-                    onClick={e => {
-                        e.stopPropagation();
-                        onEdit();
-                    }}>
-                    <Edit3 className="h-4 w-4" />
-                </span>
-            ) : null}
+            <span className="ml-1 flex shrink-0 items-start gap-2">
+                {right}
 
-            {canExpand ? (
-                <span
-                    className={cn(
-                        "ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-xl transition",
-                        "bg-white ring-1 ring-[color:var(--sinaxys-border)]",
-                        active ? "text-[color:var(--sinaxys-primary)]" : "text-[color:var(--sinaxys-ink)]"
-                    )}
-                    title={expanded ? "Recolher" : "Expandir"}
-                    onClick={e => {
-                        e.stopPropagation();
-                        onToggle?.();
-                    }}>
-                    {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                </span>
-            ) : null}
+                {onEdit ? (
+                    <span
+                        className={cn(
+                            "grid h-8 w-8 place-items-center rounded-xl transition",
+                            "bg-white ring-1 ring-[color:var(--sinaxys-border)]",
+                            active ? "text-[color:var(--sinaxys-primary)]" : "text-muted-foreground"
+                        )}
+                        title="Editar"
+                        onClick={e => {
+                            e.stopPropagation();
+                            onEdit();
+                        }}>
+                        <Edit3 className="h-4 w-4" />
+                    </span>
+                ) : null}
+
+                {canExpand ? (
+                    <span
+                        className={cn(
+                            "grid h-8 w-8 place-items-center rounded-xl transition",
+                            "bg-white ring-1 ring-[color:var(--sinaxys-border)]",
+                            active ? "text-[color:var(--sinaxys-primary)]" : "text-[color:var(--sinaxys-ink)]"
+                        )}
+                        title={expanded ? "Recolher" : "Expandir"}
+                        onClick={e => {
+                            e.stopPropagation();
+                            onToggle?.();
+                        }}>
+                        {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </span>
+                ) : null}
+            </span>
         </button>
     );
 }
@@ -1388,8 +1395,7 @@ function Tree(
         if (field === "values" || field === "culture") {
             const items = parseDescribedItems(trimmed);
             if (!items.length) return "Sem itens";
-            const first = items[0]?.title?.trim() || items[0]?.description?.trim() || "";
-            return `${items.length} itens${first ? ` • ${first}` : ""}`;
+            return `${items.length} itens`;
         }
 
         const flat = trimmed.replace(/\s+/g, " ");
