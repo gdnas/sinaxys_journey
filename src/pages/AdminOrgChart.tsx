@@ -387,7 +387,7 @@ export default function AdminOrgChart() {
 
         <Separator className="my-5" />
 
-        <Tabs defaultValue="list" className="w-full">
+        <Tabs defaultValue="tree" className="w-full">
           <ScrollableTabsList
             listClassName="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1"
             containerClassName="-mx-1 px-1"

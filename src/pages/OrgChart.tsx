@@ -414,20 +414,7 @@ export default function OrgChart() {
       </div>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Estrutura</div>
-            <p className="mt-1 text-sm text-muted-foreground">{isLoading ? "Carregando…" : `${profilesSource.length} pessoa(s) na empresa.`}</p>
-          </div>
-          <div className="relative w-full md:w-[360px]">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(e) => setQuery(e.target.value)} className="h-11 rounded-xl pl-9" placeholder="Buscar por nome, papel ou cargo…" />
-          </div>
-        </div>
-
-        <Separator className="my-5" />
-
-        <Tabs defaultValue="list" className="w-full">
+        <Tabs defaultValue="tree" className="w-full">
           <ScrollableTabsList
             listClassName="w-full justify-start rounded-2xl bg-[color:var(--sinaxys-tint)] p-1"
             containerClassName="-mx-1 px-1"
