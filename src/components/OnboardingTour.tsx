@@ -79,55 +79,8 @@ function rectFromTarget(el: Element, padding = 12): Rect {
 }
 
 function getRoleSteps(role: Role): Step[] {
-  // NOTE: all steps still get filtered by moduleKey (contract) and by availability in DOM.
-  if (role === "MASTERADMIN") {
-    return [
-      {
-        id: "welcome-master",
-        title: "Bem-vindo à área Master",
-        body: (
-          <div className="grid gap-2">
-            <p>
-              Você está no modo <span className="font-semibold">Master Admin</span>.
-            </p>
-            <p className="text-sm text-muted-foreground">
-              Aqui você gerencia <span className="font-semibold">empresas (tenants)</span>, usuários e configurações globais da plataforma.
-            </p>
-          </div>
-        ),
-        route: "/master/overview",
-        moduleKey: "MASTER",
-      },
-      {
-        id: "master-overview",
-        title: "Indicadores e saúde da plataforma",
-        body: (
-          <div className="grid gap-2">
-            <p className="text-sm text-muted-foreground">Use a visão geral para checar rapidamente volume de empresas e perfis.</p>
-            <p className="text-sm text-muted-foreground">
-              Dica: se algo parecer estranho, comece por <span className="font-semibold">Empresas</span> (tenant) e depois valide os perfis.
-            </p>
-          </div>
-        ),
-        route: "/master/overview",
-        targetSelector: "[data-tour=\"master-overview-hero\"]",
-        moduleKey: "MASTER",
-      },
-      {
-        id: "top-profile",
-        title: "Seu perfil",
-        body: <p className="text-sm text-muted-foreground">Acesse sua área para atualizar dados e refazer este tour quando quiser.</p>,
-        targetSelector: "[data-tour=\"top-profile\"]",
-        moduleKey: "PROFILE",
-      },
-      {
-        id: "finish-master",
-        title: "Fechado — bora!",
-        body: <p className="text-sm text-muted-foreground">Tour concluído. Qualquer coisa, refaça pelo botão no seu perfil.</p>,
-        moduleKey: "MASTER",
-      },
-    ];
-  }
+  // Master Admin não tem onboarding/tour.
+  if (role === "MASTERADMIN") return [];
 
   const okrRoute = role === "COLABORADOR" ? "/okr/hoje" : "/okr/ciclos";
 
@@ -371,10 +324,12 @@ export function OnboardingTourProvider({ children }: { children: React.ReactNode
   const [steps, setSteps] = useState<Step[]>([]);
   const autoStartedRef = useRef(false);
 
+  const isMaster = user?.role === "MASTERADMIN";
+
   const { data: status } = useQuery({
     queryKey: ["onboarding-status", user?.id],
     queryFn: () => getOnboardingStatus(String(user?.id)),
-    enabled: !!user?.id,
+    enabled: !!user?.id && !isMaster,
   });
 
   const { data: companyModules = [] } = useQuery({
@@ -387,6 +342,7 @@ export function OnboardingTourProvider({ children }: { children: React.ReactNode
 
   const effectiveSteps = useMemo(() => {
     if (!user) return [];
+    if (user.role === "MASTERADMIN") return [];
     const base = getRoleSteps(user.role as Role);
 
     return base
@@ -396,6 +352,7 @@ export function OnboardingTourProvider({ children }: { children: React.ReactNode
 
   const open = useCallback(() => {
     if (!user) return;
+    if (user.role === "MASTERADMIN") return;
     setSteps(effectiveSteps);
     setStepIndex(0);
     setIsOpen(true);
@@ -413,6 +370,7 @@ export function OnboardingTourProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     if (loading) return;
     if (!user?.id) return;
+    if (user.role === "MASTERADMIN") return;
     if (autoStartedRef.current) return;
     if (!status) return;
 
@@ -421,15 +379,16 @@ export function OnboardingTourProvider({ children }: { children: React.ReactNode
 
     autoStartedRef.current = true;
     open();
-  }, [loading, user?.id, status?.completedAt, status?.version, open, status]);
+  }, [loading, user?.id, user?.role, status?.completedAt, status?.version, open, status]);
 
   // Sync steps when user/company modules resolve (ex.: PDI enabled).
   useEffect(() => {
     if (!isOpen) return;
     if (!user) return;
+    if (user.role === "MASTERADMIN") return;
     setSteps(effectiveSteps);
     setStepIndex((i) => clamp(i, 0, Math.max(0, effectiveSteps.length - 1)));
-  }, [isOpen, effectiveSteps, user?.id]);
+  }, [isOpen, effectiveSteps, user?.id, user?.role]);
 
   const current = steps[stepIndex] ?? null;
 
@@ -446,7 +405,7 @@ export function OnboardingTourProvider({ children }: { children: React.ReactNode
   const goNext = useCallback(() => setStepIndex((i) => Math.min(steps.length - 1, i + 1)), [steps.length]);
 
   const finish = useCallback(async () => {
-    if (!user?.id) {
+    if (!user?.id || user.role === "MASTERADMIN") {
       close();
       return;
     }
@@ -456,7 +415,7 @@ export function OnboardingTourProvider({ children }: { children: React.ReactNode
     } finally {
       close();
     }
-  }, [user?.id, close, qc]);
+  }, [user?.id, user?.role, close, qc]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -483,7 +442,7 @@ export function OnboardingTourProvider({ children }: { children: React.ReactNode
   return (
     <Ctx.Provider value={value}>
       {children}
-      {isOpen && current ? (
+      {isMaster ? null : isOpen && current ? (
         <TourOverlay
           key={current.id}
           step={current}

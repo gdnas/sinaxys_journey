@@ -62,6 +62,8 @@ export default function Profile() {
 
   if (!user) return null;
 
+  const isMaster = user.role === "MASTERADMIN";
+
   const canEditSensitive = user.role === "ADMIN" || user.role === "MASTERADMIN";
   const canEditCompanyFinance = user.role === "ADMIN" || user.role === "MASTERADMIN";
   const canApproveVacation = user.role === "ADMIN" || user.role === "HEAD";
@@ -270,16 +272,18 @@ export default function Profile() {
             <Button variant="outline" className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto" onClick={() => fileRef.current?.click()}>
               Enviar foto
             </Button>
-            <Button
-              variant="outline"
-              className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto"
-              data-tour="profile-redo-onboarding"
-              onClick={() => startTour()}
-              title="Refazer o tour guiado"
-            >
-              <Sparkles className="mr-2 h-4 w-4" />
-              Refazer onboarding
-            </Button>
+            {!isMaster ? (
+              <Button
+                variant="outline"
+                className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto"
+                data-tour="profile-redo-onboarding"
+                onClick={() => startTour()}
+                title="Refazer o tour guiado"
+              >
+                <Sparkles className="mr-2 h-4 w-4" />
+                Refazer onboarding
+              </Button>
+            ) : null}
             <Button asChild variant="outline" className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto">
               <Link to="/password">
                 <KeyRound className="mr-2 h-4 w-4" />
