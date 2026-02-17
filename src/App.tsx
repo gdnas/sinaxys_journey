@@ -353,7 +353,7 @@ const App = () => (
                 <Route
                   path="/admin/users/:userId"
                   element={
-                    <RequireAuth roles={["ADMIN"]}>
+                    <RequireAuth roles={["ADMIN", "MASTERADMIN"]}>
                       <RequireCompanyModule moduleKey="ADMIN">
                         <AdminUserCard />
                       </RequireCompanyModule>

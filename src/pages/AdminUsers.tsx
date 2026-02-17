@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Link } from "react-router-dom";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -270,28 +271,23 @@ export default function AdminUsers() {
                       <TableCell className="text-right font-medium text-[color:var(--sinaxys-ink)]">{stat ? stat.access_count : "—"}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end">
-                          <Switch
-                            checked={!!p.active}
-                            onCheckedChange={async (v) => {
-                              try {
-                                await updateProfile(p.id, { active: v });
-                                await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
-                              } catch (e) {
-                                toast({
-                                  title: "Não foi possível atualizar",
-                                  description: e instanceof Error ? e.message : "Erro inesperado.",
-                                  variant: "destructive",
-                                });
-                              }
-                            }}
-                          />
+                        <div className="flex items-center justify-end gap-2">
+                          <Button
+                            asChild
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 rounded-xl"
+                            title="Abrir card"
+                          >
+                            <Link to={`/admin/users/${p.id}`}>
+                              <UserRound className="h-4 w-4" />
+                            </Link>
+                          </Button>
+
+                          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => openEdit(p)} title="Editar dados básicos">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                         </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => openEdit(p)}>
-                          <Pencil className="h-4 w-4" />
-                        </Button>
                       </TableCell>
                     </TableRow>
                   );
