@@ -96,7 +96,7 @@ const nav: NavItem[] = [
     to: "/pdi-performance",
     label: "PDI & Performance",
     icon: <Handshake className="h-4 w-4" />,
-    roles: ["COLABORADOR", "HEAD", "ADMIN", "MASTERADMIN"],
+    roles: ["COLABORADOR", "HEAD", "ADMIN"],
     moduleKey: "PDI_PERFORMANCE",
   },
 
@@ -112,7 +112,7 @@ const nav: NavItem[] = [
         to: "/rankings",
         label: "Ranking",
         icon: <Trophy className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR", "MASTERADMIN"],
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "POINTS",
       },
       {
@@ -132,7 +132,7 @@ const nav: NavItem[] = [
     to: "/okr",
     label: "OKRs",
     icon: <Target className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR", "MASTERADMIN"],
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
     moduleKey: "OKR",
   },
 
@@ -147,7 +147,7 @@ const nav: NavItem[] = [
         to: "/org",
         label: "Organograma",
         icon: <Network className="h-4 w-4" />,
-        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "ORG",
       },
       {
@@ -257,7 +257,7 @@ const nav: NavItem[] = [
     to: "/profile",
     label: "Minha área",
     icon: <UserIcon className="h-4 w-4" />,
-    roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
 ];
 
