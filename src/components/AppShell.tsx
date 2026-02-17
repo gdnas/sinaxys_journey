@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   BarChart3,
@@ -29,6 +30,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { isCompanyModuleEnabled } from "@/lib/modulesDb";
+import { getCompanyFundamentals } from "@/lib/okrDb";
+import { describedItemsToLines, parseDescribedItems, textPreview } from "@/lib/fundamentalsFormat";
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 import { OnboardingTourProvider } from "@/components/OnboardingTour";
@@ -337,11 +340,74 @@ function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
   );
 }
 
-function JourneyRuleCard() {
+function pickRandom<T>(items: T[]) {
+  if (!items.length) return null;
+  return items[Math.floor(Math.random() * items.length)] ?? null;
+}
+
+function FundamentalsSpotlightCard() {
+  const { company, companyId } = useCompany();
+  const { pathname } = useLocation();
+
+  const { data: fundamentals } = useQuery({
+    queryKey: ["company-fundamentals", companyId],
+    queryFn: () => getCompanyFundamentals(String(companyId)),
+    enabled: !!companyId,
+  });
+
+  const candidates = useMemo(() => {
+    const res: Array<{ label: string; text: string }> = [];
+    if (!fundamentals) return res;
+
+    const addText = (label: string, raw?: string | null) => {
+      const t = (raw ?? "").trim();
+      if (!t) return;
+      res.push({ label, text: textPreview(t, 170) });
+    };
+
+    addText("Propósito", fundamentals.purpose);
+    addText("Missão", fundamentals.mission);
+    addText("Visão", fundamentals.vision);
+
+    const valuesLines = describedItemsToLines(parseDescribedItems(fundamentals.values));
+    for (const line of valuesLines) {
+      res.push({ label: "Valores", text: textPreview(line, 170) });
+    }
+
+    const cultureLines = describedItemsToLines(parseDescribedItems(fundamentals.culture));
+    for (const line of cultureLines) {
+      res.push({ label: "Cultura", text: textPreview(line, 170) });
+    }
+
+    return res;
+  }, [fundamentals]);
+
+  const [selected, setSelected] = useState<{ label: string; text: string } | null>(null);
+
+  useEffect(() => {
+    setSelected(pickRandom(candidates));
+  }, [pathname, companyId, candidates]);
+
   return (
-    <div className="rounded-xl bg-[color:var(--sinaxys-tint)] p-3">
-      <div className="text-xs font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">Regra da jornada</div>
-      <p className="mt-1 text-xs text-muted-foreground">Você avança em sequência. Ao concluir o módulo atual, o próximo é liberado automaticamente.</p>
+    <div className="rounded-xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-3">
+      <div className="flex items-start gap-3">
+        <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm">
+          {company.logoDataUrl ? (
+            <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
+          ) : (
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-primary)]">{initials(company.name || "SJ")}</div>
+          )}
+        </div>
+
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
+            {selected?.label ?? "Fundamento"}
+          </div>
+          <p className="mt-1 text-sm leading-snug text-[color:var(--sinaxys-ink)]">
+            {selected?.text ?? textPreview(company.tagline || "Defina os fundamentos e volte aqui para ver um destaque aleatório.", 170)}
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
@@ -452,7 +518,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {user.role !== "MASTERADMIN" ? (
                       <>
                         <Separator />
-                        <JourneyRuleCard />
+                        <FundamentalsSpotlightCard />
                       </>
                     ) : null}
                   </div>
