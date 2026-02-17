@@ -212,7 +212,7 @@ const nav: NavItem[] = [
         to: "/admin/users",
         label: "Usuários",
         icon: <Shield className="h-4 w-4" />,
-        roles: ["ADMIN", "MASTERADMIN"],
+        roles: ["ADMIN"],
       },
       {
         type: "link",
