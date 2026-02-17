@@ -29,6 +29,13 @@ import {
     Link2,
     UserRound,
     Plus,
+    Compass,
+    Eye,
+    Gem,
+    Sparkles,
+    Goal,
+    BadgeCheck,
+    ChevronUp,
 } from "lucide-react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -200,6 +207,52 @@ function rowIndentStyle(depth: number) {
     } as const;
 }
 
+type RowTone = {
+    bg: string;
+    border: string;
+    ink: string;
+};
+
+function toneFromKind(kind: Node["kind"]): RowTone {
+    if (kind === "fundamentals" || kind === "fundamental") {
+        return {
+            bg: "var(--map-fundamentals-bg)",
+            border: "var(--map-fundamentals-border)",
+            ink: "var(--map-fundamentals-ink)",
+        };
+    }
+
+    if (kind === "strategy" || kind === "strategyObjective") {
+        return {
+            bg: "var(--map-strategy-bg)",
+            border: "var(--map-strategy-border)",
+            ink: "var(--map-strategy-ink)",
+        };
+    }
+
+    if (kind === "cycles" || kind === "cycle") {
+        return {
+            bg: "var(--map-cycles-bg)",
+            border: "var(--map-cycles-border)",
+            ink: "var(--map-cycles-ink)",
+        };
+    }
+
+    if (kind === "objective" || kind === "kr") {
+        return {
+            bg: "var(--map-objectives-bg)",
+            border: "var(--map-objectives-border)",
+            ink: "var(--map-objectives-ink)",
+        };
+    }
+
+    return {
+        bg: "var(--map-neutral-bg)",
+        border: "var(--map-neutral-border)",
+        ink: "var(--map-neutral-ink)",
+    };
+}
+
 function Row(
     {
         depth,
@@ -212,7 +265,8 @@ function Row(
         right,
         onToggle,
         onEdit,
-        onClick
+        onClick,
+        toneKind,
     }: {
         depth: number;
         active: boolean;
@@ -225,26 +279,40 @@ function Row(
         onToggle?: () => void;
         onEdit?: () => void;
         onClick: () => void;
+        toneKind: Node["kind"];
     }
 ) {
+    const tone = toneFromKind(toneKind);
+
     return (
         <button
             type="button"
-            style={rowIndentStyle(depth)}
+            style={{
+                ...rowIndentStyle(depth),
+                borderColor: active ? tone.ink : tone.border,
+                backgroundColor: active ? "color-mix(in srgb, " + tone.bg + " 70%, white 30%)" : "white",
+            }}
             className={cn(
                 "group flex w-full items-center gap-2 rounded-2xl border px-3 py-2 text-left transition",
-                active ? "border-[color:var(--sinaxys-primary)]/40 bg-[color:var(--sinaxys-tint)]/55" : "border-[color:var(--sinaxys-border)] bg-white hover:bg-[color:var(--sinaxys-tint)]/35"
+                "hover:[background-color:color-mix(in_srgb,var(--sinaxys-tint)_35%,white)]"
             )}
             onClick={onClick}>
             <span
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                style={{
+                    backgroundColor: tone.bg,
+                    color: tone.ink,
+                    borderColor: tone.border,
+                }}
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border">
                 {icon}
             </span>
             <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-2">
                     <span
                         className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{title}</span>
-                    {subtitle ? <span className="truncate text-xs text-muted-foreground">{subtitle}</span> : null}
+                    {subtitle ? (
+                        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">{subtitle}</span>
+                    ) : null}
                 </span>
             </span>
             {right}
@@ -252,8 +320,9 @@ function Row(
             {onEdit ? (
                 <span
                     className={cn(
-                        "ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-xl text-muted-foreground transition hover:bg-white",
-                        active ? "bg-white" : "bg-transparent"
+                        "ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-xl transition",
+                        "ring-1 ring-[color:var(--sinaxys-border)]",
+                        active ? "bg-white text-[color:var(--sinaxys-primary)]" : "bg-white text-muted-foreground"
                     )}
                     title="Editar"
                     onClick={e => {
@@ -267,8 +336,9 @@ function Row(
             {canExpand ? (
                 <span
                     className={cn(
-                        "ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-xl text-muted-foreground transition group-hover:bg-white",
-                        active ? "bg-white" : "bg-transparent"
+                        "ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-xl transition",
+                        "bg-white ring-1 ring-[color:var(--sinaxys-border)]",
+                        active ? "text-[color:var(--sinaxys-primary)]" : "text-[color:var(--sinaxys-ink)]"
                     )}
                     title={expanded ? "Recolher" : "Expandir"}
                     onClick={e => {
@@ -1296,20 +1366,80 @@ function Tree(
         icon: React.ReactNode;
     }> = [{
         field: "purpose",
-        icon: <Route className="h-4 w-4" />
+        icon: <Compass className="h-4 w-4" />
     }, {
         field: "vision",
-        icon: <Route className="h-4 w-4" />
+        icon: <Eye className="h-4 w-4" />
     }, {
         field: "mission",
-        icon: <Route className="h-4 w-4" />
+        icon: <Flag className="h-4 w-4" />
     }, {
         field: "values",
-        icon: <Route className="h-4 w-4" />
+        icon: <Gem className="h-4 w-4" />
     }, {
         field: "culture",
-        icon: <Route className="h-4 w-4" />
+        icon: <Sparkles className="h-4 w-4" />
     }];
+
+    const fundamentalsPreview = (field: keyof DbCompanyFundamentals, raw: string) => {
+        const trimmed = raw.trim();
+        if (!trimmed) return "Sem conteúdo";
+
+        if (field === "values" || field === "culture") {
+            const items = parseDescribedItems(trimmed);
+            if (!items.length) return "Sem itens";
+            const first = items[0]?.title?.trim() || items[0]?.description?.trim() || "";
+            return `${items.length} itens${first ? ` • ${first}` : ""}`;
+        }
+
+        const flat = trimmed.replace(/\s+/g, " ");
+        return flat.length > 72 ? flat.slice(0, 72) + "…" : flat;
+    };
+
+    const renderFundamentalsExpanded = (field: keyof DbCompanyFundamentals, raw: string) => {
+        const trimmed = raw.trim();
+
+        if (!trimmed) {
+            return <div className="text-muted-foreground">Sem conteúdo.</div>;
+        }
+
+        if (field !== "values" && field !== "culture") {
+            return <div className="whitespace-pre-line leading-relaxed">{trimmed}</div>;
+        }
+
+        const items = parseDescribedItems(trimmed);
+
+        if (!items.length) {
+            return <div className="text-muted-foreground">Sem itens.</div>;
+        }
+
+        return (
+            <div className="grid gap-2 sm:grid-cols-2">
+                {items.map((it, idx) => (
+                    <div
+                        key={idx}
+                        className="rounded-2xl border border-[color:var(--map-fundamentals-border)] bg-white p-3">
+                        <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="text-sm font-semibold text-[color:var(--map-fundamentals-ink)]">
+                                    {it.title?.trim() ? it.title.trim() : (field === "values" ? "Valor" : "Item")}
+                                </div>
+                                {it.description?.trim() ? (
+                                    <div className="mt-1 text-xs leading-relaxed text-[color:var(--sinaxys-ink)]/80">
+                                        {it.description.trim()}
+                                    </div>
+                                ) : null}
+                            </div>
+                            <div
+                                className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-[color:var(--map-fundamentals-border)] bg-[color:var(--map-fundamentals-bg)] text-[color:var(--map-fundamentals-ink)]">
+                                {field === "values" ? <Gem className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        );
+    };
 
     return (
         <div className="grid gap-3">
@@ -1318,18 +1448,20 @@ function Tree(
                 active={ctx.activeId === "fundamentals"}
                 expanded={!!ctx.expanded["fundamentals"]}
                 canExpand
-                icon={<Route className="h-4 w-4" />}
+                icon={<Compass className="h-4 w-4" />}
                 title="Fundamentos"
-                subtitle={"Missão, visão, valores e cultura"}
+                subtitle={"Propósito, visão, missão, valores e cultura"}
                 onToggle={() => ctx.toggle("fundamentals")}
-                onClick={() => ctx.toggle("fundamentals")} />
+                onEdit={() => ctx.select({ kind: "fundamentals", id: "fundamentals" })}
+                onClick={() => ctx.toggle("fundamentals")}
+                toneKind="fundamentals" />
             {ctx.expanded["fundamentals"] ? (
                 <div className="grid gap-2">
                     {fundamentalsFields.map(({ field, icon }) => {
                         const id = `fund:${field}` as const;
                         const open = !!ctx.expanded[id];
-                        const raw = typeof (fundamentals as any)?.[field] === "string" ? String((fundamentals as any)[field]).trim() : "";
-                        const preview = raw ? (raw.length > 72 ? raw.slice(0, 72) + "…" : raw) : undefined;
+                        const raw = typeof (fundamentals as any)?.[field] === "string" ? String((fundamentals as any)[field]) : "";
+                        const preview = fundamentalsPreview(field, raw);
 
                         return (
                             <div key={field} className="grid gap-2">
@@ -1344,11 +1476,11 @@ function Tree(
                                     onToggle={() => ctx.toggle(id)}
                                     onEdit={() => ctx.select({ kind: "fundamental", id: id as any, field })}
                                     onClick={() => ctx.toggle(id)}
-                                />
+                                    toneKind="fundamental" />
 
                                 {open ? (
-                                    <div className="ml-6 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-[color:var(--sinaxys-ink)]">
-                                        {raw ? <div className="whitespace-pre-line leading-relaxed">{raw}</div> : <div className="text-muted-foreground">Sem conteúdo.</div>}
+                                    <div className="ml-6 rounded-2xl border border-[color:var(--map-fundamentals-border)] bg-[color:var(--map-fundamentals-bg)] p-4 text-sm text-[color:var(--sinaxys-ink)]">
+                                        {renderFundamentalsExpanded(field, raw)}
                                     </div>
                                 ) : null}
                             </div>
@@ -1366,12 +1498,14 @@ function Tree(
                 title="Objetivos de longo prazo"
                 subtitle={"1–10 anos"}
                 right={
-                    <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                    <Badge className="rounded-full bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)] hover:bg-[color:var(--map-strategy-bg)]">
                         {strategy.length}
                     </Badge>
                 }
                 onToggle={() => ctx.toggle("strategy")}
-                onClick={() => ctx.toggle("strategy")} />
+                onEdit={() => ctx.select({ kind: "strategy", id: "strategy" })}
+                onClick={() => ctx.toggle("strategy")}
+                toneKind="strategy" />
             {ctx.expanded["strategy"] ? (
                 <div className="grid gap-2">
                     {strategy.map(so => {
@@ -1399,10 +1533,10 @@ function Tree(
                                         })
                                     }
                                     onClick={() => (desc ? ctx.toggle(id) : ctx.select({ kind: "strategyObjective", id: id as any, soId: so.id }))}
-                                />
+                                    toneKind="strategyObjective" />
 
                                 {open && desc ? (
-                                    <div className="ml-6 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-[color:var(--sinaxys-ink)]">
+                                    <div className="ml-6 rounded-2xl border border-[color:var(--map-strategy-border)] bg-[color:var(--map-strategy-bg)] p-4 text-sm text-[color:var(--sinaxys-ink)]">
                                         <div className="whitespace-pre-line leading-relaxed">{desc}</div>
                                     </div>
                                 ) : null}
@@ -1432,12 +1566,14 @@ function Tree(
                 title="OKRs (ciclos)"
                 subtitle={"Ano e trimestre"}
                 right={
-                    <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                    <Badge className="rounded-full bg-[color:var(--map-cycles-bg)] text-[color:var(--map-cycles-ink)] ring-1 ring-[color:var(--map-cycles-border)] hover:bg-[color:var(--map-cycles-bg)]">
                         {cycles.length}
                     </Badge>
                 }
                 onToggle={() => ctx.toggle("cycles")}
-                onClick={() => ctx.toggle("cycles")} />
+                onEdit={() => ctx.select({ kind: "cycles", id: "cycles" })}
+                onClick={() => ctx.toggle("cycles")}
+                toneKind="cycles" />
 
             {ctx.expanded["cycles"] ? (
                 <div className="grid gap-3">
@@ -1460,8 +1596,9 @@ function Tree(
                                                 title={cycleLabel(c)}
                                                 subtitle={c.status}
                                                 onToggle={() => ctx.toggle(`c:${c.id}`)}
+                                                onEdit={() => ctx.select({ kind: "cycle", id: `c:${c.id}` as any, cycleId: c.id })}
                                                 onClick={() => ctx.toggle(`c:${c.id}`)}
-                                            />
+                                                toneKind="cycle" />
 
                                             {open ? (
                                                 <div className="grid gap-2 pl-3">
@@ -1482,6 +1619,7 @@ function Tree(
                                                                         <span>{objectiveLevelLabel(o.level)}</span>
                                                                     </span>
                                                                 }
+                                                                onEdit={() => ctx.select({ kind: "objective", id: `o:${o.id}` as any, objectiveId: o.id })}
                                                                 onClick={() =>
                                                                     ctx.select({
                                                                         kind: "objective",
@@ -1489,6 +1627,7 @@ function Tree(
                                                                         objectiveId: o.id,
                                                                     })
                                                                 }
+                                                                toneKind="objective"
                                                             />
                                                         ))
                                                     ) : (
@@ -1531,8 +1670,9 @@ function Tree(
                                                 title={cycleLabel(c)}
                                                 subtitle={c.status}
                                                 onToggle={() => ctx.toggle(`c:${c.id}`)}
+                                                onEdit={() => ctx.select({ kind: "cycle", id: `c:${c.id}` as any, cycleId: c.id })}
                                                 onClick={() => ctx.toggle(`c:${c.id}`)}
-                                            />
+                                                toneKind="cycle" />
 
                                             {open ? (
                                                 <div className="grid gap-2 pl-3">
@@ -1553,6 +1693,7 @@ function Tree(
                                                                         <span>{objectiveLevelLabel(o.level)}</span>
                                                                     </span>
                                                                 }
+                                                                onEdit={() => ctx.select({ kind: "objective", id: `o:${o.id}` as any, objectiveId: o.id })}
                                                                 onClick={() =>
                                                                     ctx.select({
                                                                         kind: "objective",
@@ -1560,6 +1701,7 @@ function Tree(
                                                                         objectiveId: o.id,
                                                                     })
                                                                 }
+                                                                toneKind="objective"
                                                             />
                                                         ))
                                                     ) : (

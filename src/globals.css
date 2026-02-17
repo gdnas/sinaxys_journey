@@ -42,6 +42,27 @@
     --sinaxys-tint: #efeaff;
     --sinaxys-border: #e6e1ff;
 
+    /* OKR Map accents (hex) */
+    --map-fundamentals-bg: #f4f0ff;
+    --map-fundamentals-ink: #3a1d8a;
+    --map-fundamentals-border: #e4dcff;
+
+    --map-strategy-bg: #fff1f5;
+    --map-strategy-ink: #9f1239;
+    --map-strategy-border: #ffd6e3;
+
+    --map-cycles-bg: #fff8e6;
+    --map-cycles-ink: #92400e;
+    --map-cycles-border: #ffe3b5;
+
+    --map-objectives-bg: #e8fbf6;
+    --map-objectives-ink: #0f766e;
+    --map-objectives-border: #bff4e6;
+
+    --map-neutral-bg: #f6f4ff;
+    --map-neutral-ink: #20105b;
+    --map-neutral-border: #e6e1ff;
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
@@ -88,27 +109,5 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-
-  html,
-  body {
-    width: 100%;
-    overflow-x: hidden;
-  }
-
-  #root {
-    width: 100%;
-    overflow-x: hidden;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "ss01" 1, "ss02" 1;
   }
 }
