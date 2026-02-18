@@ -36,6 +36,7 @@ import {
     Goal,
     BadgeCheck,
     ChevronUp,
+    Building2,
 } from "lucide-react";
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -88,7 +89,6 @@ import {
 } from "@/lib/fundamentalsFormat";
 
 import { DescribedItemsEditor } from "@/components/fundamentals/DescribedItemsEditor";
-import { StrategyKrsEditor } from "@/components/okr/StrategyKrsEditor";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { brl } from "@/lib/costs";
 
@@ -155,6 +155,17 @@ function hueFromId(id: string) {
     return h;
 }
 
+function yearForStrategyObjective(so: DbStrategyObjective) {
+    if (typeof so.target_year === "number" && Number.isFinite(so.target_year)) return so.target_year;
+    const base = new Date().getFullYear();
+    return base + (so.horizon_years ?? 3);
+}
+
+function StrategyYearIcon({ so }: { so: DbStrategyObjective }) {
+    const yy = yearForStrategyObjective(so);
+    return <span className="font-mono text-[10px] font-bold tracking-tight">{yy}</span>;
+}
+
 function nodeTitle(n: Node) {
     if (n.kind === "root")
         return "Mapa";
@@ -171,6 +182,7 @@ function nodeTitle(n: Node) {
             values: "Valores",
             culture: "Cultura",
             strategic_north: "(removido)",
+            annual_drivers: "Direcionadores do ano",
             created_at: "Criado em",
             updated_at: "Atualizado em"
         };
@@ -1744,7 +1756,7 @@ function Tree(
                                     active={ctx.activeId === id}
                                     expanded={open}
                                     canExpand={!!desc}
-                                    icon={<Flag className="h-4 w-4" />}
+                                    icon={<StrategyYearIcon so={so} />}
                                     title={so.title}
                                     subtitle={preview}
                                     onToggle={() => ctx.toggle(id)}
@@ -2257,12 +2269,14 @@ function StrategyObjectiveInlineCard(
     const [title, setTitle] = useState(so.title);
     const [description, setDescription] = useState(so.description ?? "");
     const [ownerId, setOwnerId] = useState<string | null>(so.owner_user_id ?? null);
+    const [targetYear, setTargetYear] = useState<string>(so.target_year ? String(so.target_year) : "");
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         setTitle(so.title);
         setDescription(so.description ?? "");
         setOwnerId(so.owner_user_id ?? null);
+        setTargetYear(so.target_year ? String(so.target_year) : "");
         setSaving(false);
     }, [so.id, so.updated_at]);
 
@@ -2286,8 +2300,8 @@ function StrategyObjectiveInlineCard(
                             className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{so.title}</div>
                         <Badge
                             className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
-                            {so.horizon_years}a
-                                        </Badge>
+                            {so.target_year ?? yearForStrategyObjective(so)}
+                        </Badge>
                     </div>
                     {so.description?.trim() ? (<div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{so.description.trim()}</div>) : (<div className="mt-1 text-xs text-muted-foreground">Sem descrição.</div>)}
                 </div>
@@ -2299,8 +2313,9 @@ function StrategyObjectiveInlineCard(
                             alt={owner.name}
                             className="h-full w-full object-cover" />) : (<span className="text-xs font-bold text-[color:var(--sinaxys-ink)]">{initials(owner.name)}</span>)}
                     </div>) : (<div
-                        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-white text-[color:var(--sinaxys-primary)]">
-                        <UserRound className="h-4 w-4" />
+                        className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-white text-[color:var(--sinaxys-primary)]"
+                        title="Responsável: toda a empresa">
+                        <Building2 className="h-4 w-4" />
                     </div>)}
                     <div
                         className="grid h-10 w-10 place-items-center rounded-2xl bg-white text-muted-foreground ring-1 ring-[color:var(--sinaxys-border)]">
@@ -2318,17 +2333,32 @@ function StrategyObjectiveInlineCard(
                             onChange={e => setTitle(e.target.value)}
                             disabled={!canEdit || saving} />
                     </div>
+
+                    <div className="grid gap-2">
+                        <Label>Para quando (ano)</Label>
+                        <Input
+                            type="number"
+                            inputMode="numeric"
+                            className="h-11 rounded-2xl"
+                            value={targetYear}
+                            onChange={e => setTargetYear(e.target.value)}
+                            disabled={!canEdit || saving}
+                            placeholder={String(yearForStrategyObjective(so))}
+                        />
+                        <div className="text-[11px] text-muted-foreground">Use um ano (ex.: 2028). Se vazio, usamos o horizonte como referência.</div>
+                    </div>
+
                     <div className="grid gap-2">
                         <Label>Responsável</Label>
                         <Select
-                            value={ownerId ?? "__none__"}
-                            onValueChange={v => setOwnerId(v === "__none__" ? null : v)}
+                            value={ownerId ?? "__company__"}
+                            onValueChange={v => setOwnerId(v === "__company__" ? null : v)}
                             disabled={!canEdit || saving}>
                             <SelectTrigger className="h-11 rounded-2xl bg-white">
                                 <SelectValue placeholder="Selecione…" />
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl">
-                                <SelectItem value="__none__">Sem responsável</SelectItem>
+                                <SelectItem value="__company__">Toda a empresa</SelectItem>
                                 {peopleOptions.map(p => (<SelectItem key={p.id} value={p.id}>
                                     {p.name}
                                 </SelectItem>))}
@@ -2352,8 +2382,11 @@ function StrategyObjectiveInlineCard(
                                 setSaving(true);
 
                                 try {
+                                    const nYear = targetYear.trim() ? Number(targetYear.trim()) : null;
+
                                     await updateStrategyObjective(so.id, {
                                         title,
+                                        target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
                                         description: description.trim() || null,
                                         owner_user_id: ownerId
                                     });
@@ -2377,9 +2410,8 @@ function StrategyObjectiveInlineCard(
                                             </Button>
                     </div>) : null}
                 </div>
-                <div className="mt-5">
-                    <StrategyKrsEditor objectiveId={so.id} canEdit={canEdit} people={people} />
-                </div>
+
+                {/* Removido: KRs de objetivos de longo prazo */}
             </div>) : null}
         </Card>
     );
@@ -2421,6 +2453,8 @@ function StrategyPicker(
     const [newTitle, setNewTitle] = useState("");
     const [newDesc, setNewDesc] = useState("");
     const [newOwner, setNewOwner] = useState<string | null>(null);
+    const [newTargetYear, setNewTargetYear] = useState<string>("");
+    const [newTargetTouched, setNewTargetTouched] = useState(false);
 
     useEffect(() => {
         if (!createOpen)
@@ -2431,7 +2465,15 @@ function StrategyPicker(
         setNewTitle("");
         setNewDesc("");
         setNewOwner(null);
+        setNewTargetYear(String(new Date().getFullYear() + 3));
+        setNewTargetTouched(false);
     }, [createOpen]);
+
+    useEffect(() => {
+        if (!createOpen) return;
+        if (newTargetTouched) return;
+        setNewTargetYear(String(new Date().getFullYear() + Number(newYears)));
+    }, [createOpen, newYears, newTargetTouched]);
 
     const canCreate = canEdit && !!user;
 
@@ -2451,7 +2493,7 @@ function StrategyPicker(
                     <div className="flex items-start justify-between gap-4">
                         <div>
                             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos de longo prazo</div>
-                            <div className="mt-1 text-sm text-muted-foreground">Veja todos juntos. Clique em um objetivo para editar e adicionar KRs de longo prazo.
+                            <div className="mt-1 text-sm text-muted-foreground">Veja todos juntos. Clique em um objetivo para editar.
                                               </div>
                         </div>
                         <div className="flex items-center gap-2">
@@ -2494,21 +2536,39 @@ function StrategyPicker(
                         <DialogTitle>Novo objetivo de longo prazo</DialogTitle>
                     </DialogHeader>
                     <div className="grid gap-4">
-                        <div className="grid gap-2">
-                            <Label>Horizonte</Label>
-                            <Select
-                                value={String(newYears)}
-                                onValueChange={v => setNewYears(Number(v) as any)}>
-                                <SelectTrigger className="h-11 rounded-2xl bg-white">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent className="rounded-2xl">
-                                    <SelectItem value="1">1 ano</SelectItem>
-                                    <SelectItem value="3">3 anos</SelectItem>
-                                    <SelectItem value="5">5 anos</SelectItem>
-                                    <SelectItem value="10">10 anos</SelectItem>
-                                </SelectContent>
-                            </Select>
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="grid gap-2">
+                                <Label>Horizonte</Label>
+                                <Select
+                                    value={String(newYears)}
+                                    onValueChange={v => setNewYears(Number(v) as any)}>
+                                    <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-2xl">
+                                        <SelectItem value="1">1 ano</SelectItem>
+                                        <SelectItem value="3">3 anos</SelectItem>
+                                        <SelectItem value="5">5 anos</SelectItem>
+                                        <SelectItem value="10">10 anos</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label>Para quando (ano)</Label>
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    className="h-11 rounded-2xl"
+                                    value={newTargetYear}
+                                    onChange={e => {
+                                        setNewTargetYear(e.target.value);
+                                        setNewTargetTouched(true);
+                                    }}
+                                    placeholder={String(new Date().getFullYear() + Number(newYears))}
+                                    disabled={creating}
+                                />
+                            </div>
                         </div>
                         <div className="grid gap-2">
                             <Label>Título</Label>
@@ -2522,14 +2582,14 @@ function StrategyPicker(
                         <div className="grid gap-2">
                             <Label>Responsável</Label>
                             <Select
-                                value={newOwner ?? "__none__"}
-                                onValueChange={v => setNewOwner(v === "__none__" ? null : v)}
+                                value={newOwner ?? "__company__"}
+                                onValueChange={v => setNewOwner(v === "__company__" ? null : v)}
                                 disabled={creating}>
                                 <SelectTrigger className="h-11 rounded-2xl bg-white">
                                     <SelectValue placeholder="Selecione…" />
                                 </SelectTrigger>
                                 <SelectContent className="rounded-2xl">
-                                    <SelectItem value="__none__">Sem responsável</SelectItem>
+                                    <SelectItem value="__company__">Toda a empresa</SelectItem>
                                     {peopleOptions.map(p => (<SelectItem key={p.id} value={p.id}>
                                         {p.name}
                                     </SelectItem>))}
@@ -2562,9 +2622,12 @@ function StrategyPicker(
                                     setCreating(true);
 
                                     try {
+                                        const nYear = newTargetYear.trim() ? Number(newTargetYear.trim()) : null;
+
                                         const created = await createStrategyObjective({
                                             company_id: cid,
                                             horizon_years: newYears,
+                                            target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
                                             title: newTitle,
                                             description: newDesc.trim() || null,
                                             created_by_user_id: user.id,
