@@ -8,6 +8,7 @@ export type DbCompanyFundamentals = {
   values: string | null;
   culture: string | null;
   strategic_north: string | null;
+  annual_drivers: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -15,7 +16,7 @@ export type DbCompanyFundamentals = {
 export async function getCompanyFundamentals(companyId: string) {
   const { data, error } = await supabase
     .from("company_fundamentals")
-    .select("company_id,mission,vision,purpose,values,culture,strategic_north,created_at,updated_at")
+    .select("company_id,mission,vision,purpose,values,culture,strategic_north,annual_drivers,created_at,updated_at")
     .eq("company_id", companyId)
     .maybeSingle();
   if (error) throw error;
@@ -26,14 +27,9 @@ export async function upsertCompanyFundamentals(companyId: string, patch: Partia
   // IMPORTANT: Only send fields that are present in `patch`.
   // Otherwise, we would overwrite other columns with NULL when doing a partial update.
   const payload: Record<string, any> = { company_id: companyId };
-  const keys: Array<keyof Pick<DbCompanyFundamentals, "mission" | "vision" | "purpose" | "values" | "culture" | "strategic_north">> = [
-    "mission",
-    "vision",
-    "purpose",
-    "values",
-    "culture",
-    "strategic_north",
-  ];
+  const keys: Array<
+    keyof Pick<DbCompanyFundamentals, "mission" | "vision" | "purpose" | "values" | "culture" | "strategic_north" | "annual_drivers">
+  > = ["mission", "vision", "purpose", "values", "culture", "strategic_north", "annual_drivers"];
 
   for (const k of keys) {
     if (Object.prototype.hasOwnProperty.call(patch, k)) {
@@ -44,7 +40,7 @@ export async function upsertCompanyFundamentals(companyId: string, patch: Partia
   const { data, error } = await supabase
     .from("company_fundamentals")
     .upsert(payload, { onConflict: "company_id" })
-    .select("company_id,mission,vision,purpose,values,culture,strategic_north,created_at,updated_at")
+    .select("company_id,mission,vision,purpose,values,culture,strategic_north,annual_drivers,created_at,updated_at")
     .single();
 
   if (error) throw error;
@@ -207,7 +203,7 @@ export type DbOkrObjective = {
   title: string;
   description: string | null;
   strategic_reason: string | null;
-  linked_fundamental: "MISSION" | "VISION" | "PURPOSE" | "VALUES" | "CULTURE" | "NORTH" | null;
+  linked_fundamental: "MISSION" | "VISION" | "PURPOSE" | "VALUES" | "CULTURE" | "NORTH" | "DRIVERS" | null;
   linked_fundamental_text: string | null;
   due_at: string | null;
   // Business case (optional)
@@ -220,12 +216,16 @@ export type DbOkrObjective = {
   status: ObjectiveStatus;
   achieved_pct: number | null;
   achieved_at: string | null;
+  // Performance assessment (by head)
+  head_performance_score: number | null;
+  head_performance_notes: string | null;
+  head_performance_reviewed_at: string | null;
   created_at: string | null;
   updated_at: string | null;
 };
 
 const objectiveSelect =
-  "id,company_id,cycle_id,parent_objective_id,strategy_objective_id,level,department_id,owner_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,expected_attainment_pct,status,achieved_pct,achieved_at,created_at,updated_at";
+  "id,company_id,cycle_id,parent_objective_id,strategy_objective_id,level,department_id,owner_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,expected_attainment_pct,status,achieved_pct,achieved_at,head_performance_score,head_performance_notes,head_performance_reviewed_at,created_at,updated_at";
 
 export async function listOkrObjectives(companyId: string, cycleId: string) {
   const { data, error } = await supabase
@@ -300,6 +300,9 @@ export async function updateOkrObjective(
       | "achieved_at"
       | "due_at"
       | "level"
+      | "head_performance_score"
+      | "head_performance_notes"
+      | "head_performance_reviewed_at"
     >
   >,
 ) {
@@ -328,6 +331,9 @@ export async function updateOkrObjective(
   if ("achieved_pct" in patch) update.achieved_pct = patch.achieved_pct ?? null;
   if ("achieved_at" in patch) update.achieved_at = patch.achieved_at ?? null;
   if ("due_at" in patch) update.due_at = patch.due_at ?? null;
+  if ("head_performance_score" in patch) update.head_performance_score = patch.head_performance_score ?? null;
+  if ("head_performance_notes" in patch) update.head_performance_notes = patch.head_performance_notes ?? null;
+  if ("head_performance_reviewed_at" in patch) update.head_performance_reviewed_at = patch.head_performance_reviewed_at ?? null;
 
   const { data, error } = await supabase.from("okr_objectives").update(update).eq("id", objectiveId).select(objectiveSelect).maybeSingle();
 
