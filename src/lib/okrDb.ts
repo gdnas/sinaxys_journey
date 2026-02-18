@@ -51,6 +51,7 @@ export type DbStrategyObjective = {
   id: string;
   company_id: string;
   horizon_years: 1 | 3 | 5 | 10;
+  target_year: number | null;
   title: string;
   description: string | null;
   growth_levers: string | null;
@@ -67,7 +68,7 @@ export async function listStrategyObjectives(companyId: string) {
   const { data, error } = await supabase
     .from("strategy_objectives")
     .select(
-      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
+      "id,company_id,horizon_years,target_year,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
     )
     .eq("company_id", companyId)
     .order("horizon_years", { ascending: true })
@@ -79,13 +80,19 @@ export async function listStrategyObjectives(companyId: string) {
 
 export async function createStrategyObjective(
   payload: Pick<DbStrategyObjective, "company_id" | "horizon_years" | "title"> &
-    Partial<Pick<DbStrategyObjective, "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "created_by_user_id" | "owner_user_id">>,
+    Partial<
+      Pick<
+        DbStrategyObjective,
+        "target_year" | "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "created_by_user_id" | "owner_user_id"
+      >
+    >,
 ) {
   const { data, error } = await supabase
     .from("strategy_objectives")
     .insert({
       company_id: payload.company_id,
       horizon_years: payload.horizon_years,
+      target_year: payload.target_year ?? null,
       title: payload.title.trim(),
       description: payload.description ?? null,
       growth_levers: payload.growth_levers ?? null,
@@ -96,7 +103,7 @@ export async function createStrategyObjective(
       owner_user_id: payload.owner_user_id ?? null,
     })
     .select(
-      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
+      "id,company_id,horizon_years,target_year,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
     )
     .single();
   if (error) throw error;
@@ -108,12 +115,13 @@ export async function updateStrategyObjective(
   patch: Partial<
     Pick<
       DbStrategyObjective,
-      "title" | "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "horizon_years" | "owner_user_id"
+      "title" | "target_year" | "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "horizon_years" | "owner_user_id"
     >
   >,
 ) {
   const update: Record<string, any> = {};
   if ("title" in patch) update.title = patch.title?.trim();
+  if ("target_year" in patch) update.target_year = patch.target_year ?? null;
   if ("description" in patch) update.description = patch.description ?? null;
   if ("growth_levers" in patch) update.growth_levers = patch.growth_levers ?? null;
   if ("structuring_projects" in patch) update.structuring_projects = patch.structuring_projects ?? null;
@@ -127,7 +135,7 @@ export async function updateStrategyObjective(
     .update(update)
     .eq("id", id)
     .select(
-      "id,company_id,horizon_years,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
+      "id,company_id,horizon_years,target_year,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
     )
     .maybeSingle();
 
