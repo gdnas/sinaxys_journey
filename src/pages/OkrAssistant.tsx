@@ -14,8 +14,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
-import { brl, brlPerHourFromMonthly } from "@/lib/costs";
+import { brl, brlPerHourFromMonthly, hourlyFromMonthly } from "@/lib/costs";
 import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
+import { listDepartments, type DbDepartment } from "@/lib/departmentsDb";
+import { listProfilesByCompany } from "@/lib/profilesDb";
 import {
   createDeliverable,
   createKeyResult,
@@ -120,6 +122,41 @@ export default function OkrAssistant() {
     staleTime: 20_000,
   });
 
+  const { data: departments = [] } = useQuery({
+    queryKey: ["departments", cid],
+    enabled: hasCompany,
+    queryFn: () => listDepartments(cid),
+    staleTime: 60_000,
+  });
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ["profiles", cid],
+    enabled: hasCompany,
+    queryFn: () => listProfilesByCompany(cid),
+    staleTime: 60_000,
+  });
+
+  const [participatingDeptId, setParticipatingDeptId] = useState<string>(user.departmentId ?? "");
+
+  useEffect(() => {
+    // keep a reasonable default when user has a dept
+    if (!participatingDeptId && user.departmentId) setParticipatingDeptId(user.departmentId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user.departmentId]);
+
+  const deptMembers = useMemo(() => {
+    if (!participatingDeptId) return [] as typeof profiles;
+    return profiles.filter((p) => p.department_id === participatingDeptId && p.active);
+  }, [participatingDeptId, profiles]);
+
+  const deptAvgHourly = useMemo(() => {
+    const rates = deptMembers
+      .map((p) => (typeof p.monthly_cost_brl === "number" ? hourlyFromMonthly(p.monthly_cost_brl) : null))
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v > 0);
+    if (!rates.length) return null;
+    return rates.reduce((a, b) => a + b, 0) / rates.length;
+  }, [deptMembers]);
+
   const companyObjectives = useMemo(() => cycleObjectives.filter((o) => o.level === "COMPANY"), [cycleObjectives]);
 
   const [parentId, setParentId] = useState<string>("");
@@ -166,14 +203,24 @@ export default function OkrAssistant() {
 
   const [publishing, setPublishing] = useState(false);
 
-  const requiresBusinessCase = !!user.departmentId;
+  const requiresBusinessCase = level === "COMPANY" ? true : !!user.departmentId;
   const myMonthly = user.monthlyCostBRL ?? null;
   const { enabled: okrRoiEnabled } = useCompanyModuleEnabled("OKR_ROI");
 
   const expectedAtt = parsePtNumber(objectiveExpected);
   const objectiveValueBRL = parsePtNumber(objectiveValue);
   const objectiveHours = parsePtNumber(objectiveEffortHours);
-  const objectiveCostBRL = laborCostFromMonthly(myMonthly, objectiveHours);
+
+  const objectiveCostBRL = useMemo(() => {
+    if (level === "COMPANY") {
+      if (!objectiveHours || objectiveHours <= 0) return null;
+      if (deptAvgHourly) return deptAvgHourly * objectiveHours;
+      // fallback: usa o custo do criador
+      return laborCostFromMonthly(myMonthly, objectiveHours);
+    }
+    return laborCostFromMonthly(myMonthly, objectiveHours);
+  }, [deptAvgHourly, level, myMonthly, objectiveHours]);
+
   const objectiveRoi = roiPct(objectiveValueBRL, objectiveCostBRL);
 
   const businessCaseOk =
@@ -185,8 +232,8 @@ export default function OkrAssistant() {
         objectiveValueBRL > 0 &&
         !!objectiveHours &&
         objectiveHours > 0 &&
-        !!myMonthly &&
-        myMonthly > 0 &&
+        ((level === "COMPANY" ? !!participatingDeptId : true)) &&
+        ((level === "COMPANY" ? (deptAvgHourly !== null || (!!myMonthly && myMonthly > 0)) : (!!myMonthly && myMonthly > 0))) &&
         objectiveCostBRL !== null &&
         objectiveRoi !== null &&
         tasks.length >= 1 &&
@@ -304,8 +351,8 @@ export default function OkrAssistant() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="INDIVIDUAL">Individual</SelectItem>
-                    <SelectItem value="TEAM">Time</SelectItem>
-                    <SelectItem value="DEPARTMENT">Departamento</SelectItem>
+                    {/* DEPARTMENT e TEAM são sinônimos: expomos apenas um */}
+                    <SelectItem value="DEPARTMENT">Time</SelectItem>
                     <SelectItem value="COMPANY">Empresa</SelectItem>
                   </SelectContent>
                 </Select>
@@ -382,6 +429,25 @@ export default function OkrAssistant() {
                 </div>
               )}
 
+              {level === "COMPANY" ? (
+                <div className="mt-4 grid gap-2">
+                  <Label>Time participante (para orçamento)</Label>
+                  <Select value={participatingDeptId} onValueChange={setParticipatingDeptId}>
+                    <SelectTrigger className="h-11 rounded-xl">
+                      <SelectValue placeholder={departments.length ? "Selecione…" : "Sem times cadastrados"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departments.map((d: DbDepartment) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-xs text-muted-foreground">Para Empresa, o custo é calculado pela média de custo/h dos colaboradores do time selecionado.</div>
+                </div>
+              ) : null}
+
               <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-sm">
                 <span className="font-semibold text-[color:var(--sinaxys-ink)]">Tier automático do entregável:</span>{" "}
                 <span className="font-semibold text-[color:var(--sinaxys-ink)]">{deliverableTierAuto === "TIER2" ? "Tier 2" : "Tier 1"}</span>
@@ -431,7 +497,11 @@ export default function OkrAssistant() {
             {requiresBusinessCase && okrRoiEnabled ? (
               <div className="mt-4 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
-                <p className="mt-1 text-sm text-muted-foreground">Como esse objetivo retorna dinheiro — e qual o ROI, baseado no seu custo/hora.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {level === "COMPANY"
+                    ? "Para objetivos de Empresa, o orçamento usa o time participante (não apenas o custo do dono)."
+                    : "Como esse objetivo retorna dinheiro — e qual o ROI, baseado no seu custo/hora."}
+                </p>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
                   <div className="grid gap-2">
@@ -450,19 +520,24 @@ export default function OkrAssistant() {
                 </div>
 
                 <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                  <div className="text-xs text-muted-foreground">Seu custo/h: {brlPerHourFromMonthly(myMonthly ?? 0)}</div>
-                  {!myMonthly ? (
-                    <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]">
-                      Para calcular ROI, cadastre seu custo mensal em <span className="font-semibold">Custos</span>.
+                  <div className="text-xs text-muted-foreground">
+                    {level === "COMPANY"
+                      ? `Custo/h do time: ${deptAvgHourly ? `${brl(deptAvgHourly)}/h` : `${brlPerHourFromMonthly(myMonthly ?? 0)}`}`
+                      : `Seu custo/h: ${brlPerHourFromMonthly(myMonthly ?? 0)}`}
+                  </div>
+                  {level === "COMPANY" ? (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Base: {deptMembers.length} colaboradores ativos no time • {deptMembers.filter((p) => typeof p.monthly_cost_brl === "number" && p.monthly_cost_brl > 0).length} com custo cadastrado.
                     </div>
+                  ) : null}
+                  {!myMonthly ? (
+                    <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]">Para calcular ROI, cadastre seu custo mensal em <span className="font-semibold">Custos</span>.</div>
                   ) : null}
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                     <span className="text-muted-foreground">Custo estimado:</span>
                     <span className="font-semibold text-[color:var(--sinaxys-ink)]">{objectiveCostBRL !== null ? brl(objectiveCostBRL) : "—"}</span>
                     <span className="text-muted-foreground">• ROI:</span>
-                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">
-                      {objectiveRoi !== null ? `${objectiveRoi.toFixed(1)}%` : "—"}
-                    </span>
+                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{objectiveRoi !== null ? `${objectiveRoi.toFixed(1)}%` : "—"}</span>
                   </div>
                 </div>
               </div>
@@ -720,7 +795,7 @@ export default function OkrAssistant() {
                       parent_objective_id: parentId || null,
                       strategy_objective_id: strategyObjectiveId || null,
                       level,
-                      department_id: user.departmentId ?? null,
+                      department_id: level === "COMPANY" ? (participatingDeptId || null) : user.departmentId ?? null,
                       owner_user_id: user.id,
                       title: objectiveTitle,
                       description: objectiveDesc,

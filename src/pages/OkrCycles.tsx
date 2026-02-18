@@ -26,7 +26,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { brl, brlPerHourFromMonthly } from "@/lib/costs";
+import { brl, brlPerHourFromMonthly, hourlyFromMonthly } from "@/lib/costs";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany } from "@/lib/profilesDb";
 import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
@@ -235,7 +235,32 @@ export default function OkrCycles() {
   const ownerMonthly = byUserId.get(objOwner)?.monthlyCostBRL ?? null;
   const valueBRL = parsePtNumber(objValue);
   const effortHours = parsePtNumber(objEffortHours);
-  const costBRL = laborCostFromMonthly(ownerMonthly, effortHours);
+
+  const deptMembers = useMemo(() => {
+    if (!objDept) return [] as typeof profiles;
+    return profiles.filter((p) => p.department_id === objDept && p.active);
+  }, [objDept, profiles]);
+
+  const deptAvgHourly = useMemo(() => {
+    const rates = deptMembers
+      .map((p) => (typeof p.monthly_cost_brl === "number" ? hourlyFromMonthly(p.monthly_cost_brl) : null))
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v > 0);
+    if (!rates.length) return null;
+    return rates.reduce((a, b) => a + b, 0) / rates.length;
+  }, [deptMembers]);
+
+  const costBRL = useMemo(() => {
+    if (objLevel === "COMPANY") {
+      if (!effortHours || effortHours <= 0) return null;
+      // Para Empresa: orçar pelo time/área participante (média do custo/h dos colaboradores do departamento)
+      if (deptAvgHourly) return deptAvgHourly * effortHours;
+      // Fallback: se ninguém do dept tem custo cadastrado, usa o dono
+      return laborCostFromMonthly(ownerMonthly, effortHours);
+    }
+
+    return laborCostFromMonthly(ownerMonthly, effortHours);
+  }, [deptAvgHourly, effortHours, objLevel, ownerMonthly]);
+
   const roi = roiPct(valueBRL, costBRL);
 
   const expectedAtt = parsePtNumber(objExpected);
@@ -244,7 +269,7 @@ export default function OkrCycles() {
     expectedAtt !== null && expectedAtt >= 0 && expectedAtt <= 100 &&
     (!requiresBusinessCase ||
       !okrRoiEnabled ||
-      (!!valueBRL && valueBRL > 0 && !!effortHours && effortHours > 0 && !!ownerMonthly && ownerMonthly > 0 && costBRL !== null && roi !== null));
+      (!!valueBRL && valueBRL > 0 && !!effortHours && effortHours > 0 && ((objLevel === "COMPANY" ? !!objDept : true)) && costBRL !== null && roi !== null));
 
   if (!hasCompany) {
     return (
@@ -589,8 +614,7 @@ export default function OkrCycles() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="COMPANY">Empresa</SelectItem>
-                  <SelectItem value="DEPARTMENT">Departamento</SelectItem>
-                  <SelectItem value="TEAM">Time</SelectItem>
+                  <SelectItem value="DEPARTMENT">Time</SelectItem>
                   <SelectItem value="INDIVIDUAL">Individual</SelectItem>
                 </SelectContent>
               </Select>
@@ -666,10 +690,12 @@ export default function OkrCycles() {
             </div>
 
             {requiresBusinessCase && okrRoiEnabled ? (
-              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+              <div className="mt-4 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Como esse objetivo retorna dinheiro para a empresa — e qual o ROI, baseado no custo/hora do responsável.
+                  {objLevel === "COMPANY"
+                    ? "Para objetivos de Empresa, o custo é estimado pela média de custo/h dos colaboradores do time participante."
+                    : "Para objetivos de departamento, o ROI usa seu custo/h (cadastre em Custos)."}
                 </p>
 
                 <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -689,19 +715,21 @@ export default function OkrCycles() {
                 </div>
 
                 <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                  <div className="text-xs text-muted-foreground">Custo/h do responsável: {brlPerHourFromMonthly(ownerMonthly ?? 0)}</div>
-                  {!ownerMonthly ? (
-                    <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]">
-                      Para calcular ROI, cadastre o custo mensal da pessoa em <span className="font-semibold">Custos</span>.
+                  <div className="text-xs text-muted-foreground">
+                    {objLevel === "COMPANY"
+                      ? `Custo/h do time: ${deptAvgHourly ? `${brl(deptAvgHourly)}/h` : "—"}`
+                      : `Custo/h do responsável: ${brlPerHourFromMonthly(ownerMonthly ?? 0)}`}
+                  </div>
+                  {objLevel === "COMPANY" ? (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Base: {deptMembers.length} colaboradores ativos no time • {deptMembers.filter((p) => typeof p.monthly_cost_brl === "number" && p.monthly_cost_brl > 0).length} com custo cadastrado.
                     </div>
                   ) : null}
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
                     <span className="text-muted-foreground">Custo estimado:</span>
                     <span className="font-semibold text-[color:var(--sinaxys-ink)]">{costBRL !== null ? brl(costBRL) : "—"}</span>
                     <span className="text-muted-foreground">• ROI:</span>
-                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">
-                      {roi !== null ? `${roi.toFixed(1)}%` : "—"}
-                    </span>
+                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{roi !== null ? `${roi.toFixed(1)}%` : "—"}</span>
                   </div>
                 </div>
               </div>
