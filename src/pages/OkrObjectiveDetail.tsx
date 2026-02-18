@@ -38,6 +38,7 @@ import {
   listDeliverablesByKeyResultIds,
   listKeyResults,
   listTasksByDeliverableIds,
+  listOkrCycles,
   listOkrObjectives,
   updateKeyResult,
   updateOkrObjective,
@@ -48,6 +49,7 @@ import {
   type DeliverableTier,
   type WorkStatus,
 } from "@/lib/okrDb";
+
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { OkrObjectiveCostItems } from "@/components/OkrObjectiveCostItems";
@@ -129,6 +131,42 @@ export default function OkrObjectiveDetail() {
     queryFn: () => listOkrObjectives(cid, objective!.cycle_id),
     staleTime: 20_000,
   });
+
+  const { data: cycles = [] } = useQuery({
+    queryKey: ["okr-cycles", cid],
+    enabled: hasCompany,
+    queryFn: () => listOkrCycles(cid),
+    staleTime: 60_000,
+  });
+
+  const cycleById = useMemo(() => {
+    const m = new Map<string, { type: string; year: number; quarter: number | null }>();
+    for (const c of cycles) m.set(c.id, { type: c.type, year: c.year, quarter: c.quarter });
+    return m;
+  }, [cycles]);
+
+  const { data: parentObjective } = useQuery({
+    queryKey: ["okr-objective", objective?.parent_objective_id],
+    enabled: !!objective?.parent_objective_id,
+    queryFn: () => getOkrObjective(objective!.parent_objective_id as string),
+    staleTime: 20_000,
+  });
+
+  const deliverableTierAuto: DeliverableTier = useMemo(() => {
+    if (!objective) return "TIER1";
+
+    // Tier 2: vinculado a OKR estratégico (objetivo de longo prazo)
+    if (objective.strategy_objective_id) return "TIER2";
+
+    // Tier 1: no trimestre, vinculado ao OKR do ano (via objetivo pai anual)
+    const cycle = cycleById.get(objective.cycle_id);
+    if (cycle?.type === "QUARTERLY" && parentObjective) {
+      const parentCycle = cycleById.get(parentObjective.cycle_id);
+      if (parentCycle?.type === "ANNUAL") return "TIER1";
+    }
+
+    return "TIER1";
+  }, [cycleById, objective, parentObjective]);
 
   const childrenCostBRL = useMemo(() => {
     if (!objective) return null;
@@ -219,7 +257,6 @@ export default function OkrObjectiveDetail() {
 
   const [delOpen, setDelOpen] = useState(false);
   const [delKrId, setDelKrId] = useState<string | null>(null);
-  const [delTier, setDelTier] = useState<DeliverableTier>("TIER1");
   const [delTitle, setDelTitle] = useState("");
   const [delDesc, setDelDesc] = useState("");
   const [delOwner, setDelOwner] = useState<string | null>(null);
@@ -228,7 +265,6 @@ export default function OkrObjectiveDetail() {
 
   const resetDeliverable = () => {
     setDelKrId(null);
-    setDelTier("TIER1");
     setDelTitle("");
     setDelDesc("");
     setDelOwner(null);
@@ -621,17 +657,10 @@ export default function OkrObjectiveDetail() {
           </DialogHeader>
 
           <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Tier</Label>
-              <Select value={delTier} onValueChange={(v) => setDelTier(v as DeliverableTier)}>
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="TIER1">Tier I (estratégico)</SelectItem>
-                  <SelectItem value="TIER2">Tier II (operacional)</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-sm">
+              <span className="font-semibold text-[color:var(--sinaxys-ink)]">Tier automático:</span>{" "}
+              <span className="font-semibold text-[color:var(--sinaxys-ink)]">{deliverableTierAuto === "TIER2" ? "Tier 2" : "Tier 1"}</span>
+              <span className="text-muted-foreground"> • baseado nos vínculos do objetivo</span>
             </div>
 
             <div className="grid gap-2">
@@ -687,7 +716,7 @@ export default function OkrObjectiveDetail() {
                 try {
                   await createDeliverable({
                     key_result_id: delKrId,
-                    tier: delTier,
+                    tier: deliverableTierAuto,
                     title: delTitle,
                     description: delDesc,
                     owner_user_id: delOwner,

@@ -24,11 +24,13 @@ import {
   getCompanyFundamentals,
   listOkrCycles,
   listOkrObjectives,
+  listStrategyObjectives,
   type DbOkrCycle,
   type DbOkrObjective,
   type DeliverableTier,
   type KrKind,
   type ObjectiveLevel,
+  type DbStrategyObjective,
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
@@ -90,15 +92,50 @@ export default function OkrAssistant() {
 
   const [level, setLevel] = useState<ObjectiveLevel>("INDIVIDUAL");
 
+  const selectedCycle = useMemo(() => cycles.find((c) => c.id === cycleId) ?? null, [cycles, cycleId]);
+
+  const annualCycleIdForSelected = useMemo(() => {
+    if (!selectedCycle) return null;
+    if (selectedCycle.type !== "QUARTERLY") return null;
+    return cycles.find((c) => c.type === "ANNUAL" && c.year === selectedCycle.year)?.id ?? null;
+  }, [cycles, selectedCycle]);
+
   const { data: cycleObjectives = [] } = useQuery({
     queryKey: ["okr-objectives", cid, cycleId],
     enabled: hasCompany && !!cycleId,
     queryFn: () => listOkrObjectives(cid, cycleId),
   });
 
+  const { data: annualObjectives = [] } = useQuery({
+    queryKey: ["okr-objectives", cid, annualCycleIdForSelected],
+    enabled: hasCompany && !!annualCycleIdForSelected,
+    queryFn: () => listOkrObjectives(cid, annualCycleIdForSelected as string),
+    staleTime: 20_000,
+  });
+
+  const { data: strategyObjectives = [] } = useQuery({
+    queryKey: ["okr-strategy", cid],
+    enabled: hasCompany,
+    queryFn: () => listStrategyObjectives(cid),
+    staleTime: 20_000,
+  });
+
   const companyObjectives = useMemo(() => cycleObjectives.filter((o) => o.level === "COMPANY"), [cycleObjectives]);
 
   const [parentId, setParentId] = useState<string>("");
+  const [strategyObjectiveId, setStrategyObjectiveId] = useState<string>("");
+
+  const deliverableTierAuto: DeliverableTier = useMemo(() => {
+    // Tier 2: vinculado a OKR estratégico (objetivo de longo prazo)
+    if (strategyObjectiveId) return "TIER2";
+
+    // Tier 1: no trimestre, vinculado ao OKR do ano
+    if (selectedCycle?.type === "QUARTERLY" && parentId) return "TIER1";
+
+    // Padrão
+    return "TIER1";
+  }, [parentId, selectedCycle?.type, strategyObjectiveId]);
+
   const [objectiveTitle, setObjectiveTitle] = useState("");
   const [objectiveDesc, setObjectiveDesc] = useState("");
   const [objectiveReason, setObjectiveReason] = useState("");
@@ -117,7 +154,6 @@ export default function OkrAssistant() {
   const [krTarget, setKrTarget] = useState("");
   const [krDue, setKrDue] = useState("");
 
-  const [tier, setTier] = useState<DeliverableTier>("TIER2");
   const [deliverableTitle, setDeliverableTitle] = useState("");
   const [deliverableDesc, setDeliverableDesc] = useState("");
   const [deliverableDue, setDeliverableDue] = useState("");
@@ -276,27 +312,81 @@ export default function OkrAssistant() {
               </div>
             </div>
 
-            <div className="mt-4 grid gap-2">
-              <Label>Contribui para qual objetivo estratégico (opcional)?</Label>
-              <Select
-                value={parentId}
-                onValueChange={(v) => {
-                  setParentId(v === SELECT_NONE ? "" : v);
-                }}
-              >
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder={companyObjectives.length ? "Escolha um objetivo da empresa" : "Nenhum objetivo da empresa neste ciclo"} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
-                  {companyObjectives.map((o) => (
-                    <SelectItem key={o.id} value={o.id}>
-                      {o.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="text-xs text-muted-foreground">Isso gera a cascata (empresa → área/time → você). Se não tiver, pode criar mesmo assim.</div>
+            <div className="mt-4 grid gap-4">
+              <div className="grid gap-2">
+                <Label>Vincular a objetivo de longo prazo (Tier 2, opcional)</Label>
+                <Select
+                  value={strategyObjectiveId}
+                  onValueChange={(v) => setStrategyObjectiveId(v === SELECT_NONE ? "" : v)}
+                >
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder={strategyObjectives.length ? "Selecione…" : "Sem objetivos de longo prazo"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SELECT_NONE}>Sem vínculo</SelectItem>
+                    {strategyObjectives.map((so: DbStrategyObjective) => (
+                      <SelectItem key={so.id} value={so.id}>
+                        {so.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">Se vincular, os entregáveis serão automaticamente Tier 2.</div>
+              </div>
+
+              {selectedCycle?.type === "QUARTERLY" ? (
+                <div className="grid gap-2">
+                  <Label>Vincular ao OKR do ano (Tier 1, opcional)</Label>
+                  <Select
+                    value={parentId}
+                    onValueChange={(v) => {
+                      setParentId(v === SELECT_NONE ? "" : v);
+                    }}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl">
+                      <SelectValue placeholder={annualObjectives.length ? "Selecione um objetivo anual" : "Sem objetivo anual para este ano"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SELECT_NONE}>Sem objetivo anual</SelectItem>
+                      {annualObjectives.map((o) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-xs text-muted-foreground">Esse vínculo define o Tier 1 automaticamente no trimestre.</div>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <Label>Objetivo pai (opcional)</Label>
+                  <Select
+                    value={parentId}
+                    onValueChange={(v) => {
+                      setParentId(v === SELECT_NONE ? "" : v);
+                    }}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl">
+                      <SelectValue placeholder={companyObjectives.length ? "Escolha um objetivo da empresa" : "Nenhum objetivo da empresa neste ciclo"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
+                      {companyObjectives.map((o) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <div className="text-xs text-muted-foreground">Opcional — ajuda a criar cascata entre objetivos.</div>
+                </div>
+              )}
+
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-sm">
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">Tier automático do entregável:</span>{" "}
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">{deliverableTierAuto === "TIER2" ? "Tier 2" : "Tier 1"}</span>
+                <span className="text-muted-foreground"> • baseado no vínculo acima</span>
+              </div>
             </div>
           </Card>
 
@@ -493,19 +583,6 @@ export default function OkrAssistant() {
 
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label>Tier</Label>
-                <Select value={tier} onValueChange={(v) => setTier(v as DeliverableTier)}>
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="TIER1">Tier I (estratégico)</SelectItem>
-                    <SelectItem value="TIER2">Tier II (operacional)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="grid gap-2">
                 <Label>Entregável</Label>
                 <Input
                   className="h-11 rounded-xl"
@@ -641,7 +718,7 @@ export default function OkrAssistant() {
                       company_id: cid,
                       cycle_id: cycleId,
                       parent_objective_id: parentId || null,
-                      strategy_objective_id: null,
+                      strategy_objective_id: strategyObjectiveId || null,
                       level,
                       department_id: user.departmentId ?? null,
                       owner_user_id: user.id,
@@ -674,7 +751,7 @@ export default function OkrAssistant() {
 
                     const del = await createDeliverable({
                       key_result_id: kr.id,
-                      tier,
+                      tier: deliverableTierAuto,
                       title: deliverableTitle,
                       description: deliverableDesc,
                       owner_user_id: user.id,
