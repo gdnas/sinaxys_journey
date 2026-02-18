@@ -306,7 +306,7 @@ export default function OkrCycles() {
             <p className="mt-1 text-sm text-muted-foreground">Você pode manter histórico de trimestres e anos.</p>
           </div>
 
-          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:flex-wrap md:items-center md:justify-end">
             <Select value={cycleId ?? ""} onValueChange={(v) => setCycleId(v)}>
               <SelectTrigger className="h-11 w-full rounded-xl md:w-[340px]">
                 <SelectValue placeholder="Escolha um ciclo" />
@@ -406,7 +406,7 @@ export default function OkrCycles() {
                     ) : null}
                   </div>
 
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:w-auto">
                     {canWriteObjective ? (
                       <Button
                         variant="outline"

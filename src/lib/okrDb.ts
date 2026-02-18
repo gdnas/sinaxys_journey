@@ -254,7 +254,20 @@ export async function getOkrObjective(objectiveId: string) {
   return (data ?? null) as DbOkrObjective | null;
 }
 
-export async function createOkrObjective(payload: Omit<DbOkrObjective, "id" | "created_at" | "updated_at" | "status" | "achieved_pct" | "achieved_at">) {
+export async function createOkrObjective(
+  payload: Omit<
+    DbOkrObjective,
+    | "id"
+    | "created_at"
+    | "updated_at"
+    | "status"
+    | "achieved_pct"
+    | "achieved_at"
+    | "head_performance_score"
+    | "head_performance_notes"
+    | "head_performance_reviewed_at"
+  >,
+) {
   const { data, error } = await supabase
     .from("okr_objectives")
     .insert({
