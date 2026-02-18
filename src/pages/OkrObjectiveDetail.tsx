@@ -38,6 +38,7 @@ import {
   listDeliverablesByKeyResultIds,
   listKeyResults,
   listTasksByDeliverableIds,
+  listOkrObjectives,
   updateKeyResult,
   updateOkrObjective,
   updateTask,
@@ -67,6 +68,38 @@ function fmtDate(d?: string | null) {
   return asDate.toLocaleDateString("pt-BR");
 }
 
+function sumDescendantCosts(objectiveId: string, objectives: { id: string; parent_objective_id: string | null; estimated_cost_brl: number | null }[]) {
+  const childrenByParent = new Map<string, string[]>();
+  for (const o of objectives) {
+    if (!o.parent_objective_id) continue;
+    const arr = childrenByParent.get(o.parent_objective_id) ?? [];
+    arr.push(o.id);
+    childrenByParent.set(o.parent_objective_id, arr);
+  }
+
+  const costById = new Map<string, number>();
+  for (const o of objectives) {
+    if (typeof o.estimated_cost_brl === "number" && Number.isFinite(o.estimated_cost_brl)) {
+      costById.set(o.id, o.estimated_cost_brl);
+    }
+  }
+
+  const visited = new Set<string>();
+  const stack = [...(childrenByParent.get(objectiveId) ?? [])];
+  let sum = 0;
+
+  while (stack.length) {
+    const id = stack.pop()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    sum += costById.get(id) ?? 0;
+    const children = childrenByParent.get(id) ?? [];
+    for (const c of children) stack.push(c);
+  }
+
+  return sum;
+}
+
 export default function OkrObjectiveDetail() {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -89,6 +122,29 @@ export default function OkrObjectiveDetail() {
     queryKey: ["okr-krs", objectiveId],
     queryFn: () => listKeyResults(objectiveId),
   });
+
+  const { data: objectivesInCycle = [] } = useQuery({
+    queryKey: ["okr-cycle-objectives", cid, objective?.cycle_id],
+    enabled: hasCompany && !!objective?.cycle_id,
+    queryFn: () => listOkrObjectives(cid, objective!.cycle_id),
+    staleTime: 20_000,
+  });
+
+  const childrenCostBRL = useMemo(() => {
+    if (!objective) return null;
+    if (objective.level !== "COMPANY") return null;
+    const sum = sumDescendantCosts(objective.id, objectivesInCycle);
+    return Number.isFinite(sum) ? sum : null;
+  }, [objective, objectivesInCycle]);
+
+  const totalCompanyCostBRL = useMemo(() => {
+    if (!objective) return null;
+    if (objective.level !== "COMPANY") return null;
+    const own = typeof objective.estimated_cost_brl === "number" ? objective.estimated_cost_brl : 0;
+    const kids = typeof childrenCostBRL === "number" ? childrenCostBRL : 0;
+    const total = own + kids;
+    return Number.isFinite(total) ? total : null;
+  }, [childrenCostBRL, objective]);
 
   const overallPct = useMemo(() => {
     const pcts = krs
@@ -410,6 +466,25 @@ export default function OkrObjectiveDetail() {
                     </div>
                   </div>
                 </div>
+
+                {objective.level === "COMPANY" ? (
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
+                      <div className="text-xs text-muted-foreground">Custo dos filhos (R$)</div>
+                      <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                        {typeof childrenCostBRL === "number" ? brl(childrenCostBRL) : "—"}
+                      </div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">Soma de custos de todos os objetivos descendentes.</div>
+                    </div>
+                    <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)] sm:col-span-2">
+                      <div className="text-xs text-muted-foreground">Custo total (este + filhos) (R$)</div>
+                      <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                        {typeof totalCompanyCostBRL === "number" ? brl(totalCompanyCostBRL) : "—"}
+                      </div>
+                      <div className="mt-1 text-[11px] text-muted-foreground">Para objetivos de nível Empresa, o custo real costuma estar nos filhos.</div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>

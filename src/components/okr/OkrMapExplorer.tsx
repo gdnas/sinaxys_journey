@@ -90,6 +90,8 @@ import {
 import { DescribedItemsEditor } from "@/components/fundamentals/DescribedItemsEditor";
 import { StrategyKrsEditor } from "@/components/okr/StrategyKrsEditor";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { brl } from "@/lib/costs";
+
 type NodeId = string;
 
 type Node = {
@@ -387,6 +389,42 @@ function averageObjectivePct(krs: DbOkrKeyResult[]) {
         return null;
 
     return Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
+}
+
+function sumDescendantCosts(objectiveId: string, objectives: DbOkrObjective[]) {
+    const childrenByParent = new Map<string, string[]>();
+
+    for (const o of objectives) {
+        if (!o.parent_objective_id)
+            continue;
+
+        const arr = childrenByParent.get(o.parent_objective_id) ?? [];
+        arr.push(o.id);
+        childrenByParent.set(o.parent_objective_id, arr);
+    }
+
+    const costById = new Map<string, number>();
+    for (const o of objectives) {
+        if (typeof o.estimated_cost_brl === "number" && Number.isFinite(o.estimated_cost_brl))
+            costById.set(o.id, o.estimated_cost_brl);
+    }
+
+    const visited = new Set<string>();
+    const stack = [...(childrenByParent.get(objectiveId) ?? [])];
+    let sum = 0;
+
+    while (stack.length) {
+        const id = stack.pop()!;
+        if (visited.has(id))
+            continue;
+        visited.add(id);
+        sum += costById.get(id) ?? 0;
+        const children = childrenByParent.get(id) ?? [];
+        for (const c of children)
+            stack.push(c);
+    }
+
+    return sum;
 }
 
 function StrategyLinker(
@@ -890,6 +928,13 @@ function ObjectiveEditor(
 
     const objectivesInCycle = qObjectivesInCycle.data ?? [];
 
+    const childrenCostBRL = useMemo(() => {
+        if (objective.level !== "COMPANY")
+            return null;
+        const sum = sumDescendantCosts(objective.id, objectivesInCycle);
+        return Number.isFinite(sum) && sum > 0 ? sum : 0;
+    }, [objective.id, objective.level, objectivesInCycle]);
+
     return (
         <div className="grid gap-4">
             <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
@@ -902,8 +947,16 @@ function ObjectiveEditor(
                             {typeof pct === "number" ? (<Badge
                                 className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                                 {pct}%
-                                                </Badge>) : null}
+                            </Badge>) : null}
                         </div>
+
+                        {objective.level === "COMPANY" && typeof childrenCostBRL === "number" ? (
+                            <div className="mt-3 inline-flex flex-wrap items-center gap-2 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2 text-xs">
+                                <span className="font-semibold text-[color:var(--sinaxys-ink)]">Custo (filhos):</span>
+                                <span className="font-semibold text-[color:var(--sinaxys-ink)]">{brl(childrenCostBRL)}</span>
+                                <span className="text-muted-foreground">(soma de objetivos descendentes)</span>
+                            </div>
+                        ) : null}
                     </div>
                     <Button asChild variant="outline" className="h-11 rounded-2xl bg-white">
                         <Link to={`/okr/objetivos/${objective.id}`}>Abrir</Link>
@@ -991,7 +1044,7 @@ function ObjectiveEditor(
                                 }
                             }}>
                             <Save className="mr-2 h-4 w-4" />Salvar
-                                          </Button>
+                        </Button>
                     </div>) : null}
                 </div>
             </Card>
