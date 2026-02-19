@@ -53,6 +53,7 @@ import {
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { OkrObjectiveCostItems } from "@/components/OkrObjectiveCostItems";
+import { OkrObjectiveBusinessCase } from "@/components/okr/OkrObjectiveBusinessCase";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 
 const SELECT_NONE = "__none__";
@@ -478,58 +479,13 @@ export default function OkrObjectiveDetail() {
             ) : null}
 
             {showRoi ? (
-              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
-                <p className="mt-1 text-sm text-muted-foreground">Resumo do business case cadastrado no objetivo.</p>
-
-                <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                  <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                    <div className="text-xs text-muted-foreground">Impacto (R$)</div>
-                    <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                      {typeof objective.estimated_value_brl === "number" ? brl(objective.estimated_value_brl) : "—"}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                    <div className="text-xs text-muted-foreground">Custo (R$)</div>
-                    <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                      {typeof objective.estimated_cost_brl === "number" ? brl(objective.estimated_cost_brl) : "—"}
-                    </div>
-                  </div>
-                  <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                    <div className="text-xs text-muted-foreground">ROI</div>
-                    <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                      {typeof objective.estimated_roi_pct === "number" ? `${objective.estimated_roi_pct.toFixed(1)}%` : "—"}
-                    </div>
-                  </div>
-                </div>
-
-                {objective.level === "COMPANY" ? (
-                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                    <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                      <div className="text-xs text-muted-foreground">Custo dos filhos (R$)</div>
-                      <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                        {typeof childrenCostBRL === "number" ? brl(childrenCostBRL) : "—"}
-                      </div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">Soma de custos de todos os objetivos descendentes.</div>
-                    </div>
-                    <div className="rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)] sm:col-span-2">
-                      <div className="text-xs text-muted-foreground">Custo total (este + filhos) (R$)</div>
-                      <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-                        {typeof totalCompanyCostBRL === "number" ? brl(totalCompanyCostBRL) : "—"}
-                      </div>
-                      <div className="mt-1 text-[11px] text-muted-foreground">Para objetivos de nível Empresa, o custo real costuma estar nos filhos.</div>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+              <OkrObjectiveBusinessCase companyId={cid} objective={objective} canWrite={canWrite} />
             ) : null}
           </div>
         ) : (
           <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Objetivo não encontrado.</div>
         )}
       </Card>
-
-      {objective ? <OkrObjectiveCostItems objectiveId={objective.id} canWrite={canWrite} /> : null}
 
       <div className="grid gap-6">
         {krs.length ? (
