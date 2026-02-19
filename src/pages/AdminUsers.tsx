@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MailPlus, Pencil, Search, Shield, UserRound } from "lucide-react";
+import { MailPlus, Pencil, Search, Shield, UploadCloud, UserRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,7 @@ import { listAccessStatsByCompany } from "@/lib/accessStatsDb";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany, updateProfile, type DbProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
+import { ImportUsersPanel } from "@/components/admin/ImportUsersPanel";
 
 const ROLE_OPTIONS = [
   { value: "ADMIN", label: "Admin" },
@@ -166,6 +167,11 @@ export default function AdminUsers() {
   const [inviteTempPassword, setInviteTempPassword] = useState("");
   const [inviting, setInviting] = useState(false);
 
+  // Role used by edge function expects MASTERADMIN too; cast to string.
+  const inviteRoleForFunction = inviteRole as unknown as string;
+
+  const [importOpen, setImportOpen] = useState(false);
+
   const resetInvite = () => {
     setInviteEmail("");
     setInviteName("");
@@ -214,6 +220,11 @@ export default function AdminUsers() {
               Adicionar usuário
             </Button>
 
+            <Button variant="outline" className="h-11 w-full rounded-xl bg-white md:w-auto" onClick={() => setImportOpen(true)}>
+              <UploadCloud className="mr-2 h-4 w-4" />
+              Importar
+            </Button>
+
             <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2 md:w-[260px]">
               <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Ocultar inativos</div>
               <Switch checked={hideInactive} onCheckedChange={setHideInactive} />
@@ -257,10 +268,16 @@ export default function AdminUsers() {
                 {filtered.map((p) => {
                   const dept = p.department_id ? deptById.get(p.department_id)?.name : "—";
                   const stat = statsByUserId.get(p.id);
-
                   return (
                     <TableRow key={p.id}>
-                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">{p.name ?? "—"}</TableCell>
+                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
+                        <Link to={`/admin/users/${p.id}`} className="inline-flex items-center gap-2 hover:underline">
+                          <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                            <UserRound className="h-4 w-4" />
+                          </span>
+                          <span className="min-w-0 truncate">{p.name ?? "—"}</span>
+                        </Link>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{p.email}</TableCell>
                       <TableCell>
                         <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
@@ -268,32 +285,24 @@ export default function AdminUsers() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{dept ?? "—"}</TableCell>
-                      <TableCell className="text-right font-medium text-[color:var(--sinaxys-ink)]">{stat ? stat.access_count : "—"}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{stat?.access_count ?? 0}</TableCell>
                       <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            asChild
-                            variant="outline"
-                            size="icon"
-                            className="h-9 w-9 rounded-xl"
-                            title="Abrir card"
-                          >
-                            <Link to={`/admin/users/${p.id}`}>
-                              <UserRound className="h-4 w-4" />
-                            </Link>
-                          </Button>
-
-                          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => openEdit(p)} title="Editar dados básicos">
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <Badge className={p.active ? "rounded-full bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : "rounded-full bg-amber-50 text-amber-800 hover:bg-amber-50"}>
+                          {p.active ? "Ativo" : "Inativo"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" className="h-9 rounded-xl" onClick={() => openEdit(p)}>
+                          <Pencil className="mr-2 h-4 w-4" />
+                          Editar
+                        </Button>
                       </TableCell>
                     </TableRow>
                   );
                 })}
 
-                {!isLoading && !filtered.length ? (
+                {!filtered.length ? (
                   <TableRow>
                     <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                       Nenhum usuário encontrado.
@@ -304,11 +313,22 @@ export default function AdminUsers() {
             </Table>
           </div>
         </ResponsiveTable>
-
-        <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-          Acessos são registrados quando a pessoa entra no sistema (inclui recarregar a aplicação). Se alguém nunca entrou, os campos aparecem como "—".
-        </div>
       </Card>
+
+      <Dialog open={importOpen} onOpenChange={setImportOpen}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-5xl">
+          <DialogHeader>
+            <DialogTitle>Importar usuários</DialogTitle>
+          </DialogHeader>
+          <ImportUsersPanel
+            companyId={companyId}
+            onImported={() => {
+              setImportOpen(false);
+              qc.invalidateQueries({ queryKey: ["profiles", companyId] });
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Invite / Create */}
       <Dialog
@@ -425,7 +445,7 @@ export default function AdminUsers() {
                     body: {
                       email: inviteEmail,
                       name: inviteName,
-                      role: inviteRole,
+                      role: inviteRoleForFunction,
                       departmentId: inviteDeptId || null,
                       jobTitle: inviteJobTitle || null,
                       phone: invitePhone || null,

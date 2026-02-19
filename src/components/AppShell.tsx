@@ -153,6 +153,20 @@ const nav: NavItem[] = [
       },
       {
         type: "link",
+        to: "/admin/users",
+        label: "Usuários",
+        icon: <Shield className="h-4 w-4" />,
+        roles: ["ADMIN"],
+      },
+      {
+        type: "link",
+        to: "/admin/import-users",
+        label: "Importar usuários",
+        icon: <UploadCloud className="h-4 w-4" />,
+        roles: ["ADMIN"],
+      },
+      {
+        type: "link",
         to: "/admin/departments",
         label: "Departamentos",
         icon: <Layers className="h-4 w-4" />,
@@ -198,29 +212,6 @@ const nav: NavItem[] = [
         icon: <GraduationCap className="h-4 w-4" />,
         roles: ["HEAD"],
         moduleKey: "TRACKS",
-      },
-    ],
-  },
-
-  // Usuários (admin)
-  {
-    type: "group",
-    label: "Usuários",
-    icon: <Shield className="h-4 w-4" />,
-    children: [
-      {
-        type: "link",
-        to: "/admin/users",
-        label: "Usuários",
-        icon: <Shield className="h-4 w-4" />,
-        roles: ["ADMIN"],
-      },
-      {
-        type: "link",
-        to: "/admin/import",
-        label: "Importar usuários",
-        icon: <UploadCloud className="h-4 w-4" />,
-        roles: ["ADMIN"],
       },
     ],
   },
