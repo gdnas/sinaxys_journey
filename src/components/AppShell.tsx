@@ -174,6 +174,14 @@ const nav: NavItem[] = [
       },
       {
         type: "link",
+        to: "/admin/costs",
+        label: "Custos",
+        icon: <Wallet className="h-4 w-4" />,
+        roles: ["ADMIN"],
+        moduleKey: "COSTS",
+      },
+      {
+        type: "link",
         to: "/admin/brand",
         label: "Marca & Módulos",
         icon: <Palette className="h-4 w-4" />,
@@ -230,16 +238,6 @@ const nav: NavItem[] = [
     label: "Head — Custos",
     icon: <Wallet className="h-4 w-4" />,
     roles: ["HEAD"],
-    moduleKey: "COSTS",
-  },
-
-  // Custos (admin)
-  {
-    type: "link",
-    to: "/admin/costs",
-    label: "Custos",
-    icon: <Wallet className="h-4 w-4" />,
-    roles: ["ADMIN"],
     moduleKey: "COSTS",
   },
 
