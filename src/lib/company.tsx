@@ -72,6 +72,38 @@ function hexToHsl(hex: string) {
   };
 }
 
+function clamp(n: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, n));
+}
+
+function mixHex(a: string, b: string, t: number) {
+  const ah = normalizeHex(a);
+  const bh = normalizeHex(b);
+  if (!ah || !bh) return ah || bh || a;
+
+  const ar = parseInt(ah.slice(1, 3), 16);
+  const ag = parseInt(ah.slice(3, 5), 16);
+  const ab = parseInt(ah.slice(5, 7), 16);
+
+  const br = parseInt(bh.slice(1, 3), 16);
+  const bg = parseInt(bh.slice(3, 5), 16);
+  const bb = parseInt(bh.slice(5, 7), 16);
+
+  const r = Math.round(ar + (br - ar) * t);
+  const g = Math.round(ag + (bg - ag) * t);
+  const bl = Math.round(ab + (bb - ab) * t);
+
+  return (
+    "#" +
+    [r, g, bl]
+      .map((x) => {
+        const s = x.toString(16);
+        return s.length === 1 ? `0${s}` : s;
+      })
+      .join("")
+  ).toUpperCase();
+}
+
 function mergeBrand(raw: Partial<CompanyBrand> | null | undefined): CompanyBrand {
   const base: CompanyBrand = structuredClone(DEFAULT_BRAND);
   if (!raw) return base;
@@ -93,16 +125,35 @@ function mergeBrand(raw: Partial<CompanyBrand> | null | undefined): CompanyBrand
 export function applyCompanyTheme(brand: CompanyBrand) {
   const root = document.documentElement;
 
-  root.style.setProperty("--sinaxys-ink", brand.colors.ink);
-  root.style.setProperty("--sinaxys-primary", brand.colors.primary);
-  root.style.setProperty("--sinaxys-bg", brand.colors.bg);
-  root.style.setProperty("--sinaxys-tint", brand.colors.tint);
-  root.style.setProperty("--sinaxys-border", brand.colors.border);
+  // We store LIGHT and DARK variants separately, and let CSS decide which one
+  // is active based on the `.dark` class. (Inline styles would otherwise override
+  // `.dark { ... }` definitions.)
+  root.style.setProperty("--sinaxys-ink-light", brand.colors.ink);
+  root.style.setProperty("--sinaxys-primary-light", brand.colors.primary);
+  root.style.setProperty("--sinaxys-bg-light", brand.colors.bg);
+  root.style.setProperty("--sinaxys-tint-light", brand.colors.tint);
+  root.style.setProperty("--sinaxys-border-light", brand.colors.border);
 
-  const primaryHsl = hexToHsl(brand.colors.primary);
-  if (primaryHsl) {
-    root.style.setProperty("--primary", `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
-    root.style.setProperty("--ring", `${primaryHsl.h} ${primaryHsl.s}% ${primaryHsl.l}%`);
+  // Dark palette: keep a comfortable neutral base, but keep the brand accent.
+  const primaryDarkHex = mixHex(brand.colors.primary, "#FFFFFF", 0.22);
+  root.style.setProperty("--sinaxys-ink-dark", "#F2EFFF");
+  root.style.setProperty("--sinaxys-primary-dark", primaryDarkHex);
+  root.style.setProperty("--sinaxys-bg-dark", "#09081A");
+  root.style.setProperty("--sinaxys-tint-dark", "#141336");
+  root.style.setProperty("--sinaxys-border-dark", "#2A2854");
+
+  const primaryHslLight = hexToHsl(brand.colors.primary);
+  if (primaryHslLight) {
+    root.style.setProperty("--primary-light", `${primaryHslLight.h} ${primaryHslLight.s}% ${primaryHslLight.l}%`);
+    root.style.setProperty("--ring-light", `${primaryHslLight.h} ${primaryHslLight.s}% ${primaryHslLight.l}%`);
+
+    const primaryHslDark = hexToHsl(primaryDarkHex);
+    if (primaryHslDark) {
+      // Slightly brighten in dark mode to read well on dark surfaces.
+      const l = clamp(primaryHslDark.l + 6, 58, 78);
+      root.style.setProperty("--primary-dark", `${primaryHslDark.h} ${primaryHslDark.s}% ${l}%`);
+      root.style.setProperty("--ring-dark", `${primaryHslDark.h} ${primaryHslDark.s}% ${l}%`);
+    }
   }
 }
 

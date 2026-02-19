@@ -14,7 +14,13 @@
     --popover: 0 0% 100%;
     --popover-foreground: 258 66% 21%;
 
-    --primary: 252 85% 55%;
+    /* theme-aware primary (set by company theme as --primary-light / --primary-dark) */
+    --primary-light: 252 85% 55%;
+    --ring-light: 252 85% 55%;
+    --primary-dark: 252 85% 68%;
+    --ring-dark: 252 85% 68%;
+
+    --primary: var(--primary-light);
     --primary-foreground: 0 0% 100%;
 
     --secondary: 252 35% 96%;
@@ -31,16 +37,28 @@
 
     --border: 252 30% 90%;
     --input: 252 30% 90%;
-    --ring: 252 85% 55%;
+    --ring: var(--ring-light);
 
     --radius: 0.9rem;
 
-    /* Sinaxys brand variables (hex, usadas via Tailwind arbitrary values) */
-    --sinaxys-ink: #20105b;
-    --sinaxys-primary: #542aef;
-    --sinaxys-bg: #f6f4ff;
-    --sinaxys-tint: #efeaff;
-    --sinaxys-border: #e6e1ff;
+    /* Sinaxys brand variables (active tokens map to light/dark variants) */
+    --sinaxys-ink-light: #20105b;
+    --sinaxys-primary-light: #542aef;
+    --sinaxys-bg-light: #f6f4ff;
+    --sinaxys-tint-light: #efeaff;
+    --sinaxys-border-light: #e6e1ff;
+
+    --sinaxys-ink-dark: #f2efff;
+    --sinaxys-primary-dark: #8b6cff;
+    --sinaxys-bg-dark: #09081a;
+    --sinaxys-tint-dark: #141336;
+    --sinaxys-border-dark: #2a2854;
+
+    --sinaxys-ink: var(--sinaxys-ink-light);
+    --sinaxys-primary: var(--sinaxys-primary-light);
+    --sinaxys-bg: var(--sinaxys-bg-light);
+    --sinaxys-tint: var(--sinaxys-tint-light);
+    --sinaxys-border: var(--sinaxys-border-light);
 
     /* OKR Map accents (hex) */
     --map-fundamentals-bg: #f4f0ff;
@@ -74,41 +92,41 @@
   }
 
   .dark {
-    /* shadcn tokens */
-    --background: 222.2 60% 7%;
-    --foreground: 210 40% 98%;
+    /* More comfortable contrast for reading */
+    --background: 236 24% 10%;
+    --foreground: 240 12% 96%;
 
-    --card: 222.2 56% 9%;
-    --card-foreground: 210 40% 98%;
+    --card: 236 22% 14%;
+    --card-foreground: 240 12% 96%;
 
-    --popover: 222.2 56% 9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 236 22% 14%;
+    --popover-foreground: 240 12% 96%;
 
-    --primary: 252 85% 68%;
+    --primary: var(--primary-dark);
     --primary-foreground: 240 10% 10%;
 
-    --secondary: 235 20% 14%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 236 18% 18%;
+    --secondary-foreground: 240 12% 96%;
 
-    --muted: 235 20% 14%;
-    --muted-foreground: 215 20% 72%;
+    --muted: 236 18% 18%;
+    --muted-foreground: 235 10% 78%;
 
-    --accent: 235 20% 14%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 236 18% 18%;
+    --accent-foreground: 240 12% 96%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 240 12% 96%;
 
-    --border: 235 18% 18%;
-    --input: 235 18% 18%;
-    --ring: 252 85% 68%;
+    --border: 236 16% 24%;
+    --input: 236 16% 24%;
+    --ring: var(--ring-dark);
 
-    /* Sinaxys brand variables (hex) - tuned for dark mode */
-    --sinaxys-ink: #f2efff;
-    --sinaxys-primary: #8b6cff;
-    --sinaxys-bg: #09081a;
-    --sinaxys-tint: #141336;
-    --sinaxys-border: #2a2854;
+    /* Switch Sinaxys active tokens */
+    --sinaxys-ink: var(--sinaxys-ink-dark);
+    --sinaxys-primary: var(--sinaxys-primary-dark);
+    --sinaxys-bg: var(--sinaxys-bg-dark);
+    --sinaxys-tint: var(--sinaxys-tint-dark);
+    --sinaxys-border: var(--sinaxys-border-dark);
 
     /* OKR Map accents (hex) */
     --map-fundamentals-bg: #121033;
