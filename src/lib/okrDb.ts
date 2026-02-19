@@ -221,6 +221,7 @@ export type DbOkrObjective = {
   estimated_roi_pct: number | null;
   expected_profit_brl: number | null;
   profit_thesis: string | null;
+  expected_revenue_at: string | null;
   // Attainment
   expected_attainment_pct: number | null;
   status: ObjectiveStatus;
@@ -235,7 +236,7 @@ export type DbOkrObjective = {
 };
 
 const objectiveSelect =
-  "id,company_id,cycle_id,parent_objective_id,strategy_objective_id,level,department_id,owner_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,expected_profit_brl,profit_thesis,expected_attainment_pct,status,achieved_pct,achieved_at,head_performance_score,head_performance_notes,head_performance_reviewed_at,created_at,updated_at";
+  "id,company_id,cycle_id,parent_objective_id,strategy_objective_id,level,department_id,owner_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,expected_profit_brl,profit_thesis,expected_revenue_at,expected_attainment_pct,status,achieved_pct,achieved_at,head_performance_score,head_performance_notes,head_performance_reviewed_at,created_at,updated_at";
 
 export async function listOkrObjectives(companyId: string, cycleId: string) {
   const { data, error } = await supabase
@@ -292,6 +293,7 @@ export async function createOkrObjective(
       estimated_roi_pct: payload.estimated_roi_pct ?? null,
       expected_profit_brl: payload.expected_profit_brl ?? null,
       profit_thesis: payload.profit_thesis ?? null,
+      expected_revenue_at: payload.expected_revenue_at ?? null,
       expected_attainment_pct: payload.expected_attainment_pct ?? null,
     })
     .select(objectiveSelect)
@@ -322,6 +324,7 @@ export async function updateOkrObjective(
       | "estimated_roi_pct"
       | "expected_profit_brl"
       | "profit_thesis"
+      | "expected_revenue_at"
       | "status"
       | "achieved_pct"
       | "achieved_at"
@@ -355,6 +358,7 @@ export async function updateOkrObjective(
   if ("estimated_roi_pct" in patch) update.estimated_roi_pct = patch.estimated_roi_pct ?? null;
   if ("expected_profit_brl" in patch) update.expected_profit_brl = patch.expected_profit_brl ?? null;
   if ("profit_thesis" in patch) update.profit_thesis = patch.profit_thesis ?? null;
+  if ("expected_revenue_at" in patch) update.expected_revenue_at = patch.expected_revenue_at ?? null;
 
   if ("status" in patch) update.status = patch.status;
   if ("achieved_pct" in patch) update.achieved_pct = patch.achieved_pct ?? null;

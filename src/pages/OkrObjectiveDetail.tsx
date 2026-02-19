@@ -221,6 +221,14 @@ export default function OkrObjectiveDetail() {
     return m;
   }, [objectivesInCycle]);
 
+  const linkedTier2Objectives = useMemo(() => {
+    const ids = new Set<string>();
+    for (const l of krObjectiveLinks) ids.add(l.objective_id);
+    return Array.from(ids)
+      .map((id) => ({ id, title: objectiveTitleById.get(id) ?? "OKR" }))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }, [krObjectiveLinks, objectiveTitleById]);
+
   const childrenCostBRL = useMemo(() => {
     if (!objective) return null;
     if (objective.level !== "COMPANY") return null;
@@ -536,7 +544,7 @@ export default function OkrObjectiveDetail() {
             ) : null}
 
             {showRoi ? (
-              <OkrObjectiveBusinessCase companyId={cid} objective={objective} canWrite={canWrite} />
+              <OkrObjectiveBusinessCase companyId={cid} objective={objective} canWrite={canWrite} linkedObjectives={linkedTier2Objectives} />
             ) : null}
           </div>
         ) : (
