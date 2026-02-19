@@ -803,6 +803,8 @@ export default function OkrCycles() {
                       estimated_effort_hours: effortHours,
                       estimated_cost_brl: costBRL !== null ? Number(costBRL.toFixed(2)) : null,
                       estimated_roi_pct: roi !== null ? Number(roi.toFixed(2)) : null,
+                      expected_profit_brl: null,
+                      profit_thesis: null,
                     });
                     toast({ title: "Objetivo criado" });
                   }

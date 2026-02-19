@@ -809,6 +809,8 @@ export default function OkrAssistant() {
                       estimated_effort_hours: objectiveHours,
                       estimated_cost_brl: objectiveCostBRL !== null ? Number(objectiveCostBRL.toFixed(2)) : null,
                       estimated_roi_pct: objectiveRoi !== null ? Number(objectiveRoi.toFixed(2)) : null,
+                      expected_profit_brl: null,
+                      profit_thesis: null,
                     });
 
                     const kr = await createKeyResult({
