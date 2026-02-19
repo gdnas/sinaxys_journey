@@ -755,7 +755,7 @@ function KrInlineEditor(
                         value={cur}
                         onChange={e => setCur(e.target.value)}
                         placeholder="Ex.: 42" />
-                    <div className="text-[11px] text-muted-foreground">Início: {kr.start_value ?? "—"}• Meta: {kr.target_value ?? "—"} {kr.metric_unit ? `(${kr.metric_unit})` : ""}
+                    <div className="text-[11px] text-muted-foreground">Início: {kr.start_value ?? "—"} • Atual: {kr.current_value ?? "—"} • Meta: {kr.target_value ?? "—"} {kr.metric_unit ? `(${kr.metric_unit})` : ""}
                     </div>
                 </div>) : (<div
                     className="flex items-center justify-between gap-3 rounded-xl bg-[color:var(--sinaxys-bg)] px-3 py-2">

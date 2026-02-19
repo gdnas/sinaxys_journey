@@ -70,6 +70,11 @@ function fmtDate(d?: string | null) {
   return asDate.toLocaleDateString("pt-BR");
 }
 
+function fmtMetricValue(v: number | null) {
+  if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+  return new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 }).format(v);
+}
+
 function sumDescendantCosts(objectiveId: string, objectives: { id: string; parent_objective_id: string | null; estimated_cost_brl: number | null }[]) {
   const childrenByParent = new Map<string, string[]>();
   for (const o of objectives) {
@@ -896,6 +901,8 @@ function KrCard({
   onToggleTask: (t: DbTask) => void;
 }) {
   const pct = krProgressPct(kr);
+  const unit = kr.metric_unit?.trim() ?? "";
+  const unitSuffix = unit ? ` ${unit}` : "";
 
   return (
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
@@ -936,6 +943,23 @@ function KrCard({
               </>
             ) : null}
           </div>
+
+          {kr.kind === "METRIC" ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Inicial</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{fmtMetricValue(kr.start_value)}{unitSuffix}</div>
+              </div>
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Atual</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{fmtMetricValue(kr.current_value)}{unitSuffix}</div>
+              </div>
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2">
+                <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Meta</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{fmtMetricValue(kr.target_value)}{unitSuffix}</div>
+              </div>
+            </div>
+          ) : null}
 
           {typeof pct === "number" ? (
             <div className="mt-4">
