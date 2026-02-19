@@ -174,6 +174,17 @@ const App = () => (
                       </RequireAuth>
                     }
                   />
+                  {/* Alias (plural) used by several links */}
+                  <Route
+                    path="/okr/objetivos/:objectiveId"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="OKR">
+                          <OkrObjectiveDetail />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
 
                   {/* Admin */}
                   <Route
