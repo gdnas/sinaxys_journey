@@ -231,7 +231,7 @@ export default function AdminBrand() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="h-11 rounded-xl"
-                placeholder="Ex.: Journey — Acme"
+                placeholder="Ex.: KAIROOS — Acme"
               />
             </div>
             <div className="grid gap-2">

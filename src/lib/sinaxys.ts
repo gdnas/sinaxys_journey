@@ -1,10 +1,11 @@
 import type { Role } from "@/lib/domain";
 
+// Backwards-compat: this module name remains, but the product brand is now KAIROOS.
 export const SINAXYS = {
-  name: "Sinaxys Journey",
+  name: "KAIROOS",
   colors: {
-    ink: "#20105B",
-    primary: "#542AEF",
+    ink: "#FFFFFF",
+    primary: "#6D4CFF",
     white: "#FFFFFF",
   },
 };

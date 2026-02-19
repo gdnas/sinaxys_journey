@@ -1,21 +1,21 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
 import type { Company, CompanyColors } from "@/lib/domain";
 import { useAuth } from "@/lib/auth";
-import { SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
+import { KAIROOS_LOGO_DATA_URL, SINAXYS_LOGO_DATA_URL } from "@/lib/brand";
 import { supabase } from "@/integrations/supabase/client";
 
 export type CompanyBrand = Pick<Company, "name" | "tagline" | "logoDataUrl" | "colors">;
 
 const DEFAULT_BRAND: CompanyBrand = {
-  name: "Sinaxys Journey",
-  tagline: "Aprendizado com clareza. Evolução com propósito.",
-  logoDataUrl: SINAXYS_LOGO_DATA_URL,
+  name: "KAIROOS",
+  tagline: "Kairoos connects strategy, people and daily execution in one operating system.",
+  logoDataUrl: KAIROOS_LOGO_DATA_URL,
   colors: {
-    ink: "#20105B",
-    primary: "#542AEF",
-    bg: "#F6F4FF",
-    tint: "#EFEAFF",
-    border: "#E6E1FF",
+    ink: "#FFFFFF",
+    primary: "#6D4CFF",
+    bg: "#07071A",
+    tint: "#12122A",
+    border: "#24244A",
   },
 };
 
