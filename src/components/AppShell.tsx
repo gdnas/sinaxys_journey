@@ -35,6 +35,7 @@ import { describedItemsToLines, parseDescribedItems, textPreview } from "@/lib/f
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 import { OnboardingTourProvider } from "@/components/OnboardingTour";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Role = "MASTERADMIN" | "ADMIN" | "HEAD" | "COLABORADOR";
 
@@ -500,7 +501,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <OnboardingTourProvider>
       <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
-        <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur dark:bg-[hsl(var(--background))]/85">
           <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
             <div className="flex items-center gap-3">
               <Sheet>
@@ -534,7 +535,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   )}
                 </div>
                 <div className="min-w-0 leading-tight">
-                  <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] sm:max-w-[260px]">
+                  <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))] sm:max-w-[260px]">
                     {company.name}
                   </div>
                   <div className="hidden text-xs text-muted-foreground sm:block">{company.tagline}</div>
@@ -543,19 +544,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-3">
+              <ThemeToggle />
+
               <button
                 type="button"
-                className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)]"
+                className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)] dark:border-border dark:bg-background dark:hover:bg-muted"
                 onClick={() => navigate("/profile")}
                 aria-label="Abrir perfil"
                 data-tour="top-profile"
               >
                 <Avatar className="h-9 w-9">
                   <AvatarImage src={user.avatarUrl} alt={user.name} />
-                  <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">{initials(user.name)}</AvatarFallback>
+                  <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] dark:bg-muted dark:text-[hsl(var(--foreground))]">
+                    {initials(user.name)}
+                  </AvatarFallback>
                 </Avatar>
                 <div className="hidden max-w-[42vw] min-w-0 text-right sm:block lg:max-w-[360px]">
-                  <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">
+                  <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))]">
                     {user.name} <span className="text-muted-foreground">— {jobTitleLabel}</span>
                   </div>
                   <div className="text-xs text-muted-foreground">{roleLabel(user.role)}</div>
@@ -567,7 +572,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <Button
                     variant="outline"
                     size="icon"
-                    className="rounded-full border-[color:var(--sinaxys-border)] bg-white"
+                    className="rounded-full border-[color:var(--sinaxys-border)] bg-white dark:border-border dark:bg-background"
                     onClick={async () => {
                       await logout();
                       navigate("/login");

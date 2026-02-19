@@ -74,33 +74,63 @@
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* shadcn tokens */
+    --background: 222.2 60% 7%;
     --foreground: 210 40% 98%;
 
-    --card: 222.2 84% 4.9%;
+    --card: 222.2 56% 9%;
     --card-foreground: 210 40% 98%;
 
-    --popover: 222.2 84% 4.9%;
+    --popover: 222.2 56% 9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 252 85% 68%;
+    --primary-foreground: 240 10% 10%;
 
-    --secondary: 217.2 32.6% 17.5%;
+    --secondary: 235 20% 14%;
     --secondary-foreground: 210 40% 98%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 235 20% 14%;
+    --muted-foreground: 215 20% 72%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 235 20% 14%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 235 18% 18%;
+    --input: 235 18% 18%;
+    --ring: 252 85% 68%;
+
+    /* Sinaxys brand variables (hex) - tuned for dark mode */
+    --sinaxys-ink: #f2efff;
+    --sinaxys-primary: #8b6cff;
+    --sinaxys-bg: #09081a;
+    --sinaxys-tint: #141336;
+    --sinaxys-border: #2a2854;
+
+    /* OKR Map accents (hex) */
+    --map-fundamentals-bg: #121033;
+    --map-fundamentals-ink: #e7e1ff;
+    --map-fundamentals-border: #2a2854;
+
+    --map-strategy-bg: #26101a;
+    --map-strategy-ink: #ffd1e0;
+    --map-strategy-border: #4a2232;
+
+    --map-cycles-bg: #241a0d;
+    --map-cycles-ink: #ffe8c2;
+    --map-cycles-border: #4d3418;
+
+    --map-objectives-bg: #0c211f;
+    --map-objectives-ink: #c7fff5;
+    --map-objectives-border: #1f4a43;
+
+    --map-neutral-bg: #0b0a1d;
+    --map-neutral-ink: #f2efff;
+    --map-neutral-border: #2a2854;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
