@@ -811,6 +811,7 @@ export default function OkrAssistant() {
                       estimated_roi_pct: objectiveRoi !== null ? Number(objectiveRoi.toFixed(2)) : null,
                       expected_profit_brl: null,
                       profit_thesis: null,
+                      expected_revenue_at: null,
                     });
 
                     const kr = await createKeyResult({

@@ -345,6 +345,7 @@ export default function OkrCycles() {
         estimated_roi_pct: o.estimated_roi_pct,
         expected_profit_brl: o.expected_profit_brl,
         profit_thesis: o.profit_thesis,
+        expected_revenue_at: o.expected_revenue_at ?? null,
       });
 
       idMap.set(o.id, created.id);
@@ -1278,6 +1279,7 @@ export default function OkrCycles() {
                       estimated_roi_pct: roi !== null ? Number(roi.toFixed(2)) : null,
                       expected_profit_brl: null,
                       profit_thesis: null,
+                      expected_revenue_at: null,
                     });
                     toast({ title: "Objetivo criado" });
                   }
