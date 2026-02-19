@@ -6,8 +6,15 @@ export function RequireAuth({ roles, children }: { roles?: Role[]; children: Rea
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  // While hydrating the session, don't redirect (prevents flicker to /login).
+  /**
+   * IMPORTANT UX BEHAVIOR:
+   * Supabase can emit auth events when the tab regains focus (token refresh).
+   * During this brief re-hydration we must NOT unmount the protected UI;
+   * otherwise any open dialogs/popups lose their in-memory state.
+   */
   if (loading) {
+    if (user) return <>{children}</>;
+
     return (
       <div className="grid min-h-[60vh] place-items-center">
         <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-6 py-4 text-sm text-muted-foreground">
