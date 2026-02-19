@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Circle, Layers, Pencil, Plus, Target, Trash2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, Layers, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,7 @@ import {
   type DeliverableTier,
   type WorkStatus,
 } from "@/lib/okrDb";
+import { linkObjectiveToKr, listLinkedObjectivesByKrIds, unlinkObjectiveFromKr } from "@/lib/okrAlignmentDb";
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
@@ -130,6 +131,34 @@ export default function OkrObjectiveDetail() {
     queryFn: () => listKeyResults(objectiveId),
   });
 
+  const krIds = useMemo(() => krs.map((k) => k.id), [krs]);
+
+  const { data: krObjectiveLinks = [] } = useQuery({
+    queryKey: ["okr-kr-objective-links", objectiveId, krIds.join(",")],
+    enabled: krIds.length > 0,
+    queryFn: () => listLinkedObjectivesByKrIds(krIds),
+  });
+
+  const linkedObjectiveIdsByKrId = useMemo(() => {
+    const m = new Map<string, Set<string>>();
+    for (const l of krObjectiveLinks) {
+      const set = m.get(l.key_result_id) ?? new Set<string>();
+      set.add(l.objective_id);
+      m.set(l.key_result_id, set);
+    }
+    return m;
+  }, [krObjectiveLinks]);
+
+  const linkedObjectiveLinksByKrId = useMemo(() => {
+    const m = new Map<string, { id: string; objectiveId: string }[]>();
+    for (const l of krObjectiveLinks) {
+      const arr = m.get(l.key_result_id) ?? [];
+      arr.push({ id: l.id, objectiveId: l.objective_id });
+      m.set(l.key_result_id, arr);
+    }
+    return m;
+  }, [krObjectiveLinks]);
+
   const { data: objectivesInCycle = [] } = useQuery({
     queryKey: ["okr-cycle-objectives", cid, objective?.cycle_id],
     enabled: hasCompany && !!objective?.cycle_id,
@@ -173,6 +202,25 @@ export default function OkrObjectiveDetail() {
     return "TIER1";
   }, [cycleById, objective, parentObjective]);
 
+  const isTier1 = deliverableTierAuto === "TIER1";
+
+  const tier2LinkCandidates = useMemo(() => {
+    if (!objective) return [] as { id: string; title: string; level: string; department_id: string | null }[];
+
+    // Candidates: objectives in the SAME cycle that are not this objective, and are non-company (dept/team/individual).
+    // This covers Tier 2 OKRs.
+    return objectivesInCycle
+      .filter((o) => o.id !== objective.id)
+      .filter((o) => o.level !== "COMPANY")
+      .map((o) => ({ id: o.id, title: o.title, level: o.level, department_id: o.department_id }));
+  }, [objective, objectivesInCycle]);
+
+  const objectiveTitleById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of objectivesInCycle) m.set(o.id, o.title);
+    return m;
+  }, [objectivesInCycle]);
+
   const childrenCostBRL = useMemo(() => {
     if (!objective) return null;
     if (objective.level !== "COMPANY") return null;
@@ -196,8 +244,6 @@ export default function OkrObjectiveDetail() {
     if (!pcts.length) return null;
     return Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
   }, [krs]);
-
-  const krIds = useMemo(() => krs.map((k) => k.id), [krs]);
 
   const { data: deliverables = [] } = useQuery({
     queryKey: ["okr-deliverables", objectiveId, krIds.join(",")],
@@ -267,6 +313,17 @@ export default function OkrObjectiveDetail() {
   const [delOwner, setDelOwner] = useState<string | null>(null);
   const [delDue, setDelDue] = useState<string>("");
   const [delSaving, setDelSaving] = useState(false);
+
+  // Alignment (Tier1 -> link Tier2 objectives to a KR)
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [linkKrId, setLinkKrId] = useState<string | null>(null);
+  const [linkObjectiveId, setLinkObjectiveId] = useState<string>(SELECT_NONE);
+  const [linkSaving, setLinkSaving] = useState(false);
+
+  const resetLink = () => {
+    setLinkKrId(null);
+    setLinkObjectiveId(SELECT_NONE);
+  };
 
   const resetDeliverable = () => {
     setDelKrId(null);
@@ -498,11 +555,33 @@ export default function OkrObjectiveDetail() {
               byUserId={byUserId}
               canWrite={canWrite}
               canEditTask={canEditTask}
+              isTier1={isTier1}
+              linkedObjectives={linkedObjectiveLinksByKrId.get(kr.id) ?? []}
+              objectiveTitleById={objectiveTitleById}
+              onUnlinkObjective={async (linkId) => {
+                try {
+                  await unlinkObjectiveFromKr(linkId);
+                  await qc.invalidateQueries({ queryKey: ["okr-kr-objective-links", objectiveId] });
+                  toast({ title: "Vínculo removido" });
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível desvincular",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                }
+              }}
               onToggleDeliverableKr={() => toggleDeliverableKr(kr)}
               onAddDeliverable={() => {
                 resetDeliverable();
                 setDelKrId(kr.id);
                 setDelOpen(true);
+              }}
+              onLinkTier2={() => {
+                resetLink();
+                setLinkKrId(kr.id);
+                setLinkObjectiveId(SELECT_NONE);
+                setLinkOpen(true);
               }}
               onAddTask={(deliverableId) => {
                 resetTask();
@@ -535,6 +614,86 @@ export default function OkrObjectiveDetail() {
             <p className="mt-1 text-sm text-muted-foreground">Volte para "Ciclos & OKRs" e adicione KRs mensuráveis.</p>
           </Card>
         )}
+      </div>
+
+      <div className="grid gap-6">
+        <Dialog
+          open={linkOpen}
+          onOpenChange={(v) => {
+            setLinkOpen(v);
+            if (!v) resetLink();
+          }}
+        >
+          <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Vincular OKR (Tier 2) ao KR</DialogTitle>
+            </DialogHeader>
+
+            <div className="grid gap-4">
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-sm text-muted-foreground">
+                Esse vínculo serve para alinhar os OKRs táticos (Tier 2) aos resultados-chave do OKR estratégico (Tier 1).
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Escolha o OKR Tier 2</Label>
+                <Select value={linkObjectiveId} onValueChange={setLinkObjectiveId}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SELECT_NONE}>Selecione</SelectItem>
+                    {tier2LinkCandidates.map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.title}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {tier2LinkCandidates.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">Nenhum OKR Tier 2 encontrado neste ciclo. Crie um objetivo tático no ciclo para poder vincular.</div>
+                ) : null}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" className="rounded-xl" onClick={() => setLinkOpen(false)} disabled={linkSaving}>
+                Cancelar
+              </Button>
+              <Button
+                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={
+                  linkSaving ||
+                  !canWrite ||
+                  !linkKrId ||
+                  linkObjectiveId === SELECT_NONE ||
+                  !tier2LinkCandidates.some((o) => o.id === linkObjectiveId)
+                }
+                onClick={async () => {
+                  if (!linkKrId) return;
+                  if (linkObjectiveId === SELECT_NONE) return;
+                  setLinkSaving(true);
+                  try {
+                    await linkObjectiveToKr(linkKrId, linkObjectiveId);
+                    await qc.invalidateQueries({ queryKey: ["okr-kr-objective-links", objectiveId] });
+                    toast({ title: "OKR vinculado ao KR" });
+                    setLinkOpen(false);
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível vincular",
+                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setLinkSaving(false);
+                  }
+                }}
+              >
+                Vincular
+                <Link2 className="ml-2 h-4 w-4" />
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
 
       <Dialog open={markOpen} onOpenChange={setMarkOpen}>
@@ -629,33 +788,31 @@ export default function OkrObjectiveDetail() {
               <Textarea className="min-h-[92px] rounded-2xl" value={delDesc} onChange={(e) => setDelDesc(e.target.value)} />
             </div>
 
-            <div className="grid gap-2 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>Responsável (opcional)</Label>
-                <Select
-                  value={delOwner ?? ""}
-                  onValueChange={(v) => {
-                    setDelOwner(v === SELECT_NONE ? null : v);
-                  }}
-                >
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue placeholder="Sem responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={SELECT_NONE}>Sem responsável</SelectItem>
-                    {profiles.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name ?? p.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid gap-2">
+              <Label>Responsável (opcional)</Label>
+              <Select
+                value={delOwner ?? ""}
+                onValueChange={(v) => {
+                  setDelOwner(v === SELECT_NONE ? null : v);
+                }}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Sem responsável" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SELECT_NONE}>Sem responsável</SelectItem>
+                  {profiles.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name ?? p.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-              <div className="grid gap-2">
-                <Label>Prazo (opcional)</Label>
-                <Input className="h-11 rounded-xl" type="date" value={delDue} onChange={(e) => setDelDue(e.target.value)} />
-              </div>
+            <div className="grid gap-2">
+              <Label>Prazo (opcional)</Label>
+              <Input className="h-11 rounded-xl" type="date" value={delDue} onChange={(e) => setDelDue(e.target.value)} />
             </div>
           </div>
 
@@ -882,6 +1039,11 @@ function KrCard({
   canEditTask,
   onToggleDeliverableKr,
   onAddDeliverable,
+  onLinkTier2,
+  isTier1,
+  linkedObjectives,
+  objectiveTitleById,
+  onUnlinkObjective,
   onAddTask,
   onEditTask,
   onDeleteTask,
@@ -895,6 +1057,11 @@ function KrCard({
   canEditTask: (t: DbTask) => boolean;
   onToggleDeliverableKr: () => void;
   onAddDeliverable: () => void;
+  onLinkTier2: () => void;
+  isTier1: boolean;
+  linkedObjectives: { id: string; objectiveId: string }[];
+  objectiveTitleById: Map<string, string>;
+  onUnlinkObjective: (linkId: string) => void;
   onAddTask: (deliverableId: string) => void;
   onEditTask: (t: DbTask) => void;
   onDeleteTask: (t: DbTask) => void;
@@ -944,19 +1111,51 @@ function KrCard({
             ) : null}
           </div>
 
+          {isTier1 && linkedObjectives.length ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {linkedObjectives.map((l) => (
+                <div
+                  key={l.id}
+                  className="group inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-1.5 text-xs"
+                  title="OKR Tier 2 vinculado"
+                >
+                  <span className="font-semibold text-[color:var(--sinaxys-ink)]">
+                    {objectiveTitleById.get(l.objectiveId) ?? "OKR"}
+                  </span>
+                  {canWrite ? (
+                    <button
+                      type="button"
+                      className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground transition hover:bg-white hover:text-[color:var(--sinaxys-ink)]"
+                      onClick={() => onUnlinkObjective(l.id)}
+                      title="Desvincular"
+                    >
+                      <Unlink2 className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           {kr.kind === "METRIC" ? (
             <div className="mt-3 flex flex-wrap gap-2">
               <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2">
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Inicial</div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{fmtMetricValue(kr.start_value)}{unitSuffix}</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                  {fmtMetricValue(kr.start_value)}{unitSuffix}
+                </div>
               </div>
               <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2">
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Atual</div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{fmtMetricValue(kr.current_value)}{unitSuffix}</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                  {fmtMetricValue(kr.current_value)}{unitSuffix}
+                </div>
               </div>
               <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2">
                 <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Meta</div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{fmtMetricValue(kr.target_value)}{unitSuffix}</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+                  {fmtMetricValue(kr.target_value)}{unitSuffix}
+                </div>
               </div>
             </div>
           ) : null}
@@ -984,15 +1183,34 @@ function KrCard({
           ) : null}
 
           {canWrite ? (
-            <Button variant="outline" className="h-11 rounded-xl" onClick={onAddDeliverable} title="Criar entregável (Tier I/II)">
-              <Plus className="mr-2 h-4 w-4" />
-              Entregável
-            </Button>
+            isTier1 ? (
+              <Button variant="outline" className="h-11 rounded-xl" onClick={onLinkTier2} title="Vincular OKR Tier 2 a este KR">
+                <Link2 className="mr-2 h-4 w-4" />
+                Vincular
+              </Button>
+            ) : (
+              <Button variant="outline" className="h-11 rounded-xl" onClick={onAddDeliverable} title="Criar entregável (Tier I/II)">
+                <Plus className="mr-2 h-4 w-4" />
+                Entregável
+              </Button>
+            )
           ) : null}
         </div>
       </div>
 
       <Separator className="my-5" />
+
+      {isTier1 ? (
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entregáveis</div>
+          {canWrite ? (
+            <Button variant="outline" className="h-10 rounded-xl" onClick={onAddDeliverable} title="Criar entregável">
+              <Plus className="mr-2 h-4 w-4" />
+              Entregável
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-3">
         {deliverables.length ? (
