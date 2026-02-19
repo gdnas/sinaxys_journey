@@ -2784,9 +2784,9 @@ function OkrMapTreeCanvas(
     }
 ) {
     const [expanded, setExpanded] = useState<Record<string, boolean>>({
-        fundamentals: true,
-        strategy: true,
-        cycles: true
+        fundamentals: false,
+        strategy: false,
+        cycles: false,
     });
 
     const toggle = (id: string) => setExpanded(p => ({
