@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, Users, Wallet, TrendingUp, Sparkles } from "lucide-react";
+import { Pencil, Plus, Trash2, Users, Wallet, TrendingUp, Sparkles } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { brl, brlPerHourFromMonthly, hourlyFromMonthly } from "@/lib/costs";
 import { parsePtNumber, roiPct } from "@/lib/roi";
 import { listProfilesByCompany, type DbProfile } from "@/lib/profilesDb";
-import { createObjectiveCostItem, deleteObjectiveCostItem, listObjectiveCostItems } from "@/lib/okrCostsDb";
+import { createObjectiveCostItem, deleteObjectiveCostItem, listObjectiveCostItems, updateObjectiveCostItem } from "@/lib/okrCostsDb";
 import {
   deleteObjectiveLaborAllocation,
   listObjectiveLaborAllocations,
@@ -175,17 +175,70 @@ export function OkrObjectiveBusinessCase({
     }
   };
 
-  // Non-human costs modal
+  // Non-human costs modal (create/edit)
   const [costOpen, setCostOpen] = useState(false);
+  const [editingCostId, setEditingCostId] = useState<string | null>(null);
   const [costTitle, setCostTitle] = useState("");
   const [costAmount, setCostAmount] = useState("");
   const [costNotes, setCostNotes] = useState("");
   const [costSaving, setCostSaving] = useState(false);
 
   const resetCost = () => {
+    setEditingCostId(null);
     setCostTitle("");
     setCostAmount("");
     setCostNotes("");
+  };
+
+  const openCreateCost = () => {
+    resetCost();
+    setCostOpen(true);
+  };
+
+  const openEditCost = (it: { id: string; title: string; amount_brl: number; notes: string | null }) => {
+    setEditingCostId(it.id);
+    setCostTitle(it.title);
+    setCostAmount(String(Number(it.amount_brl) || 0));
+    setCostNotes(it.notes ?? "");
+    setCostOpen(true);
+  };
+
+  const saveCost = async () => {
+    if (!canWrite) return;
+
+    const value = parsePtNumber(costAmount);
+    if (value === null) {
+      toast({ title: "Valor inválido", description: "Informe um número (ex.: 1200).", variant: "destructive" });
+      return;
+    }
+
+    try {
+      setCostSaving(true);
+      if (editingCostId) {
+        await updateObjectiveCostItem(editingCostId, {
+          title: costTitle,
+          amount_brl: value,
+          notes: costNotes.trim() || null,
+        });
+      } else {
+        await createObjectiveCostItem({
+          objective_id: objective.id,
+          title: costTitle,
+          amount_brl: value,
+          notes: costNotes.trim() || null,
+        });
+      }
+      await qc.invalidateQueries({ queryKey: ["okr-objective-cost-items", objective.id] });
+      setCostOpen(false);
+    } catch (e) {
+      toast({
+        title: "Não foi possível salvar",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    } finally {
+      setCostSaving(false);
+    }
   };
 
   return (
@@ -344,10 +397,7 @@ export function OkrObjectiveBusinessCase({
           {canWrite ? (
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              onClick={() => {
-                resetCost();
-                setCostOpen(true);
-              }}
+              onClick={openCreateCost}
             >
               <Plus className="mr-2 h-4 w-4" />
               Adicionar custo
@@ -360,6 +410,7 @@ export function OkrObjectiveBusinessCase({
             <span className="text-muted-foreground">Total:</span>{" "}
             <span className="font-semibold text-[color:var(--sinaxys-ink)]">{brl(nonHumanCostBRL)}</span>
           </div>
+          {canWrite ? <div className="text-xs text-muted-foreground">Clique em um item para editar.</div> : null}
         </div>
 
         <div className="mt-4 grid gap-3">
@@ -367,34 +418,63 @@ export function OkrObjectiveBusinessCase({
             <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">Carregando…</div>
           ) : costItems.length ? (
             costItems.map((it) => (
-              <div key={it.id} className="flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+              <div
+                key={it.id}
+                role={canWrite ? "button" : undefined}
+                tabIndex={canWrite ? 0 : -1}
+                className={
+                  "flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 transition " +
+                  (canWrite ? " cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/35" : "")
+                }
+                onClick={() => {
+                  if (!canWrite) return;
+                  openEditCost(it);
+                }}
+                title={canWrite ? "Clique para editar" : undefined}
+              >
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{it.title}</div>
                   <div className="mt-1 text-sm text-muted-foreground">{brl(n(it.amount_brl))}</div>
                   {it.notes?.trim() ? <div className="mt-2 text-sm text-muted-foreground">{it.notes}</div> : null}
                 </div>
                 {canWrite ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
-                    title="Excluir"
-                    onClick={async () => {
-                      try {
-                        await deleteObjectiveCostItem(it.id);
-                        await qc.invalidateQueries({ queryKey: ["okr-objective-cost-items", objective.id] });
-                      } catch (e) {
-                        toast({
-                          title: "Não foi possível excluir",
-                          description: e instanceof Error ? e.message : "Erro inesperado.",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                      title="Editar"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openEditCost(it);
+                      }}
+                    >
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                      title="Excluir"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await deleteObjectiveCostItem(it.id);
+                          await qc.invalidateQueries({ queryKey: ["okr-objective-cost-items", objective.id] });
+                        } catch (e2) {
+                          toast({
+                            title: "Não foi possível excluir",
+                            description: e2 instanceof Error ? e2.message : "Erro inesperado.",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 ) : null}
               </div>
             ))
@@ -561,7 +641,7 @@ export function OkrObjectiveBusinessCase({
       >
         <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Novo custo extra</DialogTitle>
+            <DialogTitle>{editingCostId ? "Editar custo extra" : "Novo custo extra"}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4">
@@ -586,33 +666,9 @@ export function OkrObjectiveBusinessCase({
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
               disabled={costSaving || !canWrite || costTitle.trim().length < 3 || parsePtNumber(costAmount) === null}
-              onClick={async () => {
-                if (!canWrite) return;
-                const value = parsePtNumber(costAmount);
-                if (value === null) return;
-
-                try {
-                  setCostSaving(true);
-                  await createObjectiveCostItem({
-                    objective_id: objective.id,
-                    title: costTitle,
-                    amount_brl: value,
-                    notes: costNotes.trim() || null,
-                  });
-                  await qc.invalidateQueries({ queryKey: ["okr-objective-cost-items", objective.id] });
-                  setCostOpen(false);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível salvar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setCostSaving(false);
-                }
-              }}
+              onClick={saveCost}
             >
-              Adicionar
+              {editingCostId ? "Salvar" : "Adicionar"}
             </Button>
           </DialogFooter>
         </DialogContent>

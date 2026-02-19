@@ -23,7 +23,9 @@ export async function listObjectiveCostItems(objectiveId: string) {
   return (data ?? []) as DbObjectiveCostItem[];
 }
 
-export async function createObjectiveCostItem(payload: Pick<DbObjectiveCostItem, "objective_id" | "title" | "amount_brl"> & Partial<Pick<DbObjectiveCostItem, "notes" | "created_by_user_id">>) {
+export async function createObjectiveCostItem(
+  payload: Pick<DbObjectiveCostItem, "objective_id" | "title" | "amount_brl"> & Partial<Pick<DbObjectiveCostItem, "notes" | "created_by_user_id">>,
+) {
   const { data, error } = await supabase
     .from("okr_objective_cost_items")
     .insert({
@@ -37,6 +39,20 @@ export async function createObjectiveCostItem(payload: Pick<DbObjectiveCostItem,
     .single();
   if (error) throw error;
   return data as DbObjectiveCostItem;
+}
+
+export async function updateObjectiveCostItem(
+  id: string,
+  patch: Partial<Pick<DbObjectiveCostItem, "title" | "amount_brl" | "notes">>,
+) {
+  const update: Record<string, any> = {};
+  if ("title" in patch) update.title = patch.title?.trim();
+  if ("amount_brl" in patch) update.amount_brl = patch.amount_brl;
+  if ("notes" in patch) update.notes = patch.notes ?? null;
+
+  const { data, error } = await supabase.from("okr_objective_cost_items").update(update).eq("id", id).select(select).maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as DbObjectiveCostItem | null;
 }
 
 export async function deleteObjectiveCostItem(id: string) {
