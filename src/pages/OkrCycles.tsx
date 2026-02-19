@@ -389,7 +389,13 @@ export default function OkrCycles() {
                           <span>Evolução</span>
                           <span className="font-medium text-[color:var(--sinaxys-ink)]">{st.pct}%</span>
                         </div>
-                        <Progress value={st.pct} className="mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
+                        <Progress
+                          value={st.pct}
+                          className={
+                            "mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70 ring-1 ring-[color:var(--sinaxys-border)]/70 " +
+                            "dark:bg-[hsl(var(--secondary))] dark:ring-border [&>div]:bg-[color:var(--sinaxys-primary)]"
+                          }
+                        />
                       </div>
                     ) : null}
                   </div>
@@ -423,7 +429,11 @@ export default function OkrCycles() {
                     {canWriteObjective ? (
                       <Button
                         variant="outline"
-                        className="h-11 rounded-xl border-destructive/30 text-destructive hover:bg-destructive/5 hover:text-destructive"
+                        className={
+                          "h-11 rounded-xl border-destructive/40 bg-destructive/5 text-destructive " +
+                          "hover:bg-destructive/10 hover:text-destructive " +
+                          "dark:border-destructive/50 dark:bg-destructive/20 dark:hover:bg-destructive/25"
+                        }
                         onClick={() => {
                           setDeleteObjectiveId(o.id);
                           setDeleteOpen(true);
