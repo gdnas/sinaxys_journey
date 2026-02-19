@@ -298,18 +298,20 @@ function Row(
     }
 ) {
     const tone = toneFromKind(toneKind);
+    const surface = "hsl(var(--card))";
+    const activeBg = `color-mix(in srgb, ${tone.bg} 22%, ${surface} 78%)`;
 
     return (
         <button
             type="button"
             style={{
                 ...rowIndentStyle(depth),
-                borderColor: active ? tone.ink : tone.border,
-                backgroundColor: active ? "color-mix(in srgb, " + tone.bg + " 70%, white 30%)" : "white",
+                borderColor: active ? tone.border : "hsl(var(--border))",
+                backgroundColor: active ? activeBg : surface,
             }}
             className={cn(
                 "group flex w-full items-start gap-2 rounded-2xl border px-3 py-2 text-left transition",
-                "hover:[background-color:color-mix(in_srgb,var(--sinaxys-tint)_35%,white)]"
+                "hover:bg-[hsl(var(--muted))]"
             )}
             onClick={onClick}>
             <span
@@ -342,8 +344,9 @@ function Row(
                     <span
                         className={cn(
                             "grid h-8 w-8 place-items-center rounded-xl transition",
-                            "bg-white ring-1 ring-[color:var(--sinaxys-border)]",
-                            active ? "text-[color:var(--sinaxys-primary)]" : "text-muted-foreground"
+                            "bg-[hsl(var(--card))] ring-1 ring-border",
+                            active ? "text-[color:var(--sinaxys-primary)]" : "text-muted-foreground",
+                            "hover:bg-[hsl(var(--muted))]"
                         )}
                         title="Editar"
                         onClick={e => {
@@ -358,8 +361,9 @@ function Row(
                     <span
                         className={cn(
                             "grid h-8 w-8 place-items-center rounded-xl transition",
-                            "bg-white ring-1 ring-[color:var(--sinaxys-border)]",
-                            active ? "text-[color:var(--sinaxys-primary)]" : "text-[color:var(--sinaxys-ink)]"
+                            "bg-[hsl(var(--card))] ring-1 ring-border",
+                            active ? "text-[color:var(--sinaxys-primary)]" : "text-[color:var(--sinaxys-ink)]",
+                            "hover:bg-[hsl(var(--muted))]"
                         )}
                         title={expanded ? "Recolher" : "Expandir"}
                         onClick={e => {

@@ -128,26 +128,26 @@
     --sinaxys-tint: var(--sinaxys-tint-dark);
     --sinaxys-border: var(--sinaxys-border-dark);
 
-    /* OKR Map accents (hex) */
-    --map-fundamentals-bg: #121033;
-    --map-fundamentals-ink: #e7e1ff;
-    --map-fundamentals-border: #2a2854;
+    /* OKR Map accents (hex) - lifted for legibility on dark surfaces */
+    --map-fundamentals-bg: #1b1846;
+    --map-fundamentals-ink: #efeaff;
+    --map-fundamentals-border: #3a3572;
 
-    --map-strategy-bg: #26101a;
-    --map-strategy-ink: #ffd1e0;
-    --map-strategy-border: #4a2232;
+    --map-strategy-bg: #3a1625;
+    --map-strategy-ink: #ffd6e5;
+    --map-strategy-border: #6a2c44;
 
-    --map-cycles-bg: #241a0d;
-    --map-cycles-ink: #ffe8c2;
-    --map-cycles-border: #4d3418;
+    --map-cycles-bg: #3a2a12;
+    --map-cycles-ink: #ffe6bf;
+    --map-cycles-border: #6a4b1e;
 
-    --map-objectives-bg: #0c211f;
-    --map-objectives-ink: #c7fff5;
-    --map-objectives-border: #1f4a43;
+    --map-objectives-bg: #0f2f2a;
+    --map-objectives-ink: #cafff2;
+    --map-objectives-border: #245c52;
 
-    --map-neutral-bg: #0b0a1d;
-    --map-neutral-ink: #f2efff;
-    --map-neutral-border: #2a2854;
+    --map-neutral-bg: #17163a;
+    --map-neutral-ink: #f0eeff;
+    --map-neutral-border: #2f2d5d;
 
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
