@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus, Trash2, Users, Wallet, TrendingUp, Sparkles } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { brl, brlPerHourFromMonthly, hourlyFromMonthly } from "@/lib/costs";
 import { parsePtNumber, roiPct } from "@/lib/roi";
 import { listProfilesByCompany, type DbProfile } from "@/lib/profilesDb";
-import { listObjectiveCostItems } from "@/lib/okrCostsDb";
+import { createObjectiveCostItem, deleteObjectiveCostItem, listObjectiveCostItems } from "@/lib/okrCostsDb";
 import {
   deleteObjectiveLaborAllocation,
   listObjectiveLaborAllocations,
@@ -66,7 +66,7 @@ export function OkrObjectiveBusinessCase({
     staleTime: 60_000,
   });
 
-  const { data: costItems = [] } = useQuery({
+  const { data: costItems = [], isLoading: loadingCostItems } = useQuery({
     queryKey: ["okr-objective-cost-items", objective.id],
     queryFn: () => listObjectiveCostItems(objective.id),
   });
@@ -143,6 +143,12 @@ export function OkrObjectiveBusinessCase({
   const [thesis, setThesis] = useState<string>(plannedProfitThesis ?? "");
   const [savingProfit, setSavingProfit] = useState(false);
 
+  useEffect(() => {
+    setProfit(plannedProfit !== null ? String(plannedProfit) : "");
+    setThesis(plannedProfitThesis ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [objective.id, objective.expected_profit_brl, objective.profit_thesis]);
+
   const saveProfit = async () => {
     const p = profit.trim() ? parsePtNumber(profit) : null;
     if (profit.trim() && p === null) {
@@ -169,13 +175,26 @@ export function OkrObjectiveBusinessCase({
     }
   };
 
+  // Non-human costs modal
+  const [costOpen, setCostOpen] = useState(false);
+  const [costTitle, setCostTitle] = useState("");
+  const [costAmount, setCostAmount] = useState("");
+  const [costNotes, setCostNotes] = useState("");
+  const [costSaving, setCostSaving] = useState(false);
+
+  const resetCost = () => {
+    setCostTitle("");
+    setCostAmount("");
+    setCostNotes("");
+  };
+
   return (
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Business case (custos + lucro + ROI)</div>
           <p className="mt-1 text-sm text-muted-foreground">
-            Primeiro estime custos (humanos e não-humanos). Depois registre quanto pretendemos lucrar e a tese do retorno.
+            Junte tudo aqui: custos humanos (pessoas + horas), custos não-humanos (opex) e retorno esperado (lucro + tese).
           </p>
         </div>
         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
@@ -197,7 +216,7 @@ export function OkrObjectiveBusinessCase({
               <Users className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
             </div>
           </div>
-          <div className="mt-2 text-[11px] text-muted-foreground">Baseado em pessoas do time + horas estimadas + custo/h.</div>
+          <div className="mt-2 text-[11px] text-muted-foreground">Pessoas do time × horas × custo/h.</div>
         </div>
 
         <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 ring-1 ring-[color:var(--sinaxys-border)]">
@@ -223,7 +242,7 @@ export function OkrObjectiveBusinessCase({
               <Sparkles className="h-5 w-5" />
             </div>
           </div>
-          <div className="mt-2 text-[11px] text-white/80">Usado como base para o ROI.</div>
+          <div className="mt-2 text-[11px] text-white/80">Base do ROI.</div>
         </div>
       </div>
 
@@ -232,7 +251,7 @@ export function OkrObjectiveBusinessCase({
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Time + horas (custo humano)</div>
-            <p className="mt-1 text-sm text-muted-foreground">Escolha as pessoas do time e estime horas empregadas por pessoa.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Escolha as pessoas e estime horas por pessoa.</p>
           </div>
           {canWrite ? (
             <Button
@@ -310,8 +329,78 @@ export function OkrObjectiveBusinessCase({
         <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-[color:var(--sinaxys-border)]">
           <div className="text-xs text-muted-foreground">Dica</div>
           <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)]">
-            Se o custo/h aparecer como “—”, vá em <span className="font-semibold">Custos</span> e cadastre o custo mensal da pessoa.
+            Se o custo/h aparecer como "—", vá em <span className="font-semibold">Custos</span> e cadastre o custo mensal da pessoa.
           </div>
+        </div>
+      </div>
+
+      {/* Non-human costs */}
+      <div className="mt-6 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos extras (não-humanos)</div>
+            <p className="mt-1 text-sm text-muted-foreground">Ferramentas, fornecedores, mídia, deslocamento, infraestrutura etc.</p>
+          </div>
+          {canWrite ? (
+            <Button
+              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              onClick={() => {
+                resetCost();
+                setCostOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar custo
+            </Button>
+          ) : null}
+        </div>
+
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm">
+            <span className="text-muted-foreground">Total:</span>{" "}
+            <span className="font-semibold text-[color:var(--sinaxys-ink)]">{brl(nonHumanCostBRL)}</span>
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3">
+          {loadingCostItems ? (
+            <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">Carregando…</div>
+          ) : costItems.length ? (
+            costItems.map((it) => (
+              <div key={it.id} className="flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{it.title}</div>
+                  <div className="mt-1 text-sm text-muted-foreground">{brl(n(it.amount_brl))}</div>
+                  {it.notes?.trim() ? <div className="mt-2 text-sm text-muted-foreground">{it.notes}</div> : null}
+                </div>
+                {canWrite ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                    title="Excluir"
+                    onClick={async () => {
+                      try {
+                        await deleteObjectiveCostItem(it.id);
+                        await qc.invalidateQueries({ queryKey: ["okr-objective-cost-items", objective.id] });
+                      } catch (e) {
+                        toast({
+                          title: "Não foi possível excluir",
+                          description: e instanceof Error ? e.message : "Erro inesperado.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                ) : null}
+              </div>
+            ))
+          ) : (
+            <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">Nenhum custo extra cadastrado.</div>
+          )}
         </div>
       </div>
 
@@ -323,7 +412,7 @@ export function OkrObjectiveBusinessCase({
             <p className="mt-1 text-sm text-muted-foreground">Quanto pretendemos lucrar com isso (se atingirmos) e como.</p>
           </div>
           <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] px-3 py-2 text-xs text-[color:var(--sinaxys-ink)]">
-            ROI (base): {plannedRoiPct !== null ? `${plannedRoiPct.toFixed(1)}%` : "—"}
+            ROI (se atingirmos): {plannedRoiPct !== null ? `${plannedRoiPct.toFixed(1)}%` : "—"}
           </div>
         </div>
 
@@ -453,6 +542,73 @@ export function OkrObjectiveBusinessCase({
                   });
                 } finally {
                   setSavingHuman(false);
+                }
+              }}
+            >
+              Adicionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Non-human cost dialog */}
+      <Dialog
+        open={costOpen}
+        onOpenChange={(v) => {
+          setCostOpen(v);
+          if (!v) resetCost();
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Novo custo extra</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Nome</Label>
+              <Input className="h-11 rounded-xl" value={costTitle} onChange={(e) => setCostTitle(e.target.value)} placeholder="Ex.: Licença do CRM" />
+            </div>
+            <div className="grid gap-2">
+              <Label>Valor estimado (R$)</Label>
+              <Input className="h-11 rounded-xl" value={costAmount} onChange={(e) => setCostAmount(e.target.value)} placeholder="1200" />
+            </div>
+            <div className="grid gap-2">
+              <Label>Notas (opcional)</Label>
+              <Textarea className="min-h-[88px] rounded-2xl" value={costNotes} onChange={(e) => setCostNotes(e.target.value)} />
+            </div>
+          </div>
+
+          <DialogFooter className="mt-2 gap-2 sm:gap-0">
+            <Button variant="outline" className="h-11 rounded-xl" onClick={() => setCostOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={costSaving || !canWrite || costTitle.trim().length < 3 || parsePtNumber(costAmount) === null}
+              onClick={async () => {
+                if (!canWrite) return;
+                const value = parsePtNumber(costAmount);
+                if (value === null) return;
+
+                try {
+                  setCostSaving(true);
+                  await createObjectiveCostItem({
+                    objective_id: objective.id,
+                    title: costTitle,
+                    amount_brl: value,
+                    notes: costNotes.trim() || null,
+                  });
+                  await qc.invalidateQueries({ queryKey: ["okr-objective-cost-items", objective.id] });
+                  setCostOpen(false);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível salvar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setCostSaving(false);
                 }
               }}
             >

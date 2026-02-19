@@ -52,7 +52,6 @@ import {
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
-import { OkrObjectiveCostItems } from "@/components/OkrObjectiveCostItems";
 import { OkrObjectiveBusinessCase } from "@/components/okr/OkrObjectiveBusinessCase";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 
@@ -365,11 +364,7 @@ export default function OkrObjectiveDetail() {
   }
 
   const expected = typeof objective?.expected_attainment_pct === "number" ? objective.expected_attainment_pct : null;
-  const showRoi =
-    okrRoiEnabled &&
-    !!objective &&
-    !!objective.department_id &&
-    (typeof objective.estimated_value_brl === "number" || typeof objective.estimated_cost_brl === "number" || typeof objective.estimated_roi_pct === "number");
+  const showRoi = okrRoiEnabled && !!objective;
 
   return (
     <div className="grid gap-6">
