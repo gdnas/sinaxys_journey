@@ -141,3 +141,43 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 }
+
+@layer utilities {
+  /* Many pages still use Tailwind's bg-white*. Make them respect dark mode globally. */
+  .dark .bg-white {
+    background-color: hsl(var(--card));
+  }
+  .dark .bg-white\/90 {
+    background-color: hsl(var(--card) / 0.9);
+  }
+  .dark .bg-white\/80 {
+    background-color: hsl(var(--card) / 0.8);
+  }
+  .dark .bg-white\/70 {
+    background-color: hsl(var(--card) / 0.7);
+  }
+  .dark .bg-white\/60 {
+    background-color: hsl(var(--card) / 0.6);
+  }
+  .dark .bg-white\/15 {
+    background-color: hsl(var(--card) / 0.15);
+  }
+
+  .dark .hover\:bg-white:hover {
+    background-color: hsl(var(--card));
+  }
+  .dark .hover\:bg-white\/90:hover {
+    background-color: hsl(var(--card) / 0.9);
+  }
+  .dark .hover\:bg-white\/70:hover {
+    background-color: hsl(var(--card) / 0.7);
+  }
+
+  /* A few components rely on white rings/borders; soften them in dark mode. */
+  .dark .ring-white {
+    --tw-ring-color: hsl(var(--border));
+  }
+  .dark .border-white {
+    border-color: hsl(var(--border));
+  }
+}
