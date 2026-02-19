@@ -49,6 +49,7 @@ import { AppShell } from "@/components/AppShell";
 import { RequireAuth } from "@/components/RequireAuth";
 import { RequireCompanyModule } from "@/components/RequireCompanyModule";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import Pricing from "./pages/Pricing";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
               <AppShell>
                 <Routes>
                   <Route path="/" element={<Index />} />
+                  <Route path="/pricing" element={<Pricing />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
                   <Route

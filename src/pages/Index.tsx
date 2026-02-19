@@ -9,6 +9,10 @@ import {
   Sparkles,
   Target,
   Users,
+  Wallet,
+  Network,
+  Handshake,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -83,14 +87,21 @@ function Landing() {
               variant="ghost"
               className="h-9 rounded-full border border-transparent text-[color:var(--sinaxys-ink)]/80 hover:bg-white/5 hover:text-[color:var(--sinaxys-ink)]"
             >
+              <Link to="/pricing">Planos</Link>
+            </Button>
+            <Button
+              asChild
+              variant="ghost"
+              className="h-9 rounded-full border border-transparent text-[color:var(--sinaxys-ink)]/80 hover:bg-white/5 hover:text-[color:var(--sinaxys-ink)]"
+            >
               <Link to="/login">Entrar</Link>
             </Button>
             <Button
               asChild
               className="h-9 rounded-full bg-[color:var(--sinaxys-primary)] px-4 text-white hover:bg-[color:var(--sinaxys-primary)]/90"
             >
-              <Link to="/login">
-                Acessar
+              <Link to="/pricing">
+                Ver planos
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -123,8 +134,8 @@ function Landing() {
                   asChild
                   className="h-11 rounded-full bg-[color:var(--sinaxys-primary)] px-6 text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                 >
-                  <Link to="/login">
-                    Entrar na plataforma
+                  <Link to="/pricing">
+                    Começar com OKRs grátis
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
@@ -133,7 +144,7 @@ function Landing() {
                   variant="outline"
                   className="h-11 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 px-6 text-[color:var(--sinaxys-ink)] hover:bg-white/5"
                 >
-                  <a href="#produto">Ver recursos</a>
+                  <a href="#modulos">Ver módulos</a>
                 </Button>
               </div>
 
@@ -263,6 +274,96 @@ function Landing() {
               desc="Custos humanos e não-humanos, agregação automática e data esperada de faturamento para validar o business case."
               delayClass="motion-safe:delay-200"
             />
+          </div>
+        </section>
+
+        {/* MODULES & PRICING */}
+        <section id="modulos" className="mx-auto max-w-6xl px-4 pb-12 md:px-6 md:pb-16">
+          <div className="grid gap-6 rounded-3xl border border-[color:var(--sinaxys-border)] bg-white/5 p-6 backdrop-blur md:grid-cols-[1.1fr_0.9fr] md:p-10">
+            <div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-primary)]">Módulos</div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">OKRs grátis. O resto, como add-on pago.</h2>
+              <p className="mt-3 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70">
+                Você começa com gestão completa de OKRs (Tier 1/Tier 2, mapa, ciclos). Conforme a operação amadurece, habilita ROI, pessoas,
+                onboarding e performance.
+              </p>
+
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+                <Button
+                  asChild
+                  className="h-11 rounded-full bg-[color:var(--sinaxys-primary)] px-6 text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                >
+                  <Link to="/pricing">Ver planos e add-ons</Link>
+                </Button>
+                <Button
+                  asChild
+                  variant="ghost"
+                  className="h-11 rounded-full bg-white/0 px-6 text-[color:var(--sinaxys-ink)]/80 hover:bg-white/5"
+                >
+                  <Link to="/login">Já tenho conta</Link>
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {[{
+                title: "OKRs",
+                desc: "Gestão completa",
+                icon: <Target className="h-4 w-4" />,
+                pill: "Grátis",
+                pillClass: "bg-[color:var(--sinaxys-primary)] text-white",
+              }, {
+                title: "ROI & custos",
+                desc: "Business case",
+                icon: <Wallet className="h-4 w-4" />,
+                pill: "Pago",
+                pillClass: "bg-white/5 text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]",
+              }, {
+                title: "Org & pessoas",
+                desc: "Estrutura",
+                icon: <Network className="h-4 w-4" />,
+                pill: "Pago",
+                pillClass: "bg-white/5 text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]",
+              }, {
+                title: "PDI & Performance",
+                desc: "Evolução",
+                icon: <Handshake className="h-4 w-4" />,
+                pill: "Pago",
+                pillClass: "bg-white/5 text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]",
+              }, {
+                title: "Trilhas",
+                desc: "Onboarding",
+                icon: <CalendarClock className="h-4 w-4" />,
+                pill: "Pago",
+                pillClass: "bg-white/5 text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]",
+              }, {
+                title: "Points",
+                desc: "Reconhecimento",
+                icon: <Trophy className="h-4 w-4" />,
+                pill: "Pago",
+                pillClass: "bg-white/5 text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]",
+              }].map((m, idx) => (
+                <div
+                  key={m.title}
+                  className={cn(
+                    "flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/60 p-4",
+                    "motion-safe:animate-in motion-safe:fade-in-0 motion-safe:slide-in-from-bottom-2 motion-safe:duration-700",
+                    idx === 0 ? "motion-safe:delay-100" : idx === 1 ? "motion-safe:delay-150" : idx === 2 ? "motion-safe:delay-200" : idx === 3 ? "motion-safe:delay-250" : idx === 4 ? "motion-safe:delay-300" : "motion-safe:delay-350",
+                  )}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                      {m.icon}
+                    </div>
+                    <div className="leading-tight">
+                      <div className="text-sm font-semibold">{m.title}</div>
+                      <div className="text-xs text-[color:var(--sinaxys-ink)]/70">{m.desc}</div>
+                    </div>
+                  </div>
+                  <div className={cn("rounded-full px-3 py-1 text-xs font-semibold", m.pillClass)}>{m.pill}</div>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
