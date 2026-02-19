@@ -30,6 +30,8 @@ import { brl, brlPerHourFromMonthly, hourlyFromMonthly } from "@/lib/costs";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany } from "@/lib/profilesDb";
 import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
 import {
   createKeyResult,
   createOkrCycle,
@@ -400,74 +402,97 @@ export default function OkrCycles() {
                     ) : null}
                   </div>
 
-                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-end md:w-auto">
+                  <div className="flex w-full items-center justify-end gap-2 md:w-auto">
                     {canWriteObjective ? (
-                      <Button
-                        variant="outline"
-                        className="h-11 rounded-xl"
-                        onClick={() => {
-                          setEditingObjectiveId(o.id);
-                          setObjLevel(o.level);
-                          setObjTitle(o.title);
-                          setObjDesc(o.description ?? "");
-                          setObjReason(o.strategic_reason ?? "");
-                          setObjOwner(o.owner_user_id);
-                          setObjDept(o.department_id);
-                          setObjParent(o.parent_objective_id);
-                          setObjExpected(typeof o.expected_attainment_pct === "number" ? String(o.expected_attainment_pct) : "80");
-                          setObjValue(typeof o.estimated_value_brl === "number" ? String(o.estimated_value_brl) : "");
-                          setObjEffortHours(typeof o.estimated_effort_hours === "number" ? String(o.estimated_effort_hours) : "");
-                          setObjOpen(true);
-                        }}
-                        title="Editar objetivo"
-                      >
-                        <Pencil className="mr-2 h-4 w-4" />
-                        Editar
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-11 w-11 rounded-xl"
+                            onClick={() => {
+                              setEditingObjectiveId(o.id);
+                              setObjLevel(o.level);
+                              setObjTitle(o.title);
+                              setObjDesc(o.description ?? "");
+                              setObjReason(o.strategic_reason ?? "");
+                              setObjOwner(o.owner_user_id);
+                              setObjDept(o.department_id);
+                              setObjParent(o.parent_objective_id);
+                              setObjExpected(typeof o.expected_attainment_pct === "number" ? String(o.expected_attainment_pct) : "80");
+                              setObjValue(typeof o.estimated_value_brl === "number" ? String(o.estimated_value_brl) : "");
+                              setObjEffortHours(typeof o.estimated_effort_hours === "number" ? String(o.estimated_effort_hours) : "");
+                              setObjOpen(true);
+                            }}
+                            aria-label="Editar objetivo"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Editar</TooltipContent>
+                      </Tooltip>
                     ) : null}
 
                     {canWriteObjective ? (
-                      <Button
-                        variant="outline"
-                        className={
-                          "h-11 rounded-xl border-destructive/40 bg-destructive/5 text-destructive " +
-                          "hover:bg-destructive/10 hover:text-destructive " +
-                          "dark:border-destructive/50 dark:bg-destructive/20 dark:hover:bg-destructive/25"
-                        }
-                        onClick={() => {
-                          setDeleteObjectiveId(o.id);
-                          setDeleteOpen(true);
-                        }}
-                        title="Excluir objetivo"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Excluir
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className={
+                              "h-11 w-11 rounded-xl border-destructive/40 bg-destructive/5 text-destructive " +
+                              "hover:bg-destructive/10 hover:text-destructive " +
+                              "dark:border-destructive/50 dark:bg-destructive/20 dark:hover:bg-destructive/25"
+                            }
+                            onClick={() => {
+                              // Always confirm before deleting
+                              setDeleteObjectiveId(o.id);
+                              setDeleteOpen(true);
+                            }}
+                            aria-label="Excluir objetivo"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Excluir</TooltipContent>
+                      </Tooltip>
                     ) : null}
 
                     {canWriteObjective ? (
-                      <Button
-                        variant="outline"
-                        className="h-11 rounded-xl"
-                        onClick={() => {
-                          resetKr();
-                          setKrObjectiveId(o.id);
-                          setKrOpen(true);
-                        }}
-                      >
-                        + KR
-                      </Button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-11 w-11 rounded-xl"
+                            onClick={() => {
+                              resetKr();
+                              setKrObjectiveId(o.id);
+                              setKrOpen(true);
+                            }}
+                            aria-label="Adicionar KR"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>+ KR</TooltipContent>
+                      </Tooltip>
                     ) : null}
 
-                    <Button
-                      asChild
-                      className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                    >
-                      <Link to={`/okr/objetivos/${o.id}`}>
-                        Abrir
-                        <ArrowRight className="ml-2 h-4 w-4" />
-                      </Link>
-                    </Button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          asChild
+                          size="icon"
+                          className="h-11 w-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                        >
+                          <Link to={`/okr/objetivos/${o.id}`} aria-label="Abrir objetivo">
+                            <ArrowRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Abrir</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
               );
