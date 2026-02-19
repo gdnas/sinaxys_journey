@@ -42,6 +42,7 @@ import OkrObjectiveDetail from "./pages/OkrObjectiveDetail";
 import PdiPerformance from "./pages/PdiPerformance";
 import VacationRequests from "./pages/VacationRequests";
 import VacationApprovals from "./pages/VacationApprovals";
+import SupabaseStatus from "./pages/SupabaseStatus";
 import { AuthProvider } from "@/lib/auth";
 import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
@@ -64,6 +65,7 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/supabase" element={<SupabaseStatus />} />
                   <Route
                     path="/password"
                     element={
