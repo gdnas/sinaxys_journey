@@ -176,7 +176,8 @@ export default function OkrHome() {
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Mapa estratégico</div>
-              <p className="mt-1 text-sm text-muted-foreground">Entenda a cascata: visão → estratégia → OKRs → tarefas.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Entenda o alinhamento: visão → estratégia → OKRs → tarefas.</p>
+
             </div>
             <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
               <Map className="h-5 w-5" />

@@ -158,8 +158,6 @@ export default function OkrCycles() {
   const [objOwner, setObjOwner] = useState<string>(user.id);
   const [objDept, setObjDept] = useState<string | null>(user.departmentId ?? null);
   const [objParent, setObjParent] = useState<string | null>(null);
-  const [objFund, setObjFund] = useState<DbOkrObjective["linked_fundamental"]>(null);
-  const [objFundText, setObjFundText] = useState("");
 
   const [objExpected, setObjExpected] = useState<string>("80");
 
@@ -176,8 +174,6 @@ export default function OkrCycles() {
     setObjOwner(user.id);
     setObjDept(user.departmentId ?? null);
     setObjParent(null);
-    setObjFund(null);
-    setObjFundText("");
     setObjExpected("80");
     setObjValue("");
     setObjEffortHours("");
@@ -385,14 +381,6 @@ export default function OkrCycles() {
                       <span>Dono: {owner}</span>
                       <span>•</span>
                       <span>{st.count} KRs</span>
-                      {o.linked_fundamental ? (
-                        <>
-                          <span>•</span>
-                          <span>
-                            Conectado a: <span className="font-medium text-[color:var(--sinaxys-ink)]">{o.linked_fundamental}</span>
-                          </span>
-                        </>
-                      ) : null}
                     </div>
 
                     {typeof st.pct === "number" ? (
@@ -420,8 +408,6 @@ export default function OkrCycles() {
                           setObjOwner(o.owner_user_id);
                           setObjDept(o.department_id);
                           setObjParent(o.parent_objective_id);
-                          setObjFund(o.linked_fundamental);
-                          setObjFundText(o.linked_fundamental_text ?? "");
                           setObjExpected(typeof o.expected_attainment_pct === "number" ? String(o.expected_attainment_pct) : "80");
                           setObjValue(typeof o.estimated_value_brl === "number" ? String(o.estimated_value_brl) : "");
                           setObjEffortHours(typeof o.estimated_effort_hours === "number" ? String(o.estimated_effort_hours) : "");
@@ -736,33 +722,7 @@ export default function OkrCycles() {
             ) : null}
 
             <div className="grid gap-2">
-              <Label>Conexão com estratégia (obrigatório)</Label>
-              <Select value={objFund ?? ""} onValueChange={(v) => setObjFund((v || null) as any)}>
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Esse objetivo está conectado a…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PURPOSE">Propósito</SelectItem>
-                  <SelectItem value="VISION">Visão</SelectItem>
-                  <SelectItem value="MISSION">Missão</SelectItem>
-                  <SelectItem value="VALUES">Valores</SelectItem>
-                  <SelectItem value="CULTURE">Cultura</SelectItem>
-                </SelectContent>
-              </Select>
-              <Textarea
-                className="min-h-[70px] rounded-2xl"
-                value={objFundText}
-                onChange={(e) => setObjFundText(e.target.value)}
-                placeholder={
-                  fundamentals?.purpose?.trim() && objFund === "PURPOSE"
-                    ? `Ex.: ${fundamentals.purpose}`
-                    : "Escreva a frase / trecho do fundamento que esse objetivo atende."
-                }
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Objetivo pai (cascata opcional)</Label>
+              <Label>Objetivo pai (alinhamento opcional)</Label>
               <Select
                 value={objParent ?? ""}
                 onValueChange={(v) => {
@@ -783,6 +743,7 @@ export default function OkrCycles() {
                     ))}
                 </SelectContent>
               </Select>
+              <div className="text-xs text-muted-foreground">Use isso para manter alinhamento entre objetivos (ex.: time → empresa).</div>
             </div>
           </div>
 
@@ -796,8 +757,6 @@ export default function OkrCycles() {
                 objSaving ||
                 !selected ||
                 objTitle.trim().length < 6 ||
-                !objFund ||
-                objFundText.trim().length < 6 ||
                 !businessCaseOk ||
                 expectedAtt === null
               }
@@ -814,8 +773,8 @@ export default function OkrCycles() {
                       title: objTitle,
                       description: objDesc,
                       strategic_reason: objReason,
-                      linked_fundamental: objFund,
-                      linked_fundamental_text: objFundText,
+                      linked_fundamental: null,
+                      linked_fundamental_text: null,
                       due_at: null,
                       expected_attainment_pct: expectedAtt,
                       estimated_value_brl: valueBRL,
@@ -836,8 +795,8 @@ export default function OkrCycles() {
                       title: objTitle,
                       description: objDesc,
                       strategic_reason: objReason,
-                      linked_fundamental: objFund,
-                      linked_fundamental_text: objFundText,
+                      linked_fundamental: null,
+                      linked_fundamental_text: null,
                       due_at: null,
                       expected_attainment_pct: expectedAtt,
                       estimated_value_brl: valueBRL,

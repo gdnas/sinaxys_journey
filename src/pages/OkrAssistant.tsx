@@ -425,7 +425,8 @@ export default function OkrAssistant() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <div className="text-xs text-muted-foreground">Opcional — ajuda a criar cascata entre objetivos.</div>
+                  <div className="text-xs text-muted-foreground">Opcional — ajuda a manter alinhamento entre objetivos.</div>
+
                 </div>
               )}
 
