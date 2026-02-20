@@ -50,6 +50,8 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { RequireCompanyModule } from "@/components/RequireCompanyModule";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import Pricing from "./pages/Pricing";
+import HowItWorks from "./pages/HowItWorks";
+import Demo from "./pages/Demo";
 
 const queryClient = new QueryClient();
 
@@ -66,6 +68,8 @@ const App = () => (
                 <Routes>
                   <Route path="/" element={<Index />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/como-funciona" element={<HowItWorks />} />
+                  <Route path="/demo" element={<Demo />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
 
