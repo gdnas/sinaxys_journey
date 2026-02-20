@@ -68,6 +68,19 @@ const App = () => (
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
+
+                  {/* Empresa */}
+                  <Route
+                    path="/org"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="ORG">
+                          <OrgChart />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
                   <Route
                     path="/password"
                     element={
