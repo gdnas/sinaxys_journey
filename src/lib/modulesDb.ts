@@ -1,8 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
 
 // NOTE:
-// - `company_modules` rows are optional. If a row doesn't exist, we treat the module as enabled by default.
-// - This keeps all modules "liberados" for new companies unless explicitly disabled.
+// - `company_modules` rows are optional.
+// - If a row doesn't exist, we fall back to DEFAULT_ENABLED.
+// - KAIROOS is sold as a modular platform: OKR is free; everything else is a paid add-on by default.
 
 export type ModuleKey =
   | "PDI_PERFORMANCE"
@@ -18,20 +19,25 @@ export type ModuleKey =
   | (string & {});
 
 const DEFAULT_ENABLED: Record<string, boolean> = {
-  PDI_PERFORMANCE: true,
+  // Free
   OKR: true,
-  OKR_ROI: true,
-  TRACKS: true,
-  POINTS: true,
-  COSTS: true,
-  ORG: true,
+
+  // Paid add-ons (default locked)
+  OKR_ROI: false,
+  ORG: false,
+  COSTS: false,
+  TRACKS: false,
+  POINTS: false,
+  PDI_PERFORMANCE: false,
+
+  // Core areas (not sold as modules for now)
   PROFILE: true,
   ADMIN: true,
   MASTER: true,
 };
 
 export function getDefaultModuleEnabled(moduleKey: ModuleKey) {
-  return DEFAULT_ENABLED[String(moduleKey)] ?? true;
+  return DEFAULT_ENABLED[String(moduleKey)] ?? false;
 }
 
 export type DbCompanyModule = {
