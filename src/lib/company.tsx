@@ -165,8 +165,8 @@ export function bootstrapCompanyTheme() {
 type CompanyState = {
   companyId: string | null;
   company: CompanyBrand;
-  setCompany: (next: Partial<CompanyBrand>) => void;
-  resetCompany: () => void;
+  setCompany: (next: Partial<CompanyBrand>) => Promise<{ ok: true } | { ok: false; message: string }>;
+  resetCompany: () => Promise<{ ok: true } | { ok: false; message: string }>;
 };
 
 const CompanyContext = createContext<CompanyState | null>(null);
@@ -234,16 +234,16 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
     return {
       companyId,
       company,
-      setCompany(next) {
+      async setCompany(next) {
         if (!companyId) {
           setCompanyState((prev) => mergeBrand({ ...prev, ...next }));
-          return;
+          return { ok: true as const };
         }
 
         const merged = mergeBrand({ ...company, ...next });
         setCompanyState(merged);
 
-        supabase
+        const { error } = await supabase
           .from("companies")
           .update({
             name: merged.name,
@@ -251,18 +251,30 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             logo_data_url: merged.logoDataUrl ?? null,
             colors: merged.colors as any,
           })
-          .eq("id", companyId)
-          .then(() => null);
+          .eq("id", companyId);
+
+        if (error) {
+          // Re-hydrate from server so we don't keep a local state that wasn't persisted.
+          try {
+            const fresh = await fetchCompanyBrand(companyId);
+            setCompanyState(fresh);
+          } catch {
+            // ignore
+          }
+          return { ok: false as const, message: error.message };
+        }
+
+        return { ok: true as const };
       },
-      resetCompany() {
+      async resetCompany() {
         if (!companyId) {
           setCompanyState(DEFAULT_BRAND);
-          return;
+          return { ok: true as const };
         }
 
         setCompanyState(DEFAULT_BRAND);
 
-        supabase
+        const { error } = await supabase
           .from("companies")
           .update({
             name: DEFAULT_BRAND.name,
@@ -270,8 +282,19 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
             logo_data_url: DEFAULT_BRAND.logoDataUrl ?? null,
             colors: DEFAULT_BRAND.colors as any,
           })
-          .eq("id", companyId)
-          .then(() => null);
+          .eq("id", companyId);
+
+        if (error) {
+          try {
+            const fresh = await fetchCompanyBrand(companyId);
+            setCompanyState(fresh);
+          } catch {
+            // ignore
+          }
+          return { ok: false as const, message: error.message };
+        }
+
+        return { ok: true as const };
       },
     };
   }, [companyId, company]);

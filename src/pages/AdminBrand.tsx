@@ -33,10 +33,7 @@ function ColorField({
     <div className="grid gap-2">
       <Label htmlFor={id}>{label}</Label>
       <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white px-3 py-2">
-        <div
-          className="h-8 w-8 shrink-0 rounded-xl border"
-          style={{ backgroundColor: value, borderColor: "rgba(0,0,0,0.08)" }}
-        />
+        <div className="h-8 w-8 shrink-0 rounded-xl border" style={{ backgroundColor: value, borderColor: "rgba(0,0,0,0.08)" }} />
         <Input
           id={id}
           value={value}
@@ -80,9 +77,7 @@ function ModuleToggle({
       }
     >
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 grid h-10 w-10 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
-          {icon}
-        </div>
+        <div className="mt-0.5 grid h-10 w-10 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">{icon}</div>
         <div>
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{title}</div>
           <div className="mt-1 text-sm text-muted-foreground">{description}</div>
@@ -100,6 +95,8 @@ function ModuleToggle({
 export default function AdminBrand() {
   const { toast } = useToast();
   const { company, setCompany, resetCompany, companyId } = useCompany();
+
+  const [saving, setSaving] = useState(false);
 
   const [name, setName] = useState(company.name);
   const [tagline, setTagline] = useState(company.tagline);
@@ -170,14 +167,25 @@ export default function AdminBrand() {
                 size="icon"
                 className="rounded-xl"
                 aria-label="Restaurar padrão"
-                onClick={() => {
-                  resetCompany();
-                  const fresh = loadCompanySettings();
-                  setName(fresh.name);
-                  setTagline(fresh.tagline);
-                  setLogoDataUrl(fresh.logoDataUrl);
-                  setColors(fresh.colors);
-                  toast({ title: "Marca restaurada", description: "Voltamos para o padrão da empresa." });
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const res = await resetCompany();
+                    if (!res.ok) {
+                      toast({ title: "Não foi possível restaurar", description: "message" in res ? res.message : "Sem permissão.", variant: "destructive" });
+                      return;
+                    }
+
+                    const fresh = loadCompanySettings();
+                    setName(fresh.name);
+                    setTagline(fresh.tagline);
+                    setLogoDataUrl(fresh.logoDataUrl);
+                    setColors(fresh.colors);
+                    toast({ title: "Marca restaurada", description: "Voltamos para o padrão da empresa." });
+                  } finally {
+                    setSaving(false);
+                  }
                 }}
               >
                 <RotateCcw className="h-4 w-4" />
@@ -191,16 +199,27 @@ export default function AdminBrand() {
               <Button
                 size="icon"
                 className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                disabled={!dirty}
+                disabled={!dirty || saving}
                 aria-label="Salvar"
-                onClick={() => {
-                  setCompany({
-                    name: name.trim() || company.name,
-                    tagline: tagline.trim() || company.tagline,
-                    logoDataUrl,
-                    colors,
-                  });
-                  toast({ title: "Marca atualizada", description: "Nome, logo e cores foram aplicados." });
+                onClick={async () => {
+                  setSaving(true);
+                  try {
+                    const res = await setCompany({
+                      name: name.trim() || company.name,
+                      tagline: tagline.trim() || company.tagline,
+                      logoDataUrl,
+                      colors,
+                    });
+
+                    if (!res.ok) {
+                      toast({ title: "Sem permissão para salvar", description: "message" in res ? res.message : "Sem permissão.", variant: "destructive" });
+                      return;
+                    }
+
+                    toast({ title: "Marca atualizada", description: "Nome, logo e cores foram salvos para a empresa." });
+                  } finally {
+                    setSaving(false);
+                  }
                 }}
               >
                 <Save className="h-4 w-4" />
@@ -288,7 +307,7 @@ export default function AdminBrand() {
                         size="icon"
                         className="rounded-xl"
                         onClick={() => setLogoDataUrl(undefined)}
-                        disabled={!logoDataUrl}
+                        disabled={!logoDataUrl || saving}
                         aria-label="Remover logo"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -314,26 +333,11 @@ export default function AdminBrand() {
           </div>
 
           <div className="mt-5 grid gap-4">
-            <ColorField
-              id="cPrimary"
-              label="Primária"
-              value={colors.primary}
-              onChange={(v) => setColors((c) => ({ ...c, primary: v }))}
-            />
+            <ColorField id="cPrimary" label="Primária" value={colors.primary} onChange={(v) => setColors((c) => ({ ...c, primary: v }))} />
             <ColorField id="cInk" label="Texto / Ink" value={colors.ink} onChange={(v) => setColors((c) => ({ ...c, ink: v }))} />
             <ColorField id="cBg" label="Fundo" value={colors.bg} onChange={(v) => setColors((c) => ({ ...c, bg: v }))} />
-            <ColorField
-              id="cTint"
-              label="Tint (cards e chips)"
-              value={colors.tint}
-              onChange={(v) => setColors((c) => ({ ...c, tint: v }))}
-            />
-            <ColorField
-              id="cBorder"
-              label="Bordas"
-              value={colors.border}
-              onChange={(v) => setColors((c) => ({ ...c, border: v }))}
-            />
+            <ColorField id="cTint" label="Tint (cards e chips)" value={colors.tint} onChange={(v) => setColors((c) => ({ ...c, tint: v }))} />
+            <ColorField id="cBorder" label="Bordas" value={colors.border} onChange={(v) => setColors((c) => ({ ...c, border: v }))} />
           </div>
         </Card>
       </div>
@@ -342,9 +346,7 @@ export default function AdminBrand() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulos (visibilidade por empresa)</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              OKRs é o módulo primário. Os demais podem ser ocultados conforme a estratégia da empresa.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">OKRs é o módulo primário. Os demais podem ser ocultados conforme a estratégia da empresa.</p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
             <BarChart3 className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -449,9 +451,7 @@ export default function AdminBrand() {
                 <div className="truncate text-xs text-muted-foreground">{tagline.trim() || "—"}</div>
               </div>
               <div className="ml-auto flex items-center gap-2">
-                <div className="rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
-                  Chip
-                </div>
+                <div className="rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">Chip</div>
                 <Button
                   size="icon"
                   className="h-9 w-9 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
