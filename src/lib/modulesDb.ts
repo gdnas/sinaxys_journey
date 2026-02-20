@@ -24,7 +24,7 @@ const DEFAULT_ENABLED: Record<string, boolean> = {
 
   // Paid add-ons (default locked)
   OKR_ROI: false,
-  ORG: false,
+  ORG: true,
   COSTS: false,
   TRACKS: false,
   POINTS: false,
