@@ -440,6 +440,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => isCompanyModuleEnabled(String(companyId), "OKR"),
     enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
   });
+  const { data: orgEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "ORG"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "ORG"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
 
   if (!user) return <>{children}</>;
 
@@ -448,6 +453,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const allowPoints = user.role === "MASTERADMIN" ? true : !!pointsEnabled;
   const allowCosts = user.role === "MASTERADMIN" ? true : !!costsEnabled;
   const allowOkr = user.role === "MASTERADMIN" ? true : !!okrEnabled;
+  const allowOrg = user.role === "MASTERADMIN" ? true : !!orgEnabled;
 
   const moduleAllowed = (key?: string) => {
     if (!key) return true;
@@ -462,6 +468,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return allowCosts;
       case "OKR":
         return allowOkr;
+      case "ORG":
+        return allowOrg;
       default:
         return true;
     }

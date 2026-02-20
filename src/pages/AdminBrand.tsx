@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ImageIcon, Palette, RotateCcw, Save, Trash2, Handshake, Target, Trophy, GraduationCap, Wallet, BarChart3 } from "lucide-react";
+import { ImageIcon, Palette, RotateCcw, Save, Trash2, Handshake, Target, Trophy, GraduationCap, Wallet, BarChart3, Network } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -147,6 +147,12 @@ export default function AdminBrand() {
   const { data: costsEnabled = true, refetch: refetchCosts } = useQuery({
     queryKey: ["company-module", companyId, "COSTS"],
     queryFn: () => isCompanyModuleEnabled(String(companyId), "COSTS"),
+    enabled: queryEnabled,
+  });
+
+  const { data: orgEnabled = true, refetch: refetchOrg } = useQuery({
+    queryKey: ["company-module", companyId, "ORG"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "ORG"),
     enabled: queryEnabled,
   });
 
@@ -346,7 +352,9 @@ export default function AdminBrand() {
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulos (visibilidade por empresa)</div>
-            <p className="mt-1 text-sm text-muted-foreground">OKRs é o módulo primário. Os demais podem ser ocultados conforme a estratégia da empresa.</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              OKRs é o módulo primário. Os demais podem ser ocultados conforme a estratégia da empresa.
+            </p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
             <BarChart3 className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -413,6 +421,19 @@ export default function AdminBrand() {
               if (!companyId) return;
               await setCompanyModuleEnabled(companyId, "COSTS", v);
               await refetchCosts();
+              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+            }}
+          />
+
+          <ModuleToggle
+            icon={<Network className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+            title="Organograma"
+            description="Organograma e contexto da organização (pessoas e reporting lines)."
+            checked={orgEnabled}
+            onChange={async (v) => {
+              if (!companyId) return;
+              await setCompanyModuleEnabled(companyId, "ORG", v);
+              await refetchOrg();
               toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
             }}
           />
