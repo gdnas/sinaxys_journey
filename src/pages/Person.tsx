@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { Mail, Phone, UserRound, Users } from "lucide-react";
+import { CalendarClock, Mail, MessageSquareText, Phone, Target, UserRound, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,12 +12,22 @@ import { listDepartments } from "@/lib/departmentsDb";
 import { getPublicProfile } from "@/lib/profilePublicDb";
 import { getProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
+import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
+import { listOkrCycles, listOkrObjectives, listOkrObjectivesByIds, listOkrObjectivesForOwner, listTasksForUserWithContext } from "@/lib/okrDb";
+import { PersonFeedbackCard } from "@/components/PersonFeedbackCard";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   const a = parts[0]?.[0] ?? "";
   const b = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
   return (a + b).toUpperCase();
+}
+
+function shortDate(isoOrDate: string | null | undefined) {
+  if (!isoOrDate) return null;
+  const d = new Date(isoOrDate);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
 export default function Person() {
@@ -57,6 +67,100 @@ export default function Person() {
     },
   });
 
+  // --- OKR involvement ---
+  const qCycles = useQuery({
+    queryKey: ["okr", "cycles", companyId],
+    queryFn: () => listOkrCycles(companyId),
+    enabled: !!companyId,
+  });
+
+  const activeCycleId = useMemo(() => {
+    const cycles = qCycles.data ?? [];
+    return cycles.find((c) => c.status === "ACTIVE")?.id ?? cycles[0]?.id ?? null;
+  }, [qCycles.data]);
+
+  const qOwnedObjectives = useQuery({
+    queryKey: ["okr", "objectives", "owner", companyId, userId],
+    queryFn: () => listOkrObjectivesForOwner(companyId, userId),
+    enabled: !!companyId && !!userId,
+  });
+
+  const qTasks = useQuery({
+    queryKey: ["okr", "tasks", "user", userId],
+    queryFn: () => listTasksForUserWithContext(userId),
+    enabled: !!userId,
+  });
+
+  const qActiveCycleObjectives = useQuery({
+    queryKey: ["okr", "objectives", "cycle", companyId, activeCycleId],
+    queryFn: () => listOkrObjectives(companyId, activeCycleId as string),
+    enabled: !!companyId && !!activeCycleId,
+  });
+
+  const taskObjectiveIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const t of qTasks.data ?? []) ids.add(t.objective_id);
+    return Array.from(ids);
+  }, [qTasks.data]);
+
+  const qObjectivesFromTasks = useQuery({
+    queryKey: ["okr", "objectives", "byIds", taskObjectiveIds.join(",")],
+    queryFn: () => listOkrObjectivesByIds(taskObjectiveIds),
+    enabled: taskObjectiveIds.length > 0,
+  });
+
+  const okrInvolvement = useMemo(() => {
+    const byId = new Map<string, any>();
+    const add = (o: any, kind: "dono" | "tarefas") => {
+      const prev = byId.get(o.id);
+      if (!prev) {
+        byId.set(o.id, { objective: o, kinds: new Set([kind]) });
+      } else {
+        prev.kinds.add(kind);
+      }
+    };
+
+    for (const o of qOwnedObjectives.data ?? []) add(o, "dono");
+    for (const o of qObjectivesFromTasks.data ?? []) add(o, "tarefas");
+
+    // enrich with cycle label
+    const cycleById = new Map((qCycles.data ?? []).map((c) => [c.id, c] as const));
+    const rows = Array.from(byId.values()).map((r) => {
+      const c = cycleById.get(r.objective.cycle_id);
+      const cycleLabel = c
+        ? c.type === "ANNUAL"
+          ? `${c.year}`
+          : `${c.year} • Q${c.quarter ?? "—"}`
+        : "—";
+      const isActiveCycle = c?.status === "ACTIVE";
+      return {
+        objective: r.objective,
+        kinds: Array.from(r.kinds) as Array<"dono" | "tarefas">,
+        cycleLabel,
+        isActiveCycle,
+      };
+    });
+
+    // prioritize active cycle, then newest
+    rows.sort((a, b) => {
+      if (a.isActiveCycle !== b.isActiveCycle) return a.isActiveCycle ? -1 : 1;
+      const da = a.objective.created_at ? new Date(a.objective.created_at).getTime() : 0;
+      const db = b.objective.created_at ? new Date(b.objective.created_at).getTime() : 0;
+      return db - da;
+    });
+
+    return rows;
+  }, [qCycles.data, qObjectivesFromTasks.data, qOwnedObjectives.data]);
+
+  const tasksByObjectiveId = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const t of qTasks.data ?? []) {
+      m.set(t.objective_id, (m.get(t.objective_id) ?? 0) + 1);
+    }
+    return m;
+  }, [qTasks.data]);
+
+  // --- profile cards ---
   const profile = qPublic.data;
 
   const departmentName = useMemo(() => {
@@ -95,17 +199,24 @@ export default function Person() {
   const email = qSensitive.data?.email ?? "—";
   const phone = qSensitive.data?.phone?.trim() || "—";
 
+  const okrCount = okrInvolvement.length;
+
   return (
     <div className="grid gap-6">
       <div className="flex items-center justify-between gap-3">
         <Button asChild variant="outline" className="h-10 rounded-xl">
           <Link to="/org">Voltar</Link>
         </Button>
-        {user.role === "ADMIN" || user.role === "MASTERADMIN" ? (
-          <Button asChild className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-            <Link to={`/admin/users/${profile.id}`}>Editar (Admin)</Link>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
+            <Link to="/pdi-performance">Abrir PDI</Link>
           </Button>
-        ) : null}
+          {user.role === "ADMIN" || user.role === "MASTERADMIN" ? (
+            <Button asChild className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+              <Link to={`/admin/users/${profile.id}`}>Editar (Admin)</Link>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
@@ -124,6 +235,9 @@ export default function Person() {
                   </Badge>
                 ) : null}
                 {!profile.active ? <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Inativo</Badge> : null}
+                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white ring-1 ring-[color:var(--sinaxys-border)]">
+                  {okrCount} OKR{okrCount === 1 ? "" : "s"}
+                </Badge>
               </div>
               <div className="mt-2 text-sm text-muted-foreground">{jobTitle}</div>
             </div>
@@ -169,6 +283,108 @@ export default function Person() {
         </div>
 
         <Separator className="my-5" />
+
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">OKRs em que está envolvido</div>
+                <p className="mt-1 text-sm text-muted-foreground">Dono do objetivo ou com tarefas atribuídas.</p>
+              </div>
+              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                <Target className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+              </div>
+            </div>
+
+            <Separator className="my-5" />
+
+            {qOwnedObjectives.isLoading || qTasks.isLoading || qObjectivesFromTasks.isLoading || qCycles.isLoading ? (
+              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando OKRs…</div>
+            ) : null}
+
+            {okrInvolvement.length === 0 && !(qOwnedObjectives.isLoading || qTasks.isLoading) ? (
+              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum OKR encontrado para esta pessoa.</div>
+            ) : null}
+
+            <div className="grid gap-2">
+              {okrInvolvement.map((row) => {
+                const o = row.objective;
+                const isOwner = row.kinds.includes("dono");
+                const hasTasks = row.kinds.includes("tarefas");
+                const nTasks = tasksByObjectiveId.get(o.id) ?? 0;
+
+                return (
+                  <Link
+                    key={o.id}
+                    to={`/okr/objetivos/${o.id}`}
+                    className="block rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 transition hover:bg-[color:var(--sinaxys-tint)]/40"
+                    title="Abrir OKR"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge className={"rounded-full " + objectiveTypeBadgeClass(o.level)}>{objectiveLevelLabel(o.level)}</Badge>
+                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white ring-1 ring-[color:var(--sinaxys-border)]">
+                            {row.cycleLabel}{row.isActiveCycle ? " • ativo" : ""}
+                          </Badge>
+                          {isOwner ? (
+                            <Badge className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">dono</Badge>
+                          ) : null}
+                          {hasTasks ? (
+                            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                              {nTasks} tarefa{nTasks === 1 ? "" : "s"}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <div className="mt-2 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          <span>{objectiveTypeLabel(o.level)}</span>
+                          {shortDate(o.due_at) ? (
+                            <span className="inline-flex items-center gap-1">
+                              <CalendarClock className="h-3.5 w-3.5" /> {shortDate(o.due_at)}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="text-xs font-semibold text-[color:var(--sinaxys-primary)]">Abrir</div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          </Card>
+
+          <div className="grid gap-6">
+            <PersonFeedbackCard tenantId={companyId} fromUserId={user.id} toUserId={profile.id} toUserLabel={title} />
+
+            <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Atalhos</div>
+                  <p className="mt-1 text-sm text-muted-foreground">Ações rápidas relacionadas à pessoa.</p>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                  <MessageSquareText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                </div>
+              </div>
+
+              <Separator className="my-5" />
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
+                  <Link to="/pdi-performance">Ver histórico (PDI)</Link>
+                </Button>
+                <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
+                  <Link to="/okr/hoje">OKRs</Link>
+                </Button>
+              </div>
+
+              <div className="mt-3 text-xs text-muted-foreground">
+                Dica: feedbacks ficam visíveis para quem escreveu, para o destinatário e para gestão (conforme as regras do PDI).
+              </div>
+            </Card>
+          </div>
+        </div>
       </Card>
     </div>
   );

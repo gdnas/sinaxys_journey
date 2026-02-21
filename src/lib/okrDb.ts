@@ -250,6 +250,31 @@ export async function listOkrObjectives(companyId: string, cycleId: string) {
   return (data ?? []) as DbOkrObjective[];
 }
 
+export async function listOkrObjectivesForOwner(companyId: string, ownerUserId: string) {
+  const { data, error } = await supabase
+    .from("okr_objectives")
+    .select(objectiveSelect)
+    .eq("company_id", companyId)
+    .eq("owner_user_id", ownerUserId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as DbOkrObjective[];
+}
+
+export async function listOkrObjectivesByIds(objectiveIds: string[]) {
+  if (!objectiveIds.length) return [] as DbOkrObjective[];
+
+  const { data, error } = await supabase
+    .from("okr_objectives")
+    .select(objectiveSelect)
+    .in("id", objectiveIds)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as DbOkrObjective[];
+}
+
 export async function getOkrObjective(objectiveId: string) {
   const { data, error } = await supabase.from("okr_objectives").select(objectiveSelect).eq("id", objectiveId).maybeSingle();
 
