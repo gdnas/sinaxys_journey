@@ -25,3 +25,9 @@ export async function listPublicProfilesByCompany(companyId: string) {
   if (error) throw error;
   return (data ?? []) as DbProfilePublic[];
 }
+
+export async function getPublicProfile(profileId: string) {
+  const { data, error } = await supabase.from("profile_public").select(baseSelect).eq("id", profileId).maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as DbProfilePublic | null;
+}

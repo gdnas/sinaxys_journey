@@ -52,6 +52,7 @@ import { ThemeProvider } from "@/components/ThemeProvider";
 import Pricing from "./pages/Pricing";
 import HowItWorks from "./pages/HowItWorks";
 import Demo from "./pages/Demo";
+import Person from "./pages/Person";
 
 const queryClient = new QueryClient();
 
@@ -80,6 +81,17 @@ const App = () => (
                       <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="ORG">
                           <OrgChart />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/people/:userId"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="ORG">
+                          <Person />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }

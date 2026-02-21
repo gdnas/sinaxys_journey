@@ -1,17 +1,20 @@
 import { useMemo, useState } from "react";
-import { CalendarClock, Medal, Network, Search, Sparkles, UserRound } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { CalendarClock, Mail, Medal, Network, Phone, Search, Sparkles, UserRound, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
 import { fetchLeaderboard, listRewardTiers } from "@/lib/pointsDb";
 import { fetchXpLeaderboard } from "@/lib/journeyDb";
 import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profilePublicDb";
+import { getProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 
@@ -89,6 +92,7 @@ function PersonDialog({
   points,
   xp,
   tier,
+  leader,
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -98,8 +102,26 @@ function PersonDialog({
   points: number;
   xp: number;
   tier: string | null;
+  leader: DbProfilePublic | null;
 }) {
+  const navigate = useNavigate();
   const theme = deptTheme(deptThemeIdx);
+
+  const qSensitive = useQuery({
+    queryKey: ["profile-sensitive", profile?.id],
+    enabled: !!profile?.id,
+    queryFn: async () => {
+      if (!profile?.id) return null;
+      try {
+        return await getProfile(profile.id);
+      } catch {
+        return null;
+      }
+    },
+  });
+
+  const email = qSensitive.data?.email ?? "—";
+  const phone = qSensitive.data?.phone?.trim() || "—";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -112,7 +134,14 @@ function PersonDialog({
           <div className="grid gap-4">
             <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="flex min-w-0 items-center gap-3">
+                <button
+                  type="button"
+                  className="flex min-w-0 items-center gap-3 text-left"
+                  onClick={() => {
+                    onOpenChange(false);
+                    navigate(`/people/${profile.id}`);
+                  }}
+                >
                   <div className={cn("grid h-12 w-12 place-items-center rounded-2xl text-white", theme.bar)}>
                     <span className="text-xs font-bold">{initials(profile.name)}</span>
                   </div>
@@ -122,17 +151,13 @@ function PersonDialog({
                       <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                         {roleLabel(profile.role as any)}
                       </Badge>
-                      {deptName ? (
-                        <span className={cn("rounded-full px-2 py-0.5 font-semibold ring-1", theme.chip)}>{deptName}</span>
-                      ) : null}
-                      {tier ? (
-                        <span className="rounded-full bg-[color:var(--sinaxys-primary)] px-2 py-0.5 font-semibold text-white">{tier}</span>
-                      ) : null}
+                      {deptName ? <span className={cn("rounded-full px-2 py-0.5 font-semibold ring-1", theme.chip)}>{deptName}</span> : null}
+                      {tier ? <span className="rounded-full bg-[color:var(--sinaxys-primary)] px-2 py-0.5 font-semibold text-white">{tier}</span> : null}
                       {!profile.active ? <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900">Inativo</span> : null}
                     </div>
                     <div className="mt-2 text-sm text-muted-foreground">{profile.job_title?.trim() ? profile.job_title.trim() : "—"}</div>
                   </div>
-                </div>
+                </button>
 
                 <div className="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-[260px]">
                   <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
@@ -149,13 +174,58 @@ function PersonDialog({
                   </div>
                 </div>
               </div>
+
+              <Separator className="my-4" />
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)]/50 p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Contato</div>
+                  <div className="mt-2 grid gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-[color:var(--sinaxys-ink)]">
+                      <Mail className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                      <span className="truncate">{email}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-[color:var(--sinaxys-ink)]">
+                      <Phone className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                      <span className="truncate">{phone}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)]/50 p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Estrutura</div>
+                  <div className="mt-2 flex items-center gap-2 text-sm text-[color:var(--sinaxys-ink)]">
+                    <Users className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                    <span className="text-muted-foreground">Líder direto:</span>
+                    {leader ? (
+                      <button
+                        type="button"
+                        className="truncate font-semibold text-[color:var(--sinaxys-primary)] hover:underline"
+                        onClick={() => {
+                          onOpenChange(false);
+                          navigate(`/people/${leader.id}`);
+                        }}
+                      >
+                        {leader.name}
+                      </button>
+                    ) : (
+                      <span className="font-semibold">{profile.manager_id ? "—" : "Sem líder"}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-xs text-muted-foreground">
-              Esta visão é interna (somente membros da empresa). Dados sensíveis como e-mail/telefone não aparecem aqui.
-            </div>
-
-            <div className="flex justify-end">
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <Button
+                className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                onClick={() => {
+                  onOpenChange(false);
+                  navigate(`/people/${profile.id}`);
+                }}
+              >
+                Abrir página
+              </Button>
               <Button variant="outline" className="h-10 rounded-xl" onClick={() => onOpenChange(false)}>
                 Fechar
               </Button>
@@ -187,6 +257,8 @@ export default function OrgChart() {
 
   // Requirement: inactive users should not appear in the company org chart.
   const activeProfiles = useMemo(() => profiles.filter((p) => !!p.active), [profiles]);
+
+  const profileById = useMemo(() => new Map(profiles.map((p) => [p.id, p] as const)), [profiles]);
 
   const qPoints = useQuery({
     queryKey: ["points", "leaderboard", companyId],
@@ -260,6 +332,7 @@ export default function OrgChart() {
   const selectedPoints = selected ? pointsByUserId.get(selected.id) ?? 0 : 0;
   const selectedXp = selected ? xpByUserId.get(selected.id) ?? 0 : 0;
   const selectedTier = selected ? tierByUserId.get(selected.id) ?? null : null;
+  const selectedLeader = selected?.manager_id ? profileById.get(selected.manager_id) ?? null : null;
 
   return (
     <div className="grid gap-6">
@@ -376,6 +449,7 @@ export default function OrgChart() {
         points={selectedPoints}
         xp={selectedXp}
         tier={selectedTier}
+        leader={selectedLeader}
       />
     </div>
   );
