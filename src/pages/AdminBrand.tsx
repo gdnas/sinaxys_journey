@@ -402,7 +402,7 @@ export default function AdminBrand() {
           <ModuleToggle
             icon={<Trophy className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
             title="Points"
-            description="Reconhecimento: ranking, regras, tiers e recompensas."
+            description="Reconhecimento: ranking, regras, prêmios e recompensas."
             checked={pointsEnabled}
             onChange={async (v) => {
               if (!companyId) return;

@@ -106,7 +106,7 @@ function CurrentTier({ tiers, myPoints }: { tiers: RewardTierRow[]; myPoints: nu
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seu tier</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seu prêmio</div>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {current ? (
               <>
@@ -116,7 +116,7 @@ function CurrentTier({ tiers, myPoints }: { tiers: RewardTierRow[]; myPoints: nu
                 <span className="text-sm text-muted-foreground">— {current.prize}</span>
               </>
             ) : (
-              <span className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Ainda sem tier</span>
+              <span className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Ainda sem prêmio</span>
             )}
           </div>
           {next ? (
@@ -375,7 +375,7 @@ function TiersAdmin({ companyId, tiers }: { companyId: string; tiers: RewardTier
     <Card className="mt-4 rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Tiers & premiações</div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Prêmios</div>
           <div className="mt-1 text-sm text-muted-foreground">Defina marcos para reconhecer evolução (ex.: brindes, cursos, bônus).</div>
         </div>
 
@@ -383,12 +383,12 @@ function TiersAdmin({ companyId, tiers }: { companyId: string; tiers: RewardTier
           <DialogTrigger asChild>
             <Button className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
               <Plus className="mr-2 h-4 w-4" />
-              Novo tier
+              Novo prêmio
             </Button>
           </DialogTrigger>
           <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
             <DialogHeader>
-              <DialogTitle className="text-[color:var(--sinaxys-ink)]">Criar tier</DialogTitle>
+              <DialogTitle className="text-[color:var(--sinaxys-ink)]">Criar prêmio</DialogTitle>
             </DialogHeader>
 
             <div className="grid gap-3">
@@ -431,10 +431,10 @@ function TiersAdmin({ companyId, tiers }: { companyId: string; tiers: RewardTier
                     setName("");
                     setPrize("");
                     setDescription("");
-                    toast({ title: "Tier criado." });
+                    toast({ title: "Prêmio criado." });
                     await qc.invalidateQueries({ queryKey: ["points", "tiers", companyId] });
                   } catch (e: any) {
-                    toast({ title: "Erro ao criar tier", description: e?.message ?? String(e) });
+                    toast({ title: "Erro ao criar prêmio", description: e?.message ?? String(e) });
                   }
                 }}
               >
@@ -447,7 +447,7 @@ function TiersAdmin({ companyId, tiers }: { companyId: string; tiers: RewardTier
 
       <div className="mt-4 grid gap-2">
         {tiers.length === 0 ? (
-          <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum tier ainda.</div>
+          <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum prêmio ainda.</div>
         ) : null}
 
         {tiers.map((t) => (
@@ -482,7 +482,7 @@ function TiersAdmin({ companyId, tiers }: { companyId: string; tiers: RewardTier
                   variant="outline"
                   className="h-10 rounded-xl border-[color:var(--sinaxys-border)]"
                   onClick={async () => {
-                    if (!confirm("Remover este tier?")) return;
+                    if (!confirm("Remover este prêmio?")) return;
                     try {
                       await deleteRewardTier(t.id);
                       await qc.invalidateQueries({ queryKey: ["points", "tiers", companyId] });
@@ -615,7 +615,7 @@ export default function Rankings() {
                   Regras
                 </TabsTrigger>
                 <TabsTrigger value="tiers" className="shrink-0 rounded-xl data-[state=active]:bg-white data-[state=active]:text-[color:var(--sinaxys-ink)]">
-                  Tiers
+                  Prêmios
                 </TabsTrigger>
               </>
             ) : null}
@@ -654,7 +654,7 @@ export default function Rankings() {
           <TabsContent value="tiers" className="mt-4">
             {user.role === "ADMIN" ? (
               qTiers.isLoading ? (
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando tiers…</div>
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando prêmios…</div>
               ) : (
                 <TiersAdmin companyId={companyId} tiers={qTiers.data ?? []} />
               )

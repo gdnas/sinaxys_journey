@@ -463,7 +463,7 @@ export default function AppDashboard() {
           />
           <ShortcutCard
             title="Points"
-            desc={isAdmin ? "Engajamento e regras de pontuação." : "Ranking, tiers e recompensas."}
+            desc={isAdmin ? "Engajamento e regras de pontuação." : "Ranking, prêmios e recompensas."}
             icon={<Sparkles className="h-5 w-5" />}
             to={isAdmin ? "/rankings?tab=rules" : "/rankings"}
             badge="reconhecimento"

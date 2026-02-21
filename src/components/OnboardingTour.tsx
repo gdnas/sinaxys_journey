@@ -188,7 +188,7 @@ function getRoleSteps(role: Role): Step[] {
       title: "Points = reconhecimento com regra",
       body: (
         <div className="grid gap-2">
-          <p className="text-sm text-muted-foreground">Aqui o progresso vira motivação: ranking, tiers e recompensas — com regras claras.</p>
+          <p className="text-sm text-muted-foreground">Aqui o progresso vira motivação: ranking, prêmios e recompensas — com regras claras.</p>
           <p className="text-sm text-muted-foreground">Melhor prática: reconheça ações específicas (o que foi feito e qual impacto gerou).</p>
         </div>
       ),
