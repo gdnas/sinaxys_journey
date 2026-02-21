@@ -185,7 +185,7 @@ function getRoleSteps(role: Role): Step[] {
     },
     {
       id: "dash-points",
-      title: "Sinaxys Points = reconhecimento com regra",
+      title: "Points = reconhecimento com regra",
       body: (
         <div className="grid gap-2">
           <p className="text-sm text-muted-foreground">Aqui o progresso vira motivação: ranking, tiers e recompensas — com regras claras.</p>

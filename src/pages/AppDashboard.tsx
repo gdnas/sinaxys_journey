@@ -362,7 +362,7 @@ export default function AppDashboard() {
                 to="/okr/hoje"
               />
               <StatPill
-                label="Sinaxys Points"
+                label="Points"
                 value={formatPts(myPoints)}
                 hint={myRank ? `posição #${myRank} (Top 50)` : "entre no ranking"}
                 icon={<Trophy className="h-5 w-5" />}
@@ -462,7 +462,7 @@ export default function AppDashboard() {
             tourId="dash-trilhas"
           />
           <ShortcutCard
-            title="Sinaxys Points"
+            title="Points"
             desc={isAdmin ? "Engajamento e regras de pontuação." : "Ranking, tiers e recompensas."}
             icon={<Sparkles className="h-5 w-5" />}
             to={isAdmin ? "/rankings?tab=rules" : "/rankings"}

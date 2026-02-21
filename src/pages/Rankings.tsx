@@ -62,7 +62,7 @@ function TopBanner() {
             <span className="grid h-5 w-5 place-items-center rounded-full bg-white ring-1 ring-[color:var(--sinaxys-border)]">
               <Sparkles className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
             </span>
-            Sinaxys Points
+            Points
           </div>
           <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-3xl">Ranking & recompensas</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
@@ -562,7 +562,7 @@ export default function Rankings() {
         <TopBanner />
         <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Sem empresa ativa</div>
-          <div className="mt-2 text-sm text-muted-foreground">Para usar o Sinaxys Points, é preciso ter um tenant/empresa selecionada.</div>
+          <div className="mt-2 text-sm text-muted-foreground">Para usar o Points, é preciso ter uma empresa selecionada.</div>
         </div>
       </div>
     );
