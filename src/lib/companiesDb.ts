@@ -48,3 +48,8 @@ export async function updateCompany(companyId: string, patch: Partial<Pick<DbCom
   if (error) throw error;
   return (data ?? null) as DbCompany | null;
 }
+
+export async function deleteCompany(companyId: string) {
+  const { error } = await supabase.from("companies").delete().eq("id", companyId);
+  if (error) throw error;
+}
