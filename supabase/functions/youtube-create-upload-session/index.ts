@@ -44,6 +44,14 @@ async function refreshAccessToken(refreshToken: string, clientId: string, client
   return { ok: true as const, accessToken, expiresAt };
 }
 
+function tryParseJson(text: string) {
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -205,12 +213,34 @@ serve(async (req) => {
 
     if (!initRes.ok) {
       const errText = await initRes.text().catch(() => "");
+      const errJson = tryParseJson(errText);
+      const errMsg = String(errJson?.error?.message ?? "").trim();
+
       console.error(`[${functionName}] resumable init failed`, { status: initRes.status, errText });
+
+      const friendly = errMsg.includes("YouTube Data API v3 has not been used")
+        ? {
+            message:
+              "O projeto do Google usado por este login ainda está sem a YouTube Data API v3 habilitada (ou a alteração ainda não propagou).",
+            details: errMsg,
+            hint:
+              "Confirme que você habilitou a API no MESMO projeto do OAuth Client ID configurado no app. Tente novamente após alguns minutos e reconecte o YouTube.",
+          }
+        : {
+            message: "Falha ao criar sessão de upload no YouTube.",
+            details: errMsg || errText || null,
+          };
+
       await service
         .from("trail_videos")
         .update({ status: "error", error_message: `init_failed:${initRes.status}` })
         .eq("id", tv.id);
-      return json(400, { ok: false, message: "Falha ao criar sessão de upload no YouTube." });
+
+      return json(initRes.status, {
+        ok: false,
+        error: "youtube_init_failed",
+        ...friendly,
+      });
     }
 
     const uploadUrl = initRes.headers.get("Location");
