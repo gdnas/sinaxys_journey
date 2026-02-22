@@ -227,6 +227,7 @@ export default function OkrCycles() {
   };
 
   const [objOpen, setObjOpen] = useState(false);
+  const [creatingAnnualObjective, setCreatingAnnualObjective] = useState(false);
   const [editingObjectiveId, setEditingObjectiveId] = useState<string | null>(null);
   const [objLevel, setObjLevel] = useState<ObjectiveLevel>("COMPANY");
   const [objTitle, setObjTitle] = useState("");
@@ -485,6 +486,23 @@ export default function OkrCycles() {
             </div>
 
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+              {isAdminish ? (
+                <Button
+                  className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  onClick={() => {
+                    resetObjective();
+                    setCreatingAnnualObjective(true);
+                    setObjLevel("COMPANY");
+                    setObjDept(null);
+                    setObjParent(null);
+                    setObjOpen(true);
+                  }}
+                >
+                  <Plus className="mr-2 h-4 w-4" />
+                  Novo objetivo do ano
+                </Button>
+              ) : null}
+
               {historyAnnualCycle ? (
                 <Button
                   variant="outline"
@@ -740,6 +758,7 @@ export default function OkrCycles() {
               disabled={!selected}
               onClick={() => {
                 resetObjective();
+                setCreatingAnnualObjective(false);
                 setObjOpen(true);
               }}
             >
@@ -1052,12 +1071,17 @@ export default function OkrCycles() {
         open={objOpen}
         onOpenChange={(v) => {
           setObjOpen(v);
-          if (!v) resetObjective();
+          if (!v) {
+            setCreatingAnnualObjective(false);
+            resetObjective();
+          }
         }}
       >
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingObjectiveId ? "Editar objetivo" : "Novo objetivo do ciclo"}</DialogTitle>
+            <DialogTitle>
+              {editingObjectiveId ? "Editar objetivo" : creatingAnnualObjective ? "Novo objetivo do ano" : "Novo objetivo do ciclo"}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4">
