@@ -53,6 +53,7 @@ import Pricing from "./pages/Pricing";
 import HowItWorks from "./pages/HowItWorks";
 import Demo from "./pages/Demo";
 import Person from "./pages/Person";
+import TrailVideos from "./pages/TrailVideos";
 
 const queryClient = new QueryClient();
 
@@ -381,6 +382,17 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <TrackDetail />
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/videos"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="TRACKS">
+                          <TrailVideos />
+                        </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />
