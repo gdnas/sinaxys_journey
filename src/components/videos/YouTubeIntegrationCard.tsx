@@ -75,7 +75,7 @@ function ConfigChecklist({ details }: { details?: string }) {
         })}
       </div>
 
-      {details ? (
+      {details && !ok ? (
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
           <div className="font-semibold">Detalhes</div>
           <div className="mt-1 break-words opacity-90">{details}</div>
@@ -117,6 +117,8 @@ export function YouTubeIntegrationCard({ tenantId, userId }: { tenantId: string;
 
   const connectMutation = useMutation({
     mutationFn: async () => {
+      // Clear stale error (e.g., user configured secrets after a previous failure)
+      setLastError(null);
       const { authUrl } = await startYouTubeConnect("/videos");
       window.location.href = authUrl;
     },

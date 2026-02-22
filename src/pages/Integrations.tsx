@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { CheckCircle2, Copy, ShieldCheck, Youtube } from "lucide-react";
+import { CheckCircle2, Copy, Info, ShieldCheck, Youtube } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -85,6 +85,19 @@ export default function Integrations() {
                       </div>
                     </div>
                   </div>
+
+                  <div className="mt-4 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/20 p-4 text-sm text-muted-foreground">
+                    <div className="flex items-start gap-2">
+                      <Info className="mt-0.5 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                      <div>
+                        <div className="font-medium text-[color:var(--sinaxys-ink)]">Se aparecer "Acesso bloqueado"</div>
+                        <div className="mt-1">
+                          No Google Cloud, vá em <span className="font-medium">Google Auth Platform → Audience</span> e adicione o e-mail em
+                          <span className="font-medium"> Test users</span> (quando o app estiver em "Testing").
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -139,7 +152,7 @@ export default function Integrations() {
                   <div className="font-semibold">{configured ? "Pronto para conectar" : "Configuração pendente"}</div>
                   <div className="mt-1 opacity-90">
                     {configured
-                      ? "Tudo configurado. Se falhar, é quase sempre redirect_uri no Google Cloud ou permissões."
+                      ? "Tudo configurado. Se falhar, é quase sempre o app estar em Testing (Test users) ou o redirect_uri no Google Cloud."
                       : "Peça para o administrador configurar as chaves do Google OAuth no Supabase (secrets)."}
                   </div>
                 </div>
