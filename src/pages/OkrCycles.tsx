@@ -429,6 +429,8 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                   levelBadge={levelBadge(o.level)}
                   canWriteObjective={canWriteObjective}
                   openHref={`/okr/objetivos/${o.id}`}
+                  companyId={cid}
+                  currentUserId={user.id}
                   onEdit={
                     canWriteObjective
                       ? () => {

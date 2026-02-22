@@ -457,6 +457,40 @@ export type DbOkrKeyResult = {
   updated_at: string | null;
 };
 
+export type DbKrChangeLog = {
+  id: string;
+  company_id: string;
+  key_result_id: string;
+  user_id: string;
+  changes: any;
+  created_at: string;
+};
+
+export async function listKrChangeLogs(keyResultId: string) {
+  const { data, error } = await supabase
+    .from("okr_key_result_change_logs")
+    .select("id,company_id,key_result_id,user_id,changes,created_at")
+    .eq("key_result_id", keyResultId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbKrChangeLog[];
+}
+
+export async function createKrChangeLog(payload: Pick<DbKrChangeLog, "company_id" | "key_result_id" | "user_id" | "changes">) {
+  const { data, error } = await supabase
+    .from("okr_key_result_change_logs")
+    .insert({
+      company_id: payload.company_id,
+      key_result_id: payload.key_result_id,
+      user_id: payload.user_id,
+      changes: payload.changes ?? {},
+    })
+    .select("id,company_id,key_result_id,user_id,changes,created_at")
+    .single();
+  if (error) throw error;
+  return data as DbKrChangeLog;
+}
+
 const krSelect =
   "id,objective_id,title,kind,due_at,achieved,achieved_at,metric_unit,start_value,target_value,current_value,owner_user_id,confidence,created_at,updated_at";
 
