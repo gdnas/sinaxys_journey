@@ -99,6 +99,12 @@ export function MarketingShell({
             <Link className="hover:text-[color:var(--sinaxys-ink)]" to="/demo">
               Agendar demo
             </Link>
+            <Link className="hover:text-[color:var(--sinaxys-ink)]" to="/privacidade">
+              Privacidade
+            </Link>
+            <Link className="hover:text-[color:var(--sinaxys-ink)]" to="/termos">
+              Termos
+            </Link>
             <Link className="hover:text-[color:var(--sinaxys-ink)]" to="/login">
               Login
             </Link>

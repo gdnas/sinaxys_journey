@@ -55,6 +55,8 @@ import Demo from "./pages/Demo";
 import Person from "./pages/Person";
 import TrailVideos from "./pages/TrailVideos";
 import Integrations from "./pages/Integrations";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsOfService from "./pages/TermsOfService";
 
 const queryClient = new QueryClient();
 
@@ -73,6 +75,8 @@ const App = () => (
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/como-funciona" element={<HowItWorks />} />
                   <Route path="/demo" element={<Demo />} />
+                  <Route path="/privacidade" element={<PrivacyPolicy />} />
+                  <Route path="/termos" element={<TermsOfService />} />
                   <Route path="/login" element={<Login />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
 
@@ -126,14 +130,12 @@ const App = () => (
                     }
                   />
 
-                  {/* PDI & Performance */}
+                  {/* Dashboard */}
                   <Route
-                    path="/pdi-performance"
+                    path="/dashboard"
                     element={
                       <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <RequireCompanyModule moduleKey="PDI_PERFORMANCE">
-                          <PdiPerformance />
-                        </RequireCompanyModule>
+                        <AppDashboard />
                       </RequireAuth>
                     }
                   />
@@ -142,220 +144,83 @@ const App = () => (
                   <Route
                     path="/okr"
                     element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="OKR">
                           <OkrHome />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />
+
                   <Route
-                    path="/okr/hoje"
+                    path="/okr/today"
                     element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="OKR">
                           <OkrToday />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />
+
                   <Route
-                    path="/okr/fundamentos"
+                    path="/okr/fundamentals"
                     element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="OKR">
                           <OkrFundamentals />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />
+
                   <Route
-                    path="/okr/mapa"
+                    path="/okr/map"
                     element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="OKR">
                           <OkrMap />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />
+
                   <Route
-                    path="/okr/ciclos"
+                    path="/okr/cycles"
                     element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="OKR">
                           <OkrCycles />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />
+
                   <Route
-                    path="/okr/assistente"
+                    path="/okr/objectives/:objectiveId"
                     element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="OKR">
+                          <OkrObjectiveDetail />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/okr/assistant"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="OKR">
                           <OkrAssistant />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />
-                  <Route
-                    path="/okr/objetivo/:objectiveId"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <RequireCompanyModule moduleKey="OKR">
-                          <OkrObjectiveDetail />
-                        </RequireCompanyModule>
-                      </RequireAuth>
-                    }
-                  />
-                  {/* Alias (plural) used by several links */}
-                  <Route
-                    path="/okr/objetivos/:objectiveId"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <RequireCompanyModule moduleKey="OKR">
-                          <OkrObjectiveDetail />
-                        </RequireCompanyModule>
-                      </RequireAuth>
-                    }
-                  />
 
-                  {/* Admin */}
+                  {/* Trilhas */}
                   <Route
-                    path="/admin/users"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
-                        <AdminUsers />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/admin/users/:userId"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
-                        <AdminUserCard />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/admin/departments"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
-                        <AdminDepartments />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/admin/brand"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
-                        <AdminBrand />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/admin/orgchart"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
-                        <AdminOrgChart />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/admin/costs"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
-                        <AdminCosts />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/admin/import-users"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
-                        <AdminImportUsers />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/admin/tracks"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
-                        <AdminTracks />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/admin/tracks/:trackId/edit"
-                    element={
-                      <RequireAuth roles={["ADMIN"]}>
-                        <HeadTrackEdit />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/admin/rewards"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
-                        <AdminRewards />
-                      </RequireAuth>
-                    }
-                  />
-
-                  {/* Head */}
-                  <Route
-                    path="/head/tracks"
-                    element={
-                      <RequireAuth roles={["HEAD"]}>
-                        <HeadTracks />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/head/tracks/:trackId"
-                    element={
-                      <RequireAuth roles={["HEAD"]}>
-                        <HeadTrackEdit />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/head/users"
-                    element={
-                      <RequireAuth roles={["HEAD"]}>
-                        <HeadUsers />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/head/costs"
-                    element={
-                      <RequireAuth roles={["HEAD"]}>
-                        <HeadCosts />
-                      </RequireAuth>
-                    }
-                  />
-
-                  {/* Colaborador */}
-                  <Route
-                    path="/app"
-                    element={
-                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                        <AppDashboard />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/app/tracks/:trackId"
-                    element={
-                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                        <TrackDetail />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/app/player/:trackId"
+                    path="/track/:trackId"
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <TrackPlayer />

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { ArrowRight, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -50,6 +50,15 @@ export default function Login() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   Entre com seu e-mail e senha. Se você não tiver acesso, solicite ao administrador da sua empresa.
                 </p>
+                <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
+                  <Link className="text-[color:var(--sinaxys-primary)] hover:underline" to="/privacidade">
+                    Política de Privacidade
+                  </Link>
+                  <span className="text-muted-foreground">•</span>
+                  <Link className="text-[color:var(--sinaxys-primary)] hover:underline" to="/termos">
+                    Termos de Serviço
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
