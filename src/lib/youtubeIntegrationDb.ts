@@ -116,9 +116,18 @@ export async function startYouTubeConnect(redirectTo: string) {
     });
   }
 
-  if (!data?.ok || !data?.authUrl) {
+  // youtube-connect is "plug-and-play": when it's not configured, it returns HTTP 200 + ok:false.
+  // Treat this as a user-facing error so the UI can open the setup modal.
+  if (!data?.ok) {
+    throw new EdgeFunctionError("YouTube não configurado", {
+      status: 200,
+      details: String((data as any)?.details ?? (data as any)?.error ?? "Conexão não configurada."),
+    });
+  }
+
+  if (!data?.authUrl) {
     throw new EdgeFunctionError("Não foi possível iniciar conexão.", {
-      details: String((data as any)?.details ?? (data as any)?.error ?? "Resposta inválida."),
+      details: "Resposta inválida.",
     });
   }
 

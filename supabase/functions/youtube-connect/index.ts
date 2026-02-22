@@ -43,7 +43,8 @@ serve(async (req) => {
       const r = requireSecret(s);
       if (!r.ok) {
         console.error(`[${functionName}] missing secret`, { name: r.name });
-        return json(500, { ok: false, error: "config", details: `Missing secret: ${r.name}` });
+        // IMPORTANT: return 200 with ok:false so the client can show a friendly setup screen.
+        return json(200, { ok: false, error: "config", details: `Missing secret: ${r.name}` });
       }
     }
 

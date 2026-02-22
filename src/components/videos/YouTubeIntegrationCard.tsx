@@ -25,11 +25,23 @@ function ConfigChecklist({ details }: { details?: string }) {
     retry: false,
   });
 
+  const missing = healthQuery.data?.missing ?? [];
+  const ok = healthQuery.data?.ok ?? false;
+
   return (
     <div className="grid gap-3">
       <div className="text-sm text-muted-foreground">
-        Plug-n-play: se algo falhar, esta tela mostra exatamente o que falta para habilitar a conexão.
+        Plug-n-play: esta tela ajuda a diagnosticar configuração (Google OAuth / secrets) quando a conexão não abre.
       </div>
+
+      {healthQuery.data && !ok ? (
+        <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
+          <div className="font-semibold">Configuração pendente</div>
+          <div className="mt-1 opacity-90">
+            Faltam chaves no backend. Um administrador precisa configurar os secrets no Supabase.
+          </div>
+        </div>
+      ) : null}
 
       {healthQuery.data?.redirectUri ? (
         <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/20 p-3 text-xs text-muted-foreground">
@@ -41,7 +53,7 @@ function ConfigChecklist({ details }: { details?: string }) {
       <div className="grid gap-2">
         {items.map((k) => {
           const configured = healthQuery.data?.configured?.[k];
-          const missing = healthQuery.data?.missing?.includes(k);
+          const isMissing = missing.includes(k);
 
           return (
             <div
@@ -53,7 +65,7 @@ function ConfigChecklist({ details }: { details?: string }) {
                 <Badge className="rounded-full bg-[color:var(--sinaxys-border)]/60 text-[color:var(--sinaxys-ink)]">checando…</Badge>
               ) : configured ? (
                 <Badge className="rounded-full bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/25">ok</Badge>
-              ) : missing ? (
+              ) : isMissing ? (
                 <Badge className="rounded-full bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/25">missing</Badge>
               ) : (
                 <Badge className="rounded-full bg-[color:var(--sinaxys-border)]/60 text-[color:var(--sinaxys-ink)]">required</Badge>

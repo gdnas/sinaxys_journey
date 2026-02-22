@@ -40,7 +40,9 @@ serve(async (req) => {
 
     console.log(`[${functionName}] health check`, { ok, missingCount: missing.length });
 
-    return json(ok ? 200 : 500, {
+    // IMPORTANT: return 200 even when not configured.
+    // This keeps the UI "plug-and-play" by showing what's missing instead of throwing a non-2xx error.
+    return json(200, {
       ok,
       provider: "youtube",
       missing,
