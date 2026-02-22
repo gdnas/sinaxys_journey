@@ -57,6 +57,8 @@ import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from
 
 const SELECT_NONE = "__none__";
 
+type OkrCyclesScope = "quarter" | "year";
+
 function cycleLabel(c: { type: CycleType; year: number; quarter: number | null; name: string | null }) {
   const base = c.type === "ANNUAL" ? `${c.year}` : `Q${c.quarter ?? "?"} / ${c.year}`;
   return c.name?.trim() ? `${c.name} · ${base}` : base;
@@ -73,7 +75,7 @@ function levelBadge(level: ObjectiveLevel) {
   );
 }
 
-export default function OkrCycles() {
+export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScope }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { enabled: okrRoiEnabled } = useCompanyModuleEnabled("OKR_ROI");
@@ -99,7 +101,18 @@ export default function OkrCycles() {
     queryFn: () => listOkrCycles(cid),
   });
 
-  const defaultCycleId = cycles.find((c) => c.status === "ACTIVE" && c.type === "QUARTERLY")?.id ?? cycles[0]?.id ?? null;
+  // Define "ano corrente" based on the active quarterly cycle if available, otherwise current date.
+  const currentYear =
+    cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE")?.year ?? new Date().getFullYear();
+
+  const scopeCycleType: CycleType = scope === "year" ? "ANNUAL" : "QUARTERLY";
+  const scopedCycles = useMemo(() => cycles.filter((c) => c.type === scopeCycleType), [cycles, scopeCycleType]);
+
+  const defaultCycleId =
+    scope === "year"
+      ? (cycles.find((c) => c.type === "ANNUAL" && c.year === currentYear)?.id ?? scopedCycles[0]?.id ?? null)
+      : (cycles.find((c) => c.status === "ACTIVE" && c.type === "QUARTERLY")?.id ?? scopedCycles[0]?.id ?? null);
+
   const [cycleId, setCycleId] = useState<string | null>(defaultCycleId);
 
   // When cycles load, fill the selection once.
@@ -110,47 +123,13 @@ export default function OkrCycles() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [defaultCycleId]);
 
-  const selected = cycles.find((c) => c.id === cycleId) ?? null;
-
-  // Define "ano corrente" based on the active quarterly cycle if available, otherwise current date.
-  const currentYear =
-    cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE")?.year ?? new Date().getFullYear();
-
-  const currentAnnualCycle = cycles.find((c) => c.type === "ANNUAL" && c.year === currentYear) ?? null;
+  const selected = scopedCycles.find((c) => c.id === cycleId) ?? null;
 
   // Objectives for the selected cycle
   const { data: objectives = [] } = useQuery({
     queryKey: ["okr-objectives", cid, cycleId],
     enabled: hasCompany && !!cycleId,
     queryFn: () => listOkrObjectives(cid, String(cycleId)),
-  });
-
-  // Objectives for the current annual cycle ("OKRs do ano")
-  const { data: annualObjectives = [] } = useQuery({
-    queryKey: ["okr-objectives", cid, currentAnnualCycle?.id ?? "__none__"],
-    enabled: hasCompany && !!currentAnnualCycle?.id,
-    queryFn: () => listOkrObjectives(cid, String(currentAnnualCycle?.id)),
-  });
-
-  // History (previous annual cycles)
-  const previousAnnualCycles = useMemo(
-    () => cycles.filter((c) => c.type === "ANNUAL" && c.year < currentYear).sort((a, b) => b.year - a.year),
-    [cycles, currentYear],
-  );
-  const [historyAnnualCycleId, setHistoryAnnualCycleId] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (historyAnnualCycleId) return;
-    const first = previousAnnualCycles[0]?.id ?? null;
-    if (first) setHistoryAnnualCycleId(first);
-  }, [historyAnnualCycleId, previousAnnualCycles]);
-
-  const historyAnnualCycle = previousAnnualCycles.find((c) => c.id === historyAnnualCycleId) ?? null;
-
-  const { data: historyObjectives = [] } = useQuery({
-    queryKey: ["okr-objectives", cid, historyAnnualCycle?.id ?? "__none__"],
-    enabled: hasCompany && !!historyAnnualCycle?.id,
-    queryFn: () => listOkrObjectives(cid, String(historyAnnualCycle?.id)),
   });
 
   const { data: profiles = [] } = useQuery({
@@ -178,22 +157,15 @@ export default function OkrCycles() {
     );
   }, [profiles]);
 
-  const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d] as const)), [departments]);
-
-  // Stats for all objectives shown on this screen (selected cycle + annual section)
+  // Stats for all objectives shown on this screen
   const statsObjectiveIds = useMemo(() => {
     const ids = new Set<string>();
     for (const o of objectives) ids.add(o.id);
-    // In quarterly view, also show annual objectives
-    if (selected?.type === "QUARTERLY") {
-      for (const o of annualObjectives) ids.add(o.id);
-    }
-    // History card doesn't need live progress, so we don't include it here.
     return Array.from(ids);
-  }, [annualObjectives, objectives, selected?.type]);
+  }, [objectives]);
 
   const { data: objectiveStats = new Map<string, { count: number; pct: number | null }>() } = useQuery({
-    queryKey: ["okr-kr-stats", cid, cycleId, currentAnnualCycle?.id ?? "", statsObjectiveIds.join(",")],
+    queryKey: ["okr-kr-stats", cid, cycleId, statsObjectiveIds.join(",")],
     enabled: hasCompany && statsObjectiveIds.length > 0,
     queryFn: async () => {
       const m = new Map<string, { count: number; pct: number | null }>();
@@ -228,7 +200,6 @@ export default function OkrCycles() {
   };
 
   const [objOpen, setObjOpen] = useState(false);
-  const [creatingAnnualObjective, setCreatingAnnualObjective] = useState(false);
   const [editingObjectiveId, setEditingObjectiveId] = useState<string | null>(null);
   const [objLevel, setObjLevel] = useState<ObjectiveLevel>("COMPANY");
   const [objTitle, setObjTitle] = useState("");
@@ -287,11 +258,9 @@ export default function OkrCycles() {
     setKrOwner(null);
   };
 
-  const [replicateOpen, setReplicateOpen] = useState(false);
-  const [replicating, setReplicating] = useState(false);
-
   async function ensureCurrentAnnualCycle(): Promise<string> {
-    if (currentAnnualCycle?.id) return currentAnnualCycle.id;
+    const existing = cycles.find((c) => c.type === "ANNUAL" && c.year === currentYear)?.id ?? null;
+    if (existing) return existing;
     const created = await createOkrCycle(cid, {
       type: "ANNUAL",
       year: currentYear,
@@ -303,76 +272,6 @@ export default function OkrCycles() {
     });
     await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
     return created.id;
-  }
-
-  async function replicateAnnualOkrs(sourceAnnualCycleId: string) {
-    const targetAnnualCycleId = await ensureCurrentAnnualCycle();
-
-    const srcObjectives = await listOkrObjectives(cid, sourceAnnualCycleId);
-
-    // Keep only annual/company items by default. If you want to replicate the whole year plan, remove this filter.
-    const toCopy = srcObjectives;
-
-    // Preserve hierarchy via parent_objective_id
-    const sorted = [...toCopy].sort((a, b) => {
-      const ap = a.parent_objective_id ? 1 : 0;
-      const bp = b.parent_objective_id ? 1 : 0;
-      if (ap !== bp) return ap - bp;
-      return a.created_at && b.created_at ? a.created_at.localeCompare(b.created_at) : 0;
-    });
-
-    const idMap = new Map<string, string>();
-
-    for (const o of sorted) {
-      const newParentId = o.parent_objective_id ? idMap.get(o.parent_objective_id) ?? null : null;
-
-      const created = await createOkrObjective({
-        company_id: cid,
-        cycle_id: targetAnnualCycleId,
-        parent_objective_id: newParentId,
-        strategy_objective_id: o.strategy_objective_id,
-        level: o.level,
-        department_id: o.department_id,
-        owner_user_id: o.owner_user_id,
-        title: o.title,
-        description: o.description,
-        strategic_reason: o.strategic_reason,
-        linked_fundamental: o.linked_fundamental,
-        linked_fundamental_text: o.linked_fundamental_text,
-        due_at: o.due_at,
-        expected_attainment_pct: o.expected_attainment_pct,
-        estimated_value_brl: o.estimated_value_brl,
-        estimated_effort_hours: o.estimated_effort_hours,
-        estimated_cost_brl: o.estimated_cost_brl,
-        estimated_roi_pct: o.estimated_roi_pct,
-        expected_profit_brl: o.expected_profit_brl,
-        profit_thesis: o.profit_thesis,
-        expected_revenue_at: o.expected_revenue_at ?? null,
-      });
-
-      idMap.set(o.id, created.id);
-
-      // Replicate KRs
-      const srcKrs = await listKeyResults(o.id);
-      for (const kr of srcKrs) {
-        await createKeyResult({
-          objective_id: created.id,
-          title: kr.title,
-          kind: kr.kind,
-          due_at: kr.due_at,
-          achieved: false,
-          metric_unit: kr.metric_unit,
-          start_value: kr.start_value,
-          target_value: kr.target_value,
-          current_value: kr.start_value,
-          owner_user_id: kr.owner_user_id,
-          confidence: "ON_TRACK",
-        });
-      }
-    }
-
-    await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, targetAnnualCycleId] });
-    await qc.invalidateQueries({ queryKey: ["okr-kr-stats", cid] });
   }
 
   const requiresBusinessCase = !!objDept;
@@ -436,8 +335,12 @@ export default function OkrCycles() {
   return (
     <div className="grid gap-6">
       <OkrPageHeader
-        title="Ciclos & OKRs"
-        subtitle="Crie e acompanhe ciclos trimestrais e anuais — com ROI opcional por departamento."
+        title={scope === "year" ? "Objetivos do ano" : "Objetivos do trimestre"}
+        subtitle={
+          scope === "year"
+            ? "Revise e mantenha os objetivos anuais — com KRs, progresso e responsáveis."
+            : "Acompanhe os objetivos do trimestre — com KRs, progresso e responsáveis."
+        }
         icon={<Target className="h-5 w-5" />}
       />
 
@@ -446,17 +349,17 @@ export default function OkrCycles() {
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Selecionar ciclo</div>
-            <p className="mt-1 text-sm text-muted-foreground">Você pode manter histórico de trimestres e anos.</p>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Selecionar {scope === "year" ? "ano" : "trimestre"}</div>
+            <p className="mt-1 text-sm text-muted-foreground">Você pode manter histórico de {scope === "year" ? "anos" : "trimestres"}.</p>
           </div>
 
           <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:flex-wrap md:items-center md:justify-end">
             <Select value={cycleId ?? ""} onValueChange={(v) => setCycleId(v)}>
               <SelectTrigger className="h-11 w-full rounded-xl md:w-[340px]">
-                <SelectValue placeholder="Escolha um ciclo" />
+                <SelectValue placeholder={scope === "year" ? "Escolha um ano" : "Escolha um trimestre"} />
               </SelectTrigger>
               <SelectContent>
-                {cycles.map((c) => (
+                {scopedCycles.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {cycleLabel(c)}
                   </SelectItem>
@@ -473,200 +376,23 @@ export default function OkrCycles() {
         </div>
 
         {!selected ? (
-          <div className="mt-5 rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum ciclo disponível.</div>
+          <div className="mt-5 rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+            Nenhum {scope === "year" ? "ano" : "trimestre"} disponível.
+          </div>
         ) : null}
       </Card>
-
-      {/* OKRs do ano (área separada para objetivos estratégicos) */}
-      {selected?.type === "QUARTERLY" ? (
-        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">OKRs do ano ({currentYear})</div>
-              <p className="mt-1 text-sm text-muted-foreground">Objetivos estratégicos que organizam o ano (empresa) + KRs.</p>
-            </div>
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-              {isAdminish ? (
-                <Button
-                  className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                  onClick={() => {
-                    resetObjective();
-                    setCreatingAnnualObjective(true);
-                    setObjLevel("COMPANY");
-                    setObjDept(null);
-                    setObjParent(null);
-                    setObjOpen(true);
-                  }}
-                >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Novo objetivo do ano
-                </Button>
-              ) : null}
-
-              {historyAnnualCycle ? (
-                <Button
-                  variant="outline"
-                  className="h-11 rounded-xl bg-white"
-                  onClick={() => setReplicateOpen(true)}
-                  disabled={replicating}
-                  title="Replicar OKRs do ano selecionado no histórico para o ano corrente"
-                >
-                  Replicar do ano {historyAnnualCycle.year}
-                </Button>
-              ) : null}
-            </div>
-          </div>
-
-          {!currentAnnualCycle ? (
-            <div className="mt-4 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-              Nenhum ciclo anual encontrado para {currentYear}. Ele será criado automaticamente ao replicar ou ao criar um objetivo estratégico.
-            </div>
-          ) : null}
-
-          <Separator className="my-5" />
-
-          <div className="grid gap-3">
-            {(annualObjectives.filter((o) => o.level === "COMPANY") ?? []).length ? (
-              annualObjectives
-                .filter((o) => o.level === "COMPANY")
-                .map((o) => {
-                  const owner = byUserId.get(o.owner_user_id)?.name ?? "—";
-                  const st = objectiveStats.get(o.id) ?? { count: 0, pct: null };
-                  const canWriteObjective = user.id === o.owner_user_id || isAdminish;
-
-                  return (
-                    <OkrObjectiveCard
-                      key={o.id}
-                      objective={o}
-                      ownerName={owner}
-                      krCount={st.count}
-                      avgProgressPct={st.pct}
-                      levelBadge={levelBadge(o.level)}
-                      canWriteObjective={canWriteObjective}
-                      openHref={`/okr/objetivos/${o.id}`}
-                      onEdit={
-                        canWriteObjective
-                          ? () => {
-                              setEditingObjectiveId(o.id);
-                              setObjLevel(o.level);
-                              setObjTitle(o.title);
-                              setObjDesc(o.description ?? "");
-                              setObjReason(o.strategic_reason ?? "");
-                              setObjOwner(o.owner_user_id);
-                              setObjDept(o.department_id);
-                              setObjParent(o.parent_objective_id);
-                              setObjExpected(typeof o.expected_attainment_pct === "number" ? String(o.expected_attainment_pct) : "80");
-                              setObjValue(typeof o.estimated_value_brl === "number" ? String(o.estimated_value_brl) : "");
-                              setObjEffortHours(typeof o.estimated_effort_hours === "number" ? String(o.estimated_effort_hours) : "");
-                              setObjOpen(true);
-                            }
-                          : undefined
-                      }
-                      onDelete={
-                        canWriteObjective
-                          ? () => {
-                              setDeleteObjectiveId(o.id);
-                              setDeleteOpen(true);
-                            }
-                          : undefined
-                      }
-                      onAddKr={
-                        canWriteObjective
-                          ? () => {
-                              resetKr();
-                              setKrObjectiveId(o.id);
-                              setKrOpen(true);
-                            }
-                          : undefined
-                      }
-                    />
-                  );
-                })
-            ) : (
-              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-                Nenhum objetivo estratégico (Empresa) no ano {currentYear}.
-              </div>
-            )}
-          </div>
-
-          {/* Histórico */}
-          {previousAnnualCycles.length ? (
-            <>
-              <Separator className="my-5" />
-              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Histórico — anos anteriores</div>
-                  <p className="mt-1 text-sm text-muted-foreground">Navegue nos OKRs anuais antigos (inativos) e replique para o ano corrente.</p>
-                </div>
-
-                <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
-                  <Select value={historyAnnualCycleId ?? ""} onValueChange={(v) => setHistoryAnnualCycleId(v)}>
-                    <SelectTrigger className="h-11 w-full rounded-xl md:w-[260px]">
-                      <SelectValue placeholder="Escolha o ano" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {previousAnnualCycles.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {historyAnnualCycle ? (
-                    <Button
-                      className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                      onClick={() => setReplicateOpen(true)}
-                      disabled={replicating}
-                    >
-                      Replicar {historyAnnualCycle.year} → {currentYear}
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-
-              {historyAnnualCycle ? (
-                <div className="mt-4 grid gap-2">
-                  {historyObjectives.length ? (
-                    historyObjectives
-                      .filter((o) => o.level === "COMPANY")
-                      .map((o) => (
-                        <div
-                          key={o.id}
-                          className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3"
-                        >
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              {levelBadge(o.level)}
-                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">Ano {historyAnnualCycle.year} • {o.status}</div>
-                          </div>
-                          <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
-                            <Link to={`/okr/objetivos/${o.id}`}>Abrir</Link>
-                          </Button>
-                        </div>
-                      ))
-                  ) : (
-                    <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem objetivos nesse ano.</div>
-                  )}
-                </div>
-              ) : null}
-            </>
-          ) : null}
-        </Card>
-      ) : null}
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-              {selected?.type === "QUARTERLY" ? `OKRs do trimestre (${cycleLabel(selected)})` : "Objetivos do ciclo"}
+              {scope === "year"
+                ? `Objetivos do ano (${selected?.year ?? currentYear})`
+                : selected
+                  ? `Objetivos do trimestre (${cycleLabel(selected)})`
+                  : "Objetivos do trimestre"}
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Ao criar um objetivo, conecte explicitamente a qual parte do propósito/visão ele serve.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Expanda um objetivo para ver os KRs.</p>
           </div>
 
           {isAdminish ? (
@@ -675,12 +401,11 @@ export default function OkrCycles() {
               disabled={!selected}
               onClick={() => {
                 resetObjective();
-                setCreatingAnnualObjective(false);
                 setObjOpen(true);
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Novo objetivo do trimestre
+              {scope === "year" ? "Novo objetivo do ano" : "Novo objetivo do trimestre"}
             </Button>
           ) : null}
         </div>
@@ -688,8 +413,8 @@ export default function OkrCycles() {
         <Separator className="my-5" />
 
         <div className="grid gap-3">
-          {(selected?.type === "QUARTERLY" ? objectives.filter((o) => o.level !== "COMPANY") : objectives).length ? (
-            (selected?.type === "QUARTERLY" ? objectives.filter((o) => o.level !== "COMPANY") : objectives).map((o) => {
+          {objectives.length ? (
+            objectives.map((o) => {
               const owner = byUserId.get(o.owner_user_id)?.name ?? "—";
               const st = objectiveStats.get(o.id) ?? { count: 0, pct: null };
               const canWriteObjective = user.id === o.owner_user_id || isAdminish;
@@ -743,176 +468,23 @@ export default function OkrCycles() {
               );
             })
           ) : (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum objetivo neste ciclo.</div>
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+              Nenhum objetivo neste {scope === "year" ? "ano" : "trimestre"}.
+            </div>
           )}
         </div>
       </Card>
-
-      <AlertDialog open={replicateOpen} onOpenChange={setReplicateOpen}>
-        <AlertDialogContent className="rounded-3xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Replicar OKRs?</AlertDialogTitle>
-            <AlertDialogDescription>
-              {historyAnnualCycle
-                ? `Vamos copiar objetivos e KRs do ano ${historyAnnualCycle.year} para o ano corrente (${currentYear}). Isso não apaga nada do ano atual — apenas adiciona novos itens.`
-                : "Selecione um ano no histórico para replicar."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-xl" disabled={replicating}>
-              Cancelar
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={replicating || !historyAnnualCycle}
-              onClick={async () => {
-                if (!historyAnnualCycle) return;
-                setReplicating(true);
-                try {
-                  await replicateAnnualOkrs(historyAnnualCycle.id);
-                  toast({ title: "OKRs replicados", description: `Copiamos ${historyAnnualCycle.year} → ${currentYear}.` });
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível replicar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setReplicating(false);
-                  setReplicateOpen(false);
-                }
-              }}
-            >
-              Replicar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog
-        open={cycleOpen}
-        onOpenChange={(v) => {
-          setCycleOpen(v);
-          if (!v) resetCycle();
-        }}
-      >
-        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Novo ciclo</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Tipo</Label>
-              <Select value={cycleType} onValueChange={(v) => setCycleType(v as CycleType)}>
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="QUARTERLY">Trimestral</SelectItem>
-                  <SelectItem value="ANNUAL">Anual</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Ano</Label>
-              <Input className="h-11 rounded-xl" type="number" value={cycleYear} onChange={(e) => setCycleYear(Number(e.target.value))} />
-            </div>
-
-            {cycleType === "QUARTERLY" ? (
-              <div className="grid gap-2">
-                <Label>Trimestre</Label>
-                <Select value={String(cycleQuarter)} onValueChange={(v) => setCycleQuarter(Number(v) as any)}>
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="1">Q1</SelectItem>
-                    <SelectItem value="2">Q2</SelectItem>
-                    <SelectItem value="3">Q3</SelectItem>
-                    <SelectItem value="4">Q4</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : null}
-
-            <div className="grid gap-2">
-              <Label>Status</Label>
-              <Select value={cycleStatus} onValueChange={(v) => setCycleStatus(v as CycleStatus)}>
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PLANNING">PLANNING</SelectItem>
-                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
-                  <SelectItem value="CLOSED">CLOSED</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Nome (opcional)</Label>
-              <Input className="h-11 rounded-xl" value={cycleName} onChange={(e) => setCycleName(e.target.value)} placeholder="Ex.: Sprint Estratégico" />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setCycleOpen(false)} disabled={cycleSaving}>
-              Cancelar
-            </Button>
-            <Button
-              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={cycleSaving}
-              onClick={async () => {
-                if (cycleSaving) return;
-                setCycleSaving(true);
-                try {
-                  const c = await createOkrCycle(cid, {
-                    type: cycleType,
-                    year: cycleYear,
-                    quarter: cycleType === "QUARTERLY" ? cycleQuarter : null,
-                    start_date: null,
-                    end_date: null,
-                    status: cycleStatus,
-                    name: cycleName.trim() || null,
-                  });
-                  await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
-                  setCycleId(c.id);
-                  toast({ title: "Ciclo criado" });
-                  setCycleOpen(false);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível criar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setCycleSaving(false);
-                }
-              }}
-            >
-              Criar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={objOpen}
         onOpenChange={(v) => {
           setObjOpen(v);
-          if (!v) {
-            setCreatingAnnualObjective(false);
-            resetObjective();
-          }
+          if (!v) resetObjective();
         }}
       >
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>
-              {editingObjectiveId ? "Editar objetivo" : creatingAnnualObjective ? "Novo objetivo do ano" : "Novo objetivo do ciclo"}
-            </DialogTitle>
+            <DialogTitle>{editingObjectiveId ? "Editar objetivo" : scope === "year" ? "Novo objetivo do ano" : "Novo objetivo do trimestre"}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-4">
@@ -1077,13 +649,7 @@ export default function OkrCycles() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={
-                objSaving ||
-                !selected ||
-                objTitle.trim().length < 6 ||
-                !businessCaseOk ||
-                expectedAtt === null
-              }
+              disabled={objSaving || !selected || objTitle.trim().length < 6 || !businessCaseOk || expectedAtt === null}
               onClick={async () => {
                 if (!selected || objSaving) return;
                 setObjSaving(true);
@@ -1109,9 +675,7 @@ export default function OkrCycles() {
                     toast({ title: "Objetivo atualizado" });
                   } else {
                     const createCycleId =
-                      objLevel === "COMPANY"
-                        ? (currentAnnualCycle?.id ?? (await ensureCurrentAnnualCycle()))
-                        : selected.id;
+                      scope === "year" ? (selected?.id ?? (await ensureCurrentAnnualCycle())) : selected.id;
 
                     await createOkrObjective({
                       company_id: cid,
@@ -1140,7 +704,6 @@ export default function OkrCycles() {
                   }
 
                   await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, cycleId] });
-                  if (currentAnnualCycle?.id) await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, currentAnnualCycle.id] });
                   await qc.invalidateQueries({ queryKey: ["okr-kr-stats", cid] });
                   setObjOpen(false);
                 } catch (e) {

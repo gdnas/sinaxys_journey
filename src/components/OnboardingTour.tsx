@@ -82,7 +82,7 @@ function getRoleSteps(role: Role): Step[] {
   // Master Admin não tem onboarding/tour.
   if (role === "MASTERADMIN") return [];
 
-  const okrRoute = role === "COLABORADOR" ? "/okr/hoje" : "/okr/ciclos";
+  const okrRoute = role === "COLABORADOR" ? "/okr/hoje" : "/okr/quarter";
 
   const steps: Step[] = [
     {

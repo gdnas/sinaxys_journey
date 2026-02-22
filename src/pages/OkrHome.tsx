@@ -75,8 +75,8 @@ export default function OkrHome() {
     ? {
         title: "Comece criando o trimestre",
         desc: "Sem um ciclo ativo, fica impossível desdobrar objetivos e gerar tarefas do dia.",
-        cta: "Criar / ativar ciclo",
-        to: "/okr/ciclos",
+        cta: "Abrir objetivos do trimestre",
+        to: "/okr/quarter",
       }
     : !hasFundamentals && isAdminish
       ? {
@@ -207,7 +207,7 @@ export default function OkrHome() {
 
           <div className="mt-4">
             <Button asChild variant="outline" className="h-11 w-full rounded-xl">
-              <Link to="/okr/ciclos">
+              <Link to="/okr/quarter">
                 Abrir ciclos
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
@@ -270,7 +270,7 @@ export default function OkrHome() {
                 </div>
 
                 <Button asChild variant="outline" className="mt-2 h-11 rounded-xl bg-white">
-                  <Link to="/okr/ciclos">Ver OKRs do ciclo</Link>
+                  <Link to="/okr/quarter">Ver objetivos do trimestre</Link>
                 </Button>
               </div>
             ) : (
@@ -278,7 +278,7 @@ export default function OkrHome() {
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Nenhum trimestre ativo</div>
                 <div className="text-sm text-muted-foreground">Crie um ciclo trimestral para começar a operar OKRs.</div>
                 <Button asChild variant="outline" className="mt-2 h-11 rounded-xl bg-white">
-                  <Link to="/okr/ciclos">Criar / gerenciar ciclos</Link>
+                  <Link to="/okr/quarter">Criar / gerenciar objetivos do trimestre</Link>
                 </Button>
               </div>
             )}

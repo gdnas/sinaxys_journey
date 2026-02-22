@@ -1292,7 +1292,7 @@ function DetailsBody(
                 </div>
                 <div className="mt-4">
                     <Button asChild variant="outline" className="h-11 rounded-2xl bg-white">
-                        <Link to="/okr/ciclos">Abrir ciclos</Link>
+                        <Link to="/okr/quarter">Abrir objetivos do trimestre</Link>
                     </Button>
                 </div>
             </Card>) : null}
@@ -1963,7 +1963,7 @@ function Tree(
                                     Nenhum ciclo anual cadastrado.
                                     <div className="mt-3">
                                         <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
-                                            <Link to="/okr/ciclos">Criar ciclo anual</Link>
+                                            <Link to="/okr/year">Criar / gerenciar objetivos do ano</Link>
                                         </Button>
                                     </div>
                                 </div>
@@ -2118,7 +2118,7 @@ function Tree(
                                     Nenhum ciclo trimestral cadastrado.
                                     <div className="mt-3">
                                         <Button asChild variant="outline" className="h-10 rounded-xl bg-white">
-                                            <Link to="/okr/ciclos">Criar ciclo trimestral</Link>
+                                            <Link to="/okr/quarter">Criar / gerenciar objetivos do trimestre</Link>
                                         </Button>
                                     </div>
                                 </div>

@@ -341,7 +341,7 @@ export default function AppDashboard() {
             )}
 
             <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-              <Link to={isCollaborator ? "/okr/hoje" : "/okr/ciclos"}>
+              <Link to={isCollaborator ? "/okr/hoje" : "/okr/quarter"}>
                 {isCollaborator ? "Minhas tarefas" : "Ver OKRs"}
                 <Target className="ml-2 h-4 w-4" />
               </Link>
@@ -403,7 +403,7 @@ export default function AppDashboard() {
                     : "Nenhum ciclo trimestral ativo"
                 }
                 icon={<CheckCircle2 className="h-5 w-5" />}
-                to="/okr/ciclos"
+                to="/okr/quarter"
               />
             </>
           )}
@@ -447,7 +447,7 @@ export default function AppDashboard() {
             title="OKRs"
             desc={isAdmin ? "Saúde do trimestre: objetivos, KRs, entregáveis e tarefas." : isHead ? "OKRs do seu departamento e execução do time." : "Suas prioridades do dia e da semana."}
             icon={<MapPinned className="h-5 w-5" />}
-            to={isCollaborator ? "/okr/hoje" : "/okr/ciclos"}
+            to={isCollaborator ? "/okr/hoje" : "/okr/quarter"}
             badge="execução"
             img="/placeholder.svg"
             tourId="dash-okr"
@@ -575,7 +575,7 @@ export default function AppDashboard() {
               </Link>
             </Button>
             <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
-              <Link to="/okr/ciclos">
+              <Link to="/okr/quarter">
                 <Target className="mr-2 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
                 Ciclos & OKRs
               </Link>

@@ -1,11 +1,13 @@
 import { Link, useLocation } from "react-router-dom";
-import { BookOpenText, CalendarCheck2, MapPinned, Sparkles, Target } from "lucide-react";
+import { BookOpenText, CalendarCheck2, MapPinned, Sparkles, Target, CalendarRange, Milestone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 const items = [
   { to: "/okr/hoje", label: "Hoje", icon: CalendarCheck2 },
-  { to: "/okr/ciclos", label: "Ciclos", icon: Target },
+  { to: "/okr/quarter", label: "Trimestre", icon: CalendarRange },
+  { to: "/okr/year", label: "Ano", icon: Target },
+  { to: "/okr/long-term", label: "Longo prazo", icon: Milestone },
   { to: "/okr/mapa", label: "Mapa", icon: MapPinned },
   { to: "/okr/fundamentos", label: "Fundamentos", icon: BookOpenText },
   { to: "/okr/assistente", label: "Assistente", icon: Sparkles },

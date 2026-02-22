@@ -416,7 +416,7 @@ export default function OkrObjectiveDetail() {
           icon={<Target className="h-5 w-5" />}
           actions={
             <Button asChild variant="outline" className="h-11 rounded-xl">
-              <Link to="/okr/ciclos">
+              <Link to="/okr/quarter">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Voltar
               </Link>
@@ -461,7 +461,7 @@ export default function OkrObjectiveDetail() {
         actions={
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Button asChild variant="outline" className="h-11 rounded-xl">
-              <Link to="/okr/ciclos">
+              <Link to="/okr/quarter">
                 <ArrowLeft className="mr-2 h-4 w-4" />
                 Voltar
               </Link>

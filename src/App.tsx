@@ -37,6 +37,9 @@ import OkrToday from "./pages/OkrToday";
 import OkrFundamentals from "./pages/OkrFundamentals";
 import OkrMap from "./pages/OkrMap";
 import OkrCycles from "./pages/OkrCycles";
+import OkrQuarter from "./pages/OkrQuarter";
+import OkrYear from "./pages/OkrYear";
+import OkrLongTerm from "./pages/OkrLongTerm";
 import OkrAssistant from "./pages/OkrAssistant";
 import OkrObjectiveDetail from "./pages/OkrObjectiveDetail";
 import PdiPerformance from "./pages/PdiPerformance";
@@ -171,6 +174,38 @@ const App = () => (
                     }
                   />
 
+                  {/* Novas abas */}
+                  <Route
+                    path="/okr/quarter"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="OKR">
+                          <OkrQuarter />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/okr/year"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="OKR">
+                          <OkrYear />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/okr/long-term"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="OKR">
+                          <OkrLongTerm />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
                   {/* Rotas atuais (EN) */}
                   <Route
                     path="/okr/today"
@@ -210,7 +245,7 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="OKR">
-                          <OkrCycles />
+                          <Navigate to="/okr/quarter" replace />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
@@ -277,7 +312,7 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="OKR">
-                          <OkrCycles />
+                          <Navigate to="/okr/quarter" replace />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
