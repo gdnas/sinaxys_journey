@@ -50,7 +50,7 @@ export async function upsertCompanyFundamentals(companyId: string, patch: Partia
 export type DbStrategyObjective = {
   id: string;
   company_id: string;
-  horizon_years: 1 | 3 | 5 | 10;
+  horizon_years: 2 | 5 | 10;
   target_year: number | null;
   title: string;
   description: string | null;

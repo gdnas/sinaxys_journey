@@ -35,8 +35,9 @@ import {
 } from "@/lib/okrDb";
 
 function horizonLabel(h: DbStrategyObjective["horizon_years"]) {
-  if (h === 1) return "1 ano";
-  return `${h} anos`;
+  if (h === 2) return "2 anos";
+  if (h === 5) return "5 anos";
+  return "10 anos";
 }
 
 export default function OkrLongTerm() {
@@ -63,7 +64,7 @@ export default function OkrLongTerm() {
       const k = it.horizon_years;
       m.set(k, [...(m.get(k) ?? []), it]);
     }
-    const order: DbStrategyObjective["horizon_years"][] = [1, 3, 5, 10];
+    const order: DbStrategyObjective["horizon_years"][] = [2, 5, 10];
     return order
       .filter((k) => (m.get(k) ?? []).length)
       .map((k) => ({ horizon: k, list: m.get(k) ?? [] }));
@@ -73,14 +74,14 @@ export default function OkrLongTerm() {
   const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const [horizon, setHorizon] = useState<DbStrategyObjective["horizon_years"]>(3);
+  const [horizon, setHorizon] = useState<DbStrategyObjective["horizon_years"]>(5);
   const [targetYear, setTargetYear] = useState<string>("");
   const [title, setTitle] = useState<string>("");
   const [desc, setDesc] = useState<string>("");
 
   const reset = () => {
     setEditingId(null);
-    setHorizon(3);
+    setHorizon(5);
     setTargetYear("");
     setTitle("");
     setDesc("");
@@ -94,7 +95,7 @@ export default function OkrLongTerm() {
       <div className="grid gap-6">
         <OkrPageHeader
           title="Objetivos de longo prazo"
-          subtitle="Defina e revise os objetivos estratégicos (1–10 anos) da empresa."
+          subtitle="Defina e revise os objetivos estratégicos (2–10 anos) da empresa."
           icon={<Target className="h-5 w-5" />}
         />
         <OkrSubnav />
@@ -119,7 +120,7 @@ export default function OkrLongTerm() {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos estratégicos</div>
-            <p className="mt-1 text-sm text-muted-foreground">Crie objetivos de 1, 3, 5 e 10 anos — e revise com frequência.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Crie objetivos de 2, 5 e 10 anos — e revise com frequência.</p>
           </div>
 
           {isAdminish ? (
@@ -238,8 +239,7 @@ export default function OkrLongTerm() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">1 ano</SelectItem>
-                  <SelectItem value="3">3 anos</SelectItem>
+                  <SelectItem value="2">2 anos</SelectItem>
                   <SelectItem value="5">5 anos</SelectItem>
                   <SelectItem value="10">10 anos</SelectItem>
                 </SelectContent>
