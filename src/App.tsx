@@ -80,6 +80,35 @@ const App = () => (
                   <Route path="/login" element={<Login />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
 
+                  {/* Dashboard / Jornada */}
+                  <Route
+                    path="/app"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <AppDashboard />
+                      </RequireAuth>
+                    }
+                  />
+
+                  {/* Backwards-compat */}
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <Navigate to="/app" replace />
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/app/tracks/:assignmentId"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <TrackPlayer />
+                      </RequireAuth>
+                    }
+                  />
+
                   {/* Empresa */}
                   <Route
                     path="/org"
@@ -126,16 +155,6 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD"]}>
                         <VacationApprovals />
-                      </RequireAuth>
-                    }
-                  />
-
-                  {/* Dashboard */}
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <AppDashboard />
                       </RequireAuth>
                     }
                   />

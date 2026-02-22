@@ -56,7 +56,9 @@ export default function TrackPlayer() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const params = useParams();
-  const assignmentId = params.assignmentId ?? "";
+
+  // Backwards-compat: older routes used /track/:trackId but the value is actually an assignment id.
+  const assignmentId = (params.assignmentId ?? (params as any).trackId ?? "") as string;
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["assignment-detail", assignmentId],
