@@ -763,7 +763,7 @@ export default function OkrCycles() {
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
-              Novo objetivo
+              Novo objetivo do trimestre
             </Button>
           ) : null}
         </div>
