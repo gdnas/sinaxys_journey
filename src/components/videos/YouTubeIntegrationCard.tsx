@@ -43,6 +43,26 @@ function ConfigChecklist({ details }: { details?: string }) {
         </div>
       ) : null}
 
+      {healthQuery.data?.oauthProjectNumber ? (
+        <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/20 p-3 text-xs text-muted-foreground">
+          <div className="font-semibold text-[color:var(--sinaxys-ink)]">Projeto do OAuth (extraído do Client ID)</div>
+          <div className="mt-1 break-words">{healthQuery.data.oauthProjectNumber}</div>
+          {healthQuery.data.youtubeEnableUrl ? (
+            <a
+              className="mt-2 inline-block font-medium text-[color:var(--sinaxys-primary)] hover:underline"
+              href={healthQuery.data.youtubeEnableUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Abrir YouTube Data API v3 neste projeto
+            </a>
+          ) : null}
+          <div className="mt-2 opacity-80">
+            Dica: o erro 403 "API disabled / not used" costuma acontecer quando a API está habilitada em um projeto diferente deste.
+          </div>
+        </div>
+      ) : null}
+
       {healthQuery.data?.redirectUri ? (
         <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/20 p-3 text-xs text-muted-foreground">
           <div className="font-semibold text-[color:var(--sinaxys-ink)]">redirect_uri (Google OAuth)</div>

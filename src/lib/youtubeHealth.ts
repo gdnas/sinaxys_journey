@@ -6,6 +6,8 @@ export type YouTubeHealth = {
   missing: string[];
   configured: Record<string, boolean>;
   redirectUri: string | null;
+  oauthProjectNumber?: string | null;
+  youtubeEnableUrl?: string | null;
 };
 
 export async function getYouTubeHealth(): Promise<YouTubeHealth> {

@@ -15,6 +15,13 @@ function present(name: string) {
   return !!(v && v.trim());
 }
 
+function parseProjectNumberFromOAuthClientId(clientId: string | null) {
+  if (!clientId) return null;
+  const trimmed = clientId.trim();
+  const m = trimmed.match(/^(\d+)-/);
+  return m?.[1] ?? null;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -38,7 +45,13 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")?.trim() ?? null;
     const redirectUri = supabaseUrl ? `${supabaseUrl}/functions/v1/youtube-callback` : null;
 
-    console.log(`[${functionName}] health check`, { ok, missingCount: missing.length });
+    const clientId = Deno.env.get("YOUTUBE_GOOGLE_CLIENT_ID")?.trim() ?? null;
+    const oauthProjectNumber = parseProjectNumberFromOAuthClientId(clientId);
+    const youtubeEnableUrl = oauthProjectNumber
+      ? `https://console.developers.google.com/apis/api/youtube.googleapis.com/overview?project=${oauthProjectNumber}`
+      : null;
+
+    console.log(`[${functionName}] health check`, { ok, missingCount: missing.length, oauthProjectNumber });
 
     // IMPORTANT: return 200 even when not configured.
     // This keeps the UI "plug-and-play" by showing what's missing instead of throwing a non-2xx error.
@@ -48,6 +61,9 @@ serve(async (req) => {
       missing,
       configured: required.reduce((acc, k) => ({ ...acc, [k]: present(k) }), {} as Record<string, boolean>),
       redirectUri,
+      oauthProjectNumber,
+      youtubeEnableUrl,
+      // do NOT return clientId
     });
   } catch (e) {
     console.error(`[${functionName}] unexpected`, { error: String(e) });
