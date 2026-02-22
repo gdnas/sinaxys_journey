@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BookOpenText, CalendarClock, Search, Send, Shield, Users } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
@@ -52,6 +52,8 @@ export default function TrackLibrary() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   if (!user) return null;
   if (!user.companyId) return null;
@@ -104,6 +106,26 @@ export default function TrackLibrary() {
   const [delegateUserQuery, setDelegateUserQuery] = useState("");
   const [delegateUserIds, setDelegateUserIds] = useState<string[]>([]);
   const [delegateDueDate, setDelegateDueDate] = useState<string>("");
+
+  // Allow deep-link: /tracks?delegate=<trackId>
+  useEffect(() => {
+    const sp = new URLSearchParams(location.search);
+    const tid = sp.get("delegate");
+    if (!tid) return;
+
+    // open dialog preselected
+    setDelegateTrackId(tid);
+    setDelegateUserQuery("");
+    setDelegateUserIds([]);
+    setDelegateDueDate("");
+    setDelegateOpen(true);
+
+    // clean URL
+    const next = new URLSearchParams(location.search);
+    next.delete("delegate");
+    navigate({ pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : "" }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   const delegateTrack = useMemo(() => {
     if (!delegateTrackId) return null;

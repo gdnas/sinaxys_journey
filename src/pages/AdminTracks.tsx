@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, GraduationCap, Plus, Send } from "lucide-react";
+import { ArrowUpRight, Eye, EyeOff, GraduationCap, Plus, SquarePen, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,20 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
-import { createTrack, getTracksByCompany, setTrackPublished } from "@/lib/journeyDb";
+import { createTrack, deleteTrack, getTracksByCompany, setTrackPublished } from "@/lib/journeyDb";
 import { formatShortDate } from "@/lib/sinaxys";
 
 export default function AdminTracks() {
@@ -74,28 +84,41 @@ export default function AdminTracks() {
     },
   });
 
+  // Delete
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!deleteId) return;
+      await deleteTrack(deleteId);
+    },
+    onSuccess: async () => {
+      setDeleteOpen(false);
+      setDeleteId(null);
+      await qc.invalidateQueries({ queryKey: ["tracks", companyId] });
+      toast({ title: "Trilha excluída" });
+    },
+    onError: (e) => {
+      toast({
+        title: "Não foi possível excluir",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    },
+  });
+
   return (
     <div className="grid gap-6">
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Trilhas</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Monte trilhas para qualquer departamento e publique quando estiver pronto. Para delegar trilhas para pessoas, use a biblioteca.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Monte trilhas para qualquer departamento e publique quando estiver pronto.</p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
             <GraduationCap className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
           </div>
-        </div>
-
-        <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button asChild className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-            <Link to="/tracks">
-              <Send className="mr-2 h-4 w-4" />
-              Delegar trilhas (biblioteca)
-            </Link>
-          </Button>
         </div>
       </div>
 
@@ -165,13 +188,38 @@ export default function AdminTracks() {
                   <div className="mt-1 text-xs text-muted-foreground">Criada em {formatShortDate(t.created_at)}</div>
                 </div>
 
-                <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end md:w-auto">
-                  <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
-                    <Link to={`/admin/tracks/${t.id}/edit`}>Editar</Link>
-                  </Button>
+                <div className="flex w-full flex-wrap items-center justify-end gap-2 md:w-auto">
+                  {/* Delegar (abre biblioteca já com a trilha selecionada) */}
                   <Button
+                    asChild
+                    size="icon"
                     variant="outline"
-                    className="w-full rounded-xl sm:w-auto"
+                    className="h-10 w-10 rounded-2xl"
+                    disabled={!t.published}
+                  >
+                    <Link
+                      to={`/tracks?delegate=${encodeURIComponent(t.id)}`}
+                      aria-label="Delegar trilha"
+                      title={t.published ? "Delegar" : "Publique para delegar"}
+                    >
+                      <ArrowUpRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+
+                  {/* Editar */}
+                  <Button asChild size="icon" variant="outline" className="h-10 w-10 rounded-2xl">
+                    <Link to={`/admin/tracks/${t.id}/edit`} aria-label="Editar trilha" title="Editar">
+                      <SquarePen className="h-4 w-4" />
+                    </Link>
+                  </Button>
+
+                  {/* Publicar/Despublicar */}
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-10 w-10 rounded-2xl"
+                    aria-label={t.published ? "Despublicar trilha" : "Publicar trilha"}
+                    title={t.published ? "Despublicar" : "Publicar"}
                     onClick={async () => {
                       try {
                         await setTrackPublished(t.id, !t.published);
@@ -185,17 +233,22 @@ export default function AdminTracks() {
                       }
                     }}
                   >
-                    {t.published ? (
-                      <>
-                        <EyeOff className="mr-2 h-4 w-4" />
-                        Despublicar
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="mr-2 h-4 w-4" />
-                        Publicar
-                      </>
-                    )}
+                    {t.published ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </Button>
+
+                  {/* Excluir */}
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="h-10 w-10 rounded-2xl border-rose-500/30 text-rose-700 hover:bg-rose-50 hover:text-rose-800"
+                    aria-label="Excluir trilha"
+                    title="Excluir"
+                    onClick={() => {
+                      setDeleteId(t.id);
+                      setDeleteOpen(true);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
@@ -259,9 +312,7 @@ export default function AdminTracks() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={
-                !departmentId || title.trim().length < 6 || description.trim().length < 10 || createMutation.isPending
-              }
+              disabled={!departmentId || title.trim().length < 6 || description.trim().length < 10 || createMutation.isPending}
               onClick={async () => {
                 try {
                   await createMutation.mutateAsync();
@@ -279,6 +330,38 @@ export default function AdminTracks() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(v) => {
+          setDeleteOpen(v);
+          if (!v && !deleteMutation.isPending) setDeleteId(null);
+        }}
+      >
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir trilha?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação é permanente. Se houver módulos e atribuições vinculadas, a exclusão pode falhar.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl" disabled={deleteMutation.isPending}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-rose-600 text-white hover:bg-rose-700"
+              onClick={(e) => {
+                e.preventDefault();
+                deleteMutation.mutate();
+              }}
+              disabled={deleteMutation.isPending}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
