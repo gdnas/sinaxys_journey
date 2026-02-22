@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 
 import { krProgressPct, listKeyResults, type DbOkrKeyResult, type DbOkrObjective } from "@/lib/okrDb";
+import { objectiveAccent } from "@/lib/okrUi";
 import { KrEditDialog } from "@/components/okr/KrEditDialog";
 
 function kindLabel(kind: DbOkrKeyResult["kind"]) {
@@ -42,10 +43,25 @@ export function OkrObjectiveCard(props: {
   companyId?: string;
   currentUserId?: string;
 }) {
-  const { objective, ownerName, krCount, avgProgressPct, levelBadge, canWriteObjective, openHref, onEdit, onDelete, onAddKr, companyId, currentUserId } = props;
+  const {
+    objective,
+    ownerName,
+    krCount,
+    avgProgressPct,
+    levelBadge,
+    canWriteObjective,
+    openHref,
+    onEdit,
+    onDelete,
+    onAddKr,
+    companyId,
+    currentUserId,
+  } = props;
 
   const [open, setOpen] = useState(false);
   const [editingKr, setEditingKr] = useState<DbOkrKeyResult | null>(null);
+
+  const accent = objectiveAccent(objective.level);
 
   const { data: krs = [], isFetching } = useQuery({
     queryKey: ["okr-krs", objective.id],
@@ -56,7 +72,10 @@ export function OkrObjectiveCard(props: {
   return (
     <>
       <Collapsible open={open} onOpenChange={setOpen}>
-        <div className="overflow-hidden rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+        <div
+          className="overflow-hidden rounded-2xl border bg-white"
+          style={{ borderColor: accent.border as any }}
+        >
           {/* Header */}
           <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0 flex-1">
@@ -69,7 +88,7 @@ export function OkrObjectiveCard(props: {
                   {objective.title}
                 </Link>
                 {objective.status === "ACHIEVED" ? (
-                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
                     Atingido
                   </Badge>
                 ) : null}
@@ -91,8 +110,9 @@ export function OkrObjectiveCard(props: {
                     value={avgProgressPct}
                     className={
                       "mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70 ring-1 ring-[color:var(--sinaxys-border)]/70 " +
-                      "dark:bg-[hsl(var(--secondary))] dark:ring-border [&>div]:bg-[color:var(--sinaxys-primary)]"
+                      "dark:bg-[hsl(var(--secondary))] dark:ring-border"
                     }
+                    style={{ ["--progress-accent" as any]: accent.accent }}
                   />
                 </div>
               ) : null}
@@ -148,8 +168,8 @@ export function OkrObjectiveCard(props: {
           </div>
 
           <CollapsibleContent>
-            <Separator />
-            <div className="bg-[color:var(--sinaxys-bg)]/60 p-4">
+            <Separator style={{ backgroundColor: accent.border as any }} />
+            <div className="p-4" style={{ backgroundColor: accent.soft as any }}>
               <div className="grid gap-3">
                 {isFetching ? <div className="text-sm text-muted-foreground">Carregando KRs…</div> : null}
 
@@ -172,7 +192,14 @@ export function OkrObjectiveCard(props: {
                     <button
                       key={kr.id}
                       type="button"
-                      className="group rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-left transition hover:border-[color:var(--sinaxys-primary)]/40 hover:bg-white"
+                      className="group rounded-2xl border bg-white p-4 text-left transition"
+                      style={{ borderColor: accent.border as any }}
+                      onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = String(accent.accent);
+                      }}
+                      onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLButtonElement).style.borderColor = String(accent.border);
+                      }}
                       onClick={() => {
                         if (!companyId || !currentUserId) return;
                         setEditingKr(kr);
@@ -206,8 +233,9 @@ export function OkrObjectiveCard(props: {
                           value={pct}
                           className={
                             "mt-3 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70 ring-1 ring-[color:var(--sinaxys-border)]/70 " +
-                            "dark:bg-[hsl(var(--secondary))] dark:ring-border [&>div]:bg-[color:var(--sinaxys-primary)]"
+                            "dark:bg-[hsl(var(--secondary))] dark:ring-border"
                           }
+                          style={{ ["--progress-accent" as any]: accent.accent }}
                         />
                       ) : null}
                     </button>

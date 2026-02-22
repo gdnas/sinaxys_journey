@@ -81,6 +81,19 @@
     --map-neutral-ink: #20105b;
     --map-neutral-border: #e6e1ff;
 
+    /* OKR (Objetivo + KR) shared accents by level */
+    --okr-accent-company: var(--sinaxys-primary);
+    --okr-accent-company-soft: var(--sinaxys-tint);
+    --okr-accent-company-border: var(--sinaxys-border);
+
+    --okr-accent-team: var(--map-objectives-ink);
+    --okr-accent-team-soft: var(--map-objectives-bg);
+    --okr-accent-team-border: var(--map-objectives-border);
+
+    --okr-accent-individual: var(--map-cycles-ink);
+    --okr-accent-individual-soft: var(--map-cycles-bg);
+    --okr-accent-individual-border: var(--map-cycles-border);
+
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
     --sidebar-primary: 240 5.9% 10%;
