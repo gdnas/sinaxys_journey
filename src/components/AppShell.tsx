@@ -24,6 +24,7 @@ import {
   User as UserIcon,
   Video,
   Wallet,
+  Wrench,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -260,6 +261,13 @@ const nav: NavItem[] = [
     to: "/profile",
     label: "Minha área",
     icon: <UserIcon className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
+  },
+  {
+    type: "link",
+    to: "/integrations",
+    label: "Conexões",
+    icon: <Wrench className="h-4 w-4" />,
     roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
 ];

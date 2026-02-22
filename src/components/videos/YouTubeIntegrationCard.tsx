@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { EdgeFunctionError, startYouTubeConnect, disconnectYouTube, getMyYouTubeIntegration } from "@/lib/youtubeIntegrationDb";
+import { getYouTubeHealth } from "@/lib/youtubeHealth";
 
 function ConfigChecklist({ details }: { details?: string }) {
   const items = [
@@ -15,28 +16,64 @@ function ConfigChecklist({ details }: { details?: string }) {
     "YOUTUBE_GOOGLE_CLIENT_SECRET",
     "YOUTUBE_OAUTH_STATE_SECRET",
     "APP_BASE_URL",
+    "YOUTUBE_TOKEN_ENC_KEY",
   ];
+
+  const healthQuery = useQuery({
+    queryKey: ["youtube-health"],
+    queryFn: () => getYouTubeHealth(),
+    retry: false,
+  });
 
   return (
     <div className="grid gap-3">
       <div className="text-sm text-muted-foreground">
-        Se der erro de configuração, confira os secrets no Supabase (Edge Functions → Manage Secrets):
+        Plug-n-play: se algo falhar, esta tela mostra exatamente o que falta para habilitar a conexão.
       </div>
+
+      {healthQuery.data?.redirectUri ? (
+        <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/20 p-3 text-xs text-muted-foreground">
+          <div className="font-semibold text-[color:var(--sinaxys-ink)]">redirect_uri (Google OAuth)</div>
+          <div className="mt-1 break-words">{healthQuery.data.redirectUri}</div>
+        </div>
+      ) : null}
+
       <div className="grid gap-2">
-        {items.map((k) => (
-          <div
-            key={k}
-            className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/20 px-3 py-2"
-          >
-            <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{k}</div>
-            <Badge className="rounded-full bg-[color:var(--sinaxys-border)]/60 text-[color:var(--sinaxys-ink)]">required</Badge>
-          </div>
-        ))}
+        {items.map((k) => {
+          const configured = healthQuery.data?.configured?.[k];
+          const missing = healthQuery.data?.missing?.includes(k);
+
+          return (
+            <div
+              key={k}
+              className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/20 px-3 py-2"
+            >
+              <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{k}</div>
+              {healthQuery.isLoading ? (
+                <Badge className="rounded-full bg-[color:var(--sinaxys-border)]/60 text-[color:var(--sinaxys-ink)]">checando…</Badge>
+              ) : configured ? (
+                <Badge className="rounded-full bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-500/25">ok</Badge>
+              ) : missing ? (
+                <Badge className="rounded-full bg-rose-500/15 text-rose-200 ring-1 ring-rose-500/25">missing</Badge>
+              ) : (
+                <Badge className="rounded-full bg-[color:var(--sinaxys-border)]/60 text-[color:var(--sinaxys-ink)]">required</Badge>
+              )}
+            </div>
+          );
+        })}
       </div>
+
       {details ? (
         <div className="rounded-2xl border border-amber-500/25 bg-amber-500/10 p-3 text-xs text-amber-100">
           <div className="font-semibold">Detalhes</div>
           <div className="mt-1 break-words opacity-90">{details}</div>
+        </div>
+      ) : null}
+
+      {healthQuery.isError ? (
+        <div className="rounded-2xl border border-rose-500/25 bg-rose-500/10 p-3 text-xs text-rose-100">
+          <div className="font-semibold">Falha ao checar configuração</div>
+          <div className="mt-1 opacity-90">{String((healthQuery.error as any)?.message ?? "")}</div>
         </div>
       ) : null}
     </div>
@@ -83,10 +120,7 @@ export function YouTubeIntegrationCard({ tenantId, userId }: { tenantId: string;
         variant: "destructive",
       });
 
-      // Suggest opening config checklist when error looks like config
-      if (String(details).toLowerCase().includes("missing secret")) {
-        setCfgOpen(true);
-      }
+      setCfgOpen(true);
     },
   });
 

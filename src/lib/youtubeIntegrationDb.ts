@@ -41,12 +41,19 @@ async function invokeAuthed<T>(fn: string, body: any): Promise<{ data: T | null;
 async function parseEdgeError(error: any): Promise<{ status?: number; details?: string; parsed?: any }> {
   const status = error?.context?.response?.status ?? error?.context?.status ?? error?.status;
 
-  // Try reading response body if available
+  // supabase-js often provides parsed body in error.context.body
+  const body = error?.context?.body;
+  if (body && typeof body === "object") {
+    const details = body?.details ? String(body.details) : JSON.stringify(body);
+    return { status, details, parsed: body };
+  }
+
   let details: string | undefined = error?.message ? String(error.message) : undefined;
+
   const resp = error?.context?.response;
-  if (resp && typeof resp.text === "function") {
+  if (resp && typeof resp.clone === "function") {
     try {
-      const text = await resp.text();
+      const text = await resp.clone().text();
       if (text) details = text;
     } catch {
       // ignore
