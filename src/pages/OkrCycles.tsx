@@ -31,6 +31,7 @@ import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany } from "@/lib/profilesDb";
 import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { OkrObjectiveCard } from "@/components/okr/OkrObjectiveCard";
 
 import {
   createKeyResult,
@@ -535,135 +536,51 @@ export default function OkrCycles() {
                   const canWriteObjective = user.id === o.owner_user_id || isAdminish;
 
                   return (
-                    <div
+                    <OkrObjectiveCard
                       key={o.id}
-                      className="flex flex-col gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {levelBadge(o.level)}
-                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
-                          {o.status === "ACHIEVED" ? (
-                            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                              Atingido
-                            </Badge>
-                          ) : null}
-                        </div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span>Dono: {owner}</span>
-                          <span>•</span>
-                          <span>{st.count} KRs</span>
-                        </div>
-
-                        {typeof st.pct === "number" ? (
-                          <div className="mt-3">
-                            <div className="flex items-center justify-between text-xs text-muted-foreground">
-                              <span>Evolução</span>
-                              <span className="font-medium text-[color:var(--sinaxys-ink)]">{st.pct}%</span>
-                            </div>
-                            <Progress
-                              value={st.pct}
-                              className={
-                                "mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70 ring-1 ring-[color:var(--sinaxys-border)]/70 " +
-                                "dark:bg-[hsl(var(--secondary))] dark:ring-border [&>div]:bg-[color:var(--sinaxys-primary)]"
-                              }
-                            />
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="flex w-full items-center justify-end gap-2 md:w-auto">
-                        {canWriteObjective ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-11 w-11 rounded-xl"
-                                onClick={() => {
-                                  setEditingObjectiveId(o.id);
-                                  setObjLevel(o.level);
-                                  setObjTitle(o.title);
-                                  setObjDesc(o.description ?? "");
-                                  setObjReason(o.strategic_reason ?? "");
-                                  setObjOwner(o.owner_user_id);
-                                  setObjDept(o.department_id);
-                                  setObjParent(o.parent_objective_id);
-                                  setObjExpected(typeof o.expected_attainment_pct === "number" ? String(o.expected_attainment_pct) : "80");
-                                  setObjValue(typeof o.estimated_value_brl === "number" ? String(o.estimated_value_brl) : "");
-                                  setObjEffortHours(typeof o.estimated_effort_hours === "number" ? String(o.estimated_effort_hours) : "");
-                                  setObjOpen(true);
-                                }}
-                                aria-label="Editar objetivo"
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Editar</TooltipContent>
-                          </Tooltip>
-                        ) : null}
-
-                        {canWriteObjective ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className={
-                                  "h-11 w-11 rounded-xl border-destructive/40 bg-destructive/5 text-destructive " +
-                                  "hover:bg-destructive/10 hover:text-destructive " +
-                                  "dark:border-destructive/50 dark:bg-destructive/20 dark:hover:bg-destructive/25"
-                                }
-                                onClick={() => {
-                                  setDeleteObjectiveId(o.id);
-                                  setDeleteOpen(true);
-                                }}
-                                aria-label="Excluir objetivo"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Excluir</TooltipContent>
-                          </Tooltip>
-                        ) : null}
-
-                        {canWriteObjective ? (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-11 w-11 rounded-xl"
-                                onClick={() => {
-                                  resetKr();
-                                  setKrObjectiveId(o.id);
-                                  setKrOpen(true);
-                                }}
-                                aria-label="Adicionar KR"
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>+ KR</TooltipContent>
-                          </Tooltip>
-                        ) : null}
-
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              asChild
-                              size="icon"
-                              className="h-11 w-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                            >
-                              <Link to={`/okr/objetivos/${o.id}`} aria-label="Abrir objetivo">
-                                <ArrowRight className="h-4 w-4" />
-                              </Link>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Abrir</TooltipContent>
-                        </Tooltip>
-                      </div>
-                    </div>
+                      objective={o}
+                      ownerName={owner}
+                      krCount={st.count}
+                      avgProgressPct={st.pct}
+                      levelBadge={levelBadge(o.level)}
+                      canWriteObjective={canWriteObjective}
+                      openHref={`/okr/objetivos/${o.id}`}
+                      onEdit={
+                        canWriteObjective
+                          ? () => {
+                              setEditingObjectiveId(o.id);
+                              setObjLevel(o.level);
+                              setObjTitle(o.title);
+                              setObjDesc(o.description ?? "");
+                              setObjReason(o.strategic_reason ?? "");
+                              setObjOwner(o.owner_user_id);
+                              setObjDept(o.department_id);
+                              setObjParent(o.parent_objective_id);
+                              setObjExpected(typeof o.expected_attainment_pct === "number" ? String(o.expected_attainment_pct) : "80");
+                              setObjValue(typeof o.estimated_value_brl === "number" ? String(o.estimated_value_brl) : "");
+                              setObjEffortHours(typeof o.estimated_effort_hours === "number" ? String(o.estimated_effort_hours) : "");
+                              setObjOpen(true);
+                            }
+                          : undefined
+                      }
+                      onDelete={
+                        canWriteObjective
+                          ? () => {
+                              setDeleteObjectiveId(o.id);
+                              setDeleteOpen(true);
+                            }
+                          : undefined
+                      }
+                      onAddKr={
+                        canWriteObjective
+                          ? () => {
+                              resetKr();
+                              setKrObjectiveId(o.id);
+                              setKrOpen(true);
+                            }
+                          : undefined
+                      }
+                    />
                   );
                 })
             ) : (
@@ -778,141 +695,55 @@ export default function OkrCycles() {
               const canWriteObjective = user.id === o.owner_user_id || isAdminish;
 
               return (
-                <div
+                <OkrObjectiveCard
                   key={o.id}
-                  className="flex flex-col gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 md:flex-row md:items-center md:justify-between"
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {levelBadge(o.level)}
-                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
-                      {o.status === "ACHIEVED" ? (
-                        <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                          Atingido
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                      <span>Dono: {owner}</span>
-                      <span>•</span>
-                      <span>{st.count} KRs</span>
-                    </div>
-
-                    {typeof st.pct === "number" ? (
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>Evolução</span>
-                          <span className="font-medium text-[color:var(--sinaxys-ink)]">{st.pct}%</span>
-                        </div>
-                        <Progress
-                          value={st.pct}
-                          className={
-                            "mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70 ring-1 ring-[color:var(--sinaxys-border)]/70 " +
-                            "dark:bg-[hsl(var(--secondary))] dark:ring-border [&>div]:bg-[color:var(--sinaxys-primary)]"
-                          }
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-
-                  <div className="flex w-full items-center justify-end gap-2 md:w-auto">
-                    {canWriteObjective ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-11 w-11 rounded-xl"
-                            onClick={() => {
-                              setEditingObjectiveId(o.id);
-                              setObjLevel(o.level);
-                              setObjTitle(o.title);
-                              setObjDesc(o.description ?? "");
-                              setObjReason(o.strategic_reason ?? "");
-                              setObjOwner(o.owner_user_id);
-                              setObjDept(o.department_id);
-                              setObjParent(o.parent_objective_id);
-                              setObjExpected(typeof o.expected_attainment_pct === "number" ? String(o.expected_attainment_pct) : "80");
-                              setObjValue(typeof o.estimated_value_brl === "number" ? String(o.estimated_value_brl) : "");
-                              setObjEffortHours(typeof o.estimated_effort_hours === "number" ? String(o.estimated_effort_hours) : "");
-                              setObjOpen(true);
-                            }}
-                            aria-label="Editar objetivo"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Editar</TooltipContent>
-                      </Tooltip>
-                    ) : null}
-
-                    {canWriteObjective ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className={
-                              "h-11 w-11 rounded-xl border-destructive/40 bg-destructive/5 text-destructive " +
-                              "hover:bg-destructive/10 hover:text-destructive " +
-                              "dark:border-destructive/50 dark:bg-destructive/20 dark:hover:bg-destructive/25"
-                            }
-                            onClick={() => {
-                              setDeleteObjectiveId(o.id);
-                              setDeleteOpen(true);
-                            }}
-                            aria-label="Excluir objetivo"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Excluir</TooltipContent>
-                      </Tooltip>
-                    ) : null}
-
-                    {canWriteObjective ? (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            className="h-11 w-11 rounded-xl"
-                            onClick={() => {
-                              resetKr();
-                              setKrObjectiveId(o.id);
-                              setKrOpen(true);
-                            }}
-                            aria-label="Adicionar KR"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>+ KR</TooltipContent>
-                      </Tooltip>
-                    ) : null}
-
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          asChild
-                          size="icon"
-                          className="h-11 w-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                        >
-                          <Link to={`/okr/objetivos/${o.id}`} aria-label="Abrir objetivo">
-                            <ArrowRight className="h-4 w-4" />
-                          </Link>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Abrir</TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
+                  objective={o}
+                  ownerName={owner}
+                  krCount={st.count}
+                  avgProgressPct={st.pct}
+                  levelBadge={levelBadge(o.level)}
+                  canWriteObjective={canWriteObjective}
+                  openHref={`/okr/objetivos/${o.id}`}
+                  onEdit={
+                    canWriteObjective
+                      ? () => {
+                          setEditingObjectiveId(o.id);
+                          setObjLevel(o.level);
+                          setObjTitle(o.title);
+                          setObjDesc(o.description ?? "");
+                          setObjReason(o.strategic_reason ?? "");
+                          setObjOwner(o.owner_user_id);
+                          setObjDept(o.department_id);
+                          setObjParent(o.parent_objective_id);
+                          setObjExpected(typeof o.expected_attainment_pct === "number" ? String(o.expected_attainment_pct) : "80");
+                          setObjValue(typeof o.estimated_value_brl === "number" ? String(o.estimated_value_brl) : "");
+                          setObjEffortHours(typeof o.estimated_effort_hours === "number" ? String(o.estimated_effort_hours) : "");
+                          setObjOpen(true);
+                        }
+                      : undefined
+                  }
+                  onDelete={
+                    canWriteObjective
+                      ? () => {
+                          setDeleteObjectiveId(o.id);
+                          setDeleteOpen(true);
+                        }
+                      : undefined
+                  }
+                  onAddKr={
+                    canWriteObjective
+                      ? () => {
+                          resetKr();
+                          setKrObjectiveId(o.id);
+                          setKrOpen(true);
+                        }
+                      : undefined
+                  }
+                />
               );
             })
           ) : (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-              Nenhum objetivo criado neste ciclo.
-            </div>
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum objetivo neste ciclo.</div>
           )}
         </div>
       </Card>
