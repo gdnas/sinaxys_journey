@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowUpRight, Eye, EyeOff, GraduationCap, Plus, SquarePen, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +24,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
+import { COMPANY_WIDE_DEPARTMENT_NAME, getOrCreateCompanyWideDepartment } from "@/lib/companyWideDepartment";
 import { createTrack, deleteTrack, getTracksByCompany, setTrackPublished } from "@/lib/journeyDb";
 import { formatShortDate } from "@/lib/sinaxys";
 
@@ -36,10 +37,21 @@ export default function AdminTracks() {
   if (!user || user.role !== "ADMIN" || !user.companyId) return null;
   const companyId = user.companyId;
 
-  const { data: departments = [] } = useQuery({
+  const { data: companyWideDept } = useQuery({
+    queryKey: ["company-wide-dept", companyId],
+    queryFn: () => getOrCreateCompanyWideDepartment(companyId),
+  });
+
+  const { data: departmentsRaw = [] } = useQuery({
     queryKey: ["departments", companyId],
     queryFn: () => listDepartments(companyId),
   });
+
+  const departments = useMemo(() => {
+    const base = departmentsRaw.slice();
+    if (companyWideDept && !base.some((d) => d.id === companyWideDept.id)) base.unshift(companyWideDept as any);
+    return base;
+  }, [departmentsRaw, companyWideDept?.id]);
 
   const { data: tracks = [], isLoading } = useQuery({
     queryKey: ["tracks", companyId],
@@ -54,7 +66,7 @@ export default function AdminTracks() {
     let base = tracks;
     if (deptFilter !== "__all__") base = base.filter((t) => t.department_id === deptFilter);
     if (!q) return base;
-    return base.filter((t) => `${t.title} ${t.description}`.toLowerCase().includes(q));
+    return base.filter((t) => `${t.title} ${(t.description ?? "")}`.toLowerCase().includes(q));
   }, [tracks, deptFilter, query]);
 
   const deptNameById = useMemo(() => new Map(departments.map((d) => [d.id, d.name] as const)), [departments]);
@@ -64,6 +76,12 @@ export default function AdminTracks() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [departmentId, setDepartmentId] = useState<string>("");
+
+  useEffect(() => {
+    if (!open) return;
+    // Default to company-wide when creating, so it works "sem departamento".
+    if (!departmentId && companyWideDept?.id) setDepartmentId(companyWideDept.id);
+  }, [open, companyWideDept?.id, departmentId]);
 
   const createMutation = useMutation({
     mutationFn: () =>
@@ -81,6 +99,13 @@ export default function AdminTracks() {
       setDescription("");
       setDepartmentId("");
       navigate(`/admin/tracks/${t.id}/edit`);
+    },
+    onError: (e) => {
+      toast({
+        title: "Não foi possível criar",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -114,7 +139,7 @@ export default function AdminTracks() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Trilhas</div>
-            <p className="mt-1 text-sm text-muted-foreground">Monte trilhas para qualquer departamento e publique quando estiver pronto.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Monte trilhas para qualquer departamento — ou para a empresa toda — e publique quando estiver pronto.</p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
             <GraduationCap className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -181,7 +206,7 @@ export default function AdminTracks() {
                       <Badge className="rounded-full bg-amber-100 text-amber-800 hover:bg-amber-100">Rascunho</Badge>
                     )}
                     <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                      {deptNameById.get(t.department_id) ?? "Departamento"}
+                      {deptNameById.get(t.department_id) ?? "Empresa toda"}
                     </Badge>
                   </div>
                   <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">{t.description}</div>
@@ -281,7 +306,7 @@ export default function AdminTracks() {
               <Label>Departamento</Label>
               <Select value={departmentId} onValueChange={setDepartmentId}>
                 <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Selecione…" />
+                  <SelectValue placeholder={COMPANY_WIDE_DEPARTMENT_NAME} />
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((d) => (
@@ -291,6 +316,7 @@ export default function AdminTracks() {
                   ))}
                 </SelectContent>
               </Select>
+              <div className="text-xs text-muted-foreground">Dica: selecione "{COMPANY_WIDE_DEPARTMENT_NAME}" para criar para a empresa toda.</div>
             </div>
 
             <div className="grid gap-2">
@@ -300,7 +326,7 @@ export default function AdminTracks() {
 
             <div className="grid gap-2">
               <Label>Descrição</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 rounded-2xl" />
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 rounded-2xl" placeholder="(opcional)" />
             </div>
 
             <div className="text-xs text-muted-foreground">Depois de criar, você poderá adicionar módulos (vídeo, material, checkpoint e quiz).</div>
@@ -312,18 +338,8 @@ export default function AdminTracks() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!departmentId || title.trim().length < 6 || description.trim().length < 10 || createMutation.isPending}
-              onClick={async () => {
-                try {
-                  await createMutation.mutateAsync();
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível criar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                }
-              }}
+              disabled={!departmentId || !title.trim() || createMutation.isPending}
+              onClick={() => createMutation.mutate()}
             >
               Criar e editar
             </Button>

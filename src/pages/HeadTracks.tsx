@@ -45,7 +45,7 @@ export default function HeadTracks() {
       setOpen(false);
       setTitle("");
       setDescription("");
-      navigate(`/head/tracks/${t.id}/edit`);
+      navigate(`/head/tracks/${t.id}`);
     },
   });
 
@@ -160,7 +160,8 @@ export default function HeadTracks() {
             </div>
             <div className="grid gap-2">
               <div className="text-sm font-medium">Descrição</div>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 rounded-2xl" />
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 rounded-2xl" placeholder="(opcional)" />
+
             </div>
           </div>
           <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -169,7 +170,8 @@ export default function HeadTracks() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={title.trim().length < 6 || description.trim().length < 10 || createMutation.isPending}
+              disabled={!title.trim() || createMutation.isPending}
+
               onClick={async () => {
                 try {
                   await createMutation.mutateAsync();
