@@ -146,6 +146,11 @@ export async function setTrackPublished(trackId: string, published: boolean) {
   if (error) throw error;
 }
 
+export async function deleteTrack(trackId: string) {
+  const { error } = await supabase.from("learning_tracks").delete().eq("id", trackId);
+  if (error) throw error;
+}
+
 export async function setTrackFlags(trackId: string, data: { strategic?: boolean; onboarding?: boolean }) {
   const patch: any = {};
   if (typeof data.strategic === "boolean") patch.strategic = data.strategic;
