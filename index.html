@@ -10,6 +10,18 @@
   </head>
 
   <body>
+    <!--
+      Google (Branding / OAuth) pode validar a home page sem executar JavaScript.
+      Como este app é SPA, garantimos links "visíveis" no HTML estático.
+    -->
+    <noscript>
+      <div style="padding: 16px; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, Noto Sans, 'Apple Color Emoji', 'Segoe UI Emoji';">
+        <a href="https://kairoos.ai/privacidade">Política de Privacidade</a>
+        <span> · </span>
+        <a href="https://kairoos.ai/termos">Termos de Serviço</a>
+      </div>
+    </noscript>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
