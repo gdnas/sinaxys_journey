@@ -366,6 +366,7 @@ function pickRandom<T>(items: T[]) {
 function FundamentalsSpotlightCard() {
   const { company, companyId } = useCompany();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
 
   const { data: fundamentals } = useQuery({
     queryKey: ["company-fundamentals", companyId],
@@ -374,40 +375,68 @@ function FundamentalsSpotlightCard() {
   });
 
   const candidates = useMemo(() => {
-    const res: Array<{ label: string; text: string }> = [];
+    const res: Array<
+      | { kind: "purpose" | "mission" | "vision"; label: string; text: string }
+      | { kind: "values" | "culture"; label: string; text: string; index: number }
+    > = [];
     if (!fundamentals) return res;
 
-    const addText = (label: string, raw?: string | null) => {
+    const addText = (kind: "purpose" | "mission" | "vision", label: string, raw?: string | null) => {
       const t = (raw ?? "").trim();
       if (!t) return;
-      res.push({ label, text: textPreview(t, 170) });
+      // Do NOT truncate — user asked for the full text.
+      res.push({ kind, label, text: t });
     };
 
-    addText("Propósito", fundamentals.purpose);
-    addText("Missão", fundamentals.mission);
-    addText("Visão", fundamentals.vision);
+    addText("purpose", "Propósito", fundamentals.purpose);
+    addText("mission", "Missão", fundamentals.mission);
+    addText("vision", "Visão", fundamentals.vision);
 
     const valuesLines = describedItemsToLines(parseDescribedItems(fundamentals.values));
-    for (const line of valuesLines) {
-      res.push({ label: "Valores", text: textPreview(line, 170) });
-    }
+    valuesLines.forEach((line, index) => {
+      const t = String(line ?? "").trim();
+      if (!t) return;
+      res.push({ kind: "values", label: "Valores", text: t, index });
+    });
 
     const cultureLines = describedItemsToLines(parseDescribedItems(fundamentals.culture));
-    for (const line of cultureLines) {
-      res.push({ label: "Cultura", text: textPreview(line, 170) });
-    }
+    cultureLines.forEach((line, index) => {
+      const t = String(line ?? "").trim();
+      if (!t) return;
+      res.push({ kind: "culture", label: "Cultura", text: t, index });
+    });
 
     return res;
   }, [fundamentals]);
 
-  const [selected, setSelected] = useState<{ label: string; text: string } | null>(null);
+  const [selected, setSelected] = useState<
+    | { kind: "purpose" | "mission" | "vision"; label: string; text: string }
+    | { kind: "values" | "culture"; label: string; text: string; index: number }
+    | null
+  >(null);
 
   useEffect(() => {
     setSelected(pickRandom(candidates));
   }, [pathname, companyId, candidates]);
 
+  const destination = useMemo(() => {
+    if (!selected) return "/okr/fundamentals";
+    if (selected.kind === "values" || selected.kind === "culture") {
+      return `/okr/fundamentals?focus=${selected.kind}&i=${selected.index}`;
+    }
+    return `/okr/fundamentals?focus=${selected.kind}`;
+  }, [selected]);
+
   return (
-    <div className="rounded-xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-3">
+    <button
+      type="button"
+      onClick={() => navigate(destination)}
+      className={cn(
+        "w-full rounded-xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-3 text-left",
+        "transition hover:bg-[color:var(--sinaxys-tint)]/80 hover:shadow-sm",
+      )}
+      title="Abrir fundamentos"
+    >
       <div className="flex items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm">
           {company.logoDataUrl ? (
@@ -421,12 +450,13 @@ function FundamentalsSpotlightCard() {
           <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
             {selected?.label ?? "Fundamento"}
           </div>
-          <p className="mt-1 text-sm leading-snug text-[color:var(--sinaxys-ink)]">
-            {selected?.text ?? textPreview(company.tagline || "Defina os fundamentos e volte aqui para ver um destaque aleatório.", 170)}
+          <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-[color:var(--sinaxys-ink)]">
+            {selected?.text ?? (company.tagline || "Defina os fundamentos e volte aqui para ver um destaque aleatório.")}
           </p>
+          <div className="mt-2 text-[11px] font-semibold text-[color:var(--sinaxys-primary)]">Clique para abrir</div>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

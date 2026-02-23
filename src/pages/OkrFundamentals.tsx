@@ -21,6 +21,8 @@ import {
   type DescribedItem,
 } from "@/lib/fundamentalsFormat";
 import { DescribedItemsEditor } from "@/components/fundamentals/DescribedItemsEditor";
+import { useSearchParams } from "react-router-dom";
+import { cn } from "@/lib/utils";
 
 type ItemsState = {
   purpose: string;
@@ -52,6 +54,7 @@ export default function OkrFundamentals() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const { companyId } = useCompany();
+  const [searchParams] = useSearchParams();
 
   if (!user) return null;
 
@@ -119,6 +122,39 @@ export default function OkrFundamentals() {
     if (!open.length) open.push("vision");
     return open;
   }, [cultureLines, fundamentals?.mission, fundamentals?.purpose, fundamentals?.vision, valuesLines]);
+
+  const [openSections, setOpenSections] = useState<string[]>([]);
+  const [flashId, setFlashId] = useState<string | null>(null);
+
+  // Initialize accordion open state and support deep-link focus
+  useEffect(() => {
+    const focus = (searchParams.get("focus") ?? "").trim();
+    const allowed = new Set(["purpose", "vision", "mission", "values", "culture"]);
+    const want = allowed.has(focus) ? focus : "";
+
+    const base = defaultOpen;
+    const next = want && !base.includes(want) ? [...base, want] : base;
+    setOpenSections(next);
+
+    // Delay scrolling until after render
+    if (want) {
+      const iRaw = searchParams.get("i");
+      const idx = iRaw && /^[0-9]+$/.test(iRaw) ? Number(iRaw) : null;
+      const targetId = idx !== null && (want === "values" || want === "culture")
+        ? `fundamentals-item-${want}-${idx}`
+        : `fundamentals-section-${want}`;
+
+      window.setTimeout(() => {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          setFlashId(targetId);
+          window.setTimeout(() => setFlashId(null), 1200);
+        }
+      }, 50);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [defaultOpen, searchParams.toString()]);
 
   async function saveAll() {
     if (!canEdit || saving) return;
@@ -229,8 +265,15 @@ export default function OkrFundamentals() {
 
         {isLoading ? <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando…</div> : null}
 
-        <Accordion type="multiple" defaultValue={defaultOpen} className="grid gap-3">
-          <AccordionItem value="purpose" className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4">
+        <Accordion type="multiple" value={openSections} onValueChange={(v) => setOpenSections(v)} className="grid gap-3">
+          <AccordionItem
+            value="purpose"
+            id="fundamentals-section-purpose"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-purpose" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
             <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
               <div className="flex w-full items-start justify-between gap-3">
                 <SectionTitle title="Propósito" hint={editMode ? "Edite ou apague o texto para remover." : (purposePreview ? purposePreview : "Ainda não definido.")} />
@@ -254,7 +297,14 @@ export default function OkrFundamentals() {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="vision" className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4">
+          <AccordionItem
+            value="vision"
+            id="fundamentals-section-vision"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-vision" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
             <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
               <div className="flex w-full items-start justify-between gap-3">
                 <SectionTitle title="Visão" hint={editMode ? "Edite ou apague o texto para remover." : (visionPreview ? visionPreview : "Ainda não definido.")} />
@@ -278,7 +328,14 @@ export default function OkrFundamentals() {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="mission" className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4">
+          <AccordionItem
+            value="mission"
+            id="fundamentals-section-mission"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-mission" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
             <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
               <div className="flex w-full items-start justify-between gap-3">
                 <SectionTitle title="Missão" hint={editMode ? "Edite ou apague o texto para remover." : (missionPreview ? missionPreview : "Ainda não definido.")} />
@@ -302,7 +359,14 @@ export default function OkrFundamentals() {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="values" className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4">
+          <AccordionItem
+            value="values"
+            id="fundamentals-section-values"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-values" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
             <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
               <div className="flex w-full items-start justify-between gap-3">
                 <SectionTitle
@@ -331,8 +395,15 @@ export default function OkrFundamentals() {
                 />
               ) : valuesLines.length ? (
                 <ul className="grid gap-2 pl-1">
-                  {valuesLines.map((it) => (
-                    <li key={it} className="flex items-start gap-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
+                  {valuesLines.map((it, idx) => (
+                    <li
+                      key={it + idx}
+                      id={`fundamentals-item-values-${idx}`}
+                      className={cn(
+                        "flex items-start gap-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]",
+                        flashId === `fundamentals-item-values-${idx}` && "rounded-xl bg-[color:var(--sinaxys-tint)] p-2 ring-2 ring-[color:var(--sinaxys-primary)]",
+                      )}
+                    >
                       <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sinaxys-primary)]/70" />
                       <span className="min-w-0">{it}</span>
                     </li>
@@ -344,7 +415,14 @@ export default function OkrFundamentals() {
             </AccordionContent>
           </AccordionItem>
 
-          <AccordionItem value="culture" className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4">
+          <AccordionItem
+            value="culture"
+            id="fundamentals-section-culture"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-culture" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
             <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
               <div className="flex w-full items-start justify-between gap-3">
                 <SectionTitle
@@ -373,8 +451,15 @@ export default function OkrFundamentals() {
                 />
               ) : cultureLines.length ? (
                 <ul className="grid gap-2 pl-1">
-                  {cultureLines.map((it) => (
-                    <li key={it} className="flex items-start gap-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
+                  {cultureLines.map((it, idx) => (
+                    <li
+                      key={it + idx}
+                      id={`fundamentals-item-culture-${idx}`}
+                      className={cn(
+                        "flex items-start gap-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]",
+                        flashId === `fundamentals-item-culture-${idx}` && "rounded-xl bg-[color:var(--sinaxys-tint)] p-2 ring-2 ring-[color:var(--sinaxys-primary)]",
+                      )}
+                    >
                       <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-[color:var(--sinaxys-primary)]/70" />
                       <span className="min-w-0">{it}</span>
                     </li>
