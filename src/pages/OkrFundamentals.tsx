@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { BookOpenText, Plus, Trash2 } from "lucide-react";
+import { BookOpenText, Pencil, Plus, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,8 +42,8 @@ function CountPill({ n }: { n: number }) {
 function meaningOf(k: FundamentalKey) {
   const map: Record<FundamentalKey, string> = {
     purpose: "por que existimos",
+    mission: "o que fazemos",
     vision: "para onde vamos",
-    mission: "como entregamos no dia a dia",
     values: "como nos comportamos",
     culture: "como trabalhamos e decidimos",
   };
@@ -191,6 +191,13 @@ export default function OkrFundamentals() {
     }
   }
 
+  async function clearList(field: "values" | "culture") {
+    if (!canEdit || saving) return;
+    const ok = window.confirm(`Remover todos os itens de ${labelOf(field)}?`);
+    if (!ok) return;
+    await saveItems(field, []);
+  }
+
   function openText(field: "purpose" | "vision" | "mission") {
     setActive({ kind: "text", field });
   }
@@ -224,7 +231,7 @@ export default function OkrFundamentals() {
       <div className="grid gap-6">
         <OkrPageHeader
           title="Fundamentos"
-          subtitle="Propósito, visão, missão, valores e cultura."
+          subtitle="Propósito, missão, visão, valores e cultura."
           icon={<BookOpenText className="h-5 w-5" />}
         />
 
@@ -234,7 +241,7 @@ export default function OkrFundamentals() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão geral</div>
-              <p className="mt-1 text-sm text-muted-foreground">Clique em um elemento para abrir e editar.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Clique em um elemento para abrir.</p>
             </div>
 
             <div
@@ -258,11 +265,12 @@ export default function OkrFundamentals() {
           <div className="grid gap-4">
             {/* Text fundamentals */}
             {([
-              { key: "vision" as const, value: (fundamentals?.vision ?? "").trim() },
-              { key: "mission" as const, value: (fundamentals?.mission ?? "").trim() },
               { key: "purpose" as const, value: (fundamentals?.purpose ?? "").trim() },
+              { key: "mission" as const, value: (fundamentals?.mission ?? "").trim() },
+              { key: "vision" as const, value: (fundamentals?.vision ?? "").trim() },
             ] as const).map((s) => {
               const sectionId = `fundamentals-section-${s.key}`;
+              const isEmpty = !s.value;
               return (
                 <div
                   key={s.key}
@@ -277,13 +285,42 @@ export default function OkrFundamentals() {
                       <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{labelOf(s.key)}</div>
                       <div className="text-xs text-muted-foreground">{meaningOf(s.key)}</div>
                     </div>
+
+                    {canEdit ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 rounded-2xl bg-white"
+                          onClick={() => openText(s.key)}
+                          title="Editar"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="icon"
+                          className="h-9 w-9 rounded-2xl bg-white text-red-600 hover:text-red-700"
+                          onClick={() => {
+                            if (isEmpty) return;
+                            setActive({ kind: "text", field: s.key });
+                          }}
+                          title="Excluir"
+                          disabled={isEmpty || saving}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
 
                   <button
                     type="button"
                     className={cn(
                       "mt-3 w-full rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/30",
-                      !s.value && "text-muted-foreground",
+                      isEmpty && "text-muted-foreground",
                     )}
                     onClick={() => openText(s.key)}
                   >
@@ -318,16 +355,29 @@ export default function OkrFundamentals() {
                     <div className="flex items-center gap-2">
                       <CountPill n={s.items.length} />
                       {canEdit ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="icon"
-                          className="h-9 w-9 rounded-2xl bg-white"
-                          onClick={() => openAdd(s.key)}
-                          title="Adicionar"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 rounded-2xl bg-white"
+                            onClick={() => openAdd(s.key)}
+                            title="Adicionar"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="h-9 w-9 rounded-2xl bg-white text-red-600 hover:text-red-700"
+                            onClick={() => void clearList(s.key)}
+                            title="Excluir tudo"
+                            disabled={!s.items.length || saving}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </>
                       ) : null}
                     </div>
                   </div>
@@ -337,27 +387,67 @@ export default function OkrFundamentals() {
                       s.items.map((it, idx) => {
                         const itemId = `fundamentals-item-${s.key}-${idx}`;
                         return (
-                          <button
+                          <div
                             key={`${it.title}-${idx}`}
                             id={itemId}
-                            type="button"
-                            onClick={() => openItem(s.key, idx)}
                             className={cn(
-                              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/30",
+                              "relative rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 transition hover:bg-[color:var(--sinaxys-tint)]/30",
                               flashId === itemId && "ring-2 ring-[color:var(--sinaxys-primary)]",
                             )}
                           >
-                            <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{it.title?.trim() || "(sem título)"}</div>
-                            {it.description?.trim() ? (
-                              <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{it.description}</div>
+                            <button
+                              type="button"
+                              onClick={() => openItem(s.key, idx)}
+                              className="block w-full pr-20 text-left"
+                            >
+                              <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{it.title?.trim() || "(sem título)"}</div>
+                              {it.description?.trim() ? (
+                                <div className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">{it.description}</div>
+                              ) : null}
+                            </button>
+
+                            {canEdit ? (
+                              <div className="absolute right-3 top-3 flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-9 w-9 rounded-2xl bg-white"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openItem(s.key, idx);
+                                  }}
+                                  title="Editar"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-9 w-9 rounded-2xl bg-white text-red-600 hover:text-red-700"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActive({ kind: "item", field: s.key, index: idx });
+                                  }}
+                                  title="Excluir"
+                                  disabled={saving}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             ) : null}
-                          </button>
+                          </div>
                         );
                       })
                     ) : (
-                      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-                        {canEdit ? "Clique no + para adicionar." : "Nenhum item cadastrado."}
-                      </div>
+                      <button
+                        type="button"
+                        className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-left text-sm text-muted-foreground transition hover:bg-[color:var(--sinaxys-tint)]/30"
+                        onClick={() => (canEdit ? openAdd(s.key) : null)}
+                      >
+                        Clique para adicionar.
+                      </button>
                     )}
                   </div>
                 </div>
