@@ -244,16 +244,8 @@ export default function OkrFundamentals() {
               <p className="mt-1 text-sm text-muted-foreground">Clique em um elemento para abrir.</p>
             </div>
 
-            <div
-              className={cn(
-                "shrink-0 rounded-full px-4 py-2 text-xs font-semibold",
-                hasAny
-                  ? "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]"
-                  : "bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]",
-              )}
-            >
-              {hasAny ? "Pronto para conectar OKRs" : "Precisa de setup"}
-            </div>
+            {/* REMOVED: status pill ("Pronto para conectar OKRs") */}
+  
           </div>
 
           {isLoading ? (
