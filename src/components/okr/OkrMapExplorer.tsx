@@ -55,6 +55,7 @@ import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanva
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 import {
     createStrategyObjective,
@@ -80,7 +81,6 @@ import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profile
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 import { cn } from "@/lib/utils";
 import { listDepartments, type DbDepartment } from "@/lib/departmentsDb";
-
 import {
     describedItemsToLines,
     parseDescribedItems,
@@ -91,6 +91,7 @@ import {
 import { DescribedItemsEditor } from "@/components/fundamentals/DescribedItemsEditor";
 import { getErrorMessage } from "@/lib/errorMessage";
 import { brl } from "@/lib/costs";
+import { OkrStrategyMapCanvas } from "@/components/okr/OkrStrategyMapCanvas";
 
 type NodeId = string;
 
@@ -2915,7 +2916,7 @@ export function OkrMapExplorer(
         return m;
     }, [cycles]);
 
-    const isMobile = typeof window !== "undefined" ? window.matchMedia("(max-width: 1024px)").matches : false;
+    const isMobile = useIsMobile();
     const [sheetOpen, setSheetOpen] = useState(false);
     const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -2941,18 +2942,27 @@ export function OkrMapExplorer(
 
     return (
         <>
-            <OkrMapTreeCanvas
-                cid={companyId}
-                fundamentals={fundamentals}
-                strategy={strategy}
-                cycles={cycles}
-                activeId={selected.id}
-                onPick={n => pick(n)}
-                objectiveById={objectiveById}
-                peopleById={peopleById}
-                departmentsById={departmentsById}
-                canEdit={canEdit} />
-            {}
+            {user ? (
+                <OkrStrategyMapCanvas
+                    companyId={companyId}
+                    userId={user.id}
+                    fundamentals={fundamentals}
+                    strategy={strategy}
+                    cycles={cycles}
+                    peopleById={peopleById}
+                    departmentsById={departmentsById}
+                    onOpenVision={() =>
+                        pick({ kind: "fundamental", id: "fund:vision" as any, field: "vision" })
+                    }
+                    onOpenStrategyObjective={(soId) =>
+                        pick({ kind: "strategyObjective", id: `so:${soId}` as any, soId })
+                    }
+                    onOpenObjective={(objectiveId) =>
+                        pick({ kind: "objective", id: `o:${objectiveId}` as any, objectiveId })
+                    }
+                />
+            ) : null}
+
             <div className="hidden lg:block">
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                     <DialogContent
@@ -2977,7 +2987,7 @@ export function OkrMapExplorer(
                     </DialogContent>
                 </Dialog>
             </div>
-            {}
+
             <div className="lg:hidden">
                 <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
                     <SheetContent side="bottom" className="h-[88vh] w-full rounded-t-3xl p-0">
@@ -3000,11 +3010,6 @@ export function OkrMapExplorer(
                         </ScrollArea>
                     </SheetContent>
                 </Sheet>
-                <div
-                    className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 text-sm text-muted-foreground">
-                    <div className="font-semibold text-[color:var(--sinaxys-ink)]">Dica</div>
-                    <div className="mt-1">Toque em um item para abrir os detalhes (e editar quando disponível).</div>
-                </div>
             </div>
         </>
     );
