@@ -452,6 +452,7 @@ function StrategyLinker(
         fundamentals,
         strategy,
         objectivesInCycle,
+        cycles,
         onSaved
     }: {
         cid: string;
@@ -460,6 +461,7 @@ function StrategyLinker(
         fundamentals: DbCompanyFundamentals | null;
         strategy: DbStrategyObjective[];
         objectivesInCycle: DbOkrObjective[];
+        cycles: DbOkrCycle[];
         onSaved: () => Promise<void>;
     }
 ) {
@@ -469,10 +471,28 @@ function StrategyLinker(
 
     const [saving, setSaving] = useState(false);
 
-    const otherObjectives = useMemo(
-        () => objectivesInCycle.filter(o => o.id !== objective.id).sort((a, b) => a.title.localeCompare(b.title)),
-        [objectivesInCycle, objective.id]
-    );
+    const cycle = useMemo(() => cycles.find(c => c.id === objective.cycle_id) ?? null, [cycles, objective.cycle_id]);
+    const annualCycleId = useMemo(() => {
+        if (!cycle || cycle.type !== "QUARTERLY") return null;
+        return cycles.find(c => c.type === "ANNUAL" && c.year === cycle.year)?.id ?? null;
+    }, [cycle, cycles]);
+
+    const qAnnualParents = useQuery({
+        queryKey: ["okr-map-parent-annual", cid, annualCycleId],
+        enabled: !!annualCycleId,
+        queryFn: () => listOkrObjectives(cid, annualCycleId as string),
+        staleTime: 20_000
+    });
+
+    const parentOptions = useMemo(() => {
+        if (cycle?.type === "QUARTERLY") {
+            return (qAnnualParents.data ?? []).sort((a, b) => a.title.localeCompare(b.title));
+        }
+
+        return objectivesInCycle.filter(o => o.id !== objective.id).sort((a, b) => a.title.localeCompare(b.title));
+    }, [cycle?.type, objective.id, objectivesInCycle, qAnnualParents.data]);
+
+    const parentLabel = cycle?.type === "QUARTERLY" ? "Objetivo do ano (pai)" : "OKR pai (objetivo pai)";
 
     const fundamentalOptions = useMemo(() => [{
         key: "PURPOSE",
@@ -564,7 +584,7 @@ function StrategyLinker(
                     </Select>
                 </div>
                 <div className="grid gap-2">
-                    <Label>OKR pai (objetivo pai)</Label>
+                    <Label>{parentLabel}</Label>
                     <Select
                         disabled={!canEdit || saving}
                         value={objective.parent_objective_id ?? "__none__"}
@@ -577,7 +597,7 @@ function StrategyLinker(
                                 });
 
                                 toast({
-                                    title: "OKR pai atualizado"
+                                    title: "Alinhamento atualizado"
                                 });
 
                                 await onSaved();
@@ -596,12 +616,16 @@ function StrategyLinker(
                         </SelectTrigger>
                         <SelectContent className="rounded-2xl">
                             <SelectItem value="__none__">Sem pai</SelectItem>
-                            {otherObjectives.map(o => (<SelectItem key={o.id} value={o.id}>
+                            {parentOptions.map(o => (<SelectItem key={o.id} value={o.id}>
                                 {o.title}
                             </SelectItem>))}
                         </SelectContent>
                     </Select>
-                    <div className="text-[11px] text-muted-foreground">Mostra objetivos do mesmo ciclo (trimestre/ano).</div>
+                    {cycle?.type === "QUARTERLY" ? (
+                        <div className="text-[11px] text-muted-foreground">Mostra objetivos do ciclo anual do mesmo ano.</div>
+                    ) : (
+                        <div className="text-[11px] text-muted-foreground">Mostra objetivos do mesmo ciclo (trimestre/ano).</div>
+                    )}
                 </div>
                 <div className="grid gap-2">
                     <Label>Fundamento (missão/visão/valores etc.)</Label>
@@ -895,7 +919,8 @@ function ObjectiveEditor(
         companyId,
         strategy,
         fundamentals,
-        people
+        people,
+        cycles,
     }: {
         canEdit: boolean;
         objective: DbOkrObjective;
@@ -907,6 +932,7 @@ function ObjectiveEditor(
         strategy: DbStrategyObjective[];
         fundamentals: DbCompanyFundamentals | null;
         people: DbProfilePublic[];
+        cycles: DbOkrCycle[];
     }
 ) {
     const {
@@ -1072,6 +1098,7 @@ function ObjectiveEditor(
                 fundamentals={fundamentals}
                 strategy={strategy}
                 objectivesInCycle={objectivesInCycle}
+                cycles={cycles}
                 onSaved={onSaved} />
             <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
                 <div className="flex items-start justify-between gap-4">
@@ -1245,7 +1272,8 @@ function DetailsBody(
                 companyId={cid}
                 strategy={strategy}
                 fundamentals={fundamentals}
-                people={people} />) : (<Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+                people={people}
+                cycles={cycles} />) : (<Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
                 <div className="text-sm text-muted-foreground">Carregando objetivo…</div>
             </Card>)) : null}
             {}
@@ -1265,6 +1293,7 @@ function DetailsBody(
                 }} />) : null}
             {node.kind === "strategyObjective" ? (strategy.find(s => s.id === node.soId) ? (<StrategyObjectiveInlineCard
                 so={strategy.find(s => s.id === node.soId)!}
+                strategy={strategy}
                 people={people}
                 canEdit={canEdit}
                 open={true}
@@ -2251,6 +2280,7 @@ function FundamentalEditor(
 function StrategyObjectiveInlineCard(
     {
         so,
+        strategy,
         people,
         canEdit,
         open,
@@ -2258,6 +2288,7 @@ function StrategyObjectiveInlineCard(
         onSaved
     }: {
         so: DbStrategyObjective;
+        strategy: DbStrategyObjective[];
         people: DbProfilePublic[];
         canEdit: boolean;
         open: boolean;
@@ -2275,6 +2306,8 @@ function StrategyObjectiveInlineCard(
     const [description, setDescription] = useState(so.description ?? "");
     const [ownerId, setOwnerId] = useState<string | null>(so.owner_user_id ?? null);
     const [targetYear, setTargetYear] = useState<string>(so.target_year ? String(so.target_year) : "");
+    const [parentSoId, setParentSoId] = useState<string | null>(so.parent_strategy_objective_id ?? null);
+    const [linkedFundamental, setLinkedFundamental] = useState<DbStrategyObjective["linked_fundamental"]>(so.linked_fundamental ?? null);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
@@ -2282,12 +2315,19 @@ function StrategyObjectiveInlineCard(
         setDescription(so.description ?? "");
         setOwnerId(so.owner_user_id ?? null);
         setTargetYear(so.target_year ? String(so.target_year) : "");
+        setParentSoId(so.parent_strategy_objective_id ?? null);
+        setLinkedFundamental(so.linked_fundamental ?? null);
         setSaving(false);
     }, [so.id, so.updated_at]);
 
     const peopleOptions = useMemo(
         () => people.filter(p => p.active).sort((a, b) => a.name.localeCompare(b.name)),
         [people]
+    );
+
+    const parentStrategyOptions = useMemo(
+        () => strategy.filter(s => s.id !== so.id).sort((a, b) => (a.horizon_years - b.horizon_years) || (a.order_index - b.order_index) || a.title.localeCompare(b.title)),
+        [so.id, strategy]
     );
 
     return (
@@ -2328,96 +2368,148 @@ function StrategyObjectiveInlineCard(
                     </div>
                 </div>
             </button>
-            {open ? (<div className="border-t border-[color:var(--sinaxys-border)] px-5 py-5">
-                <div className="grid gap-3">
-                    <div className="grid gap-2">
-                        <Label>Título</Label>
-                        <Input
-                            className="h-11 rounded-2xl"
-                            value={title}
-                            onChange={e => setTitle(e.target.value)}
-                            disabled={!canEdit || saving} />
+            {open ? (
+                <div className="border-t border-[color:var(--sinaxys-border)] px-5 py-5">
+                    <div className="grid gap-3">
+                        <div className="grid gap-2">
+                            <Label>Título</Label>
+                            <Input
+                                className="h-11 rounded-2xl"
+                                value={title}
+                                onChange={e => setTitle(e.target.value)}
+                                disabled={!canEdit || saving} />
+                        </div>
+
+                        <div className="grid gap-2 sm:grid-cols-2">
+                            <div className="grid gap-2">
+                                <Label>Para quando (ano)</Label>
+                                <Input
+                                    type="number"
+                                    inputMode="numeric"
+                                    className="h-11 rounded-2xl"
+                                    value={targetYear}
+                                    onChange={e => setTargetYear(e.target.value)}
+                                    disabled={!canEdit || saving}
+                                    placeholder={String(yearForStrategyObjective(so))}
+                                />
+                                <div className="text-[11px] text-muted-foreground">Use um ano (ex.: 2028). Se vazio, usamos o horizonte como referência.</div>
+                            </div>
+
+                            <div className="grid gap-2">
+                                <Label>Vincular a fundamento</Label>
+                                <Select
+                                    value={linkedFundamental ?? "__none__"}
+                                    onValueChange={(v) => setLinkedFundamental(v === "__none__" ? null : (v as any))}
+                                    disabled={!canEdit || saving}
+                                >
+                                    <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                        <SelectValue placeholder="Sem vínculo" />
+                                    </SelectTrigger>
+                                    <SelectContent className="rounded-2xl">
+                                        <SelectItem value="__none__">Sem vínculo</SelectItem>
+                                        <SelectItem value="VISION">Visão</SelectItem>
+                                        <SelectItem value="PURPOSE">Propósito</SelectItem>
+                                        <SelectItem value="MISSION">Missão</SelectItem>
+                                        <SelectItem value="VALUES">Valores</SelectItem>
+                                        <SelectItem value="CULTURE">Cultura</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <div className="text-[11px] text-muted-foreground">Use "Visão" para conectar explicitamente o longo prazo ao norte da empresa.</div>
+                            </div>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Objetivo pai (longo prazo)</Label>
+                            <Select
+                                value={parentSoId ?? "__none__"}
+                                onValueChange={(v) => setParentSoId(v === "__none__" ? null : v)}
+                                disabled={!canEdit || saving}
+                            >
+                                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                    <SelectValue placeholder="Sem pai" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl">
+                                    <SelectItem value="__none__">Sem pai</SelectItem>
+                                    {parentStrategyOptions.map(p => (
+                                        <SelectItem key={p.id} value={p.id}>
+                                            {p.title} • {p.horizon_years} anos
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <div className="text-[11px] text-muted-foreground">Use para mostrar hierarquia e vinculação entre objetivos de longo prazo.</div>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Responsável</Label>
+                            <Select
+                                value={ownerId ?? "__company__"}
+                                onValueChange={v => setOwnerId(v === "__company__" ? null : v)}
+                                disabled={!canEdit || saving}>
+                                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                    <SelectValue placeholder="Selecione…" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl">
+                                    <SelectItem value="__company__">Toda a empresa</SelectItem>
+                                    {peopleOptions.map(p => (<SelectItem key={p.id} value={p.id}>
+                                        {p.name}
+                                    </SelectItem>))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Descrição</Label>
+                            <Textarea
+                                className="min-h-[120px] rounded-2xl"
+                                value={description}
+                                onChange={e => setDescription(e.target.value)}
+                                disabled={!canEdit || saving}
+                                placeholder="Contexto, hipóteses, como saberemos que vencemos, etc." />
+                        </div>
+                        {canEdit ? (
+                            <div className="flex justify-end">
+                                <Button
+                                    className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                                    disabled={saving || title.trim().length < 6}
+                                    onClick={async () => {
+                                        setSaving(true);
+
+                                        try {
+                                            const nYear = targetYear.trim() ? Number(targetYear.trim()) : null;
+
+                                            await updateStrategyObjective(so.id, {
+                                                title,
+                                                target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
+                                                description: description.trim() || null,
+                                                owner_user_id: ownerId,
+                                                parent_strategy_objective_id: parentSoId,
+                                                linked_fundamental: linkedFundamental,
+                                            });
+
+                                            toast({
+                                                title: "Objetivo atualizado"
+                                            });
+
+                                            await onSaved();
+                                        } catch (e) {
+                                            toast({
+                                                title: "Não foi possível salvar",
+                                                description: e instanceof Error ? e.message : "Erro inesperado.",
+                                                variant: "destructive"
+                                            });
+                                        } finally {
+                                            setSaving(false);
+                                        }
+                                    }}>
+                                    <Save className="mr-2 h-4 w-4" />Salvar
+                                </Button>
+                            </div>
+                        ) : null}
                     </div>
 
-                    <div className="grid gap-2">
-                        <Label>Para quando (ano)</Label>
-                        <Input
-                            type="number"
-                            inputMode="numeric"
-                            className="h-11 rounded-2xl"
-                            value={targetYear}
-                            onChange={e => setTargetYear(e.target.value)}
-                            disabled={!canEdit || saving}
-                            placeholder={String(yearForStrategyObjective(so))}
-                        />
-                        <div className="text-[11px] text-muted-foreground">Use um ano (ex.: 2028). Se vazio, usamos o horizonte como referência.</div>
-                    </div>
-
-                    <div className="grid gap-2">
-                        <Label>Responsável</Label>
-                        <Select
-                            value={ownerId ?? "__company__"}
-                            onValueChange={v => setOwnerId(v === "__company__" ? null : v)}
-                            disabled={!canEdit || saving}>
-                            <SelectTrigger className="h-11 rounded-2xl bg-white">
-                                <SelectValue placeholder="Selecione…" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl">
-                                <SelectItem value="__company__">Toda a empresa</SelectItem>
-                                {peopleOptions.map(p => (<SelectItem key={p.id} value={p.id}>
-                                    {p.name}
-                                </SelectItem>))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Descrição</Label>
-                        <Textarea
-                            className="min-h-[120px] rounded-2xl"
-                            value={description}
-                            onChange={e => setDescription(e.target.value)}
-                            disabled={!canEdit || saving}
-                            placeholder="Contexto, hipóteses, como saberemos que vencemos, etc." />
-                    </div>
-                    {canEdit ? (<div className="flex justify-end">
-                        <Button
-                            className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                            disabled={saving || title.trim().length < 6}
-                            onClick={async () => {
-                                setSaving(true);
-
-                                try {
-                                    const nYear = targetYear.trim() ? Number(targetYear.trim()) : null;
-
-                                    await updateStrategyObjective(so.id, {
-                                        title,
-                                        target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
-                                        description: description.trim() || null,
-                                        owner_user_id: ownerId
-                                    });
-
-                                    toast({
-                                        title: "Objetivo atualizado"
-                                    });
-
-                                    await onSaved();
-                                } catch (e) {
-                                    toast({
-                                        title: "Não foi possível salvar",
-                                        description: e instanceof Error ? e.message : "Erro inesperado.",
-                                        variant: "destructive"
-                                    });
-                                } finally {
-                                    setSaving(false);
-                                }
-                            }}>
-                            <Save className="mr-2 h-4 w-4" />Salvar
-                                            </Button>
-                    </div>) : null}
+                    {/* Removido: KRs de objetivos de longo prazo */}
                 </div>
-
-                {/* Removido: KRs de objetivos de longo prazo */}
-            </div>) : null}
+            ) : null}
         </Card>
     );
 }
@@ -2460,6 +2552,8 @@ function StrategyPicker(
     const [newOwner, setNewOwner] = useState<string | null>(null);
     const [newTargetYear, setNewTargetYear] = useState<string>("");
     const [newTargetTouched, setNewTargetTouched] = useState(false);
+    const [newParentSoId, setNewParentSoId] = useState<string | null>(null);
+    const [newLinkedFundamental, setNewLinkedFundamental] = useState<DbStrategyObjective["linked_fundamental"]>(null);
 
     useEffect(() => {
         if (!createOpen)
@@ -2470,6 +2564,8 @@ function StrategyPicker(
         setNewTitle("");
         setNewDesc("");
         setNewOwner(null);
+        setNewParentSoId(null);
+        setNewLinkedFundamental(null);
         setNewTargetYear(String(new Date().getFullYear() + 2));
         setNewTargetTouched(false);
     }, [createOpen]);
@@ -2493,6 +2589,13 @@ function StrategyPicker(
 
     return (
         <>
+            {/* Hidden list so cards can get consistent options (used by StrategyObjectiveInlineCard) */}
+            <div className="hidden">
+                {ordered.map(s => (
+                    <span key={s.id} data-strategy-option data-id={s.id} data-label={`${s.title} • ${s.horizon_years} anos`} />
+                ))}
+            </div>
+
             <div className="grid gap-4">
                 <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
                     <div className="flex items-start justify-between gap-4">
@@ -2515,6 +2618,7 @@ function StrategyPicker(
                     {ordered.map(so => (<StrategyObjectiveInlineCard
                         key={so.id}
                         so={so}
+                        strategy={ordered}
                         people={people}
                         canEdit={canEdit}
                         open={openSoId === so.id}
@@ -2551,8 +2655,7 @@ function StrategyPicker(
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent className="rounded-2xl">
-                                        <SelectItem value="1">1 ano</SelectItem>
-                                        <SelectItem value="3">3 anos</SelectItem>
+                                        <SelectItem value="2">2 anos</SelectItem>
                                         <SelectItem value="5">5 anos</SelectItem>
                                         <SelectItem value="10">10 anos</SelectItem>
                                     </SelectContent>
@@ -2575,6 +2678,50 @@ function StrategyPicker(
                                 />
                             </div>
                         </div>
+
+                        <div className="grid gap-2">
+                            <Label>Vincular a fundamento</Label>
+                            <Select
+                                value={newLinkedFundamental ?? "__none__"}
+                                onValueChange={(v) => setNewLinkedFundamental(v === "__none__" ? null : (v as any))}
+                                disabled={creating}
+                            >
+                                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                    <SelectValue placeholder="Sem vínculo" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl">
+                                    <SelectItem value="__none__">Sem vínculo</SelectItem>
+                                    <SelectItem value="VISION">Visão</SelectItem>
+                                    <SelectItem value="PURPOSE">Propósito</SelectItem>
+                                    <SelectItem value="MISSION">Missão</SelectItem>
+                                    <SelectItem value="VALUES">Valores</SelectItem>
+                                    <SelectItem value="CULTURE">Cultura</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <div className="text-[11px] text-muted-foreground">Sugestão: marque "Visão" para reforçar o elo entre estratégia e norte.</div>
+                        </div>
+
+                        <div className="grid gap-2">
+                            <Label>Objetivo pai (longo prazo)</Label>
+                            <Select
+                                value={newParentSoId ?? "__none__"}
+                                onValueChange={(v) => setNewParentSoId(v === "__none__" ? null : v)}
+                                disabled={creating}
+                            >
+                                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                    <SelectValue placeholder="Sem pai" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl">
+                                    <SelectItem value="__none__">Sem pai</SelectItem>
+                                    {ordered.map(s => (
+                                        <SelectItem key={s.id} value={s.id}>
+                                            {s.title} • {s.horizon_years} anos
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         <div className="grid gap-2">
                             <Label>Título</Label>
                             <Input
@@ -2636,7 +2783,9 @@ function StrategyPicker(
                                             title: newTitle,
                                             description: newDesc.trim() || null,
                                             created_by_user_id: user.id,
-                                            owner_user_id: newOwner
+                                            owner_user_id: newOwner,
+                                            parent_strategy_objective_id: newParentSoId,
+                                            linked_fundamental: newLinkedFundamental,
                                         });
 
                                         toast({

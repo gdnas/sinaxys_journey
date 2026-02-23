@@ -51,6 +51,7 @@ import {
   type KrKind,
   type ObjectiveLevel,
 } from "@/lib/okrDb";
+import { listStrategyObjectives, type DbStrategyObjective } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
@@ -144,6 +145,19 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
     queryFn: () => listDepartments(cid),
   });
 
+  const { data: strategyObjectives = [] } = useQuery({
+    queryKey: ["okr-strategy", cid],
+    enabled: hasCompany,
+    queryFn: () => listStrategyObjectives(cid),
+    staleTime: 60_000,
+  });
+
+  const strategyOptions = useMemo(() => {
+    return [...strategyObjectives]
+      .sort((a, b) => (a.horizon_years - b.horizon_years) || (a.order_index - b.order_index) || a.title.localeCompare(b.title, "pt-BR"))
+      .map((so) => ({ id: so.id, label: `${so.title} • ${so.horizon_years} anos` }));
+  }, [strategyObjectives]);
+
   const byUserId = useMemo(() => {
     return new Map(
       profiles.map((p) => [
@@ -208,6 +222,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
   const [objOwner, setObjOwner] = useState<string>(user.id);
   const [objDept, setObjDept] = useState<string | null>(user.departmentId ?? null);
   const [objParent, setObjParent] = useState<string | null>(null);
+  const [objStrategy, setObjStrategy] = useState<string | null>(null);
 
   const [objExpected, setObjExpected] = useState<string>("80");
 
@@ -224,6 +239,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
     setObjOwner(user.id);
     setObjDept(user.departmentId ?? null);
     setObjParent(null);
+    setObjStrategy(null);
     setObjExpected("80");
     setObjValue("");
     setObjEffortHours("");
@@ -573,6 +589,26 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
               </div>
             </div>
 
+            {scope === "year" ? (
+              <div className="grid gap-2">
+                <Label>Objetivo de longo prazo (alinhamento)</Label>
+                <Select value={objStrategy ?? ""} onValueChange={(v) => setObjStrategy(v === SELECT_NONE ? null : v)}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Sem vínculo" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SELECT_NONE}>Sem vínculo</SelectItem>
+                    {strategyOptions.map((so) => (
+                      <SelectItem key={so.id} value={so.id}>
+                        {so.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">Vincule o objetivo do ano ao objetivo de longo prazo (ex.: 2 anos) para aparecer no mapa.</div>
+              </div>
+            ) : null}
+
             {requiresBusinessCase && okrRoiEnabled ? (
               <div className="mt-4 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
@@ -656,10 +692,13 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                 if (!selected || objSaving) return;
                 setObjSaving(true);
                 try {
+                  const strategyId = scope === "year" ? objStrategy : null;
+
                   if (editingObjectiveId) {
                     await updateOkrObjective(editingObjectiveId, {
                       level: objLevel,
                       parent_objective_id: objParent,
+                      strategy_objective_id: strategyId,
                       department_id: objDept,
                       owner_user_id: objOwner,
                       title: objTitle,
@@ -676,14 +715,13 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                     });
                     toast({ title: "Objetivo atualizado" });
                   } else {
-                    const createCycleId =
-                      scope === "year" ? (selected?.id ?? (await ensureCurrentAnnualCycle())) : selected.id;
+                    const createCycleId = scope === "year" ? (selected?.id ?? (await ensureCurrentAnnualCycle())) : selected.id;
 
                     await createOkrObjective({
                       company_id: cid,
                       cycle_id: createCycleId,
                       parent_objective_id: objParent,
-                      strategy_objective_id: null,
+                      strategy_objective_id: strategyId,
                       level: objLevel,
                       department_id: objDept,
                       owner_user_id: objOwner,
@@ -707,6 +745,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
 
                   await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, cycleId] });
                   await qc.invalidateQueries({ queryKey: ["okr-kr-stats", cid] });
+                  await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
                   setObjOpen(false);
                 } catch (e) {
                   toast({

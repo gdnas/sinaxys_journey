@@ -64,7 +64,7 @@ function objectiveProgressPct(krs: DbOkrKeyResult[]) {
 
 type MapItem =
   | { kind: "vision" }
-  | { kind: "horizon"; horizon: 10 | 5 | 2 }
+  | { kind: "strategyRoot" }
   | { kind: "strategyObjective"; so: DbStrategyObjective }
   | { kind: "group"; title: string; subtitle?: string }
   | { kind: "objective"; objective: DbOkrObjective; cycle: DbOkrCycle | null; pct: number | null; ownerName: string }
@@ -112,9 +112,6 @@ export function OkrStrategyMapCanvas(props: {
     setQuarterCycleId((prev) => (quarterOptions.some((c) => c.id === prev) ? prev : pickDefaultQuarter(cycles)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycles.length]);
-
-  const annualCycle = annualOptions.find((c) => c.id === annualCycleId) ?? null;
-  const quarterCycle = quarterOptions.find((c) => c.id === quarterCycleId) ?? null;
 
   const qAnnualObjectives = useQuery({
     queryKey: ["okr-map-canvas-annual-objectives", companyId, annualCycleId],
@@ -191,15 +188,14 @@ export function OkrStrategyMapCanvas(props: {
   const [editingKr, setEditingKr] = useState<DbOkrKeyResult | null>(null);
 
   const roots = useMemo(() => {
-    const byHorizon = new Map<10 | 5 | 2, DbStrategyObjective[]>();
-    byHorizon.set(10, []);
-    byHorizon.set(5, []);
-    byHorizon.set(2, []);
+    const byParent = new Map<string | null, DbStrategyObjective[]>();
     for (const so of strategy) {
-      const arr = byHorizon.get(so.horizon_years as any);
-      if (arr) arr.push(so);
+      const k = so.parent_strategy_objective_id ?? null;
+      const arr = byParent.get(k) ?? [];
+      arr.push(so);
+      byParent.set(k, arr);
     }
-    for (const arr of byHorizon.values()) arr.sort((a, b) => (a.order_index - b.order_index) || a.title.localeCompare(b.title, "pt-BR"));
+    for (const arr of byParent.values()) arr.sort((a, b) => (a.order_index - b.order_index) || a.title.localeCompare(b.title, "pt-BR"));
 
     const makeObjectiveNode = (o: DbOkrObjective): OrgNode<MapItem> => {
       const krs = krsByObjectiveId.get(o.id) ?? [];
@@ -221,52 +217,34 @@ export function OkrStrategyMapCanvas(props: {
       );
     };
 
-    const horizon10 = node("h:10", { kind: "horizon", horizon: 10 }, byHorizon.get(10)!.map((so) => node(`so:${so.id}`, { kind: "strategyObjective", so })));
+    const seen = new Set<string>();
+    const makeStrategyNode = (so: DbStrategyObjective): OrgNode<MapItem> => {
+      if (seen.has(so.id)) {
+        // Prevent accidental cycles from breaking the tree.
+        return node(`so:${so.id}`, { kind: "strategyObjective", so });
+      }
+      seen.add(so.id);
 
-    const horizon5 = node(
-      "h:5",
-      { kind: "horizon", horizon: 5 },
-      byHorizon
-        .get(5)!
-        .map((so) => {
-          const annualKids = (annualByStrategyId.get(so.id) ?? []).map(makeObjectiveNode);
-          return node(`so:${so.id}`, { kind: "strategyObjective", so }, annualKids);
-        }),
-    );
-
-    const horizon2Children: OrgNode<MapItem>[] = [];
-
-    for (const so of byHorizon.get(2)!) {
+      const childSos = (byParent.get(so.id) ?? []).map(makeStrategyNode);
       const annualKids = (annualByStrategyId.get(so.id) ?? []).map(makeObjectiveNode);
-      horizon2Children.push(node(`so:${so.id}`, { kind: "strategyObjective", so }, annualKids));
-    }
 
-    const annualUnlinked = (annualByStrategyId.get(null) ?? []).map(makeObjectiveNode);
-    if (annualUnlinked.length) {
-      horizon2Children.push(node("g:annual-unlinked", { kind: "group", title: "Ano (sem vínculo com 2 anos)", subtitle: `${annualUnlinked.length} objetivos` }, annualUnlinked));
-    }
+      return node(`so:${so.id}`, { kind: "strategyObjective", so }, [...childSos, ...annualKids]);
+    };
 
+    const topStrategy = (byParent.get(null) ?? []).map(makeStrategyNode);
+
+    const unlinkedAnnual = (annualByStrategyId.get(null) ?? []).map(makeObjectiveNode);
+
+    const groups: OrgNode<MapItem>[] = [];
+    if (unlinkedAnnual.length) {
+      groups.push(node("g:annual-unlinked", { kind: "group", title: "Ano (sem vínculo com longo prazo)", subtitle: `${unlinkedAnnual.length} objetivos` }, unlinkedAnnual));
+    }
     if (orphanQuarterObjectives.length) {
-      horizon2Children.push(
-        node(
-          "g:quarter-orphans",
-          {
-            kind: "group",
-            title: "Trimestre (sem vínculo com o ano)",
-            subtitle: `${orphanQuarterObjectives.length} objetivos`,
-          },
-          orphanQuarterObjectives.map(makeObjectiveNode),
-        ),
-      );
+      groups.push(node("g:quarter-orphans", { kind: "group", title: "Trimestre (sem vínculo com o ano)", subtitle: `${orphanQuarterObjectives.length} objetivos` }, orphanQuarterObjectives.map(makeObjectiveNode)));
     }
 
-    const horizon2 = node("h:2", { kind: "horizon", horizon: 2 }, horizon2Children);
-
-    // Make horizons explicitly linked.
-    horizon10.children = [horizon5];
-    horizon5.children = [horizon2, ...horizon5.children];
-
-    return [node("vision", { kind: "vision" }, [horizon10])];
+    const strategyRoot = node("strategy-root", { kind: "strategyRoot" }, [...topStrategy, ...groups]);
+    return [node("vision", { kind: "vision" }, [strategyRoot])];
   }, [annualByStrategyId, cycleById, krsByObjectiveId, orphanQuarterObjectives, peopleById, quarterChildrenByAnnualId, strategy]);
 
   const visionText = (fundamentals?.vision ?? "").trim();
@@ -277,7 +255,7 @@ export function OkrStrategyMapCanvas(props: {
         <div className="min-w-0">
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Mapa</div>
           <div className="mt-1 text-sm text-muted-foreground">
-            Hierarquia da visão → longo prazo → ano → trimestre (com KRs). Clique em qualquer card para abrir detalhes.
+            Visão → longo prazo → ano → trimestre (com KRs). Clique em qualquer card para abrir detalhes.
           </div>
         </div>
 
@@ -351,13 +329,13 @@ export function OkrStrategyMapCanvas(props: {
             );
           }
 
-          if (d.kind === "horizon") {
-            const label = d.horizon === 10 ? "10 anos" : d.horizon === 5 ? "5 anos" : "2 anos";
+          if (d.kind === "strategyRoot") {
             return (
-              <div className="rounded-full border border-[color:var(--map-strategy-border)] bg-[color:var(--map-strategy-bg)] px-4 py-2 text-center shadow-sm">
-                <div className="inline-flex items-center gap-2 text-xs font-semibold text-[color:var(--map-strategy-ink)]">
-                  <Layers className="h-4 w-4" /> {label}
+              <div className="w-[300px] rounded-3xl border border-[color:var(--map-strategy-border)] bg-[color:var(--map-strategy-bg)] p-4 text-left shadow-sm">
+                <div className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--map-strategy-ink)]">
+                  <Layers className="h-4 w-4" /> Longo prazo
                 </div>
+                <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/70">Hierarquia e conexões estratégicas</div>
               </div>
             );
           }
@@ -368,7 +346,7 @@ export function OkrStrategyMapCanvas(props: {
                 type="button"
                 onClick={() => onOpenStrategyObjective(d.so.id)}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="group relative grid w-[280px] text-left outline-none"
+                className="group relative grid w-[300px] text-left outline-none"
                 aria-label={`Abrir objetivo de longo prazo: ${d.so.title}`}
                 title={d.so.title}
               >
@@ -378,11 +356,16 @@ export function OkrStrategyMapCanvas(props: {
                       <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.so.title}</div>
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <Badge className="rounded-full bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)] hover:bg-[color:var(--map-strategy-bg)]">
-                          {d.so.target_year ?? new Date().getFullYear() + d.so.horizon_years}
+                          {d.so.horizon_years} anos
                         </Badge>
                         <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
-                          Longo prazo
+                          {d.so.target_year ?? new Date().getFullYear() + d.so.horizon_years}
                         </Badge>
+                        {d.so.linked_fundamental ? (
+                          <Badge className="rounded-full bg-[color:var(--map-fundamentals-bg)] text-[color:var(--map-fundamentals-ink)] ring-1 ring-[color:var(--map-fundamentals-border)] hover:bg-[color:var(--map-fundamentals-bg)]">
+                            {d.so.linked_fundamental === "VISION" ? "Visão" : "Fundamento"}
+                          </Badge>
+                        ) : null}
                       </div>
                     </div>
                     <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)]">
@@ -396,7 +379,7 @@ export function OkrStrategyMapCanvas(props: {
 
           if (d.kind === "group") {
             return (
-              <div className="w-[280px] rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-left">
+              <div className="w-[300px] rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-left">
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
                 {d.subtitle ? <div className="mt-1 text-xs text-muted-foreground">{d.subtitle}</div> : null}
               </div>
@@ -494,7 +477,7 @@ export function OkrStrategyMapCanvas(props: {
 
       <div className="mt-4 grid gap-2 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
         <div className="font-semibold text-[color:var(--sinaxys-ink)]">Dica</div>
-        <div>Para aparecer a hierarquia completa, vincule os objetivos do ano ao objetivo de 2 anos e os do trimestre ao objetivo do ano (campo “OKR pai”).</div>
+        <div>Para o mapa ficar completo: (1) vincule objetivos do ano ao objetivo de longo prazo; (2) vincule objetivos do trimestre ao objetivo do ano (campo "Objetivo pai").</div>
       </div>
 
       {editingKr ? (
@@ -510,7 +493,6 @@ export function OkrStrategyMapCanvas(props: {
         />
       ) : null}
 
-      {/* Hidden helper input to keep layout stable on mobile; also satisfies a11y for screen readers */}
       <Input className="sr-only" aria-hidden />
     </Card>
   );

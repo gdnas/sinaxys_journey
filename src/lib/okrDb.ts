@@ -60,6 +60,8 @@ export type DbStrategyObjective = {
   order_index: number;
   created_by_user_id: string | null;
   owner_user_id: string | null;
+  parent_strategy_objective_id: string | null;
+  linked_fundamental: "VISION" | "PURPOSE" | "MISSION" | "VALUES" | "CULTURE" | null;
   created_at: string | null;
   updated_at: string | null;
 };
@@ -68,7 +70,7 @@ export async function listStrategyObjectives(companyId: string) {
   const { data, error } = await supabase
     .from("strategy_objectives")
     .select(
-      "id,company_id,horizon_years,target_year,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
+      "id,company_id,horizon_years,target_year,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,parent_strategy_objective_id,linked_fundamental,created_at,updated_at",
     )
     .eq("company_id", companyId)
     .order("horizon_years", { ascending: true })
@@ -83,7 +85,16 @@ export async function createStrategyObjective(
     Partial<
       Pick<
         DbStrategyObjective,
-        "target_year" | "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "created_by_user_id" | "owner_user_id"
+        | "target_year"
+        | "description"
+        | "growth_levers"
+        | "structuring_projects"
+        | "bets_and_expansions"
+        | "order_index"
+        | "created_by_user_id"
+        | "owner_user_id"
+        | "parent_strategy_objective_id"
+        | "linked_fundamental"
       >
     >,
 ) {
@@ -101,9 +112,11 @@ export async function createStrategyObjective(
       order_index: payload.order_index ?? 0,
       created_by_user_id: payload.created_by_user_id ?? null,
       owner_user_id: payload.owner_user_id ?? null,
+      parent_strategy_objective_id: payload.parent_strategy_objective_id ?? null,
+      linked_fundamental: payload.linked_fundamental ?? null,
     })
     .select(
-      "id,company_id,horizon_years,target_year,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
+      "id,company_id,horizon_years,target_year,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,parent_strategy_objective_id,linked_fundamental,created_at,updated_at",
     )
     .single();
   if (error) throw error;
@@ -115,7 +128,17 @@ export async function updateStrategyObjective(
   patch: Partial<
     Pick<
       DbStrategyObjective,
-      "title" | "target_year" | "description" | "growth_levers" | "structuring_projects" | "bets_and_expansions" | "order_index" | "horizon_years" | "owner_user_id"
+      | "title"
+      | "target_year"
+      | "description"
+      | "growth_levers"
+      | "structuring_projects"
+      | "bets_and_expansions"
+      | "order_index"
+      | "horizon_years"
+      | "owner_user_id"
+      | "parent_strategy_objective_id"
+      | "linked_fundamental"
     >
   >,
 ) {
@@ -129,13 +152,15 @@ export async function updateStrategyObjective(
   if ("order_index" in patch) update.order_index = patch.order_index ?? 0;
   if ("horizon_years" in patch) update.horizon_years = patch.horizon_years;
   if ("owner_user_id" in patch) update.owner_user_id = patch.owner_user_id ?? null;
+  if ("parent_strategy_objective_id" in patch) update.parent_strategy_objective_id = patch.parent_strategy_objective_id ?? null;
+  if ("linked_fundamental" in patch) update.linked_fundamental = patch.linked_fundamental ?? null;
 
   const { data, error } = await supabase
     .from("strategy_objectives")
     .update(update)
     .eq("id", id)
     .select(
-      "id,company_id,horizon_years,target_year,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,created_at,updated_at",
+      "id,company_id,horizon_years,target_year,title,description,growth_levers,structuring_projects,bets_and_expansions,order_index,created_by_user_id,owner_user_id,parent_strategy_objective_id,linked_fundamental,created_at,updated_at",
     )
     .maybeSingle();
 
