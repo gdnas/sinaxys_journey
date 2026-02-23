@@ -2454,7 +2454,7 @@ function StrategyPicker(
 
     const [createOpen, setCreateOpen] = useState(false);
     const [creating, setCreating] = useState(false);
-    const [newYears, setNewYears] = useState<DbStrategyObjective["horizon_years"]>(3);
+    const [newYears, setNewYears] = useState<DbStrategyObjective["horizon_years"]>(2);
     const [newTitle, setNewTitle] = useState("");
     const [newDesc, setNewDesc] = useState("");
     const [newOwner, setNewOwner] = useState<string | null>(null);
@@ -2466,11 +2466,11 @@ function StrategyPicker(
             return;
 
         setCreating(false);
-        setNewYears(3);
+        setNewYears(2);
         setNewTitle("");
         setNewDesc("");
         setNewOwner(null);
-        setNewTargetYear(String(new Date().getFullYear() + 3));
+        setNewTargetYear(String(new Date().getFullYear() + 2));
         setNewTargetTouched(false);
     }, [createOpen]);
 
