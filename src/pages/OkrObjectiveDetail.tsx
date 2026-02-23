@@ -48,6 +48,8 @@ import {
   type DbTask,
   type DeliverableTier,
   type WorkStatus,
+  deleteKeyResultCascade,
+  deleteOkrObjectiveCascade,
 } from "@/lib/okrDb";
 import { linkObjectiveToKr, listLinkedObjectivesByKrIds, unlinkObjectiveFromKr } from "@/lib/okrAlignmentDb";
 
@@ -328,6 +330,10 @@ export default function OkrObjectiveDetail() {
   const [linkObjectiveId, setLinkObjectiveId] = useState<string>(SELECT_NONE);
   const [linkSaving, setLinkSaving] = useState(false);
 
+  const [deleteObjectiveOpen, setDeleteObjectiveOpen] = useState(false);
+  const [deleteKrOpen, setDeleteKrOpen] = useState(false);
+  const [deleteKrId, setDeleteKrId] = useState<string | null>(null);
+
   const resetLink = () => {
     setLinkKrId(null);
     setLinkObjectiveId(SELECT_NONE);
@@ -466,6 +472,17 @@ export default function OkrObjectiveDetail() {
                 Voltar
               </Link>
             </Button>
+            {canWrite ? (
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl border-destructive/30 bg-white text-destructive hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setDeleteObjectiveOpen(true)}
+                title="Excluir objetivo"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir
+              </Button>
+            ) : null}
             {canWrite && objective?.status !== "ACHIEVED" ? (
               <Button
                 className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -614,6 +631,10 @@ export default function OkrObjectiveDetail() {
                 setTaskDeleteOpen(true);
               }}
               onToggleTask={toggleTaskDone}
+              onDeleteKr={() => {
+                setDeleteKrId(kr.id);
+                setDeleteKrOpen(true);
+              }}
             />
           ))
         ) : (
@@ -1034,6 +1055,82 @@ export default function OkrObjectiveDetail() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={deleteKrOpen} onOpenChange={setDeleteKrOpen}>
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir KR?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso também remove entregáveis, tarefas, histórico de alterações e vínculos com OKRs Tier 2.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                if (!deleteKrId) return;
+                try {
+                  await deleteKeyResultCascade(deleteKrId);
+                  await qc.invalidateQueries({ queryKey: ["okr-krs", objectiveId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-deliverables", objectiveId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-kr-objective-links", objectiveId] });
+                  toast({ title: "KR excluído" });
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível excluir",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setDeleteKrOpen(false);
+                  setDeleteKrId(null);
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteObjectiveOpen} onOpenChange={setDeleteObjectiveOpen}>
+        <AlertDialogContent className="rounded-3xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir objetivo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso exclui também KRs, entregáveis, tarefas e vínculos. Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={async () => {
+                try {
+                  await deleteOkrObjectiveCascade(objectiveId);
+                  await qc.invalidateQueries({ queryKey: ["okr-objective", objectiveId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-krs", objectiveId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-deliverables", objectiveId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-kr-objective-links", objectiveId] });
+                  toast({ title: "Objetivo excluído" });
+                  window.history.back();
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível excluir",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setDeleteObjectiveOpen(false);
+                }
+              }}
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -1056,6 +1153,7 @@ function KrCard({
   onEditTask,
   onDeleteTask,
   onToggleTask,
+  onDeleteKr,
 }: {
   kr: DbOkrKeyResult;
   deliverables: DbDeliverable[];
@@ -1074,6 +1172,7 @@ function KrCard({
   onEditTask: (t: DbTask) => void;
   onDeleteTask: (t: DbTask) => void;
   onToggleTask: (t: DbTask) => void;
+  onDeleteKr: () => void;
 }) {
   const pct = krProgressPct(kr);
   const unit = kr.metric_unit?.trim() ?? "";
@@ -1176,6 +1275,18 @@ function KrCard({
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {canWrite ? (
+            <Button
+              variant="outline"
+              className="h-11 rounded-xl border-destructive/30 bg-white text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={onDeleteKr}
+              title="Excluir KR"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir
+            </Button>
+          ) : null}
+
           {kr.kind === "DELIVERABLE" && canWrite ? (
             <Button
               variant={kr.achieved ? "default" : "outline"}

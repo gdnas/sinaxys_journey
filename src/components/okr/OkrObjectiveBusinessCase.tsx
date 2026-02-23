@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Pencil, Plus, Trash2, Users, Wallet, TrendingUp, Sparkles, Link2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, Users, Wallet, TrendingUp, Sparkles, Link2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -71,6 +71,8 @@ export function OkrObjectiveBusinessCase({
 
   const isTier1 = objective.level === "COMPANY";
   const linkedObjectiveIds = useMemo(() => linkedObjectives.map((o) => o.id), [linkedObjectives]);
+
+  const [collapsed, setCollapsed] = useState(false);
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles", companyId],
@@ -264,7 +266,7 @@ export function OkrObjectiveBusinessCase({
 
   return (
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Business case (custos + retorno + ROI)</div>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -273,479 +275,525 @@ export function OkrObjectiveBusinessCase({
               : "No Tier 2, registre custos humanos (pessoas + horas), custos não-humanos (opex) e retorno esperado (lucro + tese)."}
           </p>
         </div>
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-          <TrendingUp className="h-5 w-5" />
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setCollapsed((v) => !v)}
+            className="inline-flex h-10 items-center gap-2 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white px-3 text-xs font-semibold text-[color:var(--sinaxys-ink)] transition hover:bg-[color:var(--sinaxys-bg)]"
+            aria-label={collapsed ? "Expandir business case" : "Recolher business case"}
+            title={collapsed ? "Expandir" : "Recolher"}
+          >
+            {collapsed ? (
+              <>
+                Expandir <ChevronDown className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+              </>
+            ) : (
+              <>
+                Recolher <ChevronUp className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+              </>
+            )}
+          </button>
+
+          <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+            <TrendingUp className="h-5 w-5" />
+          </div>
         </div>
       </div>
 
       <Separator className="my-5" />
 
-      {isTier1 ? (
-        <div className="mb-5 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos do Tier 1 (vindos do Tier 2)</div>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {linkedObjectives.length
-                  ? `Somando custos de ${linkedObjectives.length} OKR(s) Tier 2 vinculado(s).`
-                  : "Nenhum OKR Tier 2 vinculado ainda. Vincule OKRs aos KRs para calcular o ROI corretamente."}
-              </p>
-            </div>
-            <div className="inline-flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-xs text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
-              <Link2 className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-              Alinhamento via KRs
-            </div>
-          </div>
-
-          {linkedObjectives.length ? (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {linkedObjectives.map((o) => (
-                <span
-                  key={o.id}
-                  className="inline-flex items-center rounded-full border border-[color:var(--sinaxys-border)] bg-white px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]"
-                >
-                  {o.title}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* Costs summary */}
-      <div className="grid gap-2 md:grid-cols-3">
-        <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 ring-1 ring-[color:var(--sinaxys-border)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs text-muted-foreground">Custo humano</div>
-              <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{brl(humanCostBRL)}</div>
-            </div>
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
-              <Users className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] text-muted-foreground">Pessoas do time × horas × custo/h.</div>
-        </div>
-
-        <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 ring-1 ring-[color:var(--sinaxys-border)]">
-          <div className="flex items-center justify-between">
-            <div>
-              <div className="text-xs text-muted-foreground">Custos não-humanos</div>
-              <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{brl(nonHumanCostBRL)}</div>
-            </div>
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
-              <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-            </div>
-          </div>
-          <div className="mt-2 text-[11px] text-muted-foreground">Ferramentas, fornecedores, mídia, infraestrutura etc.</div>
-        </div>
-
-        <div className="rounded-2xl bg-[color:var(--sinaxys-primary)] p-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
+      {collapsed ? (
+        <div className="grid gap-2">
+          <div className="grid gap-2 sm:grid-cols-3">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-primary)] p-4 text-white">
               <div className="text-xs text-white/80">Custo total</div>
               <div className="mt-1 text-sm font-semibold">{brl(totalCostBRL)}</div>
             </div>
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/15">
-              <Sparkles className="h-5 w-5" />
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 ring-1 ring-[color:var(--sinaxys-border)]">
+              <div className="text-xs text-muted-foreground">Retorno esperado</div>
+              <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{plannedProfit !== null ? brl(plannedProfit) : "—"}</div>
+            </div>
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 ring-1 ring-[color:var(--sinaxys-border)]">
+              <div className="text-xs text-muted-foreground">ROI (se atingirmos)</div>
+              <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{plannedRoiPct !== null ? `${plannedRoiPct.toFixed(1)}%` : "—"}</div>
             </div>
           </div>
-          <div className="mt-2 text-[11px] text-white/80">Base do ROI.</div>
+
+          <div className="text-xs text-muted-foreground">
+            ROI = (lucro − custo total) / custo total.
+          </div>
         </div>
-      </div>
+      ) : (
+        <>
+          {isTier1 ? (
+            <div className="mb-5 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos do Tier 1 (vindos do Tier 2)</div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {linkedObjectives.length
+                      ? `Somando custos de ${linkedObjectives.length} OKR(s) Tier 2 vinculado(s).`
+                      : "Nenhum OKR Tier 2 vinculado ainda. Vincule OKRs aos KRs para calcular o ROI corretamente."}
+                  </p>
+                </div>
+                <div className="inline-flex items-center gap-2 rounded-2xl bg-white px-3 py-2 text-xs text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
+                  <Link2 className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                  Alinhamento via KRs
+                </div>
+              </div>
 
-      {/* Human cost editor (Tier 2 only) */}
-      {!isTier1 ? (
-        <div className="mt-6 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Time + horas (custo humano)</div>
-              <p className="mt-1 text-sm text-muted-foreground">Escolha as pessoas e estime horas por pessoa.</p>
-            </div>
-            {canWrite ? (
-              <Button
-                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                onClick={() => {
-                  resetAdd();
-                  setAddOpen(true);
-                }}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Adicionar pessoa
-              </Button>
-            ) : null}
-          </div>
-
-          <div className="mt-4 grid gap-3">
-            {humanRows.length ? (
-              humanRows.map((r) => (
-                <div key={r.id} className="flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="grid h-9 w-9 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                        <span className="text-xs font-bold">{initials(r.name)}</span>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{r.name}</div>
-                        <div className="mt-0.5 text-xs text-muted-foreground">
-                          {r.jobTitle ? `${r.jobTitle} • ` : ""}
-                          {r.monthlyCostBRL ? `Custo: ${brlPerHourFromMonthly(r.monthlyCostBRL)}` : "Custo/h: — (cadastre em Custos)"}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
-                      <span className="text-muted-foreground">Horas:</span>
-                      <span className="font-semibold text-[color:var(--sinaxys-ink)]">{r.hours}</span>
-                      <span className="text-muted-foreground">• Custo:</span>
-                      <span className="font-semibold text-[color:var(--sinaxys-ink)]">{r.cost !== null ? brl(r.cost) : "—"}</span>
-                    </div>
-
-                    {r.roleLabel?.trim() ? <div className="mt-2 text-xs text-muted-foreground">Papel: {r.roleLabel}</div> : null}
-                    {r.notes?.trim() ? <div className="mt-1 text-sm text-muted-foreground">{r.notes}</div> : null}
-                  </div>
-
-                  {canWrite ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
-                      title="Remover"
-                      onClick={async () => {
-                        try {
-                          await deleteObjectiveLaborAllocation(r.id);
-                          await qc.invalidateQueries({ queryKey: ["okr-objective-labor", objective.id] });
-                        } catch (e) {
-                          toast({
-                            title: "Não foi possível remover",
-                            description: e instanceof Error ? e.message : "Erro inesperado.",
-                            variant: "destructive",
-                          });
-                        }
-                      }}
+              {linkedObjectives.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {linkedObjectives.map((o) => (
+                    <span
+                      key={o.id}
+                      className="inline-flex items-center rounded-full border border-[color:var(--sinaxys-border)] bg-white px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]"
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  ) : null}
+                      {o.title}
+                    </span>
+                  ))}
                 </div>
-              ))
-            ) : (
-              <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">Nenhuma pessoa adicionada ainda.</div>
-            )}
-          </div>
+              ) : null}
+            </div>
+          ) : null}
 
-          <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-[color:var(--sinaxys-border)]">
-            <div className="text-xs text-muted-foreground">Dica</div>
-            <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)]">
-              Se o custo/h aparecer como "—", vá em <span className="font-semibold">Custos</span> e cadastre o custo mensal da pessoa.
+          {/* Costs summary */}
+          <div className="grid gap-2 md:grid-cols-3">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 ring-1 ring-[color:var(--sinaxys-border)]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-muted-foreground">Custo humano</div>
+                  <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{brl(humanCostBRL)}</div>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
+                  <Users className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                </div>
+              </div>
+              <div className="mt-2 text-[11px] text-muted-foreground">Pessoas do time × horas × custo/h.</div>
+            </div>
+
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 ring-1 ring-[color:var(--sinaxys-border)]">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-muted-foreground">Custos não-humanos</div>
+                  <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{brl(nonHumanCostBRL)}</div>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
+                  <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                </div>
+              </div>
+              <div className="mt-2 text-[11px] text-muted-foreground">Ferramentas, fornecedores, mídia, infraestrutura etc.</div>
+            </div>
+
+            <div className="rounded-2xl bg-[color:var(--sinaxys-primary)] p-4 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-white/80">Custo total</div>
+                  <div className="mt-1 text-sm font-semibold">{brl(totalCostBRL)}</div>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/15">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-2 text-[11px] text-white/80">Base do ROI.</div>
             </div>
           </div>
-        </div>
-      ) : null}
 
-      {/* Non-human costs (Tier 2 only) */}
-      {!isTier1 ? (
-        <div className="mt-6 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos extras (não-humanos)</div>
-              <p className="mt-1 text-sm text-muted-foreground">Ferramentas, fornecedores, mídia, deslocamento, infraestrutura etc.</p>
-            </div>
-            {canWrite ? (
-              <Button
-                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                onClick={openCreateCost}
-              >
-                <Plus className="mr-2 h-4 w-4" />
-                Adicionar custo
-              </Button>
-            ) : null}
-          </div>
+          {/* Human cost editor (Tier 2 only) */}
+          {!isTier1 ? (
+            <div className="mt-6 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Time + horas (custo humano)</div>
+                  <p className="mt-1 text-sm text-muted-foreground">Escolha as pessoas e estime horas por pessoa.</p>
+                </div>
+                {canWrite ? (
+                  <Button
+                    className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                    onClick={() => {
+                      resetAdd();
+                      setAddOpen(true);
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Adicionar pessoa
+                  </Button>
+                ) : null}
+              </div>
 
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="text-sm">
-              <span className="text-muted-foreground">Total:</span>{" "}
-              <span className="font-semibold text-[color:var(--sinaxys-ink)]">{brl(nonHumanCostBRL)}</span>
-            </div>
-            {canWrite ? <div className="text-xs text-muted-foreground">Clique em um item para editar.</div> : null}
-          </div>
+              <div className="mt-4 grid gap-3">
+                {humanRows.length ? (
+                  humanRows.map((r) => (
+                    <div key={r.id} className="flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="grid h-9 w-9 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                            <span className="text-xs font-bold">{initials(r.name)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{r.name}</div>
+                            <div className="mt-0.5 text-xs text-muted-foreground">
+                              {r.jobTitle ? `${r.jobTitle} • ` : ""}
+                              {r.monthlyCostBRL ? `Custo: ${brlPerHourFromMonthly(r.monthlyCostBRL)}` : "Custo/h: — (cadastre em Custos)"}
+                            </div>
+                          </div>
+                        </div>
 
-          <div className="mt-4 grid gap-3">
-            {loadingCostItems ? (
-              <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">Carregando…</div>
-            ) : costItems.length ? (
-              costItems.map((it) => (
-                <div
-                  key={it.id}
-                  role={canWrite ? "button" : undefined}
-                  tabIndex={canWrite ? 0 : -1}
-                  className={
-                    "flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 transition " +
-                    (canWrite ? " cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/35" : "")
-                  }
-                  onClick={() => {
-                    if (!canWrite) return;
-                    openEditCost(it);
-                  }}
-                  title={canWrite ? "Clique para editar" : undefined}
-                >
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{it.title}</div>
-                    <div className="mt-1 text-sm text-muted-foreground">{brl(n(it.amount_brl))}</div>
-                    {it.notes?.trim() ? <div className="mt-2 text-sm text-muted-foreground">{it.notes}</div> : null}
-                  </div>
-                  {canWrite ? (
-                    <div className="flex items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
-                        title="Editar"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openEditCost(it);
-                        }}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
-                        title="Excluir"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          try {
-                            await deleteObjectiveCostItem(it.id);
-                            await qc.invalidateQueries({ queryKey: ["okr-objective-cost-items", objective.id] });
-                          } catch (e2) {
-                            toast({
-                              title: "Não foi possível excluir",
-                              description: e2 instanceof Error ? e2.message : "Erro inesperado.",
-                              variant: "destructive",
-                            });
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                        <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
+                          <span className="text-muted-foreground">Horas:</span>
+                          <span className="font-semibold text-[color:var(--sinaxys-ink)]">{r.hours}</span>
+                          <span className="text-muted-foreground">• Custo:</span>
+                          <span className="font-semibold text-[color:var(--sinaxys-ink)]">{r.cost !== null ? brl(r.cost) : "—"}</span>
+                        </div>
+
+                        {r.roleLabel?.trim() ? <div className="mt-2 text-xs text-muted-foreground">Papel: {r.roleLabel}</div> : null}
+                        {r.notes?.trim() ? <div className="mt-1 text-sm text-muted-foreground">{r.notes}</div> : null}
+                      </div>
+
+                      {canWrite ? (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                          title="Remover"
+                          onClick={async () => {
+                            try {
+                              await deleteObjectiveLaborAllocation(r.id);
+                              await qc.invalidateQueries({ queryKey: ["okr-objective-labor", objective.id] });
+                            } catch (e) {
+                              toast({
+                                title: "Não foi possível remover",
+                                description: e instanceof Error ? e.message : "Erro inesperado.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      ) : null}
                     </div>
-                  ) : null}
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">Nenhuma pessoa adicionada ainda.</div>
+                )}
+              </div>
+
+              <div className="mt-4 rounded-2xl bg-white p-4 ring-1 ring-[color:var(--sinaxys-border)]">
+                <div className="text-xs text-muted-foreground">Dica</div>
+                <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)]">
+                  Se o custo/h aparecer como "—", vá em <span className="font-semibold">Custos</span> e cadastre o custo mensal da pessoa.
                 </div>
-              ))
-            ) : (
-              <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">Nenhum custo extra cadastrado.</div>
-            )}
-          </div>
-        </div>
-      ) : null}
+              </div>
+            </div>
+          ) : null}
 
-      {/* Profit & thesis (Tier 1 + Tier 2) */}
-      <div className="mt-6 rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Retorno esperado</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isTier1
-                ? "Quando pretendemos faturar com este objetivo (se atingirmos) e qual lucro esperamos."
-                : "Quanto pretendemos lucrar com isso (se atingirmos) e como."}
-            </p>
-          </div>
-          <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] px-3 py-2 text-xs text-[color:var(--sinaxys-ink)]">
-            ROI (se atingirmos): {plannedRoiPct !== null ? `${plannedRoiPct.toFixed(1)}%` : "—"}
-          </div>
-        </div>
+          {/* Non-human costs (Tier 2 only) */}
+          {!isTier1 ? (
+            <div className="mt-6 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos extras (não-humanos)</div>
+                  <p className="mt-1 text-sm text-muted-foreground">Ferramentas, fornecedores, mídia, deslocamento, infraestrutura etc.</p>
+                </div>
+                {canWrite ? (
+                  <Button
+                    className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                    onClick={openCreateCost}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Adicionar custo
+                  </Button>
+                ) : null}
+              </div>
 
-        <div className="mt-4 grid gap-4 md:grid-cols-2">
-          <div className="grid gap-3">
-            {isTier1 ? (
-              <div className="grid gap-2">
-                <Label>Quando pretendemos faturar</Label>
-                <Input className="h-11 rounded-xl" type="date" value={revenueAt} onChange={(e) => setRevenueAt(e.target.value)} />
-                <div className="text-xs text-muted-foreground">Ex.: mês/ano em que o efeito financeiro começa a aparecer.</div>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Total:</span>{" "}
+                  <span className="font-semibold text-[color:var(--sinaxys-ink)]">{brl(nonHumanCostBRL)}</span>
+                </div>
+                {canWrite ? <div className="text-xs text-muted-foreground">Clique em um item para editar.</div> : null}
+              </div>
+
+              <div className="mt-4 grid gap-3">
+                {loadingCostItems ? (
+                  <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">Carregando…</div>
+                ) : costItems.length ? (
+                  costItems.map((it) => (
+                    <div
+                      key={it.id}
+                      role={canWrite ? "button" : undefined}
+                      tabIndex={canWrite ? 0 : -1}
+                      className={
+                        "flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 transition " +
+                        (canWrite ? " cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/35" : "")
+                      }
+                      onClick={() => {
+                        if (!canWrite) return;
+                        openEditCost(it);
+                      }}
+                      title={canWrite ? "Clique para editar" : undefined}
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{it.title}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">{brl(n(it.amount_brl))}</div>
+                        {it.notes?.trim() ? <div className="mt-2 text-sm text-muted-foreground">{it.notes}</div> : null}
+                      </div>
+                      {canWrite ? (
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                            title="Editar"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEditCost(it);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                            title="Excluir"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              try {
+                                await deleteObjectiveCostItem(it.id);
+                                await qc.invalidateQueries({ queryKey: ["okr-objective-cost-items", objective.id] });
+                              } catch (e2) {
+                                toast({
+                                  title: "Não foi possível excluir",
+                                  description: e2 instanceof Error ? e2.message : "Erro inesperado.",
+                                  variant: "destructive",
+                                });
+                              }
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">Nenhum custo extra cadastrado.</div>
+                )}
+              </div>
+            </div>
+          ) : null}
+
+          {/* Profit & thesis (Tier 1 + Tier 2) */}
+          <div className="mt-6 rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Retorno esperado</div>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {isTier1
+                    ? "Quando pretendemos faturar com este objetivo (se atingirmos) e qual lucro esperamos."
+                    : "Quanto pretendemos lucrar com isso (se atingirmos) e como."}
+                </p>
+              </div>
+              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] px-3 py-2 text-xs text-[color:var(--sinaxys-ink)]">
+                ROI (se atingirmos): {plannedRoiPct !== null ? `${plannedRoiPct.toFixed(1)}%` : "—"}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-4 md:grid-cols-2">
+              <div className="grid gap-3">
+                {isTier1 ? (
+                  <div className="grid gap-2">
+                    <Label>Quando pretendemos faturar</Label>
+                    <Input className="h-11 rounded-xl" type="date" value={revenueAt} onChange={(e) => setRevenueAt(e.target.value)} />
+                    <div className="text-xs text-muted-foreground">Ex.: mês/ano em que o efeito financeiro começa a aparecer.</div>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-2">
+                  <Label>Lucro pretendido (R$)</Label>
+                  <Input className="h-11 rounded-xl" value={profit} onChange={(e) => setProfit(e.target.value)} placeholder="50000" />
+                  <div className="text-xs text-muted-foreground">Use lucro (e não faturamento) para o ROI ficar mais realista.</div>
+                </div>
+              </div>
+
+              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 ring-1 ring-[color:var(--sinaxys-border)]">
+                <div className="text-xs text-muted-foreground">ROI (se atingirmos)</div>
+                <div className="mt-1 text-lg font-semibold text-[color:var(--sinaxys-ink)]">
+                  {plannedRoiPct !== null ? `${plannedRoiPct.toFixed(1)}%` : "—"}
+                </div>
+                <div className="mt-2 text-[11px] text-muted-foreground">ROI = (lucro − custo total) / custo total.</div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2">
+              <Label>Tese (como pretendemos lucrar)</Label>
+              <Textarea
+                className="min-h-[96px] rounded-2xl"
+                value={thesis}
+                onChange={(e) => setThesis(e.target.value)}
+                placeholder="Ex.: reduzir churn em X% através de..., ou aumentar conversão em..., ou reduzir custo operacional em..."
+              />
+            </div>
+
+            {canWrite ? (
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={savingProfit}
+                  onClick={saveProfit}
+                >
+                  Salvar retorno
+                </Button>
               </div>
             ) : null}
-
-            <div className="grid gap-2">
-              <Label>Lucro pretendido (R$)</Label>
-              <Input className="h-11 rounded-xl" value={profit} onChange={(e) => setProfit(e.target.value)} placeholder="50000" />
-              <div className="text-xs text-muted-foreground">Use lucro (e não faturamento) para o ROI ficar mais realista.</div>
-            </div>
           </div>
 
-          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 ring-1 ring-[color:var(--sinaxys-border)]">
-            <div className="text-xs text-muted-foreground">ROI (se atingirmos)</div>
-            <div className="mt-1 text-lg font-semibold text-[color:var(--sinaxys-ink)]">
-              {plannedRoiPct !== null ? `${plannedRoiPct.toFixed(1)}%` : "—"}
-            </div>
-            <div className="mt-2 text-[11px] text-muted-foreground">ROI = (lucro − custo total) / custo total.</div>
-          </div>
-        </div>
+          {/* Human add dialog (Tier 2 only) */}
+          <Dialog
+            open={addOpen}
+            onOpenChange={(v) => {
+              setAddOpen(v);
+              if (!v) resetAdd();
+            }}
+          >
+            <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>Adicionar pessoa ao time</DialogTitle>
+              </DialogHeader>
 
-        <div className="mt-4 grid gap-2">
-          <Label>Tese (como pretendemos lucrar)</Label>
-          <Textarea
-            className="min-h-[96px] rounded-2xl"
-            value={thesis}
-            onChange={(e) => setThesis(e.target.value)}
-            placeholder="Ex.: reduzir churn em X% através de..., ou aumentar conversão em..., ou reduzir custo operacional em..."
-          />
-        </div>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label>Pessoa</Label>
+                  <Select value={pickUserId} onValueChange={(v) => setPickUserId(v)}>
+                    <SelectTrigger className="h-11 rounded-xl">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl">
+                      <SelectItem value={SELECT_NONE}>Selecione</SelectItem>
+                      {profiles
+                        .filter((p) => p.active)
+                        .map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {(p.name ?? p.email) + (p.job_title ? ` — ${p.job_title}` : "")}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
 
-        {canWrite ? (
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-            <Button
-              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={savingProfit}
-              onClick={saveProfit}
-            >
-              Salvar retorno
-            </Button>
-          </div>
-        ) : null}
-      </div>
+                <div className="grid gap-2">
+                  <Label>Horas estimadas</Label>
+                  <Input className="h-11 rounded-xl" value={hours} onChange={(e) => setHours(e.target.value)} placeholder="12" />
+                </div>
 
-      {/* Human add dialog (Tier 2 only) */}
-      <Dialog
-        open={addOpen}
-        onOpenChange={(v) => {
-          setAddOpen(v);
-          if (!v) resetAdd();
-        }}
-      >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Adicionar pessoa ao time</DialogTitle>
-          </DialogHeader>
+                <div className="grid gap-2">
+                  <Label>Papel (opcional)</Label>
+                  <Input className="h-11 rounded-xl" value={roleLabel} onChange={(e) => setRoleLabel(e.target.value)} placeholder="Ex.: Engenheiro(a), Designer" />
+                </div>
 
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Pessoa</Label>
-              <Select value={pickUserId} onValueChange={(v) => setPickUserId(v)}>
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value={SELECT_NONE}>Selecione</SelectItem>
-                  {profiles
-                    .filter((p) => p.active)
-                    .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {(p.name ?? p.email) + (p.job_title ? ` — ${p.job_title}` : "")}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
+                <div className="grid gap-2">
+                  <Label>Notas (opcional)</Label>
+                  <Textarea className="min-h-[88px] rounded-2xl" value={notes} onChange={(e) => setNotes(e.target.value)} />
+                </div>
+              </div>
 
-            <div className="grid gap-2">
-              <Label>Horas estimadas</Label>
-              <Input className="h-11 rounded-xl" value={hours} onChange={(e) => setHours(e.target.value)} placeholder="12" />
-            </div>
+              <DialogFooter className="mt-2 gap-2 sm:gap-0">
+                <Button variant="outline" className="h-11 rounded-xl" onClick={() => setAddOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={
+                    savingHuman ||
+                    !canWrite ||
+                    !pickUserId ||
+                    pickUserId === SELECT_NONE ||
+                    parsePtNumber(hours) === null ||
+                    (parsePtNumber(hours) ?? 0) <= 0
+                  }
+                  onClick={async () => {
+                    if (!canWrite) return;
+                    const h = parsePtNumber(hours);
+                    if (h === null || h <= 0) return;
 
-            <div className="grid gap-2">
-              <Label>Papel (opcional)</Label>
-              <Input className="h-11 rounded-xl" value={roleLabel} onChange={(e) => setRoleLabel(e.target.value)} placeholder="Ex.: Engenheiro(a), Designer" />
-            </div>
+                    try {
+                      setSavingHuman(true);
+                      await upsertObjectiveLaborAllocation({
+                        objective_id: objective.id,
+                        user_id: pickUserId,
+                        hours_estimated: Number(h.toFixed(2)),
+                        role_label: roleLabel.trim() || null,
+                        notes: notes.trim() || null,
+                      });
+                      await qc.invalidateQueries({ queryKey: ["okr-objective-labor", objective.id] });
+                      setAddOpen(false);
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível salvar",
+                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setSavingHuman(false);
+                    }
+                  }}
+                >
+                  Adicionar
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
-            <div className="grid gap-2">
-              <Label>Notas (opcional)</Label>
-              <Textarea className="min-h-[88px] rounded-2xl" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-          </div>
+          {/* Non-human cost dialog (Tier 2 only) */}
+          <Dialog
+            open={costOpen}
+            onOpenChange={(v) => {
+              setCostOpen(v);
+              if (!v) resetCost();
+            }}
+          >
+            <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
+              <DialogHeader>
+                <DialogTitle>{editingCostId ? "Editar custo extra" : "Novo custo extra"}</DialogTitle>
+              </DialogHeader>
 
-          <DialogFooter className="mt-2 gap-2 sm:gap-0">
-            <Button variant="outline" className="h-11 rounded-xl" onClick={() => setAddOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={
-                savingHuman ||
-                !canWrite ||
-                !pickUserId ||
-                pickUserId === SELECT_NONE ||
-                parsePtNumber(hours) === null ||
-                (parsePtNumber(hours) ?? 0) <= 0
-              }
-              onClick={async () => {
-                if (!canWrite) return;
-                const h = parsePtNumber(hours);
-                if (h === null || h <= 0) return;
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label>Nome</Label>
+                  <Input className="h-11 rounded-xl" value={costTitle} onChange={(e) => setCostTitle(e.target.value)} placeholder="Ex.: Licença do CRM" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Valor estimado (R$)</Label>
+                  <Input className="h-11 rounded-xl" value={costAmount} onChange={(e) => setCostAmount(e.target.value)} placeholder="1200" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Notas (opcional)</Label>
+                  <Textarea className="min-h-[88px] rounded-2xl" value={costNotes} onChange={(e) => setCostNotes(e.target.value)} />
+                </div>
+              </div>
 
-                try {
-                  setSavingHuman(true);
-                  await upsertObjectiveLaborAllocation({
-                    objective_id: objective.id,
-                    user_id: pickUserId,
-                    hours_estimated: Number(h.toFixed(2)),
-                    role_label: roleLabel.trim() || null,
-                    notes: notes.trim() || null,
-                  });
-                  await qc.invalidateQueries({ queryKey: ["okr-objective-labor", objective.id] });
-                  setAddOpen(false);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível salvar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setSavingHuman(false);
-                }
-              }}
-            >
-              Adicionar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Non-human cost dialog (Tier 2 only) */}
-      <Dialog
-        open={costOpen}
-        onOpenChange={(v) => {
-          setCostOpen(v);
-          if (!v) resetCost();
-        }}
-      >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{editingCostId ? "Editar custo extra" : "Novo custo extra"}</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Nome</Label>
-              <Input className="h-11 rounded-xl" value={costTitle} onChange={(e) => setCostTitle(e.target.value)} placeholder="Ex.: Licença do CRM" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Valor estimado (R$)</Label>
-              <Input className="h-11 rounded-xl" value={costAmount} onChange={(e) => setCostAmount(e.target.value)} placeholder="1200" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Notas (opcional)</Label>
-              <Textarea className="min-h-[88px] rounded-2xl" value={costNotes} onChange={(e) => setCostNotes(e.target.value)} />
-            </div>
-          </div>
-
-          <DialogFooter className="mt-2 gap-2 sm:gap-0">
-            <Button variant="outline" className="h-11 rounded-xl" onClick={() => setCostOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={isTier1 || costSaving || !canWrite || costTitle.trim().length < 3 || parsePtNumber(costAmount) === null}
-              onClick={saveCost}
-            >
-              {editingCostId ? "Salvar" : "Adicionar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <DialogFooter className="mt-2 gap-2 sm:gap-0">
+                <Button variant="outline" className="h-11 rounded-xl" onClick={() => setCostOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={isTier1 || costSaving || !canWrite || costTitle.trim().length < 3 || parsePtNumber(costAmount) === null}
+                  onClick={saveCost}
+                >
+                  {editingCostId ? "Salvar" : "Adicionar"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
     </Card>
   );
 }

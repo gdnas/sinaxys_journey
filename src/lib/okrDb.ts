@@ -444,10 +444,33 @@ export async function deleteOkrObjective(objectiveId: string) {
   if (error) throw error;
 }
 
+export async function deleteKeyResultCascade(keyResultId: string) {
+  // Client-side cascade delete to avoid FK constraint issues.
+  const deliverables = await listDeliverablesByKeyResultIds([keyResultId]);
+  const deliverableIds = deliverables.map((d) => d.id);
+  const tasks = deliverableIds.length ? await listTasksByDeliverableIds(deliverableIds) : [];
+
+  // Remove alignment links + change logs tied to this KR (if any)
+  await supabase.from("okr_kr_objective_links").delete().eq("key_result_id", keyResultId);
+  await supabase.from("okr_key_result_change_logs").delete().eq("key_result_id", keyResultId);
+
+  // Delete bottom-up
+  await Promise.all(tasks.map((t) => deleteTask(t.id)));
+  await Promise.all(deliverables.map((d) => deleteDeliverable(d.id)));
+  await deleteKeyResult(keyResultId);
+}
+
 export async function deleteOkrObjectiveCascade(objectiveId: string) {
   // Client-side cascade delete to avoid FK constraint issues.
   const krs = await listKeyResults(objectiveId);
   const krIds = krs.map((k) => k.id);
+
+  // Remove alignment links (objective side + KR side) and change logs
+  await supabase.from("okr_kr_objective_links").delete().eq("objective_id", objectiveId);
+  if (krIds.length) {
+    await supabase.from("okr_kr_objective_links").delete().in("key_result_id", krIds);
+    await supabase.from("okr_key_result_change_logs").delete().in("key_result_id", krIds);
+  }
 
   const deliverables = krIds.length ? await listDeliverablesByKeyResultIds(krIds) : [];
   const deliverableIds = deliverables.map((d) => d.id);
