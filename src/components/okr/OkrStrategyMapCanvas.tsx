@@ -110,6 +110,7 @@ export function OkrStrategyMapCanvas(props: {
     strategy,
     cycles,
     peopleById,
+    departmentsById,
     onOpenVision,
     onOpenStrategyObjective,
     onOpenObjective,
@@ -125,14 +126,26 @@ export function OkrStrategyMapCanvas(props: {
     [cycles],
   );
 
+  const departmentOptions = useMemo(() => {
+    return Array.from(departmentsById.values()).sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [departmentsById]);
+
   const [annualCycleId, setAnnualCycleId] = useState(() => pickDefaultAnnual(cycles));
   const [quarterCycleId, setQuarterCycleId] = useState(() => pickDefaultQuarter(cycles));
+  const [teamId, setTeamId] = useState<string>("ALL");
 
   useEffect(() => {
     setAnnualCycleId((prev) => (annualOptions.some((c) => c.id === prev) ? prev : pickDefaultAnnual(cycles)));
     setQuarterCycleId((prev) => (quarterOptions.some((c) => c.id === prev) ? prev : pickDefaultQuarter(cycles)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cycles.length]);
+
+  useEffect(() => {
+    if (teamId === "ALL") return;
+    if (!departmentsById.has(teamId)) setTeamId("ALL");
+  }, [departmentsById, teamId]);
+
+  const filterActive = teamId !== "ALL";
 
   const qAnnualObjectives = useQuery({
     queryKey: ["okr-map-canvas-annual-objectives", companyId, annualCycleId],
@@ -148,10 +161,46 @@ export function OkrStrategyMapCanvas(props: {
     staleTime: 20_000,
   });
 
-  const annualObjectives = qAnnualObjectives.data ?? [];
-  const quarterObjectives = qQuarterObjectives.data ?? [];
+  const allAnnualObjectives = qAnnualObjectives.data ?? [];
+  const allQuarterObjectives = qQuarterObjectives.data ?? [];
 
   const cycleById = useMemo(() => new Map(cycles.map((c) => [c.id, c] as const)), [cycles]);
+
+  const { annualObjectives, quarterObjectives } = useMemo(() => {
+    if (!filterActive) return { annualObjectives: allAnnualObjectives, quarterObjectives: allQuarterObjectives };
+
+    const deptId = teamId;
+
+    const annualById = new Map(allAnnualObjectives.map((o) => [o.id, o] as const));
+    const quarterById = new Map(allQuarterObjectives.map((o) => [o.id, o] as const));
+
+    const include = new Set<string>();
+
+    // Seeds: objectives that belong to the selected team
+    for (const o of allAnnualObjectives) {
+      if (o.department_id === deptId) include.add(o.id);
+    }
+    for (const o of allQuarterObjectives) {
+      if (o.department_id === deptId) include.add(o.id);
+    }
+
+    // Add ancestry so we keep the "path" up to the team objectives (e.g., quarter -> annual)
+    const queue = Array.from(include);
+    while (queue.length) {
+      const id = queue.pop()!;
+      const o = annualById.get(id) ?? quarterById.get(id);
+      const parentId = o?.parent_objective_id ?? null;
+      if (parentId && !include.has(parentId)) {
+        include.add(parentId);
+        queue.push(parentId);
+      }
+    }
+
+    return {
+      annualObjectives: allAnnualObjectives.filter((o) => include.has(o.id)),
+      quarterObjectives: allQuarterObjectives.filter((o) => include.has(o.id)),
+    };
+  }, [allAnnualObjectives, allQuarterObjectives, filterActive, teamId]);
 
   const objectiveIds = useMemo(() => {
     const ids = [...annualObjectives.map((o) => o.id), ...quarterObjectives.map((o) => o.id)];
@@ -298,13 +347,35 @@ export function OkrStrategyMapCanvas(props: {
 
   const roots = useMemo(() => {
     const byParent = new Map<string | null, DbStrategyObjective[]>();
+    const parentById = new Map<string, string | null>();
+
     for (const so of strategy) {
       const k = so.parent_strategy_objective_id ?? null;
       const arr = byParent.get(k) ?? [];
       arr.push(so);
       byParent.set(k, arr);
+      parentById.set(so.id, k);
     }
     for (const arr of byParent.values()) arr.sort((a, b) => (a.order_index - b.order_index) || a.title.localeCompare(b.title, "pt-BR"));
+
+    const requiredStrategyIds = (() => {
+      if (!filterActive) return null;
+      const s = new Set<string>();
+      const seeds = [
+        ...annualObjectives.map((o) => o.strategy_objective_id).filter(Boolean),
+        ...quarterObjectives.map((o) => o.strategy_objective_id).filter(Boolean),
+      ] as string[];
+
+      const stack = [...seeds];
+      while (stack.length) {
+        const id = stack.pop()!;
+        if (s.has(id)) continue;
+        s.add(id);
+        const p = parentById.get(id) ?? null;
+        if (p) stack.push(p);
+      }
+      return s;
+    })();
 
     const makeObjectiveNode = (o: DbOkrObjective): OrgNode<MapItem> => {
       const krs = krsByObjectiveId.get(o.id) ?? [];
@@ -327,25 +398,38 @@ export function OkrStrategyMapCanvas(props: {
     };
 
     const seen = new Set<string>();
-    const makeStrategyNode = (so: DbStrategyObjective): OrgNode<MapItem> => {
+
+    const makeStrategyNodeMaybe = (so: DbStrategyObjective): OrgNode<MapItem> | null => {
       if (seen.has(so.id)) return node(`so:${so.id}`, { kind: "strategyObjective", so });
       seen.add(so.id);
 
-      const childSos = (byParent.get(so.id) ?? []).map(makeStrategyNode);
+      const childSos = (byParent.get(so.id) ?? [])
+        .map(makeStrategyNodeMaybe)
+        .filter((x): x is OrgNode<MapItem> => !!x);
+
       const annualKids = (annualByStrategyId.get(so.id) ?? []).map(makeObjectiveNode);
+
+      if (requiredStrategyIds) {
+        const hasContent = requiredStrategyIds.has(so.id) || childSos.length > 0 || annualKids.length > 0;
+        if (!hasContent) return null;
+      }
 
       return node(`so:${so.id}`, { kind: "strategyObjective", so }, [...childSos, ...annualKids]);
     };
 
-    const topStrategy = (byParent.get(null) ?? []).map(makeStrategyNode);
+    const topStrategy = (byParent.get(null) ?? [])
+      .map(makeStrategyNodeMaybe)
+      .filter((x): x is OrgNode<MapItem> => !!x);
 
     const placeholders: OrgNode<MapItem>[] = [];
-    const has10 = strategy.some((s) => s.horizon_years === 10);
-    const has5 = strategy.some((s) => s.horizon_years === 5);
-    const has2 = strategy.some((s) => s.horizon_years === 2);
-    if (!has10) placeholders.push(node("ph:10", { kind: "placeholderStrategy", horizon: 10 }));
-    if (!has5) placeholders.push(node("ph:5", { kind: "placeholderStrategy", horizon: 5 }));
-    if (!has2) placeholders.push(node("ph:2", { kind: "placeholderStrategy", horizon: 2 }));
+    if (!filterActive) {
+      const has10 = strategy.some((s) => s.horizon_years === 10);
+      const has5 = strategy.some((s) => s.horizon_years === 5);
+      const has2 = strategy.some((s) => s.horizon_years === 2);
+      if (!has10) placeholders.push(node("ph:10", { kind: "placeholderStrategy", horizon: 10 }));
+      if (!has5) placeholders.push(node("ph:5", { kind: "placeholderStrategy", horizon: 5 }));
+      if (!has2) placeholders.push(node("ph:2", { kind: "placeholderStrategy", horizon: 2 }));
+    }
 
     const unlinkedAnnual = (annualByStrategyId.get(null) ?? []).map(makeObjectiveNode);
 
@@ -359,7 +443,18 @@ export function OkrStrategyMapCanvas(props: {
 
     const strategyRoot = node("strategy-root", { kind: "strategyRoot" }, [...placeholders, ...topStrategy, ...groups]);
     return [node("vision", { kind: "vision" }, [strategyRoot])];
-  }, [annualByStrategyId, cycleById, krsByObjectiveId, orphanQuarterObjectives, peopleById, quarterChildrenByAnnualId, strategy]);
+  }, [
+    annualByStrategyId,
+    annualObjectives,
+    cycleById,
+    filterActive,
+    krsByObjectiveId,
+    orphanQuarterObjectives,
+    peopleById,
+    quarterChildrenByAnnualId,
+    quarterObjectives,
+    strategy,
+  ]);
 
   const visionText = (fundamentals?.vision ?? "").trim();
 
@@ -368,9 +463,14 @@ export function OkrStrategyMapCanvas(props: {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Mapa Estratégico-Tático-Operacional</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            {filterActive
+              ? `Filtrando por time: ${departmentsById.get(teamId)?.name ?? "—"} (mantendo fundamentos + longo prazo no caminho)`
+              : ""}
+          </div>
         </div>
 
-        <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-[520px]">
+        <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-[780px]">
           <div className="grid gap-2">
             <Label className="text-xs">Ciclo do ano</Label>
             <Select value={annualCycleId} onValueChange={setAnnualCycleId}>
@@ -396,6 +496,22 @@ export function OkrStrategyMapCanvas(props: {
                 {quarterOptions.map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {cycleLabelShort(c)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-2">
+            <Label className="text-xs">Time</Label>
+            <Select value={teamId} onValueChange={setTeamId}>
+              <SelectTrigger className="h-11 rounded-2xl bg-white">
+                <SelectValue placeholder="Todos" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                <SelectItem value="ALL">Todos os times</SelectItem>
+                {departmentOptions.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
                   </SelectItem>
                 ))}
               </SelectContent>
