@@ -38,7 +38,7 @@ export default function Integrations() {
       <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr] lg:items-start">
         <div>
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conta</div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-3xl">Conexões</h1>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-3xl">Integrações</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Integrações plug-and-play: o usuário clica em conectar, faz login no Google/YouTube e autoriza. Nós não vemos nem armazenamos a senha.
           </p>

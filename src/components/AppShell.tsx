@@ -257,18 +257,25 @@ const nav: NavItem[] = [
 
   // Minha área
   {
-    type: "link",
-    to: "/profile",
+    type: "group",
     label: "Minha área",
     icon: <UserIcon className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR"],
-  },
-  {
-    type: "link",
-    to: "/integrations",
-    label: "Conexões",
-    icon: <Wrench className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR"],
+    children: [
+      {
+        type: "link",
+        to: "/profile",
+        label: "Perfil",
+        icon: <UserIcon className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+      },
+      {
+        type: "link",
+        to: "/integrations",
+        label: "Integrações",
+        icon: <Wrench className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+      },
+    ],
   },
 ];
 
