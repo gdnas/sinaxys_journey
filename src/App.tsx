@@ -505,6 +505,17 @@ const App = () => (
                       </RequireAuth>
                     }
                   />
+
+                  {/* Backwards-compat */}
+                  <Route
+                    path="/admin/import-users"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD"]}>
+                        <Navigate to="/admin/import" replace />
+                      </RequireAuth>
+                    }
+                  />
+
                   <Route
                     path="/admin/tracks"
                     element={
