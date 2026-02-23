@@ -1,9 +1,8 @@
-import { MapPinned, MonitorSmartphone } from "lucide-react";
+import { MonitorSmartphone } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { OkrMapExplorer } from "@/components/okr/OkrMapExplorer";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -19,12 +18,6 @@ export default function OkrMap() {
   if (!companyId) {
     return (
       <div className="grid gap-6">
-        <OkrPageHeader
-          title="Mapa Estratégico-Tático-Operacional"
-          subtitle="Carregando contexto da empresa…"
-          icon={<MapPinned className="h-5 w-5" />}
-        />
-
         <OkrSubnav />
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
@@ -36,11 +29,6 @@ export default function OkrMap() {
 
   return (
     <div className="grid gap-6">
-      <OkrPageHeader
-        title="Mapa Estratégico-Tático-Operacional"
-        icon={<MapPinned className="h-5 w-5" />}
-      />
-
       <OkrSubnav />
 
       {isMobile ? (
