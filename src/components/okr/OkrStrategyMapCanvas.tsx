@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 
 import {
   createStrategyObjective,
+  createOkrObjective,
   krProgressPct,
   listKeyResults,
   listOkrObjectives,
@@ -217,6 +218,14 @@ export function OkrStrategyMapCanvas(props: {
   const [createOwner, setCreateOwner] = useState<string | null>(null);
   const [createTargetYear, setCreateTargetYear] = useState("");
 
+  const [createOkrOpen, setCreateOkrOpen] = useState(false);
+  const [creatingOkr, setCreatingOkr] = useState(false);
+  const [createOkrMode, setCreateOkrMode] = useState<"annualUnderStrategy" | "quarterUnderAnnual">("annualUnderStrategy");
+  const [createOkrParentId, setCreateOkrParentId] = useState<string | null>(null);
+  const [createOkrTitle, setCreateOkrTitle] = useState("");
+  const [createOkrDesc, setCreateOkrDesc] = useState("");
+  const [createOkrOwner, setCreateOkrOwner] = useState<string>(userId);
+
   const openCreateForHorizon = (h: 10 | 5 | 2) => {
     if (!canEdit) {
       toast({ title: "Sem permissão", description: "Você não tem permissão para criar objetivos." , variant: "destructive"});
@@ -228,6 +237,32 @@ export function OkrStrategyMapCanvas(props: {
     setCreateOwner(null);
     setCreateTargetYear(String(new Date().getFullYear() + h));
     setCreateOpen(true);
+  };
+
+  const openCreateOkr = (mode: "annualUnderStrategy" | "quarterUnderAnnual", parentId: string) => {
+    if (!canEdit) {
+      toast({ title: "Sem permissão", description: "Você não tem permissão para criar objetivos.", variant: "destructive" });
+      return;
+    }
+
+    // Validate: annual cycle must be ANNUAL; quarter cycle must be QUARTERLY
+    const annualCycle = cycleById.get(annualCycleId);
+    const quarterCycle = cycleById.get(quarterCycleId);
+    if (mode === "annualUnderStrategy" && annualCycle?.type !== "ANNUAL") {
+      toast({ title: "Ciclo inválido", description: "Selecione um ciclo ANUAL acima para criar objetivos do ano.", variant: "destructive" });
+      return;
+    }
+    if (mode === "quarterUnderAnnual" && quarterCycle?.type !== "QUARTERLY") {
+      toast({ title: "Ciclo inválido", description: "Selecione um ciclo TRIMESTRAL acima para criar objetivos do trimestre.", variant: "destructive" });
+      return;
+    }
+
+    setCreateOkrMode(mode);
+    setCreateOkrParentId(parentId);
+    setCreateOkrTitle("");
+    setCreateOkrDesc("");
+    setCreateOkrOwner(userId);
+    setCreateOkrOpen(true);
   };
 
   const roots = useMemo(() => {
@@ -301,8 +336,7 @@ export function OkrStrategyMapCanvas(props: {
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Mapa</div>
-          <div className="mt-1 text-sm text-muted-foreground">Visão → longo prazo → ano → trimestre (com KRs). Clique em qualquer card para abrir detalhes.</div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Mapa Estratégico-Tático-Operacional</div>
         </div>
 
         <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-[520px]">
@@ -381,7 +415,6 @@ export function OkrStrategyMapCanvas(props: {
                 <div className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--map-strategy-ink)]">
                   <Layers className="h-4 w-4" /> Longo prazo
                 </div>
-                <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/70">Hierarquia e conexões estratégicas</div>
               </div>
             );
           }
@@ -414,38 +447,56 @@ export function OkrStrategyMapCanvas(props: {
 
           if (d.kind === "strategyObjective") {
             return (
-              <button
-                type="button"
-                onClick={() => onOpenStrategyObjective(d.so.id)}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="group relative grid w-[300px] text-left outline-none"
-                aria-label={`Abrir objetivo de longo prazo: ${d.so.title}`}
-                title={d.so.title}
-              >
-                <div className="rounded-3xl border border-[color:var(--map-strategy-border)] bg-white p-4 shadow-sm transition group-hover:shadow-md">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.so.title}</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge className="rounded-full bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)] hover:bg-[color:var(--map-strategy-bg)]">
-                          {d.so.horizon_years} anos
-                        </Badge>
-                        <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
-                          {d.so.target_year ?? new Date().getFullYear() + d.so.horizon_years}
-                        </Badge>
-                        {d.so.linked_fundamental ? (
-                          <Badge className="rounded-full bg-[color:var(--map-fundamentals-bg)] text-[color:var(--map-fundamentals-ink)] ring-1 ring-[color:var(--map-fundamentals-border)] hover:bg-[color:var(--map-fundamentals-bg)]">
-                            {d.so.linked_fundamental === "VISION" ? "Visão" : "Fundamento"}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => onOpenStrategyObjective(d.so.id)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="group relative grid w-[300px] text-left outline-none"
+                  aria-label={`Abrir objetivo de longo prazo: ${d.so.title}`}
+                  title={d.so.title}
+                >
+                  <div className="rounded-3xl border border-[color:var(--map-strategy-border)] bg-white p-4 shadow-sm transition group-hover:shadow-md">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.so.title}</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <Badge className="rounded-full bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)] hover:bg-[color:var(--map-strategy-bg)]">
+                            {d.so.horizon_years} anos
                           </Badge>
-                        ) : null}
+                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                            {d.so.target_year ?? new Date().getFullYear() + d.so.horizon_years}
+                          </Badge>
+                          {d.so.linked_fundamental ? (
+                            <Badge className="rounded-full bg-[color:var(--map-fundamentals-bg)] text-[color:var(--map-fundamentals-ink)] ring-1 ring-[color:var(--map-fundamentals-border)] hover:bg-[color:var(--map-fundamentals-bg)]">
+                              {d.so.linked_fundamental === "VISION" ? "Visão" : "Fundamento"}
+                            </Badge>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)]">
+                        <Flag className="h-4 w-4" />
                       </div>
                     </div>
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)]">
-                      <Flag className="h-4 w-4" />
-                    </div>
                   </div>
-                </div>
-              </button>
+                </button>
+
+                {canEdit ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCreateOkr("annualUnderStrategy", d.so.id);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-strategy-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
+                    title="Criar objetivo do ano abaixo"
+                    aria-label="Criar objetivo do ano abaixo"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
             );
           }
 
@@ -462,41 +513,60 @@ export function OkrStrategyMapCanvas(props: {
             const cycle = d.cycle;
             const cycleTag = cycle ? cycleLabelShort(cycle) : "Ciclo";
             const pct = d.pct;
+            const canCreateBelow = canEdit && cycle?.type === "ANNUAL";
 
             return (
-              <button
-                type="button"
-                onClick={() => onOpenObjective(d.objective.id)}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="group relative grid w-[320px] text-left outline-none"
-                aria-label={`Abrir objetivo: ${d.objective.title}`}
-                title={d.objective.title}
-              >
-                <div className="rounded-3xl border border-[color:var(--map-objectives-border)] bg-white p-5 shadow-sm transition group-hover:shadow-md">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.objective.title}</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge className="rounded-full bg-[color:var(--map-cycles-bg)] text-[color:var(--map-cycles-ink)] ring-1 ring-[color:var(--map-cycles-border)] hover:bg-[color:var(--map-cycles-bg)]">
-                          {cycleTag}
-                        </Badge>
-                        <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
-                          {d.ownerName}
-                        </Badge>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => onOpenObjective(d.objective.id)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="group relative grid w-[320px] text-left outline-none"
+                  aria-label={`Abrir objetivo: ${d.objective.title}`}
+                  title={d.objective.title}
+                >
+                  <div className="rounded-3xl border border-[color:var(--map-objectives-border)] bg-white p-5 shadow-sm transition group-hover:shadow-md">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.objective.title}</div>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <Badge className="rounded-full bg-[color:var(--map-cycles-bg)] text-[color:var(--map-cycles-ink)] ring-1 ring-[color:var(--map-cycles-border)] hover:bg-[color:var(--map-cycles-bg)]">
+                            {cycleTag}
+                          </Badge>
+                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                            {d.ownerName}
+                          </Badge>
+                          {typeof pct === "number" ? (
+                            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">{pct}%</Badge>
+                          ) : null}
+                        </div>
                         {typeof pct === "number" ? (
-                          <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">{pct}%</Badge>
+                          <Progress value={pct} className="mt-3 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
                         ) : null}
                       </div>
-                      {typeof pct === "number" ? (
-                        <Progress value={pct} className="mt-3 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
-                      ) : null}
-                    </div>
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--map-objectives-bg)] text-[color:var(--map-objectives-ink)] ring-1 ring-[color:var(--map-objectives-border)]">
-                      {cycle?.type === "ANNUAL" ? <CalendarClock className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--map-objectives-bg)] text-[color:var(--map-objectives-ink)] ring-1 ring-[color:var(--map-objectives-border)]">
+                        {cycle?.type === "ANNUAL" ? <CalendarClock className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </button>
+                </button>
+
+                {canCreateBelow ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCreateOkr("quarterUnderAnnual", d.objective.id);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-objectives-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
+                    title="Criar objetivo do trimestre abaixo"
+                    aria-label="Criar objetivo do trimestre abaixo"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                ) : null}
+              </div>
             );
           }
 
@@ -545,11 +615,6 @@ export function OkrStrategyMapCanvas(props: {
           );
         }}
       />
-
-      <div className="mt-4 grid gap-2 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-        <div className="font-semibold text-[color:var(--sinaxys-ink)]">Dica</div>
-        <div>Para o mapa ficar completo: (1) vincule objetivos do ano ao objetivo de longo prazo; (2) vincule objetivos do trimestre ao objetivo do ano (campo "Objetivo pai").</div>
-      </div>
 
       <Dialog open={createOpen} onOpenChange={(v) => !creating && setCreateOpen(v)}>
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
@@ -633,6 +698,110 @@ export function OkrStrategyMapCanvas(props: {
                   });
                 } finally {
                   setCreating(false);
+                }
+              }}
+            >
+              Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={createOkrOpen} onOpenChange={(v) => !creatingOkr && setCreateOkrOpen(v)}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>
+              {createOkrMode === "annualUnderStrategy" ? "Criar objetivo do ano" : "Criar objetivo do trimestre"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input className="h-11 rounded-2xl" value={createOkrTitle} onChange={(e) => setCreateOkrTitle(e.target.value)} disabled={creatingOkr} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Responsável</Label>
+              <Select value={createOkrOwner} onValueChange={(v) => setCreateOkrOwner(v)} disabled={creatingOkr}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  {peopleOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-muted-foreground">Dica: escolha você mesmo para não ficar sem dono.</div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Descrição (opcional)</Label>
+              <Textarea className="min-h-[110px] rounded-2xl" value={createOkrDesc} onChange={(e) => setCreateOkrDesc(e.target.value)} disabled={creatingOkr} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateOkrOpen(false)} disabled={creatingOkr}>
+              Cancelar
+            </Button>
+            <Button
+              className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={creatingOkr || createOkrTitle.trim().length < 6 || !createOkrParentId}
+              onClick={async () => {
+                if (!createOkrParentId) return;
+                const annualCycle = cycleById.get(annualCycleId);
+                const quarterCycle = cycleById.get(quarterCycleId);
+                setCreatingOkr(true);
+                try {
+                  const cycleId = createOkrMode === "annualUnderStrategy" ? annualCycleId : quarterCycleId;
+                  const cycle = cycleById.get(cycleId);
+                  if (!cycle) throw new Error("Ciclo inválido.");
+
+                  const payload: Parameters<typeof createOkrObjective>[0] = {
+                    company_id: companyId,
+                    cycle_id: cycleId,
+                    parent_objective_id: createOkrMode === "quarterUnderAnnual" ? createOkrParentId : null,
+                    strategy_objective_id: createOkrMode === "annualUnderStrategy" ? createOkrParentId : null,
+                    level: createOkrMode === "annualUnderStrategy" ? "COMPANY" : "DEPARTMENT",
+                    department_id: null,
+                    owner_user_id: createOkrOwner,
+                    title: createOkrTitle,
+                    description: createOkrDesc.trim() || null,
+                    strategic_reason: null,
+                    linked_fundamental: null,
+                    linked_fundamental_text: null,
+                    due_at: null,
+                    estimated_value_brl: null,
+                    estimated_effort_hours: null,
+                    estimated_cost_brl: null,
+                    estimated_roi_pct: null,
+                    expected_profit_brl: null,
+                    profit_thesis: null,
+                    expected_revenue_at: null,
+                    expected_attainment_pct: 80,
+                  };
+
+                  const created = await createOkrObjective(payload);
+
+                  await qc.invalidateQueries({ queryKey: ["okr-map-canvas-annual-objectives", companyId, annualCycleId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-map-canvas-quarter-objectives", companyId, quarterCycleId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-map-canvas-krs", companyId] });
+
+                  toast({ title: "Objetivo criado" });
+                  setCreateOkrOpen(false);
+                  onOpenObjective(created.id);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível criar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setCreatingOkr(false);
                 }
               }}
             >

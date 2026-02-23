@@ -20,7 +20,7 @@ export default function OkrMap() {
     return (
       <div className="grid gap-6">
         <OkrPageHeader
-          title="Mapa estratégico"
+          title="Mapa Estratégico-Tático-Operacional"
           subtitle="Carregando contexto da empresa…"
           icon={<MapPinned className="h-5 w-5" />}
         />
@@ -37,8 +37,7 @@ export default function OkrMap() {
   return (
     <div className="grid gap-6">
       <OkrPageHeader
-        title="Mapa estratégico"
-        subtitle="Uma visão conectada da estratégia até a execução — com edição rápida e leitura do andamento."
+        title="Mapa Estratégico-Tático-Operacional"
         icon={<MapPinned className="h-5 w-5" />}
       />
 
