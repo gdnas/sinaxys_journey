@@ -1,19 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Eye, Flag, Layers, Target } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { CalendarClock, Eye, Flag, Layers, Plus, Target } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
 import { KrEditDialog } from "@/components/okr/KrEditDialog";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 import {
+  createStrategyObjective,
   krProgressPct,
   listKeyResults,
   listOkrObjectives,
@@ -62,10 +67,16 @@ function objectiveProgressPct(krs: DbOkrKeyResult[]) {
   return Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length);
 }
 
+type PlaceholderStrategy = {
+  kind: "placeholderStrategy";
+  horizon: 10 | 5 | 2;
+};
+
 type MapItem =
   | { kind: "vision" }
   | { kind: "strategyRoot" }
   | { kind: "strategyObjective"; so: DbStrategyObjective }
+  | PlaceholderStrategy
   | { kind: "group"; title: string; subtitle?: string }
   | { kind: "objective"; objective: DbOkrObjective; cycle: DbOkrCycle | null; pct: number | null; ownerName: string }
   | { kind: "kr"; kr: DbOkrKeyResult; pct: number | null };
@@ -82,6 +93,7 @@ export function OkrStrategyMapCanvas(props: {
   cycles: DbOkrCycle[];
   peopleById: Map<string, DbProfilePublic>;
   departmentsById: Map<string, DbDepartment>;
+  canEdit: boolean;
   onOpenVision: () => void;
   onOpenStrategyObjective: (soId: string) => void;
   onOpenObjective: (objectiveId: string) => void;
@@ -96,7 +108,11 @@ export function OkrStrategyMapCanvas(props: {
     onOpenVision,
     onOpenStrategyObjective,
     onOpenObjective,
+    canEdit,
   } = props;
+
+  const { toast } = useToast();
+  const qc = useQueryClient();
 
   const annualOptions = useMemo(() => [...cycles].filter((c) => c.type === "ANNUAL").sort((a, b) => b.year - a.year), [cycles]);
   const quarterOptions = useMemo(
@@ -187,6 +203,33 @@ export function OkrStrategyMapCanvas(props: {
   const [krDialogOpen, setKrDialogOpen] = useState(false);
   const [editingKr, setEditingKr] = useState<DbOkrKeyResult | null>(null);
 
+  const peopleOptions = useMemo(() => {
+    return Array.from(peopleById.values())
+      .filter((p) => p.active)
+      .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  }, [peopleById]);
+
+  const [createOpen, setCreateOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createHorizon, setCreateHorizon] = useState<10 | 5 | 2>(10);
+  const [createTitle, setCreateTitle] = useState("");
+  const [createDesc, setCreateDesc] = useState("");
+  const [createOwner, setCreateOwner] = useState<string | null>(null);
+  const [createTargetYear, setCreateTargetYear] = useState("");
+
+  const openCreateForHorizon = (h: 10 | 5 | 2) => {
+    if (!canEdit) {
+      toast({ title: "Sem permissão", description: "Você não tem permissão para criar objetivos." , variant: "destructive"});
+      return;
+    }
+    setCreateHorizon(h);
+    setCreateTitle("");
+    setCreateDesc("");
+    setCreateOwner(null);
+    setCreateTargetYear(String(new Date().getFullYear() + h));
+    setCreateOpen(true);
+  };
+
   const roots = useMemo(() => {
     const byParent = new Map<string | null, DbStrategyObjective[]>();
     for (const so of strategy) {
@@ -219,10 +262,7 @@ export function OkrStrategyMapCanvas(props: {
 
     const seen = new Set<string>();
     const makeStrategyNode = (so: DbStrategyObjective): OrgNode<MapItem> => {
-      if (seen.has(so.id)) {
-        // Prevent accidental cycles from breaking the tree.
-        return node(`so:${so.id}`, { kind: "strategyObjective", so });
-      }
+      if (seen.has(so.id)) return node(`so:${so.id}`, { kind: "strategyObjective", so });
       seen.add(so.id);
 
       const childSos = (byParent.get(so.id) ?? []).map(makeStrategyNode);
@@ -232,6 +272,14 @@ export function OkrStrategyMapCanvas(props: {
     };
 
     const topStrategy = (byParent.get(null) ?? []).map(makeStrategyNode);
+
+    const placeholders: OrgNode<MapItem>[] = [];
+    const has10 = strategy.some((s) => s.horizon_years === 10);
+    const has5 = strategy.some((s) => s.horizon_years === 5);
+    const has2 = strategy.some((s) => s.horizon_years === 2);
+    if (!has10) placeholders.push(node("ph:10", { kind: "placeholderStrategy", horizon: 10 }));
+    if (!has5) placeholders.push(node("ph:5", { kind: "placeholderStrategy", horizon: 5 }));
+    if (!has2) placeholders.push(node("ph:2", { kind: "placeholderStrategy", horizon: 2 }));
 
     const unlinkedAnnual = (annualByStrategyId.get(null) ?? []).map(makeObjectiveNode);
 
@@ -243,7 +291,7 @@ export function OkrStrategyMapCanvas(props: {
       groups.push(node("g:quarter-orphans", { kind: "group", title: "Trimestre (sem vínculo com o ano)", subtitle: `${orphanQuarterObjectives.length} objetivos` }, orphanQuarterObjectives.map(makeObjectiveNode)));
     }
 
-    const strategyRoot = node("strategy-root", { kind: "strategyRoot" }, [...topStrategy, ...groups]);
+    const strategyRoot = node("strategy-root", { kind: "strategyRoot" }, [...placeholders, ...topStrategy, ...groups]);
     return [node("vision", { kind: "vision" }, [strategyRoot])];
   }, [annualByStrategyId, cycleById, krsByObjectiveId, orphanQuarterObjectives, peopleById, quarterChildrenByAnnualId, strategy]);
 
@@ -254,9 +302,7 @@ export function OkrStrategyMapCanvas(props: {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Mapa</div>
-          <div className="mt-1 text-sm text-muted-foreground">
-            Visão → longo prazo → ano → trimestre (com KRs). Clique em qualquer card para abrir detalhes.
-          </div>
+          <div className="mt-1 text-sm text-muted-foreground">Visão → longo prazo → ano → trimestre (com KRs). Clique em qualquer card para abrir detalhes.</div>
         </div>
 
         <div className="grid w-full gap-3 sm:grid-cols-2 lg:w-[520px]">
@@ -337,6 +383,32 @@ export function OkrStrategyMapCanvas(props: {
                 </div>
                 <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/70">Hierarquia e conexões estratégicas</div>
               </div>
+            );
+          }
+
+          if (d.kind === "placeholderStrategy") {
+            const label = d.horizon === 10 ? "Criar objetivo (10 anos)" : d.horizon === 5 ? "Criar objetivo (5 anos)" : "Criar objetivo (2 anos)";
+            return (
+              <button
+                type="button"
+                onClick={() => openCreateForHorizon(d.horizon)}
+                onPointerDown={(e) => e.stopPropagation()}
+                className="group relative grid w-[300px] text-left outline-none"
+                aria-label={label}
+                title={label}
+              >
+                <div className="rounded-3xl border border-dashed border-[color:var(--map-strategy-border)] bg-[color:var(--map-strategy-bg)]/40 p-4 shadow-sm transition group-hover:bg-[color:var(--map-strategy-bg)]/55 group-hover:shadow-md">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-[color:var(--map-strategy-ink)]">{label}</div>
+                      <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/70">Não encontramos nenhum objetivo nesse horizonte.</div>
+                    </div>
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)]">
+                      <Plus className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+              </button>
             );
           }
 
@@ -428,7 +500,6 @@ export function OkrStrategyMapCanvas(props: {
             );
           }
 
-          // KR
           const pct = d.pct;
           return (
             <button
@@ -479,6 +550,97 @@ export function OkrStrategyMapCanvas(props: {
         <div className="font-semibold text-[color:var(--sinaxys-ink)]">Dica</div>
         <div>Para o mapa ficar completo: (1) vincule objetivos do ano ao objetivo de longo prazo; (2) vincule objetivos do trimestre ao objetivo do ano (campo "Objetivo pai").</div>
       </div>
+
+      <Dialog open={createOpen} onOpenChange={(v) => !creating && setCreateOpen(v)}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Criar objetivo de longo prazo ({createHorizon} anos)</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input className="h-11 rounded-2xl" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} disabled={creating} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Para quando (ano)</Label>
+              <Input
+                type="number"
+                inputMode="numeric"
+                className="h-11 rounded-2xl"
+                value={createTargetYear}
+                onChange={(e) => setCreateTargetYear(e.target.value)}
+                disabled={creating}
+              />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Responsável</Label>
+              <Select value={createOwner ?? "__company__"} onValueChange={(v) => setCreateOwner(v === "__company__" ? null : v)} disabled={creating}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="__company__">Toda a empresa</SelectItem>
+                  {peopleOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Descrição (opcional)</Label>
+              <Textarea className="min-h-[110px] rounded-2xl" value={createDesc} onChange={(e) => setCreateDesc(e.target.value)} disabled={creating} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateOpen(false)} disabled={creating}>
+              Cancelar
+            </Button>
+            <Button
+              className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={creating || createTitle.trim().length < 6}
+              onClick={async () => {
+                setCreating(true);
+                try {
+                  const nYear = createTargetYear.trim() ? Number(createTargetYear.trim()) : null;
+                  const created = await createStrategyObjective({
+                    company_id: companyId,
+                    horizon_years: createHorizon,
+                    target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
+                    title: createTitle,
+                    description: createDesc.trim() || null,
+                    created_by_user_id: userId,
+                    owner_user_id: createOwner,
+                    // Strong default: if we create the first of this horizon, connect to Vision.
+                    linked_fundamental: createHorizon === 10 ? "VISION" : null,
+                  });
+
+                  toast({ title: "Objetivo criado" });
+                  await qc.invalidateQueries({ queryKey: ["okr-strategy", companyId] });
+                  setCreateOpen(false);
+                  onOpenStrategyObjective(created.id);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível criar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setCreating(false);
+                }
+              }}
+            >
+              Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {editingKr ? (
         <KrEditDialog

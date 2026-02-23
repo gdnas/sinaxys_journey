@@ -3100,6 +3100,7 @@ export function OkrMapExplorer(
                     cycles={cycles}
                     peopleById={peopleById}
                     departmentsById={departmentsById}
+                    canEdit={canEdit}
                     onOpenVision={() =>
                         pick({ kind: "fundamental", id: "fund:vision" as any, field: "vision" })
                     }
