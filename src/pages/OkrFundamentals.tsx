@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
@@ -34,9 +33,6 @@ type ItemsState = {
   values: DescribedItem[];
   culture: DescribedItem[];
 };
-
-const TEXT_KEYS = ["purpose", "vision", "mission"] as const;
-const LIST_KEYS = ["values", "culture"] as const;
 
 function CountPill({ n }: { n: number }) {
   return (
@@ -167,23 +163,7 @@ export default function OkrFundamentals() {
   const [openSections, setOpenSections] = useState<string[]>([]);
   const [flashId, setFlashId] = useState<string | null>(null);
 
-  const isOpen = (k: (typeof TEXT_KEYS)[number] | (typeof LIST_KEYS)[number]) => openSections.includes(k);
-
-  const setTextOpen = (next: string[]) => {
-    setOpenSections((prev) => {
-      const keep = prev.filter((k) => !TEXT_KEYS.includes(k as any));
-      const merged = Array.from(new Set([...keep, ...next]));
-      return merged;
-    });
-  };
-
-  const setListOpen = (next: string[]) => {
-    setOpenSections((prev) => {
-      const keep = prev.filter((k) => !LIST_KEYS.includes(k as any));
-      const merged = Array.from(new Set([...keep, ...next]));
-      return merged;
-    });
-  };
+  const isOpen = (k: "purpose" | "vision" | "mission" | "values" | "culture") => openSections.includes(k);
 
   // Initialize accordion open state and support deep-link focus
   useEffect(() => {
@@ -259,7 +239,7 @@ export default function OkrFundamentals() {
     <div className="grid gap-6">
       <OkrPageHeader
         title="Fundamentos"
-        subtitle="Texto (propósito, visão, missão) + listas (valores, cultura)."
+        subtitle="Propósito, visão, missão, valores e cultura."
         icon={<BookOpenText className="h-5 w-5" />}
         actions={
           canEdit ? (
@@ -305,9 +285,7 @@ export default function OkrFundamentals() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="min-w-0">
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão geral</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Abra um bloco para ler/editar. Quando aberto, o resumo some para evitar repetição.
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Abra um bloco para ler/editar.</p>
           </div>
 
           <div
@@ -328,267 +306,214 @@ export default function OkrFundamentals() {
 
         <Separator className="my-5" />
 
-        <div className="grid gap-4 lg:grid-cols-12">
-          {/* Textos */}
-          <div className="lg:col-span-7">
-            <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Textos</div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">Propósito, visão e missão.</div>
-                </div>
-                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
-                  Texto
-                </Badge>
+        <Accordion type="multiple" value={openSections} onValueChange={setOpenSections} className="grid gap-3">
+          <AccordionItem
+            value="purpose"
+            id="fundamentals-section-purpose"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-purpose" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
+            <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
+              <div className="flex w-full items-start justify-between gap-3">
+                <SectionTitle
+                  title="Propósito"
+                  hint={
+                    editMode
+                      ? "Edite ou apague o texto para remover."
+                      : !isOpen("purpose")
+                        ? purposePreview || "Ainda não definido."
+                        : undefined
+                  }
+                />
               </div>
-
-              <Separator className="my-4" />
-
-              <Accordion
-                type="multiple"
-                value={openSections.filter((k) => TEXT_KEYS.includes(k as any))}
-                onValueChange={setTextOpen}
-                className="grid gap-3"
-              >
-                <AccordionItem
-                  value="purpose"
-                  id="fundamentals-section-purpose"
-                  className={cn(
-                    "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
-                    flashId === "fundamentals-section-purpose" && "ring-2 ring-[color:var(--sinaxys-primary)]",
-                  )}
-                >
-                  <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
-                    <div className="flex w-full items-start justify-between gap-3">
-                      <SectionTitle
-                        title="Propósito"
-                        hint={
-                          editMode
-                            ? "Edite ou apague o texto para remover."
-                            : !isOpen("purpose")
-                              ? purposePreview || "Ainda não definido."
-                              : undefined
-                        }
-                      />
-                      {!editMode ? (
-                        <span className="mt-0.5 text-xs font-semibold text-muted-foreground">{isOpen("purpose") ? "Aberto" : "Resumo"}</span>
-                      ) : null}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-4">
-                    {editMode ? (
-                      <Textarea
-                        className="min-h-[160px] rounded-2xl"
-                        value={items.purpose}
-                        disabled={!canEdit || saving}
-                        placeholder="Por que existimos? (uma frase forte + 1–2 parágrafos se necessário)"
-                        onChange={(e) => setItems((p) => ({ ...p, purpose: e.target.value }))}
-                      />
-                    ) : (
-                      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
-                          {fundamentals?.purpose?.trim() ? fundamentals.purpose : <span className="text-muted-foreground">Ainda não definido.</span>}
-                        </div>
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-
-                <AccordionItem
-                  value="vision"
-                  id="fundamentals-section-vision"
-                  className={cn(
-                    "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
-                    flashId === "fundamentals-section-vision" && "ring-2 ring-[color:var(--sinaxys-primary)]",
-                  )}
-                >
-                  <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
-                    <div className="flex w-full items-start justify-between gap-3">
-                      <SectionTitle
-                        title="Visão"
-                        hint={
-                          editMode
-                            ? "Edite ou apague o texto para remover."
-                            : !isOpen("vision")
-                              ? visionPreview || "Ainda não definido."
-                              : undefined
-                        }
-                      />
-                      {!editMode ? (
-                        <span className="mt-0.5 text-xs font-semibold text-muted-foreground">{isOpen("vision") ? "Aberto" : "Resumo"}</span>
-                      ) : null}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-4">
-                    {editMode ? (
-                      <Textarea
-                        className="min-h-[160px] rounded-2xl"
-                        value={items.vision}
-                        disabled={!canEdit || saving}
-                        placeholder="Como o mundo fica melhor quando vencemos? (1–3 parágrafos)"
-                        onChange={(e) => setItems((p) => ({ ...p, vision: e.target.value }))}
-                      />
-                    ) : (
-                      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
-                          {fundamentals?.vision?.trim() ? fundamentals.vision : <span className="text-muted-foreground">Ainda não definido.</span>}
-                        </div>
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-
-                <AccordionItem
-                  value="mission"
-                  id="fundamentals-section-mission"
-                  className={cn(
-                    "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
-                    flashId === "fundamentals-section-mission" && "ring-2 ring-[color:var(--sinaxys-primary)]",
-                  )}
-                >
-                  <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
-                    <div className="flex w-full items-start justify-between gap-3">
-                      <SectionTitle
-                        title="Missão"
-                        hint={
-                          editMode
-                            ? "Edite ou apague o texto para remover."
-                            : !isOpen("mission")
-                              ? missionPreview || "Ainda não definido."
-                              : undefined
-                        }
-                      />
-                      {!editMode ? (
-                        <span className="mt-0.5 text-xs font-semibold text-muted-foreground">{isOpen("mission") ? "Aberto" : "Resumo"}</span>
-                      ) : null}
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-4">
-                    {editMode ? (
-                      <Textarea
-                        className="min-h-[160px] rounded-2xl"
-                        value={items.mission}
-                        disabled={!canEdit || saving}
-                        placeholder="O que fazemos todos os dias para chegar lá? (1–3 parágrafos)"
-                        onChange={(e) => setItems((p) => ({ ...p, mission: e.target.value }))}
-                      />
-                    ) : (
-                      <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-                        <div className="whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
-                          {fundamentals?.mission?.trim() ? fundamentals.mission : <span className="text-muted-foreground">Ainda não definido.</span>}
-                        </div>
-                      </div>
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </Card>
-          </div>
-
-          {/* Listas */}
-          <div className="lg:col-span-5">
-            <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Listas</div>
-                  <div className="mt-0.5 text-xs text-muted-foreground">Itens com título + descrição.</div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              {editMode ? (
+                <Textarea
+                  className="min-h-[160px] rounded-2xl"
+                  value={items.purpose}
+                  disabled={!canEdit || saving}
+                  placeholder="Por que existimos? (uma frase forte + 1–2 parágrafos se necessário)"
+                  onChange={(e) => setItems((p) => ({ ...p, purpose: e.target.value }))}
+                />
+              ) : (
+                <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
+                    {fundamentals?.purpose?.trim() ? fundamentals.purpose : <span className="text-muted-foreground">Ainda não definido.</span>}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <CountPill n={(editMode ? (items.values?.length ?? 0) : valuesItems.length) + (editMode ? (items.culture?.length ?? 0) : cultureItems.length)} />
-                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem
+            value="vision"
+            id="fundamentals-section-vision"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-vision" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
+            <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
+              <div className="flex w-full items-start justify-between gap-3">
+                <SectionTitle
+                  title="Visão"
+                  hint={
+                    editMode
+                      ? "Edite ou apague o texto para remover."
+                      : !isOpen("vision")
+                        ? visionPreview || "Ainda não definido."
+                        : undefined
+                  }
+                />
               </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              {editMode ? (
+                <Textarea
+                  className="min-h-[160px] rounded-2xl"
+                  value={items.vision}
+                  disabled={!canEdit || saving}
+                  placeholder="Como o mundo fica melhor quando vencemos? (1–3 parágrafos)"
+                  onChange={(e) => setItems((p) => ({ ...p, vision: e.target.value }))}
+                />
+              ) : (
+                <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
+                    {fundamentals?.vision?.trim() ? fundamentals.vision : <span className="text-muted-foreground">Ainda não definido.</span>}
+                  </div>
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
 
-              <Separator className="my-4" />
+          <AccordionItem
+            value="mission"
+            id="fundamentals-section-mission"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-mission" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
+            <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
+              <div className="flex w-full items-start justify-between gap-3">
+                <SectionTitle
+                  title="Missão"
+                  hint={
+                    editMode
+                      ? "Edite ou apague o texto para remover."
+                      : !isOpen("mission")
+                        ? missionPreview || "Ainda não definido."
+                        : undefined
+                  }
+                />
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              {editMode ? (
+                <Textarea
+                  className="min-h-[160px] rounded-2xl"
+                  value={items.mission}
+                  disabled={!canEdit || saving}
+                  placeholder="O que fazemos todos os dias para chegar lá? (1–3 parágrafos)"
+                  onChange={(e) => setItems((p) => ({ ...p, mission: e.target.value }))}
+                />
+              ) : (
+                <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--sinaxys-ink)]">
+                    {fundamentals?.mission?.trim() ? fundamentals.mission : <span className="text-muted-foreground">Ainda não definido.</span>}
+                  </div>
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
 
-              <Accordion
-                type="multiple"
-                value={openSections.filter((k) => LIST_KEYS.includes(k as any))}
-                onValueChange={setListOpen}
-                className="grid gap-3"
-              >
-                <AccordionItem
-                  value="values"
-                  id="fundamentals-section-values"
-                  className={cn(
-                    "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
-                    flashId === "fundamentals-section-values" && "ring-2 ring-[color:var(--sinaxys-primary)]",
-                  )}
-                >
-                  <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
-                    <div className="flex w-full items-start justify-between gap-3">
-                      <SectionTitle
-                        title="Valores"
-                        hint={
-                          editMode
-                            ? "Adicione, edite ou remova itens."
-                            : valuesItems.length
-                              ? `${valuesItems.length} item(ns)`
-                              : "Ainda não definido."
-                        }
-                      />
-                      <CountPill n={editMode ? (items.values?.length ?? 0) : valuesItems.length} />
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-4">
-                    {editMode ? (
-                      <DescribedItemsEditor
-                        label="Valores"
-                        hint="Cada valor tem um nome e um descritivo (comportamentos, exemplos, do/don't)."
-                        items={items.values}
-                        onChange={(next) => setItems((p) => ({ ...p, values: next }))}
-                        canEdit={canEdit}
-                        saving={saving}
-                        addLabel="Adicionar valor"
-                      />
-                    ) : (
-                      <CompactItemList items={valuesItems} listId="values" flashId={flashId} />
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
+          <AccordionItem
+            value="values"
+            id="fundamentals-section-values"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-values" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
+            <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
+              <div className="flex w-full items-start justify-between gap-3">
+                <SectionTitle
+                  title="Valores"
+                  hint={
+                    editMode
+                      ? "Adicione, edite ou remova itens."
+                      : !isOpen("values")
+                        ? valuesItems.length
+                          ? `${valuesItems.length} item(ns)`
+                          : "Ainda não definido."
+                        : undefined
+                  }
+                />
+                <CountPill n={editMode ? (items.values?.length ?? 0) : valuesItems.length} />
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              {editMode ? (
+                <DescribedItemsEditor
+                  label="Valores"
+                  hint="Cada item tem título e descrição (comportamentos, exemplos, do/don't)."
+                  items={items.values}
+                  onChange={(next) => setItems((p) => ({ ...p, values: next }))}
+                  canEdit={canEdit}
+                  saving={saving}
+                  addLabel="Adicionar valor"
+                />
+              ) : (
+                <CompactItemList items={valuesItems} listId="values" flashId={flashId} />
+              )}
+            </AccordionContent>
+          </AccordionItem>
 
-                <AccordionItem
-                  value="culture"
-                  id="fundamentals-section-culture"
-                  className={cn(
-                    "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
-                    flashId === "fundamentals-section-culture" && "ring-2 ring-[color:var(--sinaxys-primary)]",
-                  )}
-                >
-                  <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
-                    <div className="flex w-full items-start justify-between gap-3">
-                      <SectionTitle
-                        title="Cultura"
-                        hint={
-                          editMode
-                            ? "Adicione, edite ou remova itens."
-                            : cultureItems.length
-                              ? `${cultureItems.length} item(ns)`
-                              : "Ainda não definido."
-                        }
-                      />
-                      <CountPill n={editMode ? (items.culture?.length ?? 0) : cultureItems.length} />
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pb-4">
-                    {editMode ? (
-                      <DescribedItemsEditor
-                        label="Cultura"
-                        hint="Descreva como trabalhamos e decidimos aqui. Use itens com nome + descritivo."
-                        items={items.culture}
-                        onChange={(next) => setItems((p) => ({ ...p, culture: next }))}
-                        canEdit={canEdit}
-                        saving={saving}
-                        addLabel="Adicionar item"
-                      />
-                    ) : (
-                      <CompactItemList items={cultureItems} listId="culture" flashId={flashId} />
-                    )}
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </Card>
-          </div>
-        </div>
+          <AccordionItem
+            value="culture"
+            id="fundamentals-section-culture"
+            className={cn(
+              "rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-4",
+              flashId === "fundamentals-section-culture" && "ring-2 ring-[color:var(--sinaxys-primary)]",
+            )}
+          >
+            <AccordionTrigger className="rounded-2xl py-4 hover:no-underline">
+              <div className="flex w-full items-start justify-between gap-3">
+                <SectionTitle
+                  title="Cultura"
+                  hint={
+                    editMode
+                      ? "Adicione, edite ou remova itens."
+                      : !isOpen("culture")
+                        ? cultureItems.length
+                          ? `${cultureItems.length} item(ns)`
+                          : "Ainda não definido."
+                        : undefined
+                  }
+                />
+                <CountPill n={editMode ? (items.culture?.length ?? 0) : cultureItems.length} />
+              </div>
+            </AccordionTrigger>
+            <AccordionContent className="pb-4">
+              {editMode ? (
+                <DescribedItemsEditor
+                  label="Cultura"
+                  hint="Itens com título e descrição (como trabalhamos e decidimos)."
+                  items={items.culture}
+                  onChange={(next) => setItems((p) => ({ ...p, culture: next }))}
+                  canEdit={canEdit}
+                  saving={saving}
+                  addLabel="Adicionar item"
+                />
+              ) : (
+                <CompactItemList items={cultureItems} listId="culture" flashId={flashId} />
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
         {editMode ? (
           <div className="mt-5 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
