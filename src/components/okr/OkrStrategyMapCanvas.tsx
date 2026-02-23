@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
@@ -18,8 +19,9 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 import {
-  createStrategyObjective,
+  createKeyResult,
   createOkrObjective,
+  createStrategyObjective,
   krProgressPct,
   listKeyResults,
   listOkrObjectives,
@@ -28,6 +30,8 @@ import {
   type DbOkrKeyResult,
   type DbOkrObjective,
   type DbStrategyObjective,
+  type KrConfidence,
+  type KrKind,
 } from "@/lib/okrDb";
 import type { DbProfilePublic } from "@/lib/profilePublicDb";
 import type { DbDepartment } from "@/lib/departmentsDb";
@@ -226,6 +230,17 @@ export function OkrStrategyMapCanvas(props: {
   const [createOkrDesc, setCreateOkrDesc] = useState("");
   const [createOkrOwner, setCreateOkrOwner] = useState<string>(userId);
 
+  const [createKrOpen, setCreateKrOpen] = useState(false);
+  const [creatingKr, setCreatingKr] = useState(false);
+  const [createKrObjectiveId, setCreateKrObjectiveId] = useState<string | null>(null);
+  const [createKrKind, setCreateKrKind] = useState<KrKind>("METRIC");
+  const [createKrTitle, setCreateKrTitle] = useState("");
+  const [createKrUnit, setCreateKrUnit] = useState("");
+  const [createKrStart, setCreateKrStart] = useState("");
+  const [createKrTarget, setCreateKrTarget] = useState("");
+  const [createKrDue, setCreateKrDue] = useState("");
+  const [createKrOwner, setCreateKrOwner] = useState<string | null>(null);
+
   const openCreateForHorizon = (h: 10 | 5 | 2) => {
     if (!canEdit) {
       toast({ title: "Sem permissão", description: "Você não tem permissão para criar objetivos." , variant: "destructive"});
@@ -263,6 +278,22 @@ export function OkrStrategyMapCanvas(props: {
     setCreateOkrDesc("");
     setCreateOkrOwner(userId);
     setCreateOkrOpen(true);
+  };
+
+  const openCreateKr = (objectiveId: string) => {
+    if (!canEdit) {
+      toast({ title: "Sem permissão", description: "Você não tem permissão para criar KRs.", variant: "destructive" });
+      return;
+    }
+    setCreateKrObjectiveId(objectiveId);
+    setCreateKrKind("METRIC");
+    setCreateKrTitle("");
+    setCreateKrUnit("");
+    setCreateKrStart("");
+    setCreateKrTarget("");
+    setCreateKrDue("");
+    setCreateKrOwner(null);
+    setCreateKrOpen(true);
   };
 
   const roots = useMemo(() => {
@@ -482,19 +513,58 @@ export function OkrStrategyMapCanvas(props: {
                 </button>
 
                 {canEdit ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openCreateOkr("annualUnderStrategy", d.so.id);
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-strategy-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
-                    title="Criar objetivo do ano abaixo"
-                    aria-label="Criar objetivo do ano abaixo"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-strategy-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
+                        title="Adicionar"
+                        aria-label="Adicionar"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      side="right"
+                      className="w-56 rounded-2xl border-[color:var(--sinaxys-border)] bg-white p-2 shadow-lg"
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <div className="grid gap-1">
+                        <Button
+                          variant="ghost"
+                          className="h-10 justify-start rounded-xl"
+                          onClick={() => openCreateOkr("annualUnderStrategy", d.so.id)}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Criar objetivo do ano
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="h-10 justify-start rounded-xl"
+                          onClick={() => {
+                            // Create KR for the first annual objective under this strategy objective (if any)
+                            const annualKids = annualByStrategyId.get(d.so.id) ?? [];
+                            const first = annualKids[0];
+                            if (!first) {
+                              toast({
+                                title: "Crie um objetivo do ano primeiro",
+                                description: "Para criar um KR, primeiro crie um objetivo do ano abaixo deste objetivo de longo prazo.",
+                                variant: "destructive",
+                              });
+                              return;
+                            }
+                            openCreateKr(first.id);
+                          }}
+                        >
+                          <Target className="mr-2 h-4 w-4" />
+                          Criar Key Result (KR)
+                        </Button>
+
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 ) : null}
               </div>
             );
@@ -551,20 +621,47 @@ export function OkrStrategyMapCanvas(props: {
                   </div>
                 </button>
 
-                {canCreateBelow ? (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      openCreateOkr("quarterUnderAnnual", d.objective.id);
-                    }}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-objectives-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
-                    title="Criar objetivo do trimestre abaixo"
-                    aria-label="Criar objetivo do trimestre abaixo"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
+                {canEdit ? (
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-objectives-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
+                        title="Adicionar"
+                        aria-label="Adicionar"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      align="start"
+                      side="right"
+                      className="w-56 rounded-2xl border-[color:var(--sinaxys-border)] bg-white p-2 shadow-lg"
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <div className="grid gap-1">
+                        <Button
+                          variant="ghost"
+                          className={cn("h-10 justify-start rounded-xl", !canCreateBelow && "opacity-50")}
+                          disabled={!canCreateBelow}
+                          onClick={() => openCreateOkr("quarterUnderAnnual", d.objective.id)}
+                          title={canCreateBelow ? "Criar objetivo do trimestre abaixo" : "Disponível apenas para objetivos do ano"}
+                        >
+                          <Plus className="mr-2 h-4 w-4" />
+                          Criar objetivo abaixo
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          className="h-10 justify-start rounded-xl"
+                          onClick={() => openCreateKr(d.objective.id)}
+                        >
+                          <Target className="mr-2 h-4 w-4" />
+                          Criar Key Result (KR)
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                 ) : null}
               </div>
             );
@@ -698,6 +795,147 @@ export function OkrStrategyMapCanvas(props: {
                   });
                 } finally {
                   setCreating(false);
+                }
+              }}
+            >
+              Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={createKrOpen}
+        onOpenChange={(v) => {
+          if (creatingKr) return;
+          setCreateKrOpen(v);
+          if (!v) setCreateKrObjectiveId(null);
+        }}
+      >
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Criar Key Result (KR)</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Tipo</Label>
+              <Select value={createKrKind} onValueChange={(v) => setCreateKrKind(v as KrKind)} disabled={creatingKr}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="METRIC">Métrico (de → para)</SelectItem>
+                  <SelectItem value="DELIVERABLE">Entregável (até data)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input className="h-11 rounded-2xl" value={createKrTitle} onChange={(e) => setCreateKrTitle(e.target.value)} disabled={creatingKr} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Responsável (opcional)</Label>
+              <Select
+                value={createKrOwner ?? "__none__"}
+                onValueChange={(v) => setCreateKrOwner(v === "__none__" ? null : v)}
+                disabled={creatingKr}
+              >
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue placeholder="Sem responsável" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="__none__">Sem responsável</SelectItem>
+                  {peopleOptions.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {createKrKind === "METRIC" ? (
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="grid gap-2">
+                  <Label>Origem</Label>
+                  <Input className="h-11 rounded-2xl" inputMode="decimal" value={createKrStart} onChange={(e) => setCreateKrStart(e.target.value)} placeholder="0" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Meta</Label>
+                  <Input className="h-11 rounded-2xl" inputMode="decimal" value={createKrTarget} onChange={(e) => setCreateKrTarget(e.target.value)} placeholder="100" />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Unidade (opcional)</Label>
+                  <Input className="h-11 rounded-2xl" value={createKrUnit} onChange={(e) => setCreateKrUnit(e.target.value)} placeholder="%, R$, pts…" />
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label>Prazo (opcional)</Label>
+                <Input className="h-11 rounded-2xl" type="date" value={createKrDue} onChange={(e) => setCreateKrDue(e.target.value)} />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateKrOpen(false)} disabled={creatingKr}>
+              Cancelar
+            </Button>
+            <Button
+              className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={creatingKr || !createKrObjectiveId || createKrTitle.trim().length < 4}
+              onClick={async () => {
+                if (!createKrObjectiveId) return;
+                setCreatingKr(true);
+                try {
+                  const toNum = (s: string) => {
+                    const raw = s.trim().replace(",", ".");
+                    if (!raw) return null;
+                    const n = Number(raw);
+                    return Number.isFinite(n) ? n : null;
+                  };
+
+                  const kind: KrKind = createKrKind;
+                  const confidence: KrConfidence = "ON_TRACK";
+
+                  const start = kind === "METRIC" ? toNum(createKrStart) : null;
+                  const target = kind === "METRIC" ? toNum(createKrTarget) : null;
+                  if (kind === "METRIC" && (start === null || target === null)) {
+                    throw new Error("Preencha origem e meta com números válidos.");
+                  }
+
+                  const created = await createKeyResult({
+                    objective_id: createKrObjectiveId,
+                    title: createKrTitle,
+                    kind,
+                    due_at: kind === "DELIVERABLE" ? (createKrDue.trim() || null) : null,
+                    achieved: false,
+                    metric_unit: kind === "METRIC" ? (createKrUnit.trim() || null) : null,
+                    start_value: kind === "METRIC" ? start : null,
+                    target_value: kind === "METRIC" ? target : null,
+                    current_value: kind === "METRIC" ? start : null,
+                    owner_user_id: createKrOwner,
+                    confidence,
+                  });
+
+                  await qc.invalidateQueries({ queryKey: ["okr-map-canvas-krs", companyId] });
+                  toast({ title: "KR criado" });
+                  setCreateKrOpen(false);
+
+                  // Abrir imediatamente o editor do KR (no mapa)
+                  setEditingKr(created);
+                  setKrDialogOpen(true);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível criar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setCreatingKr(false);
                 }
               }}
             >
