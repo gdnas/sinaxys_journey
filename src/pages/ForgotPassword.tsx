@@ -52,8 +52,9 @@ export default function ForgotPassword() {
 
                 try {
                   setSubmitting(true);
-                  const redirectTo = `${window.location.origin}/password`;
+                  const redirectTo = `https://kairoos.ai/password`;
                   const { error } = await supabase.auth.resetPasswordForEmail(e, { redirectTo });
+
                   if (error) throw error;
 
                   toast({
