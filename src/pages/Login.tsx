@@ -131,6 +131,13 @@ export default function Login() {
               {submitting ? "Entrando…" : "Continuar"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
+
+            <div className="text-center text-sm text-muted-foreground">
+              Ainda não tem conta?{" "}
+              <Link className="text-[color:var(--sinaxys-primary)] hover:underline" to="/signup">
+                Criar conta
+              </Link>
+            </div>
           </div>
         </Card>
       </div>

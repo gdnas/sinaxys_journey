@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
+import Signup from "./pages/Signup";
 import ChangePassword from "./pages/ChangePassword";
 import ForgotPassword from "./pages/ForgotPassword";
 import AppDashboard from "./pages/AppDashboard";
@@ -83,6 +84,7 @@ const App = () => (
                   <Route path="/privacidade" element={<PrivacyPolicy />} />
                   <Route path="/termos" element={<TermsOfService />} />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/signup" element={<Signup />} />
                   <Route path="/forgot" element={<ForgotPassword />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
 
