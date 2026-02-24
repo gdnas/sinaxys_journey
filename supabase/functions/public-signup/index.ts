@@ -53,27 +53,42 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const anonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-    const admin = createClient(supabaseUrl, serviceKey);
-
-    console.log(`[${functionName}] creating user`, { email });
-    const { data: created, error: createErr } = await admin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true,
-      user_metadata: { name, company_name: companyName },
+    // Use signUp (anon) so Supabase sends the confirmation email using the configured SMTP + templates.
+    const anon = createClient(supabaseUrl, anonKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false,
+      },
     });
 
-    if (createErr || !created.user) {
-      console.error(`[${functionName}] createUser failed`, { error: createErr?.message });
-      return new Response(JSON.stringify({ ok: false, message: createErr?.message ?? "Não foi possível criar sua conta." }), {
+    const redirectTo = "https://kairoos.ai/login?confirmed=1";
+
+    console.log(`[${functionName}] signing up user`, { email });
+    const { data: signUpData, error: signUpErr } = await anon.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { name, company_name: companyName },
+        emailRedirectTo: redirectTo,
+      },
+    });
+
+    if (signUpErr || !signUpData.user?.id) {
+      console.error(`[${functionName}] signUp failed`, { error: signUpErr?.message });
+      return new Response(JSON.stringify({ ok: false, message: signUpErr?.message ?? "Não foi possível criar sua conta." }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = created.user.id;
+    const userId = signUpData.user.id;
+
+    // Use service role for provisioning tenant data.
+    const admin = createClient(supabaseUrl, serviceKey);
 
     // Create tenant/company
     const kairoosColors = {
@@ -136,7 +151,7 @@ serve(async (req) => {
       { onConflict: "company_id" },
     );
 
-    return new Response(JSON.stringify({ ok: true }), {
+    return new Response(JSON.stringify({ ok: true, needsEmailConfirmation: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

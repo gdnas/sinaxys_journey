@@ -200,7 +200,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         if (error) {
-          return { ok: false as const, message: error.message };
+          const msg = error.message;
+          const isNotConfirmed = /email.*not\s+confirmed/i.test(msg) || /not\s+confirmed/i.test(msg);
+          return {
+            ok: false as const,
+            message: isNotConfirmed
+              ? "Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada (e spam) e clique no link de confirmação."
+              : msg,
+          };
         }
 
         const uid = data.user?.id ?? null;
