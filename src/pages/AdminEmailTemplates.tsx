@@ -372,7 +372,8 @@ export default function AdminEmailTemplates() {
                   accept="image/*"
                   className="h-11 rounded-2xl"
                   onChange={async (e) => {
-                    const f = e.target.files?.[0];
+                    const input = e.currentTarget;
+                    const f = input.files?.[0];
                     if (!f) return;
                     setUploading(true);
                     try {
@@ -386,7 +387,8 @@ export default function AdminEmailTemplates() {
                       });
                     } finally {
                       setUploading(false);
-                      e.currentTarget.value = "";
+                      // Reset the file input so the same file can be re-selected.
+                      if (input) input.value = "";
                     }
                   }}
                 />
