@@ -23,6 +23,7 @@ import AdminCosts from "./pages/AdminCosts";
 import AdminImportUsers from "./pages/AdminImportUsers";
 import AdminTracks from "./pages/AdminTracks";
 import AdminRewards from "./pages/AdminRewards";
+import AdminEmailTemplates from "./pages/AdminEmailTemplates";
 import Rankings from "./pages/Rankings";
 import MasterCompanies from "./pages/MasterCompanies";
 import MasterOverview from "./pages/MasterOverview";
@@ -478,8 +479,16 @@ const App = () => (
                   <Route
                     path="/admin/brand"
                     element={
-                      <RequireAuth roles={["ADMIN", "HEAD"]}>
+                      <RequireAuth roles={["ADMIN", "MASTERADMIN"]}>
                         <AdminBrand />
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/admin/email"
+                    element={
+                      <RequireAuth roles={["ADMIN", "MASTERADMIN"]}>
+                        <AdminEmailTemplates />
                       </RequireAuth>
                     }
                   />
