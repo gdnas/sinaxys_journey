@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import ChangePassword from "./pages/ChangePassword";
+import ForgotPassword from "./pages/ForgotPassword";
 import AppDashboard from "./pages/AppDashboard";
 import TrackPlayer from "./pages/TrackPlayer";
 import AppCertificates from "./pages/AppCertificates";
@@ -81,6 +82,7 @@ const App = () => (
                   <Route path="/privacidade" element={<PrivacyPolicy />} />
                   <Route path="/termos" element={<TermsOfService />} />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/forgot" element={<ForgotPassword />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
 
                   {/* Dashboard / Jornada */}
