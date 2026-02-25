@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ChevronDown, ChevronUp, Link2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Link2, Pencil, Plus, Target, Trash2, Users } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 
 import { krProgressPct, listKeyResults, listOkrObjectivesByIds, type DbOkrKeyResult, type DbOkrObjective } from "@/lib/okrDb";
 import { listLinkedObjectivesByKrIds } from "@/lib/okrAlignmentDb";
+import type { DbDepartment } from "@/lib/departmentsDb";
 import { objectiveAccent } from "@/lib/okrUi";
 import { KrEditDialog } from "@/components/okr/KrEditDialog";
 
@@ -30,6 +31,63 @@ function confidenceClass(confidence: DbOkrKeyResult["confidence"]) {
   return "bg-rose-500/10 text-rose-700 ring-1 ring-rose-500/20 dark:text-rose-200";
 }
 
+function miniObjectiveCard(props: {
+  objective: DbOkrObjective;
+  ownerName: string;
+  teamName: string | null;
+  krCount: number;
+  avgProgressPct: number | null;
+}) {
+  const { objective, ownerName, teamName, krCount, avgProgressPct } = props;
+
+  return (
+    <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+              <Users className="mr-1.5 h-3.5 w-3.5" />
+              {teamName ?? "Time"}
+            </Badge>
+            <Link
+              to={`/okr/objetivos/${objective.id}`}
+              className="min-w-0 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:underline"
+            >
+              {objective.title}
+            </Link>
+          </div>
+
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>Head: {ownerName}</span>
+            <span>•</span>
+            <span>{krCount} KRs</span>
+          </div>
+
+          {typeof avgProgressPct === "number" ? (
+            <div className="mt-2">
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Evolução</span>
+                <span className="font-medium text-[color:var(--sinaxys-ink)]">{avgProgressPct}%</span>
+              </div>
+              <Progress value={avgProgressPct} className="mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70" />
+            </div>
+          ) : null}
+        </div>
+
+        <Button
+          asChild
+          size="icon"
+          className="h-10 w-10 self-end rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:self-auto"
+        >
+          <Link to={`/okr/objetivos/${objective.id}`} aria-label="Abrir objetivo">
+            <ArrowRight className="h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function OkrObjectiveCard(props: {
   objective: DbOkrObjective;
   ownerName: string;
@@ -43,6 +101,8 @@ export function OkrObjectiveCard(props: {
   onAddKr?: () => void;
   companyId?: string;
   currentUserId?: string;
+  departments?: DbDepartment[];
+  byUserId?: Map<string, { name: string; monthlyCostBRL?: number | null; departmentId?: string | null }>;
 }) {
   const {
     objective,
@@ -57,6 +117,8 @@ export function OkrObjectiveCard(props: {
     onAddKr,
     companyId,
     currentUserId,
+    departments,
+    byUserId,
   } = props;
 
   const [open, setOpen] = useState(false);
@@ -105,6 +167,33 @@ export function OkrObjectiveCard(props: {
     staleTime: 0,
     refetchOnMount: "always",
   });
+
+  const { data: tier2StatsByObjectiveId = new Map<string, { count: number; pct: number | null }>() } = useQuery({
+    queryKey: ["okr-tier2-stats", objective.id, krIds.join(",")],
+    enabled: open && objective.level === "COMPANY" && krIds.length > 0,
+    queryFn: async () => {
+      const links = await listLinkedObjectivesByKrIds(krIds);
+      const uniqueObjectiveIds = Array.from(new Set(links.map((l) => l.objective_id)));
+
+      const m = new Map<string, { count: number; pct: number | null }>();
+      await Promise.all(
+        uniqueObjectiveIds.map(async (objectiveId) => {
+          const krs = await listKeyResults(objectiveId);
+          const pcts = krs
+            .map((k) => krProgressPct(k))
+            .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+          const pct = pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : null;
+          m.set(objectiveId, { count: krs.length, pct });
+        }),
+      );
+
+      return m;
+    },
+  });
+
+  const deptNameById = useMemo(() => {
+    return new Map((departments ?? []).map((d) => [d.id, d.name] as const));
+  }, [departments]);
 
   return (
     <>
@@ -314,15 +403,18 @@ export function OkrObjectiveCard(props: {
                             OKRs de time alinhados a este KR
                           </div>
                           <div className="mt-2 grid gap-2">
-                            {aligned.map((o) => (
-                              <Link
-                                key={o.id}
-                                to={`/okr/objetivos/${o.id}`}
-                                className="rounded-xl border border-[color:var(--sinaxys-border)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--sinaxys-ink)] transition hover:border-[color:var(--sinaxys-primary)]"
-                              >
-                                {o.title}
-                              </Link>
-                            ))}
+                            {aligned.map((o) => {
+                              const headName = byUserId?.get(o.owner_user_id)?.name ?? "—";
+                              const teamName = o.department_id ? (deptNameById.get(o.department_id) ?? null) : null;
+                              const st = tier2StatsByObjectiveId.get(o.id) ?? { count: 0, pct: null };
+
+                              return (
+                                <div key={o.id} className="grid gap-2">
+                                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time alinhado</div>
+                                  {miniObjectiveCard({ objective: o, ownerName: headName, teamName, krCount: st.count, avgProgressPct: st.pct })}
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       ) : null}

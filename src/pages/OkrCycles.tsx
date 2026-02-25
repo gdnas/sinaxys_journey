@@ -515,6 +515,8 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                   openHref={`/okr/objetivos/${o.id}`}
                   companyId={cid}
                   currentUserId={user.id}
+                  departments={departments}
+                  byUserId={byUserId}
                   onEdit={
                     canWriteObjective
                       ? () => {
