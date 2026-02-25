@@ -61,6 +61,7 @@ export function OkrObjectiveCard(props: {
 
   const [open, setOpen] = useState(false);
   const [editingKr, setEditingKr] = useState<DbOkrKeyResult | null>(null);
+  const [openKrIds, setOpenKrIds] = useState<Set<string>>(() => new Set());
 
   const accent = objectiveAccent(objective.level);
 
@@ -107,20 +108,20 @@ export function OkrObjectiveCard(props: {
 
   return (
     <>
-      <Collapsible open={open} onOpenChange={setOpen}>
-        <div
-          className="overflow-hidden rounded-2xl border bg-white"
-          style={{ borderColor: accent.border as any }}
-        >
+      <Collapsible
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) setOpenKrIds(new Set());
+        }}
+      >
+        <div className="overflow-hidden rounded-2xl border bg-white" style={{ borderColor: accent.border as any }}>
           {/* Header */}
           <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 {levelBadge}
-                <Link
-                  to={openHref}
-                  className="min-w-0 flex-1 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:underline"
-                >
+                <Link to={openHref} className="min-w-0 flex-1 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:underline">
                   {objective.title}
                 </Link>
                 {objective.status === "ACHIEVED" ? (
@@ -225,27 +226,30 @@ export function OkrObjectiveCard(props: {
                         : "Em andamento";
 
                   const aligned = linkedObjectiveData?.linksByKrId.get(kr.id) ?? [];
+                  const isKrOpen = openKrIds.has(kr.id);
 
                   return (
                     <div key={kr.id} className="grid gap-2">
-                      <button
-                        type="button"
-                        className="group rounded-2xl border bg-white p-4 text-left transition"
+                      <div
+                        className="group rounded-2xl border bg-white p-4 transition"
                         style={{ borderColor: accent.border as any }}
                         onMouseEnter={(e) => {
-                          (e.currentTarget as HTMLButtonElement).style.borderColor = String(accent.accent);
+                          (e.currentTarget as HTMLDivElement).style.borderColor = String(accent.accent);
                         }}
                         onMouseLeave={(e) => {
-                          (e.currentTarget as HTMLButtonElement).style.borderColor = String(accent.border);
+                          (e.currentTarget as HTMLDivElement).style.borderColor = String(accent.border);
                         }}
-                        onClick={() => {
-                          if (!companyId || !currentUserId) return;
-                          setEditingKr(kr);
-                        }}
-                        aria-label={`Editar KR: ${kr.title}`}
                       >
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                          <div className="min-w-0">
+                        <div className="flex items-start gap-3">
+                          <button
+                            type="button"
+                            className="min-w-0 flex-1 text-left"
+                            onClick={() => {
+                              if (!companyId || !currentUserId) return;
+                              setEditingKr(kr);
+                            }}
+                            aria-label={`Editar KR: ${kr.title}`}
+                          >
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                                 {kindLabel(kr.kind)}
@@ -253,48 +257,71 @@ export function OkrObjectiveCard(props: {
                               <span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold " + confidenceClass(kr.confidence)}>
                                 {confidenceLabel(kr.confidence)}
                               </span>
-                              <span className="text-xs text-muted-foreground opacity-0 transition group-hover:opacity-100">
-                                Clique para editar
-                              </span>
+                              {objective.level === "COMPANY" && aligned.length ? (
+                                <span className="rounded-full bg-[color:var(--sinaxys-primary)]/10 px-2.5 py-1 text-[11px] font-semibold text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-primary)]/15">
+                                  {aligned.length} OKR(s) alinhado(s)
+                                </span>
+                              ) : null}
+                              <span className="text-xs text-muted-foreground opacity-0 transition group-hover:opacity-100">Clique para editar</span>
                             </div>
+
                             <div className="mt-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{kr.title}</div>
                             <div className="mt-1 text-xs text-muted-foreground">{meta}</div>
-                          </div>
+
+                            {typeof pct === "number" ? (
+                              <Progress
+                                value={pct}
+                                className={
+                                  "mt-3 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70 ring-1 ring-[color:var(--sinaxys-border)]/70 " +
+                                  "dark:bg-[hsl(var(--secondary))] dark:ring-border"
+                                }
+                                style={{ ["--progress-accent" as any]: accent.accent }}
+                              />
+                            ) : null}
+                          </button>
+
+                          {objective.level === "COMPANY" && aligned.length ? (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-10 w-10 rounded-xl bg-white"
+                              aria-label={isKrOpen ? "Recolher alinhamentos" : "Ver alinhamentos"}
+                              title={isKrOpen ? "Recolher alinhamentos" : "Ver OKRs alinhados"}
+                              onClick={() => {
+                                setOpenKrIds((prev) => {
+                                  const next = new Set(prev);
+                                  if (next.has(kr.id)) next.delete(kr.id);
+                                  else next.add(kr.id);
+                                  return next;
+                                });
+                              }}
+                            >
+                              {isKrOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                          ) : null}
 
                           {typeof pct === "number" ? (
-                            <div className="shrink-0 text-sm font-semibold text-[color:var(--sinaxys-ink)] sm:pt-1">{Math.round(pct)}%</div>
+                            <div className="shrink-0 pt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{Math.round(pct)}%</div>
                           ) : null}
                         </div>
+                      </div>
 
-                        {typeof pct === "number" ? (
-                          <Progress
-                            value={pct}
-                            className={
-                              "mt-3 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70 ring-1 ring-[color:var(--sinaxys-border)]/70 " +
-                              "dark:bg-[hsl(var(--secondary))] dark:ring-border"
-                            }
-                            style={{ ["--progress-accent" as any]: accent.accent }}
-                          />
-                        ) : null}
-                      </button>
-
-                      {objective.level === "COMPANY" && aligned.length ? (
-                        <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white/70 p-3">
+                      {objective.level === "COMPANY" && aligned.length && isKrOpen ? (
+                        <div className="ml-4 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white/70 p-3">
                           <div className="flex items-center gap-2 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
                             <Link2 className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
                             OKRs de time alinhados a este KR
                           </div>
-                          <div className="mt-2 flex flex-wrap gap-2">
+                          <div className="mt-2 grid gap-2">
                             {aligned.map((o) => (
-                              <Button
+                              <Link
                                 key={o.id}
-                                asChild
-                                variant="secondary"
-                                size="sm"
-                                className="h-8 rounded-full bg-[color:var(--sinaxys-tint)]/70 px-3 text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]"
+                                to={`/okr/objetivos/${o.id}`}
+                                className="rounded-xl border border-[color:var(--sinaxys-border)] bg-white px-3 py-2 text-sm font-semibold text-[color:var(--sinaxys-ink)] transition hover:border-[color:var(--sinaxys-primary)]"
                               >
-                                <Link to={`/okr/objetivos/${o.id}`}>{o.title}</Link>
-                              </Button>
+                                {o.title}
+                              </Link>
                             ))}
                           </div>
                         </div>

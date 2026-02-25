@@ -498,7 +498,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
 
         <div className="grid gap-3">
           {objectives.length ? (
-            objectives.map((o) => {
+            (scope === "quarter" ? objectives.filter((o) => o.level === "COMPANY") : objectives).map((o) => {
               const owner = byUserId.get(o.owner_user_id)?.name ?? "—";
               const st = objectiveStats.get(o.id) ?? { count: 0, pct: null };
               const canWriteObjective = user.id === o.owner_user_id || isAdminish;
@@ -558,6 +558,12 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
               Nenhum objetivo neste {scope === "year" ? "ano" : "trimestre"}.
             </div>
           )}
+
+          {scope === "quarter" && objectives.some((o) => o.level !== "COMPANY") ? (
+            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+              Objetivos de time (Tier 2) aparecem dentro dos KRs estratégicos após abrir o KR.
+            </div>
+          ) : null}
         </div>
       </Card>
 
