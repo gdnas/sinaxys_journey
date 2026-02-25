@@ -66,8 +66,16 @@ export function MarketingShell({
               <Link to="/pricing">Planos</Link>
             </Button>
 
+            <Button
+              asChild
+              variant="outline"
+              className="hidden h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 px-4 text-[color:var(--sinaxys-ink)] hover:bg-white/5 sm:inline-flex"
+            >
+              <Link to="/login">Já sou usuário</Link>
+            </Button>
+
             <Button asChild className="h-9 rounded-full bg-[color:var(--sinaxys-primary)] px-4 text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-              <Link to="/login">
+              <Link to="/signup">
                 Começar grátis
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>

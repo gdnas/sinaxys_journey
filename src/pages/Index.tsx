@@ -68,13 +68,6 @@ function Landing() {
                 variant="outline"
                 className="h-11 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 px-6 text-[color:var(--sinaxys-ink)] hover:bg-white/5"
               >
-                <Link to="/login">Já sou usuário (entrar)</Link>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="h-11 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 px-6 text-[color:var(--sinaxys-ink)] hover:bg-white/5"
-              >
                 <Link to="/como-funciona">Ver como funciona na prática</Link>
               </Button>
             </div>
