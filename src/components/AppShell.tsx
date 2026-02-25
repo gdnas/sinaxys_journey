@@ -471,6 +471,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
   const { company, companyId } = useCompany();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    // When route changes (navigation), close the mobile sheet menu.
+    setMenuOpen(false);
+  }, [pathname]);
 
   // Module flags
   const { data: pdiEnabled = true } = useQuery({
@@ -559,7 +567,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur dark:bg-[hsl(var(--background))]/85">
           <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
             <div className="flex items-center gap-3">
-              <Sheet>
+              <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
                 <SheetTrigger asChild>
                   <Button variant="outline" size="icon" className="rounded-xl" aria-label="Abrir menu" data-tour="top-menu">
                     <Menu className="h-4 w-4" />
@@ -570,7 +578,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <SheetTitle className="text-[color:var(--sinaxys-ink)]">Menu</SheetTitle>
                   </SheetHeader>
                   <div className="mt-4 grid gap-3">
-                    <SideNav items={visible} />
+                    <SideNav items={visible} onNavigate={() => setMenuOpen(false)} />
                     {user.role !== "MASTERADMIN" ? (
                       <>
                         <Separator />
