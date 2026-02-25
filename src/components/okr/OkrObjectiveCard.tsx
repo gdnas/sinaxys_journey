@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ChevronDown, ChevronUp, Link2, Pencil, Plus, Target, Trash2, Users } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Link2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 
-import { krProgressPct, listKeyResults, listOkrObjectivesByIds, type DbOkrKeyResult, type DbOkrObjective } from "@/lib/okrDb";
+import { krProgressPct, listKeyResults, listOkrObjectivesByIds, type DbOkrKeyResult, type DbOkrObjective, type ObjectiveLevel } from "@/lib/okrDb";
 import { listLinkedObjectivesByKrIds } from "@/lib/okrAlignmentDb";
 import type { DbDepartment } from "@/lib/departmentsDb";
-import { objectiveAccent } from "@/lib/okrUi";
+import { objectiveAccent, objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 import { KrEditDialog } from "@/components/okr/KrEditDialog";
 
 function kindLabel(kind: DbOkrKeyResult["kind"]) {
@@ -31,59 +31,13 @@ function confidenceClass(confidence: DbOkrKeyResult["confidence"]) {
   return "bg-rose-500/10 text-rose-700 ring-1 ring-rose-500/20 dark:text-rose-200";
 }
 
-function miniObjectiveCard(props: {
-  objective: DbOkrObjective;
-  ownerName: string;
-  teamName: string | null;
-  krCount: number;
-  avgProgressPct: number | null;
-}) {
-  const { objective, ownerName, teamName, krCount, avgProgressPct } = props;
-
+function defaultLevelBadge(level: ObjectiveLevel) {
   return (
-    <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
-      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-              <Users className="mr-1.5 h-3.5 w-3.5" />
-              {teamName ?? "Time"}
-            </Badge>
-            <Link
-              to={`/okr/objetivos/${objective.id}`}
-              className="min-w-0 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:underline"
-            >
-              {objective.title}
-            </Link>
-          </div>
-
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <span>Head: {ownerName}</span>
-            <span>•</span>
-            <span>{krCount} KRs</span>
-          </div>
-
-          {typeof avgProgressPct === "number" ? (
-            <div className="mt-2">
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Evolução</span>
-                <span className="font-medium text-[color:var(--sinaxys-ink)]">{avgProgressPct}%</span>
-              </div>
-              <Progress value={avgProgressPct} className="mt-2 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70" />
-            </div>
-          ) : null}
-        </div>
-
-        <Button
-          asChild
-          size="icon"
-          className="h-10 w-10 self-end rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:self-auto"
-        >
-          <Link to={`/okr/objetivos/${objective.id}`} aria-label="Abrir objetivo">
-            <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
-      </div>
+    <div className="flex items-center gap-2">
+      <span className={"rounded-full px-3 py-1 text-[11px] font-semibold " + objectiveTypeBadgeClass(level)}>{objectiveTypeLabel(level)}</span>
+      <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
+        {objectiveLevelLabel(level)}
+      </span>
     </div>
   );
 }
@@ -101,8 +55,12 @@ export function OkrObjectiveCard(props: {
   onAddKr?: () => void;
   companyId?: string;
   currentUserId?: string;
+  isAdminish?: boolean;
   departments?: DbDepartment[];
   byUserId?: Map<string, { name: string; monthlyCostBRL?: number | null; departmentId?: string | null }>;
+  onRequestEditObjective?: (objective: DbOkrObjective) => void;
+  onRequestDeleteObjective?: (objectiveId: string) => void;
+  onRequestAddKr?: (objectiveId: string) => void;
 }) {
   const {
     objective,
@@ -117,8 +75,12 @@ export function OkrObjectiveCard(props: {
     onAddKr,
     companyId,
     currentUserId,
+    isAdminish,
     departments,
     byUserId,
+    onRequestEditObjective,
+    onRequestDeleteObjective,
+    onRequestAddKr,
   } = props;
 
   const [open, setOpen] = useState(false);
@@ -149,7 +111,6 @@ export function OkrObjectiveCard(props: {
       for (const l of links) {
         const o = objectivesById.get(l.objective_id);
         if (!o) continue;
-        // Only show aligned Tier 2 objectives from the same cycle (trimestre)
         if (o.cycle_id !== objective.cycle_id) continue;
         if (o.level === "COMPANY") continue;
         const arr = linksByKrId.get(l.key_result_id) ?? [];
@@ -402,17 +363,34 @@ export function OkrObjectiveCard(props: {
                             <Link2 className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
                             OKRs de time alinhados a este KR
                           </div>
-                          <div className="mt-2 grid gap-2">
+                          <div className="mt-3 grid gap-3">
                             {aligned.map((o) => {
                               const headName = byUserId?.get(o.owner_user_id)?.name ?? "—";
-                              const teamName = o.department_id ? (deptNameById.get(o.department_id) ?? null) : null;
                               const st = tier2StatsByObjectiveId.get(o.id) ?? { count: 0, pct: null };
+                              const canWrite = !!currentUserId && (o.owner_user_id === currentUserId || !!isAdminish);
 
                               return (
-                                <div key={o.id} className="grid gap-2">
-                                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Time alinhado</div>
-                                  {miniObjectiveCard({ objective: o, ownerName: headName, teamName, krCount: st.count, avgProgressPct: st.pct })}
-                                </div>
+                                <OkrObjectiveCard
+                                  key={o.id}
+                                  objective={o}
+                                  ownerName={headName}
+                                  krCount={st.count}
+                                  avgProgressPct={st.pct}
+                                  levelBadge={defaultLevelBadge(o.level)}
+                                  canWriteObjective={canWrite}
+                                  openHref={`/okr/objetivos/${o.id}`}
+                                  companyId={companyId}
+                                  currentUserId={currentUserId}
+                                  isAdminish={isAdminish}
+                                  departments={departments}
+                                  byUserId={byUserId}
+                                  onEdit={canWrite && onRequestEditObjective ? () => onRequestEditObjective(o) : undefined}
+                                  onDelete={canWrite && onRequestDeleteObjective ? () => onRequestDeleteObjective(o.id) : undefined}
+                                  onAddKr={canWrite && onRequestAddKr ? () => onRequestAddKr(o.id) : undefined}
+                                  onRequestEditObjective={onRequestEditObjective}
+                                  onRequestDeleteObjective={onRequestDeleteObjective}
+                                  onRequestAddKr={onRequestAddKr}
+                                />
                               );
                             })}
                           </div>

@@ -515,8 +515,32 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                   openHref={`/okr/objetivos/${o.id}`}
                   companyId={cid}
                   currentUserId={user.id}
+                  isAdminish={isAdminish}
                   departments={departments}
                   byUserId={byUserId}
+                  onRequestEditObjective={(obj) => {
+                    setEditingObjectiveId(obj.id);
+                    setObjLevel(obj.level);
+                    setObjTitle(obj.title);
+                    setObjDesc(obj.description ?? "");
+                    setObjReason(obj.strategic_reason ?? "");
+                    setObjOwner(obj.owner_user_id);
+                    setObjDept(obj.department_id);
+                    setObjParent(obj.parent_objective_id);
+                    setObjExpected(typeof obj.expected_attainment_pct === "number" ? String(obj.expected_attainment_pct) : "80");
+                    setObjValue(typeof obj.estimated_value_brl === "number" ? String(obj.estimated_value_brl) : "");
+                    setObjEffortHours(typeof obj.estimated_effort_hours === "number" ? String(obj.estimated_effort_hours) : "");
+                    setObjOpen(true);
+                  }}
+                  onRequestDeleteObjective={(objectiveId) => {
+                    setDeleteObjectiveId(objectiveId);
+                    setDeleteOpen(true);
+                  }}
+                  onRequestAddKr={(objectiveId) => {
+                    resetKr();
+                    setKrObjectiveId(objectiveId);
+                    setKrOpen(true);
+                  }}
                   onEdit={
                     canWriteObjective
                       ? () => {
