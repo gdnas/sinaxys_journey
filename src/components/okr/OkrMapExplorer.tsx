@@ -56,6 +56,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 
 import {
     createStrategyObjective,
@@ -910,10 +911,10 @@ function FundamentalsPicker(
 
 function ObjectiveEditor(
     {
-        canEdit,
         objective,
-        pct,
         krs,
+        pct,
+        canEdit,
         loadingKrs,
         onSaved,
         companyId,
@@ -922,10 +923,10 @@ function ObjectiveEditor(
         people,
         cycles,
     }: {
-        canEdit: boolean;
         objective: DbOkrObjective;
-        pct: number | null;
         krs: DbOkrKeyResult[];
+        pct: number | null;
+        canEdit: boolean;
         loadingKrs: boolean;
         onSaved: () => Promise<void>;
         companyId: string;
@@ -938,6 +939,10 @@ function ObjectiveEditor(
     const {
         toast
     } = useToast();
+
+    const { enabled: okrRoiEnabled } = useCompanyModuleEnabled("OKR_ROI");
+    const { enabled: costsEnabled } = useCompanyModuleEnabled("COSTS");
+    const showCosts = okrRoiEnabled && costsEnabled;
 
     const qc = useQueryClient();
     const [title, setTitle] = useState(objective.title);
@@ -972,11 +977,12 @@ function ObjectiveEditor(
     const objectivesInCycle = qObjectivesInCycle.data ?? [];
 
     const childrenCostBRL = useMemo(() => {
+        if (!showCosts) return null;
         if (objective.level !== "COMPANY")
             return null;
         const sum = sumDescendantCosts(objective.id, objectivesInCycle);
         return Number.isFinite(sum) && sum > 0 ? sum : 0;
-    }, [objective.id, objective.level, objectivesInCycle]);
+    }, [objective.id, objective.level, objectivesInCycle, showCosts]);
 
     return (
         <div className="grid gap-4">
@@ -1112,21 +1118,25 @@ function ObjectiveEditor(
                     </div>
                 </div>
                 <Separator className="my-4" />
-                {loadingKrs ? (<div
-                    className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Carregando KRs…</div>) : krs.length ? (<div className="grid gap-3">
-                    {krs.map(kr => (<KrInlineEditor
-                        key={kr.id}
-                        kr={kr}
-                        canEdit={canEdit}
-                        onSaved={() => {
-                            qc.invalidateQueries({
-                                queryKey: ["okr-krs", objective.id]
-                            });
-
-                            onSaved();
-                        }} />))}
-                </div>) : (<div
-                    className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem KRs ainda.</div>)}
+                {loadingKrs ? (
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Carregando KRs…</div>
+                ) : krs.length ? (
+                    <div className="grid gap-3">
+                        {krs.map(kr => (
+                            <KrInlineEditor
+                                key={kr.id}
+                                kr={kr}
+                                canEdit={canEdit}
+                                onSaved={() => {
+                                    qc.invalidateQueries({ queryKey: ["okr-krs", objective.id] });
+                                    onSaved();
+                                }}
+                            />
+                        ))}
+                    </div>
+                ) : (
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem KRs ainda.</div>
+                )}
                 <div className="mt-4">
                     <Button asChild variant="outline" className="h-11 rounded-2xl bg-white">
                         <Link to={`/okr/objetivos/${objective.id}`}>Gerenciar KRs e entregáveis</Link>
