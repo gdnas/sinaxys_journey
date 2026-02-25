@@ -701,7 +701,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
             <div className="grid gap-2">
               <Label>Objetivo pai (alinhamento opcional)</Label>
               <Select
-                value={objParent ?? ""}
+                value={objParent ?? SELECT_NONE}
                 onValueChange={(v) => {
                   setObjParent(v === SELECT_NONE ? null : v);
                 }}
@@ -734,7 +734,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                   ) : null}
 
                   {objectives
-                    .filter((o) => o.id !== objParent)
+                    .filter((o) => o.id !== editingObjectiveId)
                     .map((o) => (
                       <SelectItem key={o.id} value={o.id}>
                         {o.title}
