@@ -18,6 +18,21 @@ export async function listLinkedObjectivesByKrIds(krIds: string[]) {
   return (data ?? []) as DbOkrKrObjectiveLink[];
 }
 
+export async function listKrLinksByObjectiveId(objectiveId: string) {
+  const { data, error } = await supabase
+    .from("okr_kr_objective_links")
+    .select("id,key_result_id,objective_id,created_at")
+    .eq("objective_id", objectiveId);
+
+  if (error) throw error;
+  return (data ?? []) as DbOkrKrObjectiveLink[];
+}
+
+export async function clearKrLinksForObjective(objectiveId: string) {
+  const { error } = await supabase.from("okr_kr_objective_links").delete().eq("objective_id", objectiveId);
+  if (error) throw error;
+}
+
 export async function linkObjectiveToKr(keyResultId: string, objectiveId: string) {
   const { data, error } = await supabase
     .from("okr_kr_objective_links")

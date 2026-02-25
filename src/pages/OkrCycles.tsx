@@ -56,6 +56,7 @@ import { listStrategyObjectives, type DbStrategyObjective } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
+import { listKrLinksByObjectiveId, clearKrLinksForObjective, linkObjectiveToKr } from "@/lib/okrAlignmentDb";
 
 const SELECT_NONE = "__none__";
 
@@ -103,9 +104,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
     queryFn: () => listOkrCycles(cid),
   });
 
-  // Define "ano corrente" based on the active quarterly cycle if available, otherwise current date.
-  const currentYear =
-    cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE")?.year ?? new Date().getFullYear();
+  const currentYear = cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE")?.year ?? new Date().getFullYear();
 
   const scopeCycleType: CycleType = scope === "year" ? "ANNUAL" : "QUARTERLY";
   const scopedCycles = useMemo(() => cycles.filter((c) => c.type === scopeCycleType), [cycles, scopeCycleType]);
@@ -117,7 +116,6 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
 
   const [cycleId, setCycleId] = useState<string | null>(defaultCycleId);
 
-  // When cycles load, fill the selection once.
   useEffect(() => {
     if (cycleId) return;
     if (!defaultCycleId) return;
@@ -237,6 +235,41 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
   const [objDept, setObjDept] = useState<string | null>(user.departmentId ?? null);
   const [objParent, setObjParent] = useState<string | null>(null);
   const [objStrategy, setObjStrategy] = useState<string | null>(null);
+  const [objAlignKrId, setObjAlignKrId] = useState<string>(SELECT_NONE);
+
+  const { data: annualKrOptions = [] } = useQuery({
+    queryKey: ["okr-annual-krs", cid, annualParentCycleId],
+    enabled: hasCompany && objOpen && scope === "quarter" && !!annualParentCycleId,
+    queryFn: async () => {
+      const out: Array<{ id: string; label: string; objectiveTitle: string }> = [];
+      for (const o of annualParentObjectives) {
+        const krs = await listKeyResults(o.id);
+        for (const kr of krs) {
+          out.push({ id: kr.id, label: kr.title, objectiveTitle: o.title });
+        }
+      }
+      return out;
+    },
+    staleTime: 20_000,
+  });
+
+  const { data: existingKrLinks = [] } = useQuery({
+    queryKey: ["okr-objective-kr-links", editingObjectiveId],
+    enabled: !!editingObjectiveId && objOpen,
+    queryFn: () => listKrLinksByObjectiveId(String(editingObjectiveId)),
+    staleTime: 10_000,
+  });
+
+  useEffect(() => {
+    if (!objOpen) return;
+    if (scope !== "quarter") return;
+    if (!editingObjectiveId) {
+      setObjAlignKrId(SELECT_NONE);
+      return;
+    }
+    const first = existingKrLinks[0]?.key_result_id ?? null;
+    setObjAlignKrId(first ?? SELECT_NONE);
+  }, [editingObjectiveId, existingKrLinks, objOpen, scope]);
 
   const [objExpected, setObjExpected] = useState<string>("80");
 
@@ -254,6 +287,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
     setObjDept(user.departmentId ?? null);
     setObjParent(null);
     setObjStrategy(null);
+    setObjAlignKrId(SELECT_NONE);
     setObjExpected("80");
     setObjValue("");
     setObjEffortHours("");
@@ -698,6 +732,31 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
               </div>
             ) : null}
 
+            {scope === "quarter" ? (
+              <div className="grid gap-2">
+                <Label>KR do ano (alinhamento)</Label>
+                <Select value={objAlignKrId} onValueChange={setObjAlignKrId}>
+                  <SelectTrigger className="h-11 rounded-xl bg-white/70 dark:bg-[color:var(--sinaxys-tint)]">
+                    <SelectValue placeholder="Sem vínculo" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    <SelectItem value={SELECT_NONE}>Sem vínculo</SelectItem>
+                    {annualKrOptions
+                      .slice()
+                      .sort((a, b) => (a.objectiveTitle.localeCompare(b.objectiveTitle, "pt-BR") || a.label.localeCompare(b.label, "pt-BR")))
+                      .map((kr) => (
+                        <SelectItem key={kr.id} value={kr.id}>
+                          {kr.objectiveTitle} — {kr.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">
+                  Objetivos táticos (Tier 2) se alinham aos resultados-chave (KRs) do objetivo do ano.
+                </div>
+              </div>
+            ) : null}
+
             <div className="grid gap-2">
               <Label>Objetivo pai (alinhamento opcional)</Label>
               <Select
@@ -710,49 +769,17 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                   <SelectValue placeholder="Sem objetivo pai" />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl">
-                  <SelectGroup>
-                    <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
-                  </SelectGroup>
-
-                  {scope === "quarter" && annualParentObjectives.length ? (
-                    <>
-                      <SelectSeparator className="my-1 bg-[color:var(--sinaxys-border)]" />
-                      <SelectGroup>
-                        <SelectLabel className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          Objetivos do ano
-                        </SelectLabel>
-                        {annualParentObjectives
-                          .slice()
-                          .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
-                          .map((o) => (
-                            <SelectItem key={o.id} value={o.id}>
-                              {o.title}
-                            </SelectItem>
-                          ))}
-                      </SelectGroup>
-                      <SelectSeparator className="my-1 bg-[color:var(--sinaxys-border)]" />
-                    </>
-                  ) : null}
-
-                  <SelectGroup>
-                    {scope === "quarter" && annualParentObjectives.length ? (
-                      <SelectLabel className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Objetivos do trimestre
-                      </SelectLabel>
-                    ) : null}
-                    {objectives
-                      .filter((o) => o.id !== editingObjectiveId)
-                      .map((o) => (
-                        <SelectItem key={o.id} value={o.id}>
-                          {o.title}
-                        </SelectItem>
-                      ))}
-                  </SelectGroup>
+                  <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
+                  {objectives
+                    .filter((o) => o.id !== editingObjectiveId)
+                    .map((o) => (
+                      <SelectItem key={o.id} value={o.id}>
+                        {o.title}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
-              <div className="text-xs text-muted-foreground">
-                {scope === "quarter" ? "Sugestão: selecione um objetivo do ano para alinhar o trimestre." : "Use isso para manter alinhamento entre objetivos (ex.: time → empresa)."}
-              </div>
+              <div className="text-xs text-muted-foreground">Use isso para manter hierarquia dentro do trimestre (ex.: iniciativa → subiniciativa).</div>
             </div>
           </div>
 
@@ -788,6 +815,14 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                       estimated_cost_brl: costBRL !== null ? Number(costBRL.toFixed(2)) : null,
                       estimated_roi_pct: roi !== null ? Number(roi.toFixed(2)) : null,
                     });
+
+                    if (scope === "quarter") {
+                      await clearKrLinksForObjective(editingObjectiveId);
+                      if (objAlignKrId !== SELECT_NONE) {
+                        await linkObjectiveToKr(objAlignKrId, editingObjectiveId);
+                      }
+                    }
+
                     toast({ title: "Objetivo atualizado" });
                   } else {
                     const createCycleId =
@@ -795,7 +830,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                         ? (selected?.id ?? (await ensureCurrentAnnualCycle()))
                         : (selected?.id ?? (await ensureCurrentQuarterCycle()));
 
-                    await createOkrObjective({
+                    const created = await createOkrObjective({
                       company_id: cid,
                       cycle_id: createCycleId,
                       parent_objective_id: objParent,
@@ -818,9 +853,13 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                       profit_thesis: null,
                       expected_revenue_at: null,
                     });
+
+                    if (scope === "quarter" && objAlignKrId !== SELECT_NONE) {
+                      await linkObjectiveToKr(objAlignKrId, created.id);
+                    }
+
                     toast({ title: "Objetivo criado" });
 
-                    // If we just created the cycle, ensure the UI points to it.
                     if (cycleId !== createCycleId) setCycleId(createCycleId);
 
                     await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, createCycleId] });
