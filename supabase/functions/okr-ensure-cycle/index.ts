@@ -87,14 +87,18 @@ serve(async (req) => {
 
     const qKey = type === "QUARTERLY" ? Number(quarter) : null;
 
-    const { data: existing, error: existingErr } = await service
+    // IMPORTANT: PostgREST does not accept `eq(null)` for integer columns.
+    // Use `.is("quarter", null)` for annual cycles.
+    let q = service
       .from("okr_cycles")
       .select("id,company_id,type,year,quarter,start_date,end_date,status,name,created_at,updated_at")
       .eq("company_id", profile.company_id)
       .eq("type", type)
-      .eq("year", year)
-      .eq("quarter", qKey)
-      .maybeSingle();
+      .eq("year", year);
+
+    q = type === "ANNUAL" ? q.is("quarter", null) : q.eq("quarter", qKey);
+
+    const { data: existing, error: existingErr } = await q.maybeSingle();
 
     if (existingErr) {
       console.error(`[${functionName}] failed to check existing cycle`, { existingErr: existingErr.message });
