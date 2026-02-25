@@ -608,7 +608,19 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label>Nível</Label>
-              <Select value={objLevel} onValueChange={(v) => setObjLevel(v as ObjectiveLevel)}>
+              <Select
+                value={objLevel}
+                onValueChange={(v) => {
+                  const next = v as ObjectiveLevel;
+                  setObjLevel(next);
+
+                  // Tier 1 (Estratégico) não possui objetivo pai nem alinhamento por KR.
+                  if (next === "COMPANY") {
+                    setObjParent(null);
+                    setObjAlignKrId(SELECT_NONE);
+                  }
+                }}
+              >
                 <SelectTrigger className="h-11 rounded-xl">
                   <SelectValue />
                 </SelectTrigger>
@@ -784,30 +796,32 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
               </div>
             ) : null}
 
-            <div className="grid gap-2">
-              <Label>Objetivo pai (alinhamento opcional)</Label>
-              <Select
-                value={objParent ?? SELECT_NONE}
-                onValueChange={(v) => {
-                  setObjParent(v === SELECT_NONE ? null : v);
-                }}
-              >
-                <SelectTrigger className="h-11 rounded-xl bg-white/70 dark:bg-[color:var(--sinaxys-tint)]">
-                  <SelectValue placeholder="Sem objetivo pai" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
-                  {objectives
-                    .filter((o) => o.id !== editingObjectiveId)
-                    .map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.title}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <div className="text-xs text-muted-foreground">Use isso para manter hierarquia dentro do trimestre (ex.: iniciativa → subiniciativa).</div>
-            </div>
+            {objLevel !== "COMPANY" ? (
+              <div className="grid gap-2">
+                <Label>Objetivo pai (alinhamento opcional)</Label>
+                <Select
+                  value={objParent ?? SELECT_NONE}
+                  onValueChange={(v) => {
+                    setObjParent(v === SELECT_NONE ? null : v);
+                  }}
+                >
+                  <SelectTrigger className="h-11 rounded-xl bg-white/70 dark:bg-[color:var(--sinaxys-tint)]">
+                    <SelectValue placeholder="Sem objetivo pai" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
+                    {objectives
+                      .filter((o) => o.id !== editingObjectiveId)
+                      .map((o) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.title}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">Use isso para manter hierarquia dentro do trimestre (ex.: iniciativa → subiniciativa).</div>
+              </div>
+            ) : null}
           </div>
 
           <DialogFooter>
@@ -829,11 +843,12 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                 try {
                   const strategyId = scope === "year" ? objStrategy : null;
                   const requiresQuarterKrLink = scope === "quarter" && objLevel !== "COMPANY";
+                  const parentForSave = objLevel === "COMPANY" ? null : objParent;
 
                   if (editingObjectiveId) {
                     await updateOkrObjective(editingObjectiveId, {
                       level: objLevel,
-                      parent_objective_id: objParent,
+                      parent_objective_id: parentForSave,
                       strategy_objective_id: strategyId,
                       department_id: objDept,
                       owner_user_id: objOwner,
@@ -869,7 +884,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                     const created = await createOkrObjective({
                       company_id: cid,
                       cycle_id: createCycleId,
-                      parent_objective_id: objParent,
+                      parent_objective_id: parentForSave,
                       strategy_objective_id: strategyId,
                       level: objLevel,
                       department_id: objDept,

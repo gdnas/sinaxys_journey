@@ -530,16 +530,20 @@ function StrategyLinker(
         return String((fundamentals as any)?.[selectedFundamental.field] ?? "").split("\n").map(s => s.trim()).filter(Boolean);
     }, [fundamentals, selectedFundamental]);
 
+    const showParentAndFundamentals = objective.level !== "COMPANY";
+
     return (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Conexões</div>
-                    <div className="mt-1 text-sm text-muted-foreground">Vincule este objetivo a um pai e/ou a uma estratégia da empresa (e também a um fundamento específico).
-                                  </div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {showParentAndFundamentals
+                        ? "Vincule este objetivo a um pai e/ou a uma estratégia da empresa (e também a um fundamento específico)."
+                        : "Vincule este objetivo à estratégia da empresa. Objetivos estratégicos (Tier 1) não possuem objetivo pai nem vínculo com fundamentos."}
+                    </div>
                 </div>
-                <div
-                    className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
                     <Link2 className="h-5 w-5" />
                 </div>
             </div>
@@ -584,133 +588,138 @@ function StrategyLinker(
                         </SelectContent>
                     </Select>
                 </div>
-                <div className="grid gap-2">
-                    <Label>{parentLabel}</Label>
-                    <Select
-                        disabled={!canEdit || saving}
-                        value={objective.parent_objective_id ?? "__none__"}
-                        onValueChange={async v => {
-                            setSaving(true);
 
-                            try {
-                                await updateOkrObjective(objective.id, {
-                                    parent_objective_id: v === "__none__" ? null : v
-                                });
+                {showParentAndFundamentals ? (
+                  <>
+                    <div className="grid gap-2">
+                        <Label>{parentLabel}</Label>
+                        <Select
+                            disabled={!canEdit || saving}
+                            value={objective.parent_objective_id ?? "__none__"}
+                            onValueChange={async v => {
+                                setSaving(true);
 
-                                toast({
-                                    title: "Alinhamento atualizado"
-                                });
+                                try {
+                                    await updateOkrObjective(objective.id, {
+                                        parent_objective_id: v === "__none__" ? null : v
+                                    });
 
-                                await onSaved();
-                            } catch (e) {
-                                toast({
-                                    title: "Não foi possível salvar",
-                                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                                    variant: "destructive"
-                                });
-                            } finally {
-                                setSaving(false);
-                            }
-                        }}>
-                        <SelectTrigger className="h-11 rounded-2xl bg-white">
-                            <SelectValue placeholder="Selecione…" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl">
-                            <SelectItem value="__none__">Sem pai</SelectItem>
-                            {parentOptions.map(o => (<SelectItem key={o.id} value={o.id}>
-                                {o.title}
-                            </SelectItem>))}
-                        </SelectContent>
-                    </Select>
-                    {cycle?.type === "QUARTERLY" ? (
-                        <div className="text-[11px] text-muted-foreground">Mostra objetivos do ciclo anual do mesmo ano.</div>
-                    ) : (
-                        <div className="text-[11px] text-muted-foreground">Mostra objetivos do mesmo ciclo (trimestre/ano).</div>
-                    )}
-                </div>
-                <div className="grid gap-2">
-                    <Label>Fundamento (missão/visão/valores etc.)</Label>
-                    <Select
-                        disabled={!canEdit || saving}
-                        value={objective.linked_fundamental ?? "__none__"}
-                        onValueChange={async v => {
-                            setSaving(true);
+                                    toast({
+                                        title: "Alinhamento atualizado"
+                                    });
 
-                            try {
-                                const next = v === "__none__" ? null : (v as DbOkrObjective["linked_fundamental"]);
+                                    await onSaved();
+                                } catch (e) {
+                                    toast({
+                                        title: "Não foi possível salvar",
+                                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                                        variant: "destructive"
+                                    });
+                                } finally {
+                                    setSaving(false);
+                                }
+                            }}>
+                            <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                <SelectValue placeholder="Selecione…" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                                <SelectItem value="__none__">Sem pai</SelectItem>
+                                {parentOptions.map(o => (<SelectItem key={o.id} value={o.id}>
+                                    {o.title}
+                                </SelectItem>))}
+                            </SelectContent>
+                        </Select>
+                        {cycle?.type === "QUARTERLY" ? (
+                            <div className="text-[11px] text-muted-foreground">Mostra objetivos do ciclo anual do mesmo ano.</div>
+                        ) : (
+                            <div className="text-[11px] text-muted-foreground">Mostra objetivos do mesmo ciclo (trimestre/ano).</div>
+                        )}
+                    </div>
+                    <div className="grid gap-2">
+                        <Label>Fundamento (missão/visão/valores etc.)</Label>
+                        <Select
+                            disabled={!canEdit || saving}
+                            value={objective.linked_fundamental ?? "__none__"}
+                            onValueChange={async v => {
+                                setSaving(true);
 
-                                await updateOkrObjective(objective.id, {
-                                    linked_fundamental: next,
-                                    linked_fundamental_text: null
-                                });
+                                try {
+                                    const next = v === "__none__" ? null : (v as DbOkrObjective["linked_fundamental"]);
 
-                                toast({
-                                    title: "Fundamento atualizado"
-                                });
+                                    await updateOkrObjective(objective.id, {
+                                        linked_fundamental: next,
+                                        linked_fundamental_text: null
+                                    });
 
-                                await onSaved();
-                            } catch (e) {
-                                toast({
-                                    title: "Não foi possível salvar",
-                                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                                    variant: "destructive"
-                                });
-                            } finally {
-                                setSaving(false);
-                            }
-                        }}>
-                        <SelectTrigger className="h-11 rounded-2xl bg-white">
-                            <SelectValue placeholder="Selecione…" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl">
-                            <SelectItem value="__none__">Sem fundamento</SelectItem>
-                            {fundamentalOptions.map(o => (<SelectItem key={o.key} value={o.key}>
-                                {o.label}
-                            </SelectItem>))}
-                        </SelectContent>
-                    </Select>
-                </div>
-                {objective.linked_fundamental ? (<div className="grid gap-2">
-                    <Label>Item do fundamento</Label>
-                    <Select
-                        disabled={!canEdit || saving}
-                        value={objective.linked_fundamental_text ?? "__none__"}
-                        onValueChange={async v => {
-                            setSaving(true);
+                                    toast({
+                                        title: "Fundamento atualizado"
+                                    });
 
-                            try {
-                                await updateOkrObjective(objective.id, {
-                                    linked_fundamental_text: v === "__none__" ? null : v
-                                });
+                                    await onSaved();
+                                } catch (e) {
+                                    toast({
+                                        title: "Não foi possível salvar",
+                                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                                        variant: "destructive"
+                                    });
+                                } finally {
+                                    setSaving(false);
+                                }
+                            }}>
+                            <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                <SelectValue placeholder="Selecione…" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                                <SelectItem value="__none__">Sem fundamento</SelectItem>
+                                {fundamentalOptions.map(o => (<SelectItem key={o.key} value={o.key}>
+                                    {o.label}
+                                </SelectItem>))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    {objective.linked_fundamental ? (<div className="grid gap-2">
+                        <Label>Item do fundamento</Label>
+                        <Select
+                            disabled={!canEdit || saving}
+                            value={objective.linked_fundamental_text ?? "__none__"}
+                            onValueChange={async v => {
+                                setSaving(true);
 
-                                toast({
-                                    title: "Item do fundamento atualizado"
-                                });
+                                try {
+                                    await updateOkrObjective(objective.id, {
+                                        linked_fundamental_text: v === "__none__" ? null : v
+                                    });
 
-                                await onSaved();
-                            } catch (e) {
-                                toast({
-                                    title: "Não foi possível salvar",
-                                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                                    variant: "destructive"
-                                });
-                            } finally {
-                                setSaving(false);
-                            }
-                        }}>
-                        <SelectTrigger className="h-11 rounded-2xl bg-white">
-                            <SelectValue
-                                placeholder={selectedFundamentalItems.length ? "Selecione…" : "Sem itens cadastrados"} />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl">
-                            <SelectItem value="__none__">Sem item</SelectItem>
-                            {selectedFundamentalItems.map(it => (<SelectItem key={it} value={it}>
-                                {it}
-                            </SelectItem>))}
-                        </SelectContent>
-                    </Select>
-                    {!selectedFundamentalItems.length ? (<div className="text-[11px] text-muted-foreground">Cadastre itens nesse fundamento para poder vincular.</div>) : null}
-                </div>) : null}
+                                    toast({
+                                        title: "Item do fundamento atualizado"
+                                    });
+
+                                    await onSaved();
+                                } catch (e) {
+                                    toast({
+                                        title: "Não foi possível salvar",
+                                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                                        variant: "destructive"
+                                    });
+                                } finally {
+                                    setSaving(false);
+                                }
+                            }}>
+                            <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                <SelectValue
+                                    placeholder={selectedFundamentalItems.length ? "Selecione…" : "Sem itens cadastrados"} />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                                <SelectItem value="__none__">Sem item</SelectItem>
+                                {selectedFundamentalItems.map(it => (<SelectItem key={it} value={it}>
+                                    {it}
+                                </SelectItem>))}
+                            </SelectContent>
+                        </Select>
+                        {!selectedFundamentalItems.length ? (<div className="text-[11px] text-muted-foreground">Cadastre itens nesse fundamento para poder vincular.</div>) : null}
+                    </div>) : null}
+                  </>
+                ) : null}
             </div>
         </Card>
     );
