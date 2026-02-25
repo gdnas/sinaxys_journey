@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -710,36 +710,44 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                   <SelectValue placeholder="Sem objetivo pai" />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl">
-                  <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
+                  <SelectGroup>
+                    <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
+                  </SelectGroup>
 
                   {scope === "quarter" && annualParentObjectives.length ? (
                     <>
                       <SelectSeparator className="my-1 bg-[color:var(--sinaxys-border)]" />
-                      <SelectLabel className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Objetivos do ano
-                      </SelectLabel>
-                      {annualParentObjectives
-                        .slice()
-                        .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
-                        .map((o) => (
-                          <SelectItem key={o.id} value={o.id}>
-                            {o.title}
-                          </SelectItem>
-                        ))}
+                      <SelectGroup>
+                        <SelectLabel className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          Objetivos do ano
+                        </SelectLabel>
+                        {annualParentObjectives
+                          .slice()
+                          .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
+                          .map((o) => (
+                            <SelectItem key={o.id} value={o.id}>
+                              {o.title}
+                            </SelectItem>
+                          ))}
+                      </SelectGroup>
                       <SelectSeparator className="my-1 bg-[color:var(--sinaxys-border)]" />
-                      <SelectLabel className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                        Objetivos do trimestre
-                      </SelectLabel>
                     </>
                   ) : null}
 
-                  {objectives
-                    .filter((o) => o.id !== editingObjectiveId)
-                    .map((o) => (
-                      <SelectItem key={o.id} value={o.id}>
-                        {o.title}
-                      </SelectItem>
-                    ))}
+                  <SelectGroup>
+                    {scope === "quarter" && annualParentObjectives.length ? (
+                      <SelectLabel className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Objetivos do trimestre
+                      </SelectLabel>
+                    ) : null}
+                    {objectives
+                      .filter((o) => o.id !== editingObjectiveId)
+                      .map((o) => (
+                        <SelectItem key={o.id} value={o.id}>
+                          {o.title}
+                        </SelectItem>
+                      ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
               <div className="text-xs text-muted-foreground">
