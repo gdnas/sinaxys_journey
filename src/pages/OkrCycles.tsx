@@ -38,6 +38,7 @@ import {
   createOkrCycle,
   createOkrObjective,
   deleteOkrObjectiveCascade,
+  ensureOkrCycle,
   getCompanyFundamentals,
   krProgressPct,
   listKeyResults,
@@ -277,15 +278,16 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
   async function ensureCurrentAnnualCycle(): Promise<string> {
     const existing = cycles.find((c) => c.type === "ANNUAL" && c.year === currentYear)?.id ?? null;
     if (existing) return existing;
-    const created = await createOkrCycle(cid, {
+
+    // Use edge function so non-admin users can still open cycles as needed.
+    const created = await ensureOkrCycle({
       type: "ANNUAL",
       year: currentYear,
       quarter: null,
-      start_date: null,
-      end_date: null,
       status: "ACTIVE",
       name: null,
     });
+
     await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
     return created.id;
   }
@@ -715,7 +717,10 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                     });
                     toast({ title: "Objetivo atualizado" });
                   } else {
-                    const createCycleId = scope === "year" ? (selected?.id ?? (await ensureCurrentAnnualCycle())) : selected.id;
+                    const createCycleId =
+                      scope === "year"
+                        ? (selected?.id ?? (await ensureCurrentAnnualCycle()))
+                        : selected.id;
 
                     await createOkrObjective({
                       company_id: cid,

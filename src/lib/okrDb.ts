@@ -221,6 +221,24 @@ export async function createOkrCycle(companyId: string, payload: Omit<DbOkrCycle
   return data as DbOkrCycle;
 }
 
+export async function ensureOkrCycle(
+  payload: Pick<DbOkrCycle, "type" | "year"> & Partial<Pick<DbOkrCycle, "quarter" | "status" | "name">>,
+) {
+  const { data, error } = await supabase.functions.invoke("okr-ensure-cycle", {
+    body: {
+      type: payload.type,
+      year: payload.year,
+      quarter: payload.quarter ?? null,
+      status: payload.status ?? "ACTIVE",
+      name: payload.name ?? null,
+    },
+  });
+
+  if (error) throw error;
+  if (!data?.ok || !data?.cycle?.id) throw new Error(data?.message ?? "Não foi possível garantir o ciclo.");
+  return data.cycle as DbOkrCycle;
+}
+
 export type ObjectiveLevel = "COMPANY" | "DEPARTMENT" | "TEAM" | "INDIVIDUAL";
 export type ObjectiveStatus = "ACTIVE" | "ACHIEVED";
 
