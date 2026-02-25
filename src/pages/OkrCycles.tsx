@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectLabel, SelectSeparator, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
@@ -706,15 +706,18 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                   setObjParent(v === SELECT_NONE ? null : v);
                 }}
               >
-                <SelectTrigger className="h-11 rounded-xl">
+                <SelectTrigger className="h-11 rounded-xl bg-white/70 dark:bg-[color:var(--sinaxys-tint)]">
                   <SelectValue placeholder="Sem objetivo pai" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="rounded-2xl">
                   <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
 
                   {scope === "quarter" && annualParentObjectives.length ? (
                     <>
-                      <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Objetivos do ano</div>
+                      <SelectSeparator className="my-1 bg-[color:var(--sinaxys-border)]" />
+                      <SelectLabel className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Objetivos do ano
+                      </SelectLabel>
                       {annualParentObjectives
                         .slice()
                         .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
@@ -723,8 +726,10 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                             {o.title}
                           </SelectItem>
                         ))}
-                      <div className="my-1 h-px bg-[color:var(--sinaxys-border)]" />
-                      <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Objetivos do trimestre</div>
+                      <SelectSeparator className="my-1 bg-[color:var(--sinaxys-border)]" />
+                      <SelectLabel className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        Objetivos do trimestre
+                      </SelectLabel>
                     </>
                   ) : null}
 
