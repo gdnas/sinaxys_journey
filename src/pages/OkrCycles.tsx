@@ -823,6 +823,8 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                       if (requiresQuarterKrLink && objAlignKrId !== SELECT_NONE) {
                         await linkObjectiveToKr(objAlignKrId, editingObjectiveId);
                       }
+
+                      await qc.invalidateQueries({ queryKey: ["okr-kr-linked-objectives"] });
                     }
 
                     toast({ title: "Objetivo atualizado" });
@@ -858,6 +860,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
 
                     if (requiresQuarterKrLink && objAlignKrId !== SELECT_NONE) {
                       await linkObjectiveToKr(objAlignKrId, created.id);
+                      await qc.invalidateQueries({ queryKey: ["okr-kr-linked-objectives"] });
                     }
 
                     toast({ title: "Objetivo criado" });
