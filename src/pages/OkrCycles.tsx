@@ -127,6 +127,19 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
 
   const selected = scopedCycles.find((c) => c.id === cycleId) ?? null;
 
+  const annualParentCycleId = useMemo(() => {
+    if (scope !== "quarter") return null;
+    if (!selected || selected.type !== "QUARTERLY") return null;
+    return cycles.find((c) => c.type === "ANNUAL" && c.year === selected.year)?.id ?? null;
+  }, [cycles, scope, selected]);
+
+  const { data: annualParentObjectives = [] } = useQuery({
+    queryKey: ["okr-annual-parent-objectives", cid, annualParentCycleId],
+    enabled: hasCompany && scope === "quarter" && !!annualParentCycleId,
+    queryFn: () => listOkrObjectives(cid, String(annualParentCycleId)),
+    staleTime: 20_000,
+  });
+
   // Objectives for the selected cycle
   const { data: objectives = [] } = useQuery({
     queryKey: ["okr-objectives", cid, cycleId],
@@ -698,6 +711,23 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
+
+                  {scope === "quarter" && annualParentObjectives.length ? (
+                    <>
+                      <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Objetivos do ano</div>
+                      {annualParentObjectives
+                        .slice()
+                        .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
+                        .map((o) => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.title}
+                          </SelectItem>
+                        ))}
+                      <div className="my-1 h-px bg-[color:var(--sinaxys-border)]" />
+                      <div className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Objetivos do trimestre</div>
+                    </>
+                  ) : null}
+
                   {objectives
                     .filter((o) => o.id !== objParent)
                     .map((o) => (
@@ -707,7 +737,9 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                     ))}
                 </SelectContent>
               </Select>
-              <div className="text-xs text-muted-foreground">Use isso para manter alinhamento entre objetivos (ex.: time → empresa).</div>
+              <div className="text-xs text-muted-foreground">
+                {scope === "quarter" ? "Sugestão: selecione um objetivo do ano para alinhar o trimestre." : "Use isso para manter alinhamento entre objetivos (ex.: time → empresa)."}
+              </div>
             </div>
           </div>
 
