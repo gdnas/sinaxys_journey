@@ -292,6 +292,23 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
     return created.id;
   }
 
+  async function ensureCurrentQuarterCycle(): Promise<string> {
+    const q = (Math.floor(new Date().getMonth() / 3) + 1) as 1 | 2 | 3 | 4;
+    const existing = cycles.find((c) => c.type === "QUARTERLY" && c.year === currentYear && c.quarter === q)?.id ?? null;
+    if (existing) return existing;
+
+    const created = await ensureOkrCycle({
+      type: "QUARTERLY",
+      year: currentYear,
+      quarter: q,
+      status: "ACTIVE",
+      name: null,
+    });
+
+    await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
+    return created.id;
+  }
+
   const requiresBusinessCase = !!objDept;
   const ownerMonthly = byUserId.get(objOwner)?.monthlyCostBRL ?? null;
   const valueBRL = parsePtNumber(objValue);
@@ -416,10 +433,21 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
           {isAdminish ? (
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!selected}
-              onClick={() => {
+              onClick={async () => {
                 resetObjective();
-                setObjOpen(true);
+                try {
+                  if (!selected) {
+                    const ensuredId = scope === "year" ? await ensureCurrentAnnualCycle() : await ensureCurrentQuarterCycle();
+                    setCycleId(ensuredId);
+                  }
+                  setObjOpen(true);
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível abrir",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                }
               }}
             >
               <Plus className="mr-2 h-4 w-4" />
@@ -689,9 +717,9 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={objSaving || !selected || objTitle.trim().length < 6 || !businessCaseOk || expectedAtt === null}
+              disabled={objSaving || objTitle.trim().length < 6 || !businessCaseOk || expectedAtt === null}
               onClick={async () => {
-                if (!selected || objSaving) return;
+                if (objSaving) return;
                 setObjSaving(true);
                 try {
                   const strategyId = scope === "year" ? objStrategy : null;
@@ -720,7 +748,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                     const createCycleId =
                       scope === "year"
                         ? (selected?.id ?? (await ensureCurrentAnnualCycle()))
-                        : selected.id;
+                        : (selected?.id ?? (await ensureCurrentQuarterCycle()));
 
                     await createOkrObjective({
                       company_id: cid,
@@ -746,9 +774,14 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                       expected_revenue_at: null,
                     });
                     toast({ title: "Objetivo criado" });
+
+                    // If we just created the cycle, ensure the UI points to it.
+                    if (cycleId !== createCycleId) setCycleId(createCycleId);
+
+                    await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, createCycleId] });
                   }
 
-                  await qc.invalidateQueries({ queryKey: ["okr-objectives", cid, cycleId] });
+                  await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
                   await qc.invalidateQueries({ queryKey: ["okr-kr-stats", cid] });
                   await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
                   setObjOpen(false);

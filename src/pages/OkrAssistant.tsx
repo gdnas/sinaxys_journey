@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight, Check, Sparkles, Target } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import {
   createKeyResult,
   createOkrObjective,
   createTask,
+  ensureOkrCycle,
   getCompanyFundamentals,
   listOkrCycles,
   listOkrObjectives,
@@ -63,6 +64,7 @@ type DraftTask = {
 export default function OkrAssistant() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { user } = useAuth();
   const { companyId } = useCompany();
 
@@ -77,15 +79,39 @@ export default function OkrAssistant() {
     queryFn: () => getCompanyFundamentals(cid),
   });
 
-  const { data: cycles = [] } = useQuery({
+  const qCycles = useQuery({
     queryKey: ["okr-cycles", cid],
     enabled: hasCompany,
     queryFn: () => listOkrCycles(cid),
   });
 
+  const cycles = qCycles.data ?? [];
+
   const activeQuarterId = cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE")?.id ?? null;
 
   const [cycleId, setCycleId] = useState<string>("");
+
+  useEffect(() => {
+    if (!hasCompany) return;
+    if (!qCycles.isFetched) return;
+    if (activeQuarterId) return;
+
+    // No active quarter yet (common for new tenants) → create/open current quarter automatically.
+    const now = new Date();
+    const year = now.getFullYear();
+    const quarter = (Math.floor(now.getMonth() / 3) + 1) as 1 | 2 | 3 | 4;
+
+    (async () => {
+      try {
+        const created = await ensureOkrCycle({ type: "QUARTERLY", year, quarter, status: "ACTIVE", name: null });
+        await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
+        setCycleId(created.id);
+      } catch {
+        // If it fails, user can still proceed once an admin creates cycles.
+      }
+    })();
+  }, [activeQuarterId, cid, ensureOkrCycle, hasCompany, qCycles.isFetched, qc]);
+
   useEffect(() => {
     if (cycleId) return;
     if (!activeQuarterId) return;
