@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Building2, CheckCircle2, Mail, ShieldCheck, User2 } from "lucide-react";
+import { ArrowRight, CheckCircle2, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -62,16 +62,6 @@ export default function Signup() {
                   </div>
                 </div>
               </div>
-
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 grid h-9 w-9 place-items-center rounded-2xl bg-white">
-                  <ShieldCheck className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                </div>
-                <div>
-                  <div className="font-semibold text-[color:var(--sinaxys-ink)]">Não achou?</div>
-                  <div className="mt-1 text-muted-foreground">Verifique Spam/Lixo Eletrônico. Alguns provedores demoram alguns minutos.</div>
-                </div>
-              </div>
             </div>
 
             <div className="mt-5 flex flex-col gap-2 sm:flex-row">
@@ -126,30 +116,10 @@ export default function Signup() {
             Comece em 2 minutos
           </div>
 
-          <h1 className="mt-4 text-3xl font-semibold leading-tight text-[color:var(--sinaxys-ink)] md:text-4xl">
-            Crie sua conta no {company.name}
-          </h1>
+          <h1 className="mt-4 text-3xl font-semibold leading-tight text-[color:var(--sinaxys-ink)] md:text-4xl">Crie sua conta</h1>
           <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground">
-            Você será o administrador inicial da sua empresa. Em seguida, confirme seu e-mail para ativar o acesso.
+            Entre com seus dados para criar o acesso e começar a usar a plataforma.
           </p>
-
-          <div className="mt-6 grid gap-3">
-            {[{ icon: <User2 className="h-4 w-4" />, title: "Seu perfil", desc: "Nome e e-mail para autenticação." },
-              { icon: <Building2 className="h-4 w-4" />, title: "Sua empresa", desc: "Criamos o tenant e suas configurações iniciais." },
-              { icon: <Mail className="h-4 w-4" />, title: "Confirmação", desc: "Você confirma por e-mail para liberar o login." },].map((x) => (
-              <div key={x.title} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5 grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                    {x.icon}
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{x.title}</div>
-                    <div className="mt-1 text-sm text-muted-foreground">{x.desc}</div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
 
           <div className="mt-6 text-sm text-muted-foreground">
             Já tem conta?{" "}
@@ -193,24 +163,12 @@ export default function Signup() {
 
             <div className="grid gap-2">
               <Label>Senha (mín. 8 caracteres)</Label>
-              <Input
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-11 rounded-xl"
-                type="password"
-                autoComplete="new-password"
-              />
+              <Input value={password} onChange={(e) => setPassword(e.target.value)} className="h-11 rounded-xl" type="password" autoComplete="new-password" />
             </div>
 
             <div className="grid gap-2">
               <Label>Confirmar senha</Label>
-              <Input
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                className="h-11 rounded-xl"
-                type="password"
-                autoComplete="new-password"
-              />
+              <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} className="h-11 rounded-xl" type="password" autoComplete="new-password" />
             </div>
 
             <Button
@@ -245,20 +203,11 @@ export default function Signup() {
                 }
               }}
             >
-              {submitting ? "Criando…" : "Criar conta"}
-              <ArrowRight className="ml-2 h-4 w-4" />
+              Criar conta
             </Button>
 
             <div className="text-xs text-muted-foreground">
-              Ao criar a conta, você concorda com os{" "}
-              <Link className="text-[color:var(--sinaxys-primary)] hover:underline" to="/termos">
-                Termos
-              </Link>
-              {" "}e a{" "}
-              <Link className="text-[color:var(--sinaxys-primary)] hover:underline" to="/privacidade">
-                Política de Privacidade
-              </Link>
-              .
+              Ao continuar, você receberá um e-mail de confirmação para ativar o acesso.
             </div>
           </div>
         </Card>
