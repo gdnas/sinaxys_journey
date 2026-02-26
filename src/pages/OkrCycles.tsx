@@ -585,11 +585,6 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
             </div>
           )}
 
-          {scope === "quarter" && objectives.some((o) => o.level !== "COMPANY") ? (
-            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-              Objetivos de time (Tier 2) aparecem dentro dos KRs estratégicos após abrir o KR.
-            </div>
-          ) : null}
         </div>
       </Card>
 
