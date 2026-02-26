@@ -813,6 +813,17 @@ export type DbTaskWithContext = DbTask & {
   department_id: string | null;
 };
 
+export type DbTaskWithContextV2 = DbTaskWithContext & {
+  deliverable_title: string;
+  key_result_id: string;
+  key_result_title: string;
+  key_result_kind: KrKind;
+  cycle_id: string;
+  cycle_type: CycleType;
+  cycle_year: number;
+  cycle_quarter: number | null;
+};
+
 export async function listTasksForCompany(companyId: string, opts?: { from?: string; to?: string }) {
   const { data, error } = await supabase.rpc("okr_tasks_for_company", {
     p_company_id: companyId,
@@ -842,6 +853,16 @@ export async function listTasksForUserWithContext(userId: string, opts?: { from?
   });
   if (error) throw error;
   return (data ?? []) as unknown as DbTaskWithContext[];
+}
+
+export async function listTasksForUserWithContextV2(userId: string, opts?: { from?: string; to?: string }) {
+  const { data, error } = await supabase.rpc("okr_tasks_for_user_v2", {
+    p_user_id: userId,
+    p_from: opts?.from ?? null,
+    p_to: opts?.to ?? null,
+  });
+  if (error) throw error;
+  return (data ?? []) as unknown as DbTaskWithContextV2[];
 }
 
 // --- Long-term KRs (Strategy) ---

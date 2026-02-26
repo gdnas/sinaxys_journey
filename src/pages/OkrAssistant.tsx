@@ -23,8 +23,8 @@ import {
   createKeyResult,
   createOkrObjective,
   createTask,
-  ensureOkrCycle,
   getCompanyFundamentals,
+  listKeyResults,
   listOkrCycles,
   listOkrObjectives,
   listStrategyObjectives,
@@ -35,6 +35,7 @@ import {
   type ObjectiveLevel,
   type DbStrategyObjective,
 } from "@/lib/okrDb";
+import { linkObjectiveToKr } from "@/lib/okrAlignmentDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 
@@ -67,6 +68,7 @@ export default function OkrAssistant() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const { companyId } = useCompany();
+  const isAdminish = user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN";
 
   if (!user) return null;
 
@@ -90,27 +92,15 @@ export default function OkrAssistant() {
   const activeQuarterId = cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE")?.id ?? null;
 
   const [cycleId, setCycleId] = useState<string>("");
+  const [level, setLevel] = useState<ObjectiveLevel>("INDIVIDUAL");
 
   useEffect(() => {
     if (!hasCompany) return;
     if (!qCycles.isFetched) return;
     if (activeQuarterId) return;
 
-    // No active quarter yet (common for new tenants) → create/open current quarter automatically.
-    const now = new Date();
-    const year = now.getFullYear();
-    const quarter = (Math.floor(now.getMonth() / 3) + 1) as 1 | 2 | 3 | 4;
-
-    (async () => {
-      try {
-        const created = await ensureOkrCycle({ type: "QUARTERLY", year, quarter, status: "ACTIVE", name: null });
-        await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
-        setCycleId(created.id);
-      } catch {
-        // If it fails, user can still proceed once an admin creates cycles.
-      }
-    })();
-  }, [activeQuarterId, cid, ensureOkrCycle, hasCompany, qCycles.isFetched, qc]);
+    // Não cria ciclo automaticamente: só deixa o usuário selecionar/criar em Trimestre.
+  }, [activeQuarterId, cid, hasCompany, qCycles.isFetched]);
 
   useEffect(() => {
     if (cycleId) return;
@@ -118,13 +108,15 @@ export default function OkrAssistant() {
     setCycleId(activeQuarterId);
   }, [activeQuarterId, cycleId]);
 
-  const [level, setLevel] = useState<ObjectiveLevel>("INDIVIDUAL");
+  const cycleOptions = useMemo(() => {
+    // Assistente trabalha no trimestre (execução) — mostra apenas QUARTERLY.
+    return cycles.filter((c) => c.type === "QUARTERLY");
+  }, [cycles]);
 
-  const selectedCycle = useMemo(() => cycles.find((c) => c.id === cycleId) ?? null, [cycles, cycleId]);
+  const selectedCycle = useMemo(() => cycleOptions.find((c) => c.id === cycleId) ?? null, [cycleOptions, cycleId]);
 
   const annualCycleIdForSelected = useMemo(() => {
     if (!selectedCycle) return null;
-    if (selectedCycle.type !== "QUARTERLY") return null;
     return cycles.find((c) => c.type === "ANNUAL" && c.year === selectedCycle.year)?.id ?? null;
   }, [cycles, selectedCycle]);
 
@@ -195,9 +187,35 @@ export default function OkrAssistant() {
     // Tier 1: no trimestre, vinculado ao OKR do ano
     if (selectedCycle?.type === "QUARTERLY" && parentId) return "TIER1";
 
-    // Padrão
     return "TIER1";
   }, [parentId, selectedCycle?.type, strategyObjectiveId]);
+
+  const requiresQuarterKrLink = useMemo(() => {
+    // A regra do produto: dentro do trimestre, OKR de time/individual precisa se alinhar a um KR Tier 1 do mesmo trimestre.
+    return selectedCycle?.type === "QUARTERLY" && level !== "COMPANY";
+  }, [level, selectedCycle?.type]);
+
+  const { data: quarterKrOptions = [] } = useQuery({
+    queryKey: ["okr-assistant-quarter-strategy-krs", cid, cycleId, companyObjectives.map((o) => o.id).join(",")],
+    enabled: hasCompany && !!cycleId && requiresQuarterKrLink && companyObjectives.length > 0,
+    queryFn: async () => {
+      const out: Array<{ id: string; label: string; objectiveTitle: string }> = [];
+      for (const o of companyObjectives) {
+        const krs = await listKeyResults(o.id);
+        for (const kr of krs) out.push({ id: kr.id, label: kr.title, objectiveTitle: o.title });
+      }
+      return out;
+    },
+    staleTime: 20_000,
+  });
+
+  const [alignKrId, setAlignKrId] = useState<string>(SELECT_NONE);
+
+  useEffect(() => {
+    if (!requiresQuarterKrLink) {
+      setAlignKrId(SELECT_NONE);
+    }
+  }, [requiresQuarterKrLink]);
 
   const [objectiveTitle, setObjectiveTitle] = useState("");
   const [objectiveDesc, setObjectiveDesc] = useState("");
@@ -295,8 +313,7 @@ export default function OkrAssistant() {
     hasCompany &&
     !!cycleId &&
     objectiveQuality.ok &&
-    !!fund &&
-    fundText.trim().length >= 6 &&
+    (!!fund && fundText.trim().length >= 6) &&
     expectedAtt !== null &&
     expectedAtt >= 0 &&
     expectedAtt <= 100 &&
@@ -304,6 +321,7 @@ export default function OkrAssistant() {
     deliverableTitle.trim().length >= 4 &&
     tasks.length >= 1 &&
     businessCaseOk &&
+    (!requiresQuarterKrLink || (alignKrId !== SELECT_NONE && quarterKrOptions.length > 0)) &&
     !publishing;
 
   if (!hasCompany) {
@@ -354,19 +372,25 @@ export default function OkrAssistant() {
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Ciclo</Label>
+                <Label>Ciclo (trimestre)</Label>
                 <Select value={cycleId} onValueChange={setCycleId}>
                   <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue placeholder="Selecione um ciclo" />
+                    <SelectValue placeholder={cycleOptions.length ? "Selecione um trimestre" : "Sem trimestres cadastrados"} />
                   </SelectTrigger>
                   <SelectContent>
-                    {cycles.map((c) => (
+                    {cycleOptions.map((c) => (
                       <SelectItem key={c.id} value={c.id}>
                         {cycleLabel(c)}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {!cycleOptions.length ? (
+                  <div className="text-xs text-muted-foreground">
+                    Não há trimestres ainda. Peça para um admin criar em <Link className="underline" to="/okr/quarter">Trimestre</Link>.
+                  </div>
+                ) : null}
+
               </div>
 
               <div className="grid gap-2">
@@ -377,7 +401,6 @@ export default function OkrAssistant() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="INDIVIDUAL">Individual</SelectItem>
-                    {/* DEPARTMENT e TEAM são sinônimos: expomos apenas um */}
                     <SelectItem value="DEPARTMENT">Time</SelectItem>
                     <SelectItem value="COMPANY">Empresa</SelectItem>
                   </SelectContent>
@@ -472,6 +495,33 @@ export default function OkrAssistant() {
                     </SelectContent>
                   </Select>
                   <div className="text-xs text-muted-foreground">Para Empresa, o custo é calculado pela média de custo/h dos colaboradores do time selecionado.</div>
+                </div>
+              ) : null}
+
+              {requiresQuarterKrLink ? (
+                <div className="grid gap-2">
+                  <Label>Alinhar a um KR estratégico (Tier 1) deste trimestre</Label>
+                  <Select value={alignKrId} onValueChange={setAlignKrId}>
+                    <SelectTrigger className="h-11 rounded-xl bg-white">
+                      <SelectValue placeholder={quarterKrOptions.length ? "Selecione um KR" : "Sem KRs estratégicos neste trimestre"} />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl">
+                      <SelectItem value={SELECT_NONE}>Selecione um KR</SelectItem>
+                      {quarterKrOptions
+                        .slice()
+                        .sort((a, b) => (a.objectiveTitle.localeCompare(b.objectiveTitle, "pt-BR") || a.label.localeCompare(b.label, "pt-BR")))
+                        .map((kr) => (
+                          <SelectItem key={kr.id} value={kr.id}>
+                            {kr.objectiveTitle} — {kr.label}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                  {quarterKrOptions.length ? (
+                    <div className="text-xs text-muted-foreground">Isso posiciona seu OKR (Tier 2) abaixo do KR no mapa.</div>
+                  ) : (
+                    <div className="text-xs text-muted-foreground">Crie primeiro um objetivo Empresa (Tier 1) neste trimestre e adicione um KR.</div>
+                  )}
                 </div>
               ) : null}
 
@@ -839,6 +889,11 @@ export default function OkrAssistant() {
                       profit_thesis: null,
                       expected_revenue_at: null,
                     });
+
+                    // Regra do trimestre: criar link OKR->KR quando for Tier 2.
+                    if (requiresQuarterKrLink && alignKrId !== SELECT_NONE) {
+                      await linkObjectiveToKr(alignKrId, obj.id);
+                    }
 
                     const kr = await createKeyResult({
                       objective_id: obj.id,

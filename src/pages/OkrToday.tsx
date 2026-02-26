@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Circle, Clock, Flame, ListChecks, Pencil, Target, Trash2 } from "lucide-react";
+import { CheckCircle2, Circle, Clock, Flame, KeyRound, ListChecks, Pencil, Target, Trash2 } from "lucide-react";
 import { format, endOfWeek, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -25,8 +25,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import type { DbTaskWithContext } from "@/lib/okrDb";
-import { deleteTask, listTasksForUserWithContext, updateTask } from "@/lib/okrDb";
+import type { DbTaskWithContextV2 } from "@/lib/okrDb";
+import { deleteTask, listTasksForUserWithContextV2, updateTask } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
@@ -37,10 +37,10 @@ function TaskRow({
   onEdit,
   onDelete,
 }: {
-  task: DbTaskWithContext;
-  onToggleDone: (t: DbTaskWithContext) => void;
-  onEdit: (t: DbTaskWithContext) => void;
-  onDelete: (t: DbTaskWithContext) => void;
+  task: DbTaskWithContextV2;
+  onToggleDone: (t: DbTaskWithContextV2) => void;
+  onEdit: (t: DbTaskWithContextV2) => void;
+  onDelete: (t: DbTaskWithContextV2) => void;
 }) {
   const done = task.status === "DONE";
 
@@ -58,32 +58,50 @@ function TaskRow({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] group-hover:text-[color:var(--sinaxys-ink)]">
-              {task.title}
-            </div>
-            {task.objective_title ? (
-              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] group-hover:text-[color:var(--sinaxys-ink)]">{task.title}</div>
+
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              {task.deliverable_id ? (
+                <span className="inline-flex items-center gap-1">
+                  <ListChecks className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
+                  <Link
+                    to={`/okr/entregaveis/${task.deliverable_id}`}
+                    className="max-w-[280px] truncate font-medium text-[color:var(--sinaxys-ink)] hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                    title={task.deliverable_title}
+                  >
+                    {task.deliverable_title}
+                  </Link>
+                </span>
+              ) : null}
+
+              {task.key_result_id ? (
+                <span className="inline-flex items-center gap-1">
+                  <KeyRound className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
+                  <span className="max-w-[320px] truncate">{task.key_result_title}</span>
+                </span>
+              ) : null}
+
+              {task.objective_title ? (
                 <span className="inline-flex items-center gap-1">
                   <Target className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
-                  <span className="truncate">{task.objective_title}</span>
+                  <Link
+                    to={`/okr/objetivos/${task.objective_id}`}
+                    className="max-w-[320px] truncate font-medium text-[color:var(--sinaxys-ink)] hover:underline"
+                    onClick={(e) => e.stopPropagation()}
+                    title={task.objective_title}
+                  >
+                    {task.objective_title}
+                  </Link>
                 </span>
-                <Badge className={"rounded-full " + objectiveTypeBadgeClass(task.objective_level)}>
-                  {objectiveTypeLabel(task.objective_level)}
-                </Badge>
+              ) : null}
+
+              {task.cycle_type ? (
                 <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                  {objectiveLevelLabel(task.objective_level)}
+                  {task.cycle_type === "QUARTERLY" ? `Q${task.cycle_quarter ?? "?"}/${task.cycle_year}` : `${task.cycle_year}`}
                 </Badge>
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="sm"
-                  className="h-7 rounded-full px-3 text-[11px] font-semibold text-[color:var(--sinaxys-primary)] hover:bg-white"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Link to={`/okr/objetivos/${task.objective_id}`}>Ver objetivo</Link>
-                </Button>
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -152,13 +170,13 @@ export default function OkrToday() {
   const weekTo = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ["okr-my-tasks", cid, user.id, weekFrom, weekTo],
+    queryKey: ["okr-my-tasks-v2", cid, user.id, weekFrom, weekTo],
     enabled: hasCompany,
-    queryFn: () => listTasksForUserWithContext(user.id, { from: weekFrom, to: weekTo }),
+    queryFn: () => listTasksForUserWithContextV2(user.id, { from: weekFrom, to: weekTo }),
   });
 
   const [editOpen, setEditOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<DbTaskWithContext | null>(null);
+  const [editingTask, setEditingTask] = useState<DbTaskWithContextV2 | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDesc, setEditDesc] = useState("");
   const [editDue, setEditDue] = useState("");
@@ -168,7 +186,7 @@ export default function OkrToday() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  const openEdit = (t: DbTaskWithContext) => {
+  const openEdit = (t: DbTaskWithContextV2) => {
     setEditingTask(t);
     setEditTitle(t.title);
     setEditDesc(t.description ?? "");
@@ -178,10 +196,10 @@ export default function OkrToday() {
   };
 
   const groups = useMemo(() => {
-    const overdue: DbTaskWithContext[] = [];
-    const todayList: DbTaskWithContext[] = [];
-    const week: DbTaskWithContext[] = [];
-    const done: DbTaskWithContext[] = [];
+    const overdue: DbTaskWithContextV2[] = [];
+    const todayList: DbTaskWithContextV2[] = [];
+    const week: DbTaskWithContextV2[] = [];
+    const done: DbTaskWithContextV2[] = [];
 
     for (const t of tasks) {
       if (t.status === "DONE") {
@@ -198,11 +216,11 @@ export default function OkrToday() {
     return { overdue, todayList, week, done };
   }, [tasks, todayIso]);
 
-  const toggleDone = async (t: DbTaskWithContext) => {
+  const toggleDone = async (t: DbTaskWithContextV2) => {
     try {
       const next = t.status === "DONE" ? "TODO" : "DONE";
       await updateTask(t.id, { status: next });
-      await qc.invalidateQueries({ queryKey: ["okr-my-tasks", cid, user.id, weekFrom, weekTo] });
+      await qc.invalidateQueries({ queryKey: ["okr-my-tasks-v2", cid, user.id, weekFrom, weekTo] });
     } catch (e) {
       toast({
         title: "Não foi possível atualizar",
@@ -434,7 +452,7 @@ export default function OkrToday() {
                     due_date: editDue || null,
                     estimate_minutes: editEstimate ? Number(editEstimate) : null,
                   });
-                  await qc.invalidateQueries({ queryKey: ["okr-my-tasks", cid, user.id, weekFrom, weekTo] });
+                  await qc.invalidateQueries({ queryKey: ["okr-my-tasks-v2", cid, user.id, weekFrom, weekTo] });
                   setEditOpen(false);
                 } catch (e) {
                   toast({
@@ -467,7 +485,7 @@ export default function OkrToday() {
                 if (!deleteId) return;
                 try {
                   await deleteTask(deleteId);
-                  await qc.invalidateQueries({ queryKey: ["okr-my-tasks", cid, user.id, weekFrom, weekTo] });
+                  await qc.invalidateQueries({ queryKey: ["okr-my-tasks-v2", cid, user.id, weekFrom, weekTo] });
                 } catch (e) {
                   toast({
                     title: "Não foi possível excluir",
