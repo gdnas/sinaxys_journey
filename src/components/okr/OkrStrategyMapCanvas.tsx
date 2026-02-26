@@ -1115,9 +1115,25 @@ export function OkrStrategyMapCanvas(props: {
                 setCreatingKr(true);
                 try {
                   const toNum = (s: string) => {
-                    const raw = s.trim().replace(",", ".");
+                    const raw = s.trim();
                     if (!raw) return null;
-                    const n = Number(raw);
+
+                    // Accept pt-BR formatting and accidental suffixes (e.g., "%", spaces)
+                    // Examples accepted: "30", "30,5", "1.200", "1.200,50", "30%"
+                    let cleaned = raw.replace(/[^\d,.-]/g, "");
+                    if (!cleaned) return null;
+
+                    const hasComma = cleaned.includes(",");
+                    const hasDot = cleaned.includes(".");
+
+                    if (hasComma && hasDot) {
+                      // assume dot is thousands separator and comma is decimal separator
+                      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+                    } else if (hasComma) {
+                      cleaned = cleaned.replace(",", ".");
+                    }
+
+                    const n = Number.parseFloat(cleaned);
                     return Number.isFinite(n) ? n : null;
                   };
 
