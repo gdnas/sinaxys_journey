@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Eye, Flag, Layers, Plus, Target } from "lucide-react";
+import { CalendarClock, Eye, Flag, Layers, Package, Plus, Target, UserRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
@@ -19,13 +19,16 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 import {
+  createDeliverable,
   createKeyResult,
   createOkrObjective,
   createStrategyObjective,
   krProgressPct,
+  listDeliverablesByKeyResultIds,
   listKeyResults,
   listOkrObjectives,
   type DbCompanyFundamentals,
+  type DbDeliverable,
   type DbOkrCycle,
   type DbOkrKeyResult,
   type DbOkrObjective,
@@ -85,7 +88,8 @@ type MapItem =
   | PlaceholderStrategy
   | { kind: "group"; title: string; subtitle?: string }
   | { kind: "objective"; objective: DbOkrObjective; cycle: DbOkrCycle | null; pct: number | null; ownerName: string }
-  | { kind: "kr"; kr: DbOkrKeyResult; pct: number | null };
+  | { kind: "kr"; kr: DbOkrKeyResult; pct: number | null }
+  | { kind: "deliverable"; deliverable: DbDeliverable; ownerName: string };
 
 function node<T extends MapItem>(id: string, data: T, children: OrgNode<MapItem>[] = []): OrgNode<MapItem> {
   return { id, data, children };
@@ -196,6 +200,41 @@ export function OkrStrategyMapCanvas(props: {
   });
 
   const krsByObjectiveId = qKrs.data ?? new Map<string, DbOkrKeyResult[]>();
+
+  const krToObjectiveId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const [oid, krs] of krsByObjectiveId.entries()) {
+      for (const kr of krs) m.set(kr.id, oid);
+    }
+    return m;
+  }, [krsByObjectiveId]);
+
+  const quarterKrIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const o of allQuarterObjectives) {
+      const krs = krsByObjectiveId.get(o.id) ?? [];
+      for (const kr of krs) ids.push(kr.id);
+    }
+    return Array.from(new Set(ids));
+  }, [allQuarterObjectives, krsByObjectiveId]);
+
+  const qDeliverables = useQuery({
+    queryKey: ["okr-map-canvas-deliverables", companyId, quarterKrIds.join(",")],
+    enabled: quarterKrIds.length > 0,
+    queryFn: () => listDeliverablesByKeyResultIds(quarterKrIds),
+    staleTime: 20_000,
+  });
+
+  const deliverablesByKrId = useMemo(() => {
+    const m = new Map<string, DbDeliverable[]>();
+    for (const d of qDeliverables.data ?? []) {
+      const arr = m.get(d.key_result_id) ?? [];
+      arr.push(d);
+      m.set(d.key_result_id, arr);
+    }
+    for (const arr of m.values()) arr.sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
+    return m;
+  }, [qDeliverables.data]);
 
   const qQuarterLinks = useQuery({
     queryKey: ["okr-map-canvas-quarter-kr-links", companyId, allQuarterObjectives.map((o) => o.id).join(",")],
@@ -351,22 +390,43 @@ export function OkrStrategyMapCanvas(props: {
   const [createKrDue, setCreateKrDue] = useState("");
   const [createKrOwner, setCreateKrOwner] = useState<string | null>(null);
 
+  const [createDelOpen, setCreateDelOpen] = useState(false);
+  const [creatingDel, setCreatingDel] = useState(false);
+  const [createDelKrId, setCreateDelKrId] = useState<string | null>(null);
+  const [createDelTitle, setCreateDelTitle] = useState("");
+  const [createDelDesc, setCreateDelDesc] = useState("");
+  const [createDelDue, setCreateDelDue] = useState("");
+  const [createDelOwner, setCreateDelOwner] = useState<string | null>(null);
+
+  const openCreateDeliverable = (krId: string) => {
+    if (!canEdit) {
+      toast({ title: "Sem permissão", description: "Você não tem permissão para criar entregáveis.", variant: "destructive" });
+      return;
+    }
+    setCreateDelKrId(krId);
+    setCreateDelTitle("");
+    setCreateDelDesc("");
+    setCreateDelDue("");
+    setCreateDelOwner(null);
+    setCreateDelOpen(true);
+  };
+
   const openCreateForHorizon = (h: 10 | 5 | 2) => {
     if (!canEdit) {
-      toast({ title: "Sem permissão", description: "Você não tem permissão para criar objetivos." , variant: "destructive"});
+      toast({ title: "Sem permissão", description: "Você não tem permissão para criar objetivos.", variant: "destructive" });
       return;
     }
     setCreateHorizon(h);
     setCreateTitle("");
     setCreateDesc("");
     setCreateOwner(null);
-    setCreateTargetYear(String(new Date().getFullYear() + h));
+    setCreateTargetYear("");
     setCreateOpen(true);
   };
 
-  const openCreateOkr = (mode: "annualUnderStrategy" | "quarterUnderAnnual", parentId: string) => {
+  const openCreateOkr = (mode: "annualUnderStrategy" | "quarterUnderAnnual", parentId: string | null) => {
     if (!canEdit) {
-      toast({ title: "Sem permissão", description: "Você não tem permissão para criar objetivos.", variant: "destructive" });
+      toast({ title: "Sem permissão", description: "Você não tem permissão para criar OKRs.", variant: "destructive" });
       return;
     }
 
@@ -447,7 +507,11 @@ export function OkrStrategyMapCanvas(props: {
 
       const krChildren: OrgNode<MapItem>[] = krs.map((kr) => {
         const kpct = krProgressPct(kr);
-        return node(`kr:${kr.id}`, { kind: "kr", kr, pct: typeof kpct === "number" ? kpct : null });
+        const delChildren: OrgNode<MapItem>[] = (deliverablesByKrId.get(kr.id) ?? []).map((d) => {
+          const owner = d.owner_user_id ? (peopleById.get(d.owner_user_id)?.name ?? "Colaborador") : "Sem responsável";
+          return node(`d:${d.id}`, { kind: "deliverable", deliverable: d, ownerName: owner });
+        });
+        return node(`kr:${kr.id}`, { kind: "kr", kr, pct: typeof kpct === "number" ? kpct : null }, delChildren);
       });
 
       return node(`o:${o.id}`, { kind: "objective", objective: o, cycle, pct, ownerName }, krChildren);
@@ -518,12 +582,15 @@ export function OkrStrategyMapCanvas(props: {
       );
     }
 
-    const strategyRoot = node("strategy-root", { kind: "strategyRoot" }, [...placeholders, ...topStrategy, ...groups]);
-    return [node("vision", { kind: "vision" }, [strategyRoot])];
+    return [
+      node("vision", { kind: "vision" }),
+      node("strategy", { kind: "strategyRoot" }, [...topStrategy, ...placeholders, ...groups]),
+    ];
   }, [
     annualByStrategyId,
     annualObjectives,
     cycleById,
+    deliverablesByKrId,
     filterActive,
     krsByObjectiveId,
     orphanQuarterObjectives,
@@ -533,781 +600,933 @@ export function OkrStrategyMapCanvas(props: {
     strategy,
   ]);
 
+  const toNum = (raw: string) => {
+    const s = (raw ?? "").trim();
+    if (!s) return null;
+    const m = s.match(/-?\d+(?:[\.,]\d+)?/);
+    if (!m) return null;
+    const token = m[0].replace(/\./g, "").replace(/,/g, ".");
+    const n = Number(token);
+    return Number.isFinite(n) ? n : null;
+  };
+
   const visionText = (fundamentals?.vision ?? "").trim();
 
   return (
-    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Mapa Estratégico-Tático-Operacional</div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            {filterActive
-              ? `Filtrando por time: ${departmentsById.get(teamId)?.name ?? "—"} (mantendo fundamentos + longo prazo no caminho)`
-              : ""}
+    <div className="relative">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Mapa Estratégico-Tático-Operacional</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              {filterActive
+                ? `Filtrando por time: ${departmentsById.get(teamId)?.name ?? "—"} (mantendo fundamentos + longo prazo no caminho)`
+                : ""}
+            </div>
+          </div>
+
+          <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-[780px]">
+            <div className="grid gap-2">
+              <Label className="text-xs">Ciclo do ano</Label>
+              <Select value={annualCycleId} onValueChange={setAnnualCycleId}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  {annualOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {cycleLabelShort(c)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-xs">Ciclo do trimestre</Label>
+              <Select value={quarterCycleId} onValueChange={setQuarterCycleId}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  {quarterOptions.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {cycleLabelShort(c)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label className="text-xs">Time</Label>
+              <Select value={teamId} onValueChange={setTeamId}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue placeholder="Todos" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="ALL">Todos os times</SelectItem>
+                  {departmentOptions.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
 
-        <div className="grid w-full gap-3 sm:grid-cols-3 lg:w-[780px]">
-          <div className="grid gap-2">
-            <Label className="text-xs">Ciclo do ano</Label>
-            <Select value={annualCycleId} onValueChange={setAnnualCycleId}>
-              <SelectTrigger className="h-11 rounded-2xl bg-white">
-                <SelectValue placeholder="Selecione…" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl">
-                {annualOptions.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {cycleLabelShort(c)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label className="text-xs">Ciclo do trimestre</Label>
-            <Select value={quarterCycleId} onValueChange={setQuarterCycleId}>
-              <SelectTrigger className="h-11 rounded-2xl bg-white">
-                <SelectValue placeholder="Selecione…" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl">
-                {quarterOptions.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {cycleLabelShort(c)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label className="text-xs">Time</Label>
-            <Select value={teamId} onValueChange={setTeamId}>
-              <SelectTrigger className="h-11 rounded-2xl bg-white">
-                <SelectValue placeholder="Todos" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl">
-                <SelectItem value="ALL">Todos os times</SelectItem>
-                {departmentOptions.map((d) => (
-                  <SelectItem key={d.id} value={d.id}>
-                    {d.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+        <Separator className="my-5" />
 
-      <Separator className="my-5" />
+        <OrgChartTreeCanvas
+          roots={roots}
+          renderNode={(n) => {
+            const d = n.data;
 
-      <OrgChartTreeCanvas
-        roots={roots}
-        className={cn((qAnnualObjectives.isLoading || qQuarterObjectives.isLoading) && "opacity-70")}
-        renderNode={(n) => {
-          const d = n.data;
-
-          if (d.kind === "vision") {
-            return (
-              <button
-                type="button"
-                onClick={onOpenVision}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="group relative grid w-[320px] text-left outline-none"
-                aria-label="Abrir visão"
-              >
-                <div className="rounded-3xl border border-[color:var(--map-fundamentals-border)] bg-[color:var(--map-fundamentals-bg)] p-5 shadow-sm transition group-hover:shadow-md">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--map-fundamentals-ink)]">
-                        <Eye className="h-4 w-4" /> Visão
-                      </div>
-                      <div className="mt-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/85">
-                        {visionText ? (visionText.length > 120 ? visionText.slice(0, 120) + "…" : visionText) : "Sem visão cadastrada (clique para editar)"}
-                      </div>
-                    </div>
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 text-[color:var(--map-fundamentals-ink)] ring-1 ring-[color:var(--map-fundamentals-border)]">
-                      <Flag className="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          }
-
-          if (d.kind === "strategyRoot") {
-            return (
-              <div className="w-[300px] rounded-3xl border border-[color:var(--map-strategy-border)] bg-[color:var(--map-strategy-bg)] p-4 text-left shadow-sm">
-                <div className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--map-strategy-ink)]">
-                  <Layers className="h-4 w-4" /> Longo prazo
-                </div>
-              </div>
-            );
-          }
-
-          if (d.kind === "placeholderStrategy") {
-            const label = d.horizon === 10 ? "Criar objetivo (10 anos)" : d.horizon === 5 ? "Criar objetivo (5 anos)" : "Criar objetivo (2 anos)";
-            return (
-              <button
-                type="button"
-                onClick={() => openCreateForHorizon(d.horizon)}
-                onPointerDown={(e) => e.stopPropagation()}
-                className="group relative grid w-[300px] text-left outline-none"
-                aria-label={label}
-                title={label}
-              >
-                <div className="rounded-3xl border border-dashed border-[color:var(--map-strategy-border)] bg-[color:var(--map-strategy-bg)]/40 p-4 shadow-sm transition group-hover:bg-[color:var(--map-strategy-bg)]/55 group-hover:shadow-md">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold text-[color:var(--map-strategy-ink)]">{label}</div>
-                      <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/70">Não encontramos nenhum objetivo nesse horizonte.</div>
-                    </div>
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)]">
-                      <Plus className="h-4 w-4" />
-                    </div>
-                  </div>
-                </div>
-              </button>
-            );
-          }
-
-          if (d.kind === "strategyObjective") {
-            return (
-              <div className="relative">
+            if (d.kind === "vision") {
+              return (
                 <button
                   type="button"
-                  onClick={() => onOpenStrategyObjective(d.so.id)}
+                  onClick={onOpenVision}
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="group relative grid w-[300px] text-left outline-none"
-                  aria-label={`Abrir objetivo de longo prazo: ${d.so.title}`}
-                  title={d.so.title}
+                  className="group relative grid w-[320px] text-left outline-none"
+                  aria-label="Abrir visão"
                 >
-                  <div className="rounded-3xl border border-[color:var(--map-strategy-border)] bg-white p-4 shadow-sm transition group-hover:shadow-md">
+                  <div className="rounded-3xl border border-[color:var(--map-fundamentals-border)] bg-[color:var(--map-fundamentals-bg)] p-5 shadow-sm transition group-hover:shadow-md">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.so.title}</div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <Badge className="rounded-full bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)] hover:bg-[color:var(--map-strategy-bg)]">
-                            {d.so.horizon_years} anos
-                          </Badge>
-                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
-                            {d.so.target_year ?? new Date().getFullYear() + d.so.horizon_years}
-                          </Badge>
-                          {d.so.linked_fundamental ? (
-                            <Badge className="rounded-full bg-[color:var(--map-fundamentals-bg)] text-[color:var(--map-fundamentals-ink)] ring-1 ring-[color:var(--map-fundamentals-border)] hover:bg-[color:var(--map-fundamentals-bg)]">
-                              {d.so.linked_fundamental === "VISION" ? "Visão" : "Fundamento"}
-                            </Badge>
-                          ) : null}
+                        <div className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--map-fundamentals-ink)]">
+                          <Eye className="h-4 w-4" /> Visão
+                        </div>
+                        <div className="mt-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/85">
+                          {visionText
+                            ? visionText.length > 120
+                              ? visionText.slice(0, 120) + "…"
+                              : visionText
+                            : "Sem visão cadastrada (clique para editar)"}
                         </div>
                       </div>
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)]">
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 text-[color:var(--map-fundamentals-ink)] ring-1 ring-[color:var(--map-fundamentals-border)]">
                         <Flag className="h-4 w-4" />
                       </div>
                     </div>
                   </div>
                 </button>
+              );
+            }
 
-                {canEdit ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-strategy-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
-                        title="Adicionar"
-                        aria-label="Adicionar"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="start"
-                      side="right"
-                      className="w-56 rounded-2xl border-[color:var(--sinaxys-border)] bg-white p-2 shadow-lg"
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <div className="grid gap-1">
-                        <Button
-                          variant="ghost"
-                          className="h-10 justify-start rounded-xl"
-                          onClick={() => openCreateOkr("annualUnderStrategy", d.so.id)}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Criar objetivo do ano
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="h-10 justify-start rounded-xl"
-                          onClick={() => {
-                            // Create KR for the first annual objective under this strategy objective (if any)
-                            const annualKids = annualByStrategyId.get(d.so.id) ?? [];
-                            const first = annualKids[0];
-                            if (!first) {
-                              toast({
-                                title: "Crie um objetivo do ano primeiro",
-                                description: "Para criar um KR, primeiro crie um objetivo do ano abaixo deste objetivo de longo prazo.",
-                                variant: "destructive",
-                              });
-                              return;
-                            }
-                            openCreateKr(first.id);
-                          }}
-                        >
-                          <Target className="mr-2 h-4 w-4" />
-                          Criar Key Result (KR)
-                        </Button>
+            if (d.kind === "strategyRoot") {
+              return (
+                <div className="w-[300px] rounded-3xl border border-[color:var(--map-strategy-border)] bg-[color:var(--map-strategy-bg)] p-4 text-left shadow-sm">
+                  <div className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--map-strategy-ink)]">
+                    <Layers className="h-4 w-4" /> Longo prazo
+                  </div>
+                </div>
+              );
+            }
 
+            if (d.kind === "placeholderStrategy") {
+              const label = d.horizon === 10 ? "Criar objetivo (10 anos)" : d.horizon === 5 ? "Criar objetivo (5 anos)" : "Criar objetivo (2 anos)";
+              return (
+                <button
+                  type="button"
+                  onClick={() => openCreateForHorizon(d.horizon)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="group relative grid w-[300px] text-left outline-none"
+                  aria-label={label}
+                  title={label}
+                >
+                  <div className="rounded-3xl border border-dashed border-[color:var(--map-strategy-border)] bg-[color:var(--map-strategy-bg)]/40 p-4 shadow-sm transition group-hover:bg-[color:var(--map-strategy-bg)]/55 group-hover:shadow-md">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-[color:var(--map-strategy-ink)]">{label}</div>
+                        <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/70">Não encontramos nenhum objetivo nesse horizonte.</div>
                       </div>
-                    </PopoverContent>
-                  </Popover>
-                ) : null}
-              </div>
-            );
-          }
+                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-white/70 text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)]">
+                        <Plus className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                </button>
+              );
+            }
 
-          if (d.kind === "group") {
-            return (
-              <div className="w-[300px] rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-left">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
-                {d.subtitle ? <div className="mt-1 text-xs text-muted-foreground">{d.subtitle}</div> : null}
-              </div>
-            );
-          }
+            if (d.kind === "strategyObjective") {
+              return (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => onOpenStrategyObjective(d.so.id)}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="group relative grid w-[300px] text-left outline-none"
+                    aria-label={`Abrir objetivo de longo prazo: ${d.so.title}`}
+                    title={d.so.title}
+                  >
+                    <div className="rounded-3xl border border-[color:var(--map-strategy-border)] bg-white p-4 shadow-sm transition group-hover:shadow-md">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.so.title}</div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <Badge className="rounded-full bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)] hover:bg-[color:var(--map-strategy-bg)]">
+                              {d.so.horizon_years} anos
+                            </Badge>
+                            <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                              {d.so.target_year ?? new Date().getFullYear() + d.so.horizon_years}
+                            </Badge>
+                            {d.so.linked_fundamental ? (
+                              <Badge className="rounded-full bg-[color:var(--map-fundamentals-bg)] text-[color:var(--map-fundamentals-ink)] ring-1 ring-[color:var(--map-fundamentals-border)] hover:bg-[color:var(--map-fundamentals-bg)]">
+                                {d.so.linked_fundamental === "VISION" ? "Visão" : "Fundamento"}
+                              </Badge>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--map-strategy-bg)] text-[color:var(--map-strategy-ink)] ring-1 ring-[color:var(--map-strategy-border)]">
+                          <Flag className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </div>
+                  </button>
 
-          if (d.kind === "objective") {
-            const cycle = d.cycle;
-            const cycleTag = cycle ? cycleLabelShort(cycle) : "Ciclo";
+                  {canEdit ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-strategy-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
+                          title="Adicionar"
+                          aria-label="Adicionar"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        side="right"
+                        className="w-56 rounded-2xl border-[color:var(--sinaxys-border)] bg-white p-2 shadow-lg"
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <div className="grid gap-1">
+                          <Button
+                            variant="ghost"
+                            className="h-10 justify-start rounded-xl"
+                            onClick={() => openCreateOkr("annualUnderStrategy", d.so.id)}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Criar objetivo do ano
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="h-10 justify-start rounded-xl"
+                            onClick={() => {
+                              // Create KR for the first annual objective under this strategy objective (if any)
+                              const annualKids = annualByStrategyId.get(d.so.id) ?? [];
+                              const first = annualKids[0];
+                              if (!first) {
+                                toast({
+                                  title: "Crie um objetivo do ano primeiro",
+                                  description: "Para criar um KR, primeiro crie um objetivo do ano abaixo deste objetivo de longo prazo.",
+                                  variant: "destructive",
+                                });
+                                return;
+                              }
+                              openCreateKr(first.id);
+                            }}
+                          >
+                            <Target className="mr-2 h-4 w-4" />
+                            Criar Key Result (KR)
+                          </Button>
+
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  ) : null}
+                </div>
+              );
+            }
+
+            if (d.kind === "group") {
+              return (
+                <div className="w-[300px] rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-left">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                  {d.subtitle ? <div className="mt-1 text-xs text-muted-foreground">{d.subtitle}</div> : null}
+                </div>
+              );
+            }
+
+            if (d.kind === "objective") {
+              const cycle = d.cycle;
+              const cycleTag = cycle ? cycleLabelShort(cycle) : "Ciclo";
+              const pct = d.pct;
+              const canCreateBelow = canEdit && cycle?.type === "ANNUAL";
+
+              return (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => onOpenObjective(d.objective.id)}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="group relative grid w-[320px] text-left outline-none"
+                    aria-label={`Abrir objetivo: ${d.objective.title}`}
+                    title={d.objective.title}
+                  >
+                    <div className="rounded-3xl border border-[color:var(--map-objectives-border)] bg-white p-5 shadow-sm transition group-hover:shadow-md">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.objective.title}</div>
+                          <div className="mt-2 flex flex-wrap items-center gap-2">
+                            <Badge className="rounded-full bg-[color:var(--map-cycles-bg)] text-[color:var(--map-cycles-ink)] ring-1 ring-[color:var(--map-cycles-border)] hover:bg-[color:var(--map-cycles-bg)]">
+                              {cycleTag}
+                            </Badge>
+                            <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                              {d.ownerName}
+                            </Badge>
+                            {typeof pct === "number" ? (
+                              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">{pct}%</Badge>
+                            ) : null}
+                          </div>
+                          {typeof pct === "number" ? (
+                            <Progress value={pct} className="mt-3 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
+                          ) : null}
+                        </div>
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--map-objectives-bg)] text-[color:var(--map-objectives-ink)] ring-1 ring-[color:var(--map-objectives-border)]">
+                          {cycle?.type === "ANNUAL" ? <CalendarClock className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+
+                  {canEdit ? (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          onPointerDown={(e) => e.stopPropagation()}
+                          className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-objectives-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
+                          title="Adicionar"
+                          aria-label="Adicionar"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        align="start"
+                        side="right"
+                        className="w-56 rounded-2xl border-[color:var(--sinaxys-border)] bg-white p-2 shadow-lg"
+                        onPointerDown={(e) => e.stopPropagation()}
+                      >
+                        <div className="grid gap-1">
+                          <Button
+                            variant="ghost"
+                            className={cn("h-10 justify-start rounded-xl", !canCreateBelow && "opacity-50")}
+                            disabled={!canCreateBelow}
+                            onClick={() => openCreateOkr("quarterUnderAnnual", d.objective.id)}
+                            title={canCreateBelow ? "Criar objetivo do trimestre abaixo" : "Disponível apenas para objetivos do ano"}
+                          >
+                            <Plus className="mr-2 h-4 w-4" />
+                            Criar objetivo abaixo
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="h-10 justify-start rounded-xl"
+                            onClick={() => openCreateKr(d.objective.id)}
+                          >
+                            <Target className="mr-2 h-4 w-4" />
+                            Criar Key Result (KR)
+                          </Button>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  ) : null}
+                </div>
+              );
+            }
+
+            if (d.kind === "deliverable") {
+              const statusLabel =
+                d.deliverable.status === "DONE" ? "Concluído" : d.deliverable.status === "IN_PROGRESS" ? "Em andamento" : "A fazer";
+              const statusCls =
+                d.deliverable.status === "DONE"
+                  ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                  : d.deliverable.status === "IN_PROGRESS"
+                    ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                    : "bg-slate-50 text-slate-700 ring-1 ring-slate-200";
+
+              return (
+                <div className="w-[240px] rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.deliverable.title}</div>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                        <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold", statusCls)}>
+                          {statusLabel}
+                        </span>
+                        <span className="inline-flex items-center gap-1">
+                          <UserRound className="h-3.5 w-3.5" />
+                          {d.ownerName}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                      <Package className="h-4 w-4" />
+                    </div>
+                  </div>
+                </div>
+              );
+            }
+
             const pct = d.pct;
-            const canCreateBelow = canEdit && cycle?.type === "ANNUAL";
+            const unit = d.kr.metric_unit?.trim() ?? "";
+            const unitSuffix = unit ? ` ${unit}` : "";
+            const fmt = (v: number | null) => {
+              if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+              return v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+            };
+
+            const objectiveId = krToObjectiveId.get(d.kr.id) ?? null;
+            const parentObjective = objectiveId ? allObjectivesById.get(objectiveId) ?? null : null;
+            const parentCycle = parentObjective ? (cycleById.get(parentObjective.cycle_id) ?? null) : null;
+            const isTier2Kr = parentCycle?.type === "QUARTERLY";
 
             return (
               <div className="relative">
                 <button
                   type="button"
-                  onClick={() => onOpenObjective(d.objective.id)}
+                  onClick={() => {
+                    setEditingKr(d.kr);
+                    setKrDialogOpen(true);
+                  }}
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="group relative grid w-[320px] text-left outline-none"
-                  aria-label={`Abrir objetivo: ${d.objective.title}`}
-                  title={d.objective.title}
+                  className="group relative grid w-[260px] text-left outline-none"
+                  aria-label={`Editar KR: ${d.kr.title}`}
+                  title={d.kr.title}
                 >
-                  <div className="rounded-3xl border border-[color:var(--map-objectives-border)] bg-white p-5 shadow-sm transition group-hover:shadow-md">
-                    <div className="flex items-start justify-between gap-3">
+                  <div className="rounded-2xl border border-[color:var(--map-objectives-border)] bg-[color:var(--map-objectives-bg)]/25 p-3 shadow-sm transition group-hover:shadow-md">
+                    <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.objective.title}</div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <Badge className="rounded-full bg-[color:var(--map-cycles-bg)] text-[color:var(--map-cycles-ink)] ring-1 ring-[color:var(--map-cycles-border)] hover:bg-[color:var(--map-cycles-bg)]">
-                            {cycleTag}
-                          </Badge>
-                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
-                            {d.ownerName}
-                          </Badge>
+                        <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.kr.title}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                          <span className="inline-flex items-center gap-1">
+                            <Target className="h-3.5 w-3.5" /> KR
+                          </span>
+                          <span>•</span>
+                          <span>{d.kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico"}</span>
                           {typeof pct === "number" ? (
-                            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">{pct}%</Badge>
+                            <>
+                              <span>•</span>
+                              <span className="font-medium text-[color:var(--sinaxys-ink)]">{pct}%</span>
+                            </>
                           ) : null}
                         </div>
-                        {typeof pct === "number" ? (
-                          <Progress value={pct} className="mt-3 h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
-                        ) : null}
                       </div>
-                      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--map-objectives-bg)] text-[color:var(--map-objectives-ink)] ring-1 ring-[color:var(--map-objectives-border)]">
-                        {cycle?.type === "ANNUAL" ? <CalendarClock className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
+                      <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/80 text-[color:var(--map-objectives-ink)] ring-1 ring-[color:var(--map-objectives-border)]">
+                        <Target className="h-4 w-4" />
                       </div>
                     </div>
+
+                    {d.kr.kind === "METRIC" ? (
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        <div className="rounded-xl bg-white/70 px-2 py-1 ring-1 ring-[color:var(--map-objectives-border)]">
+                          <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Partida</div>
+                          <div className="text-[11px] font-semibold text-[color:var(--sinaxys-ink)]">
+                            {fmt(d.kr.start_value)}{unitSuffix}
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-white/70 px-2 py-1 ring-1 ring-[color:var(--map-objectives-border)]">
+                          <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Atual</div>
+                          <div className="text-[11px] font-semibold text-[color:var(--sinaxys-ink)]">
+                            {fmt(d.kr.current_value)}{unitSuffix}
+                          </div>
+                        </div>
+                        <div className="rounded-xl bg-white/70 px-2 py-1 ring-1 ring-[color:var(--map-objectives-border)]">
+                          <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Destino</div>
+                          <div className="text-[11px] font-semibold text-[color:var(--sinaxys-ink)]">
+                            {fmt(d.kr.target_value)}{unitSuffix}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {typeof pct === "number" ? (
+                      <div className="mt-2">
+                        <Progress value={pct} className="h-2 rounded-full bg-white/60" />
+                      </div>
+                    ) : null}
                   </div>
                 </button>
 
-                {canEdit ? (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-objectives-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
-                        title="Adicionar"
-                        aria-label="Adicionar"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      align="start"
-                      side="right"
-                      className="w-56 rounded-2xl border-[color:var(--sinaxys-border)] bg-white p-2 shadow-lg"
-                      onPointerDown={(e) => e.stopPropagation()}
-                    >
-                      <div className="grid gap-1">
-                        <Button
-                          variant="ghost"
-                          className={cn("h-10 justify-start rounded-xl", !canCreateBelow && "opacity-50")}
-                          disabled={!canCreateBelow}
-                          onClick={() => openCreateOkr("quarterUnderAnnual", d.objective.id)}
-                          title={canCreateBelow ? "Criar objetivo do trimestre abaixo" : "Disponível apenas para objetivos do ano"}
-                        >
-                          <Plus className="mr-2 h-4 w-4" />
-                          Criar objetivo abaixo
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="h-10 justify-start rounded-xl"
-                          onClick={() => openCreateKr(d.objective.id)}
-                        >
-                          <Target className="mr-2 h-4 w-4" />
-                          Criar Key Result (KR)
-                        </Button>
-                      </div>
-                    </PopoverContent>
-                  </Popover>
+                {canEdit && isTier2Kr ? (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCreateDeliverable(d.kr.id);
+                    }}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    className="absolute -right-3 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full bg-white text-[color:var(--sinaxys-primary)] shadow-sm ring-1 ring-[color:var(--map-objectives-border)] transition hover:bg-[color:var(--sinaxys-bg)]"
+                    title="Adicionar entregável"
+                    aria-label="Adicionar entregável"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
                 ) : null}
               </div>
             );
-          }
+          }}
+        />
 
-          const pct = d.pct;
-          const unit = d.kr.metric_unit?.trim() ?? "";
-          const unitSuffix = unit ? ` ${unit}` : "";
-          const fmt = (v: number | null) => {
-            if (typeof v !== "number" || !Number.isFinite(v)) return "—";
-            return v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-          };
+        <Dialog open={createOpen} onOpenChange={(v) => !creating && setCreateOpen(v)}>
+          <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Criar objetivo de longo prazo ({createHorizon} anos)</DialogTitle>
+            </DialogHeader>
 
-          return (
-            <button
-              type="button"
-              onClick={() => {
-                setEditingKr(d.kr);
-                setKrDialogOpen(true);
-              }}
-              onPointerDown={(e) => e.stopPropagation()}
-              className="group relative grid w-[260px] text-left outline-none"
-              aria-label={`Editar KR: ${d.kr.title}`}
-              title={d.kr.title}
-            >
-              <div className="rounded-2xl border border-[color:var(--map-objectives-border)] bg-[color:var(--map-objectives-bg)]/25 p-3 shadow-sm transition group-hover:shadow-md">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.kr.title}</div>
-                    <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                      <span className="inline-flex items-center gap-1">
-                        <Target className="h-3.5 w-3.5" /> KR
-                      </span>
-                      <span>•</span>
-                      <span>{d.kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico"}</span>
-                      {typeof pct === "number" ? (
-                        <>
-                          <span>•</span>
-                          <span className="font-medium text-[color:var(--sinaxys-ink)]">{pct}%</span>
-                        </>
-                      ) : null}
-                    </div>
-                  </div>
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-white/80 text-[color:var(--map-objectives-ink)] ring-1 ring-[color:var(--map-objectives-border)]">
-                    <Target className="h-4 w-4" />
-                  </div>
-                </div>
-
-                {d.kr.kind === "METRIC" ? (
-                  <div className="mt-2 grid grid-cols-3 gap-2">
-                    <div className="rounded-xl bg-white/70 px-2 py-1 ring-1 ring-[color:var(--map-objectives-border)]">
-                      <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Partida</div>
-                      <div className="text-[11px] font-semibold text-[color:var(--sinaxys-ink)]">
-                        {fmt(d.kr.start_value)}{unitSuffix}
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-white/70 px-2 py-1 ring-1 ring-[color:var(--map-objectives-border)]">
-                      <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Atual</div>
-                      <div className="text-[11px] font-semibold text-[color:var(--sinaxys-ink)]">
-                        {fmt(d.kr.current_value)}{unitSuffix}
-                      </div>
-                    </div>
-                    <div className="rounded-xl bg-white/70 px-2 py-1 ring-1 ring-[color:var(--map-objectives-border)]">
-                      <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Destino</div>
-                      <div className="text-[11px] font-semibold text-[color:var(--sinaxys-ink)]">
-                        {fmt(d.kr.target_value)}{unitSuffix}
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
-
-                {typeof pct === "number" ? (
-                  <div className="mt-2">
-                    <Progress value={pct} className="h-2 rounded-full bg-white/60" />
-                  </div>
-                ) : null}
-              </div>
-            </button>
-          );
-        }}
-      />
-
-      <Dialog open={createOpen} onOpenChange={(v) => !creating && setCreateOpen(v)}>
-        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Criar objetivo de longo prazo ({createHorizon} anos)</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Título</Label>
-              <Input className="h-11 rounded-2xl" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} disabled={creating} />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Para quando (ano)</Label>
-              <Input
-                type="number"
-                inputMode="numeric"
-                className="h-11 rounded-2xl"
-                value={createTargetYear}
-                onChange={(e) => setCreateTargetYear(e.target.value)}
-                disabled={creating}
-              />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Responsável</Label>
-              <Select value={createOwner ?? "__company__"} onValueChange={(v) => setCreateOwner(v === "__company__" ? null : v)} disabled={creating}>
-                <SelectTrigger className="h-11 rounded-2xl bg-white">
-                  <SelectValue placeholder="Selecione…" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value="__company__">Toda a empresa</SelectItem>
-                  {peopleOptions.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Descrição (opcional)</Label>
-              <Textarea className="min-h-[110px] rounded-2xl" value={createDesc} onChange={(e) => setCreateDesc(e.target.value)} disabled={creating} />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateOpen(false)} disabled={creating}>
-              Cancelar
-            </Button>
-            <Button
-              className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={creating || createTitle.trim().length < 6}
-              onClick={async () => {
-                setCreating(true);
-                try {
-                  const nYear = createTargetYear.trim() ? Number(createTargetYear.trim()) : null;
-                  const created = await createStrategyObjective({
-                    company_id: companyId,
-                    horizon_years: createHorizon,
-                    target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
-                    title: createTitle,
-                    description: createDesc.trim() || null,
-                    created_by_user_id: userId,
-                    owner_user_id: createOwner,
-                    // Strong default: if we create the first of this horizon, connect to Vision.
-                    linked_fundamental: createHorizon === 10 ? "VISION" : null,
-                  });
-
-                  toast({ title: "Objetivo criado" });
-                  await qc.invalidateQueries({ queryKey: ["okr-strategy", companyId] });
-                  setCreateOpen(false);
-                  onOpenStrategyObjective(created.id);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível criar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setCreating(false);
-                }
-              }}
-            >
-              Criar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={createKrOpen}
-        onOpenChange={(v) => {
-          if (creatingKr) return;
-          setCreateKrOpen(v);
-          if (!v) setCreateKrObjectiveId(null);
-        }}
-      >
-        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Criar Key Result (KR)</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Tipo</Label>
-              <Select value={createKrKind} onValueChange={(v) => {
-                const next = v as KrKind;
-                setCreateKrKind(next);
-                if (next === "METRIC" && !createKrStart.trim()) setCreateKrStart("0");
-              }} disabled={creatingKr}>
-                <SelectTrigger className="h-11 rounded-2xl bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value="METRIC">Métrico (de → para)</SelectItem>
-                  <SelectItem value="DELIVERABLE">Entregável (até data)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Título</Label>
-              <Input className="h-11 rounded-2xl" value={createKrTitle} onChange={(e) => setCreateKrTitle(e.target.value)} disabled={creatingKr} />
-            </div>
-
-            <div className="grid gap-2">
-              <Label>Responsável (opcional)</Label>
-              <Select
-                value={createKrOwner ?? "__none__"}
-                onValueChange={(v) => setCreateKrOwner(v === "__none__" ? null : v)}
-                disabled={creatingKr}
-              >
-                <SelectTrigger className="h-11 rounded-2xl bg-white">
-                  <SelectValue placeholder="Sem responsável" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value="__none__">Sem responsável</SelectItem>
-                  {peopleOptions.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {createKrKind === "METRIC" ? (
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="grid gap-2">
-                  <Label>Origem</Label>
-                  <Input className="h-11 rounded-2xl" inputMode="decimal" value={createKrStart} onChange={(e) => setCreateKrStart(e.target.value)} placeholder="0" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Meta</Label>
-                  <Input className="h-11 rounded-2xl" inputMode="decimal" value={createKrTarget} onChange={(e) => setCreateKrTarget(e.target.value)} placeholder="100" />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Unidade (opcional)</Label>
-                  <Input className="h-11 rounded-2xl" value={createKrUnit} onChange={(e) => setCreateKrUnit(e.target.value)} placeholder="%, R$, pts…" />
-                </div>
-              </div>
-            ) : (
+            <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label>Prazo (opcional)</Label>
-                <Input className="h-11 rounded-2xl" type="date" value={createKrDue} onChange={(e) => setCreateKrDue(e.target.value)} />
+                <Label>Título</Label>
+                <Input className="h-11 rounded-2xl" value={createTitle} onChange={(e) => setCreateTitle(e.target.value)} disabled={creating} />
               </div>
-            )}
-          </div>
 
-          <DialogFooter>
-            <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateKrOpen(false)} disabled={creatingKr}>
-              Cancelar
-            </Button>
-            <Button
-              className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={creatingKr || !createKrObjectiveId || createKrTitle.trim().length < 4}
-              onClick={async () => {
-                if (!createKrObjectiveId) return;
-                setCreatingKr(true);
-                try {
-                  const toNum = (s: string) => {
-                    const raw = s.trim();
-                    if (!raw) return null;
+              <div className="grid gap-2">
+                <Label>Para quando (ano)</Label>
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  className="h-11 rounded-2xl"
+                  value={createTargetYear}
+                  onChange={(e) => setCreateTargetYear(e.target.value)}
+                  disabled={creating}
+                />
+              </div>
 
-                    // Accept pt-BR formatting and accidental suffixes (e.g., "%", spaces)
-                    // Examples accepted: "30", "30,5", "1.200", "1.200,50", "30%"
-                    const token = raw.match(/-?\d+(?:[\.,]\d+)?/)?.[0] ?? "";
-                    if (!token) return null;
+              <div className="grid gap-2">
+                <Label>Responsável</Label>
+                <Select value={createOwner ?? "__company__"} onValueChange={(v) => setCreateOwner(v === "__company__" ? null : v)} disabled={creating}>
+                  <SelectTrigger className="h-11 rounded-2xl bg-white">
+                    <SelectValue placeholder="Selecione…" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    <SelectItem value="__company__">Toda a empresa</SelectItem>
+                    {peopleOptions.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-                    const hasComma = token.includes(",");
-                    const hasDot = token.includes(".");
+              <div className="grid gap-2">
+                <Label>Descrição (opcional)</Label>
+                <Textarea className="min-h-[110px] rounded-2xl" value={createDesc} onChange={(e) => setCreateDesc(e.target.value)} disabled={creating} />
+              </div>
+            </div>
 
-                    let cleaned = token;
-                    if (hasComma && hasDot) {
-                      // assume dot is thousands separator and comma is decimal separator
-                      cleaned = cleaned.replace(/\./g, "").replace(",", ".");
-                    } else if (hasComma) {
-                      cleaned = cleaned.replace(",", ".");
+            <DialogFooter>
+              <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateOpen(false)} disabled={creating}>
+                Cancelar
+              </Button>
+              <Button
+                className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={creating || createTitle.trim().length < 6}
+                onClick={async () => {
+                  setCreating(true);
+                  try {
+                    const nYear = createTargetYear.trim() ? Number(createTargetYear.trim()) : null;
+                    const created = await createStrategyObjective({
+                      company_id: companyId,
+                      horizon_years: createHorizon,
+                      target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
+                      title: createTitle,
+                      description: createDesc.trim() || null,
+                      created_by_user_id: userId,
+                      owner_user_id: createOwner,
+                      // Strong default: if we create the first of this horizon, connect to Vision.
+                      linked_fundamental: createHorizon === 10 ? "VISION" : null,
+                    });
+
+                    toast({ title: "Objetivo criado" });
+                    await qc.invalidateQueries({ queryKey: ["okr-strategy", companyId] });
+                    setCreateOpen(false);
+                    onOpenStrategyObjective(created.id);
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível criar",
+                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setCreating(false);
+                  }
+                }}
+              >
+                Criar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={createKrOpen}
+          onOpenChange={(v) => {
+            if (creatingKr) return;
+            setCreateKrOpen(v);
+            if (!v) setCreateKrObjectiveId(null);
+          }}
+        >
+          <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Criar Key Result (KR)</DialogTitle>
+            </DialogHeader>
+
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label>Tipo</Label>
+                <Select value={createKrKind} onValueChange={(v) => {
+                  const next = v as KrKind;
+                  setCreateKrKind(next);
+                  if (next === "METRIC" && !createKrStart.trim()) setCreateKrStart("0");
+                }} disabled={creatingKr}>
+                  <SelectTrigger className="h-11 rounded-2xl bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    <SelectItem value="METRIC">Métrico (de → para)</SelectItem>
+                    <SelectItem value="DELIVERABLE">Entregável (até data)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Título</Label>
+                <Input className="h-11 rounded-2xl" value={createKrTitle} onChange={(e) => setCreateKrTitle(e.target.value)} disabled={creatingKr} />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Responsável (opcional)</Label>
+                <Select
+                  value={createKrOwner ?? "__none__"}
+                  onValueChange={(v) => setCreateKrOwner(v === "__none__" ? null : v)}
+                  disabled={creatingKr}
+                >
+                  <SelectTrigger className="h-11 rounded-2xl bg-white">
+                    <SelectValue placeholder="Sem responsável" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    <SelectItem value="__none__">Sem responsável</SelectItem>
+                    {peopleOptions.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {createKrKind === "METRIC" ? (
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Label>Origem</Label>
+                    <Input className="h-11 rounded-2xl" inputMode="decimal" value={createKrStart} onChange={(e) => setCreateKrStart(e.target.value)} placeholder="0" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Meta</Label>
+                    <Input className="h-11 rounded-2xl" inputMode="decimal" value={createKrTarget} onChange={(e) => setCreateKrTarget(e.target.value)} placeholder="100" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Unidade (opcional)</Label>
+                    <Input className="h-11 rounded-2xl" value={createKrUnit} onChange={(e) => setCreateKrUnit(e.target.value)} placeholder="%, R$, pts…" />
+                  </div>
+                </div>
+              ) : (
+                <div className="grid gap-2">
+                  <Label>Prazo (opcional)</Label>
+                  <Input className="h-11 rounded-2xl" type="date" value={createKrDue} onChange={(e) => setCreateKrDue(e.target.value)} />
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateKrOpen(false)} disabled={creatingKr}>
+                Cancelar
+              </Button>
+              <Button
+                className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={creatingKr || !createKrObjectiveId || createKrTitle.trim().length < 4}
+                onClick={async () => {
+                  if (!createKrObjectiveId) return;
+                  setCreatingKr(true);
+                  try {
+                    const toNum = (s: string) => {
+                      const raw = s.trim();
+                      if (!raw) return null;
+
+                      // Accept pt-BR formatting and accidental suffixes (e.g., "%", spaces)
+                      // Examples accepted: "30", "30,5", "1.200", "1.200,50", "30%"
+                      const token = raw.match(/-?\d+(?:[\.,]\d+)?/)?.[0] ?? "";
+                      if (!token) return null;
+
+                      const hasComma = token.includes(",");
+                      const hasDot = token.includes(".");
+
+                      let cleaned = token;
+                      if (hasComma && hasDot) {
+                        // assume dot is thousands separator and comma is decimal separator
+                        cleaned = cleaned.replace(/\./g, "").replace(",", ".");
+                      } else if (hasComma) {
+                        cleaned = cleaned.replace(",", ".");
+                      }
+
+                      const n = Number.parseFloat(cleaned);
+                      return Number.isFinite(n) ? n : null;
+                    };
+
+                    const kind: KrKind = createKrKind;
+                    const confidence: KrConfidence = "ON_TRACK";
+
+                    const start = kind === "METRIC" ? (toNum(createKrStart) ?? 0) : null;
+                    const target = kind === "METRIC" ? toNum(createKrTarget) : null;
+                    if (kind === "METRIC" && target === null) {
+                      throw new Error("Preencha a meta com um número válido.");
                     }
 
-                    const n = Number.parseFloat(cleaned);
-                    return Number.isFinite(n) ? n : null;
-                  };
+                    const created = await createKeyResult({
+                      objective_id: createKrObjectiveId,
+                      title: createKrTitle,
+                      kind,
+                      due_at: kind === "DELIVERABLE" ? (createKrDue.trim() || null) : null,
+                      achieved: false,
+                      metric_unit: kind === "METRIC" ? (createKrUnit.trim() || null) : null,
+                      start_value: kind === "METRIC" ? start : null,
+                      target_value: kind === "METRIC" ? target : null,
+                      current_value: kind === "METRIC" ? start : null,
+                      owner_user_id: createKrOwner,
+                      confidence,
+                    });
 
-                  const kind: KrKind = createKrKind;
-                  const confidence: KrConfidence = "ON_TRACK";
+                    await qc.invalidateQueries({ queryKey: ["okr-map-canvas-krs", companyId] });
+                    toast({ title: "KR criado" });
+                    setCreateKrOpen(false);
 
-                  const start = kind === "METRIC" ? (toNum(createKrStart) ?? 0) : null;
-                  const target = kind === "METRIC" ? toNum(createKrTarget) : null;
-                  if (kind === "METRIC" && target === null) {
-                    throw new Error("Preencha a meta com um número válido.");
+                    // Abrir imediatamente o editor do KR (no mapa)
+                    setEditingKr(created);
+                    setKrDialogOpen(true);
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível criar",
+                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setCreatingKr(false);
                   }
+                }}
+              >
+                Criar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-                  const created = await createKeyResult({
-                    objective_id: createKrObjectiveId,
-                    title: createKrTitle,
-                    kind,
-                    due_at: kind === "DELIVERABLE" ? (createKrDue.trim() || null) : null,
-                    achieved: false,
-                    metric_unit: kind === "METRIC" ? (createKrUnit.trim() || null) : null,
-                    start_value: kind === "METRIC" ? start : null,
-                    target_value: kind === "METRIC" ? target : null,
-                    current_value: kind === "METRIC" ? start : null,
-                    owner_user_id: createKrOwner,
-                    confidence,
-                  });
+        <Dialog open={createOkrOpen} onOpenChange={(v) => !creatingOkr && setCreateOkrOpen(v)}>
+          <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>
+                {createOkrMode === "annualUnderStrategy" ? "Criar objetivo do ano" : "Criar objetivo do trimestre"}
+              </DialogTitle>
+            </DialogHeader>
 
-                  await qc.invalidateQueries({ queryKey: ["okr-map-canvas-krs", companyId] });
-                  toast({ title: "KR criado" });
-                  setCreateKrOpen(false);
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label>Título</Label>
+                <Input className="h-11 rounded-2xl" value={createOkrTitle} onChange={(e) => setCreateOkrTitle(e.target.value)} disabled={creatingOkr} />
+              </div>
 
-                  // Abrir imediatamente o editor do KR (no mapa)
-                  setEditingKr(created);
-                  setKrDialogOpen(true);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível criar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setCreatingKr(false);
-                }
-              }}
-            >
-              Criar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <div className="grid gap-2">
+                <Label>Responsável</Label>
+                <Select value={createOkrOwner} onValueChange={(v) => setCreateOkrOwner(v)} disabled={creatingOkr}>
+                  <SelectTrigger className="h-11 rounded-2xl bg-white">
+                    <SelectValue placeholder="Selecione…" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    {peopleOptions.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">Dica: escolha você mesmo para não ficar sem dono.</div>
+              </div>
 
-      <Dialog open={createOkrOpen} onOpenChange={(v) => !creatingOkr && setCreateOkrOpen(v)}>
-        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>
-              {createOkrMode === "annualUnderStrategy" ? "Criar objetivo do ano" : "Criar objetivo do trimestre"}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Título</Label>
-              <Input className="h-11 rounded-2xl" value={createOkrTitle} onChange={(e) => setCreateOkrTitle(e.target.value)} disabled={creatingOkr} />
+              <div className="grid gap-2">
+                <Label>Descrição (opcional)</Label>
+                <Textarea className="min-h-[110px] rounded-2xl" value={createOkrDesc} onChange={(e) => setCreateOkrDesc(e.target.value)} disabled={creatingOkr} />
+              </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label>Responsável</Label>
-              <Select value={createOkrOwner} onValueChange={(v) => setCreateOkrOwner(v)} disabled={creatingOkr}>
-                <SelectTrigger className="h-11 rounded-2xl bg-white">
-                  <SelectValue placeholder="Selecione…" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  {peopleOptions.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <div className="text-xs text-muted-foreground">Dica: escolha você mesmo para não ficar sem dono.</div>
+            <DialogFooter>
+              <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateOkrOpen(false)} disabled={creatingOkr}>
+                Cancelar
+              </Button>
+              <Button
+                className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={creatingOkr || createOkrTitle.trim().length < 6 || !createOkrParentId}
+                onClick={async () => {
+                  if (!createOkrParentId) return;
+                  const annualCycle = cycleById.get(annualCycleId);
+                  const quarterCycle = cycleById.get(quarterCycleId);
+                  setCreatingOkr(true);
+                  try {
+                    const cycleId = createOkrMode === "annualUnderStrategy" ? annualCycleId : quarterCycleId;
+                    const cycle = cycleById.get(cycleId);
+                    if (!cycle) throw new Error("Ciclo inválido.");
+
+                    const payload: Parameters<typeof createOkrObjective>[0] = {
+                      company_id: companyId,
+                      cycle_id: cycleId,
+                      parent_objective_id: createOkrMode === "quarterUnderAnnual" ? createOkrParentId : null,
+                      strategy_objective_id: createOkrMode === "annualUnderStrategy" ? createOkrParentId : null,
+                      level: createOkrMode === "annualUnderStrategy" ? "COMPANY" : "DEPARTMENT",
+                      department_id: null,
+                      owner_user_id: createOkrOwner,
+                      title: createOkrTitle,
+                      description: createOkrDesc.trim() || null,
+                      strategic_reason: null,
+                      linked_fundamental: null,
+                      linked_fundamental_text: null,
+                      due_at: null,
+                      estimated_value_brl: null,
+                      estimated_effort_hours: null,
+                      estimated_cost_brl: null,
+                      estimated_roi_pct: null,
+                      expected_profit_brl: null,
+                      profit_thesis: null,
+                      expected_revenue_at: null,
+                      expected_attainment_pct: 80,
+                    };
+
+                    const created = await createOkrObjective(payload);
+
+                    await qc.invalidateQueries({ queryKey: ["okr-map-canvas-annual-objectives", companyId, annualCycleId] });
+                    await qc.invalidateQueries({ queryKey: ["okr-map-canvas-quarter-objectives", companyId, quarterCycleId] });
+                    await qc.invalidateQueries({ queryKey: ["okr-map-canvas-krs", companyId] });
+
+                    toast({ title: "Objetivo criado" });
+                    setCreateOkrOpen(false);
+                    onOpenObjective(created.id);
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível criar",
+                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setCreatingOkr(false);
+                  }
+                }}
+              >
+                Criar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={createDelOpen} onOpenChange={(v) => !creatingDel && setCreateDelOpen(v)}>
+          <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+            <DialogHeader>
+              <DialogTitle>Novo entregável (para KR Tier 2)</DialogTitle>
+            </DialogHeader>
+
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label>Título</Label>
+                <Input className="h-11 rounded-2xl" value={createDelTitle} onChange={(e) => setCreateDelTitle(e.target.value)} disabled={creatingDel} />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Responsável (opcional)</Label>
+                <Select value={createDelOwner ?? "__none__"} onValueChange={(v) => setCreateDelOwner(v === "__none__" ? null : v)} disabled={creatingDel}>
+                  <SelectTrigger className="h-11 rounded-2xl bg-white">
+                    <SelectValue placeholder="Selecione…" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-2xl">
+                    <SelectItem value="__none__">Sem responsável</SelectItem>
+                    {peopleOptions.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Prazo (opcional)</Label>
+                <Input type="date" className="h-11 rounded-2xl" value={createDelDue} onChange={(e) => setCreateDelDue(e.target.value)} disabled={creatingDel} />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Descrição (opcional)</Label>
+                <Textarea className="min-h-[110px] rounded-2xl" value={createDelDesc} onChange={(e) => setCreateDelDesc(e.target.value)} disabled={creatingDel} />
+              </div>
             </div>
 
-            <div className="grid gap-2">
-              <Label>Descrição (opcional)</Label>
-              <Textarea className="min-h-[110px] rounded-2xl" value={createOkrDesc} onChange={(e) => setCreateOkrDesc(e.target.value)} disabled={creatingOkr} />
-            </div>
-          </div>
+            <DialogFooter>
+              <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateDelOpen(false)} disabled={creatingDel}>
+                Cancelar
+              </Button>
+              <Button
+                className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                disabled={creatingDel || createDelTitle.trim().length < 3 || !createDelKrId}
+                onClick={async () => {
+                  if (!createDelKrId) return;
+                  setCreatingDel(true);
+                  try {
+                    await createDeliverable({
+                      key_result_id: createDelKrId,
+                      tier: "TIER2",
+                      title: createDelTitle,
+                      description: createDelDesc.trim() || null,
+                      owner_user_id: createDelOwner,
+                      status: "TODO",
+                      due_at: createDelDue.trim() || null,
+                    });
 
-          <DialogFooter>
-            <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={() => setCreateOkrOpen(false)} disabled={creatingOkr}>
-              Cancelar
-            </Button>
-            <Button
-              className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={creatingOkr || createOkrTitle.trim().length < 6 || !createOkrParentId}
-              onClick={async () => {
-                if (!createOkrParentId) return;
-                const annualCycle = cycleById.get(annualCycleId);
-                const quarterCycle = cycleById.get(quarterCycleId);
-                setCreatingOkr(true);
-                try {
-                  const cycleId = createOkrMode === "annualUnderStrategy" ? annualCycleId : quarterCycleId;
-                  const cycle = cycleById.get(cycleId);
-                  if (!cycle) throw new Error("Ciclo inválido.");
+                    toast({ title: "Entregável criado" });
+                    await qc.invalidateQueries({ queryKey: ["okr-map-canvas-deliverables", companyId] });
+                    setCreateDelOpen(false);
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível criar",
+                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setCreatingDel(false);
+                  }
+                }}
+              >
+                Criar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-                  const payload: Parameters<typeof createOkrObjective>[0] = {
-                    company_id: companyId,
-                    cycle_id: cycleId,
-                    parent_objective_id: createOkrMode === "quarterUnderAnnual" ? createOkrParentId : null,
-                    strategy_objective_id: createOkrMode === "annualUnderStrategy" ? createOkrParentId : null,
-                    level: createOkrMode === "annualUnderStrategy" ? "COMPANY" : "DEPARTMENT",
-                    department_id: null,
-                    owner_user_id: createOkrOwner,
-                    title: createOkrTitle,
-                    description: createOkrDesc.trim() || null,
-                    strategic_reason: null,
-                    linked_fundamental: null,
-                    linked_fundamental_text: null,
-                    due_at: null,
-                    estimated_value_brl: null,
-                    estimated_effort_hours: null,
-                    estimated_cost_brl: null,
-                    estimated_roi_pct: null,
-                    expected_profit_brl: null,
-                    profit_thesis: null,
-                    expected_revenue_at: null,
-                    expected_attainment_pct: 80,
-                  };
+        {editingKr ? (
+          <KrEditDialog
+            open={krDialogOpen}
+            onOpenChange={(v) => {
+              setKrDialogOpen(v);
+              if (!v) setEditingKr(null);
+            }}
+            companyId={companyId}
+            userId={userId}
+            kr={editingKr}
+          />
+        ) : null}
 
-                  const created = await createOkrObjective(payload);
-
-                  await qc.invalidateQueries({ queryKey: ["okr-map-canvas-annual-objectives", companyId, annualCycleId] });
-                  await qc.invalidateQueries({ queryKey: ["okr-map-canvas-quarter-objectives", companyId, quarterCycleId] });
-                  await qc.invalidateQueries({ queryKey: ["okr-map-canvas-krs", companyId] });
-
-                  toast({ title: "Objetivo criado" });
-                  setCreateOkrOpen(false);
-                  onOpenObjective(created.id);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível criar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setCreatingOkr(false);
-                }
-              }}
-            >
-              Criar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {editingKr ? (
-        <KrEditDialog
-          open={krDialogOpen}
-          onOpenChange={(v) => {
-            setKrDialogOpen(v);
-            if (!v) setEditingKr(null);
-          }}
-          companyId={companyId}
-          userId={userId}
-          kr={editingKr}
-        />
-      ) : null}
-
-      <Input className="sr-only" aria-hidden />
-    </Card>
+        <Input className="sr-only" aria-hidden />
+      </Card>
+    </div>
   );
 }
