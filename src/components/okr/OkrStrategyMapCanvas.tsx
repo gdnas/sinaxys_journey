@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Eye, Flag, ListChecks, Plus, Target, UserRound, KeyRound } from "lucide-react";
+import { CalendarClock, Eye, Flag, Layers, ListChecks, Plus, Target, UserRound, KeyRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
