@@ -583,9 +583,17 @@ export default function OkrObjectiveDetail() {
               isTier1={isTier1}
               linkedObjectives={linkedObjectiveLinksByKrId.get(kr.id) ?? []}
               objectiveTitleById={objectiveTitleById}
-              onUnlinkObjective={async (linkId) => {
+              onUnlinkObjective={async (linkId, tier2ObjectiveId) => {
                 try {
                   await unlinkObjectiveFromKr(linkId);
+
+                  // Keep the "both objective + KR" invariant when this link was created via this dialog:
+                  // only clear parent if it currently points to this Tier 1 objective.
+                  const o = await getOkrObjective(tier2ObjectiveId);
+                  if (o?.parent_objective_id === objectiveId) {
+                    await updateOkrObjective(tier2ObjectiveId, { parent_objective_id: null });
+                  }
+
                   await qc.invalidateQueries({ queryKey: ["okr-kr-objective-links", objectiveId] });
                   toast({ title: "Vínculo removido" });
                 } catch (e) {
@@ -664,7 +672,32 @@ export default function OkrObjectiveDetail() {
               </div>
 
               <div className="grid gap-2">
-                <Label>Escolha o OKR Tier 2</Label>
+                <Label>Objetivo (Tier 1)</Label>
+                <Input className="h-11 rounded-xl" value={objective?.title ?? ""} disabled />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Resultado-chave (KR Tier 1)</Label>
+                <Select value={linkKrId ?? SELECT_NONE} onValueChange={(v) => setLinkKrId(v === SELECT_NONE ? null : v)}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={SELECT_NONE}>Selecione</SelectItem>
+                    {krs
+                      .slice()
+                      .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
+                      .map((kr) => (
+                        <SelectItem key={kr.id} value={kr.id}>
+                          {kr.title}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label>OKR (Tier 2)</Label>
                 <Select value={linkObjectiveId} onValueChange={setLinkObjectiveId}>
                   <SelectTrigger className="h-11 rounded-xl">
                     <SelectValue placeholder="Selecione" />
@@ -700,10 +733,15 @@ export default function OkrObjectiveDetail() {
                 onClick={async () => {
                   if (!linkKrId) return;
                   if (linkObjectiveId === SELECT_NONE) return;
+                  if (!objective) return;
                   setLinkSaving(true);
                   try {
+                    // Link is stored on KR, and we also keep the parent objective alignment explicit.
+                    await updateOkrObjective(linkObjectiveId, { parent_objective_id: objective.id });
                     await linkObjectiveToKr(linkKrId, linkObjectiveId);
+
                     await qc.invalidateQueries({ queryKey: ["okr-kr-objective-links", objectiveId] });
+                    await qc.invalidateQueries({ queryKey: ["okr-cycle-objectives", cid, objective.cycle_id] });
                     toast({ title: "OKR vinculado ao KR" });
                     setLinkOpen(false);
                   } catch (e) {
@@ -1167,7 +1205,7 @@ function KrCard({
   isTier1: boolean;
   linkedObjectives: { id: string; objectiveId: string }[];
   objectiveTitleById: Map<string, string>;
-  onUnlinkObjective: (linkId: string) => void;
+  onUnlinkObjective: (linkId: string, tier2ObjectiveId: string) => void;
   onAddTask: (deliverableId: string) => void;
   onEditTask: (t: DbTask) => void;
   onDeleteTask: (t: DbTask) => void;
@@ -1233,7 +1271,7 @@ function KrCard({
                     <button
                       type="button"
                       className="grid h-6 w-6 place-items-center rounded-full text-muted-foreground transition hover:bg-white hover:text-[color:var(--sinaxys-ink)]"
-                      onClick={() => onUnlinkObjective(l.id)}
+                      onClick={() => onUnlinkObjective(l.id, l.objectiveId)}
                       title="Desvincular"
                     >
                       <Unlink2 className="h-3.5 w-3.5" />
