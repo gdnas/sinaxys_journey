@@ -77,6 +77,11 @@ import {
     type DbOkrObjective,
     type DbStrategyObjective,
 } from "@/lib/okrDb";
+import {
+    clearKrLinksForObjective,
+    linkObjectiveToKr,
+    listKrLinksByObjectiveId,
+} from "@/lib/okrAlignmentDb";
 
 import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profilePublicDb";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
@@ -473,6 +478,8 @@ function StrategyLinker(
     const [saving, setSaving] = useState(false);
 
     const cycle = useMemo(() => cycles.find(c => c.id === objective.cycle_id) ?? null, [cycles, objective.cycle_id]);
+    const isQuarter = cycle?.type === "QUARTERLY";
+
     const annualCycleId = useMemo(() => {
         if (!cycle || cycle.type !== "QUARTERLY") return null;
         return cycles.find(c => c.type === "ANNUAL" && c.year === cycle.year)?.id ?? null;
@@ -483,6 +490,50 @@ function StrategyLinker(
         enabled: !!annualCycleId,
         queryFn: () => listOkrObjectives(cid, annualCycleId as string),
         staleTime: 20_000
+    });
+
+    const qObjectiveKrLinks = useQuery({
+        queryKey: ["okr-map-objective-kr-links", objective.id],
+        queryFn: () => listKrLinksByObjectiveId(objective.id),
+        staleTime: 20_000,
+    });
+
+    const objectiveKrLinkId = qObjectiveKrLinks.data?.[0]?.id ?? null;
+    const objectiveLinkedKrId = qObjectiveKrLinks.data?.[0]?.key_result_id ?? null;
+
+    const showAnnualKrLinker = isQuarter && objective.level === "COMPANY";
+    const showQuarterKrLinker = isQuarter && objective.level !== "COMPANY";
+
+    const annualKrOptions = useQuery({
+        queryKey: ["okr-map-annual-kr-options", cid, annualCycleId, (qAnnualParents.data ?? []).map(o => o.id).join(",")],
+        enabled: !!annualCycleId && (qAnnualParents.data ?? []).length > 0,
+        queryFn: async () => {
+            const annualObjectives = qAnnualParents.data ?? [];
+            const rows: Array<{ id: string; label: string; objectiveTitle: string }> = [];
+            for (const o of annualObjectives) {
+                const krs = await listKeyResults(o.id);
+                for (const kr of krs) {
+                    rows.push({ id: kr.id, label: kr.title, objectiveTitle: o.title });
+                }
+            }
+            return rows;
+        },
+        staleTime: 20_000,
+    });
+
+    const quarterTier1Krs = useQuery({
+        queryKey: ["okr-map-quarter-tier1-kr-options", cid, objective.cycle_id, objectivesInCycle.filter(o => o.level === "COMPANY").map(o => o.id).join(",")],
+        enabled: isQuarter && objectivesInCycle.some(o => o.level === "COMPANY"),
+        queryFn: async () => {
+            const tier1 = objectivesInCycle.filter(o => o.level === "COMPANY");
+            const rows: Array<{ id: string; label: string; objectiveTitle: string }> = [];
+            for (const o of tier1) {
+                const krs = await listKeyResults(o.id);
+                for (const kr of krs) rows.push({ id: kr.id, label: kr.title, objectiveTitle: o.title });
+            }
+            return rows;
+        },
+        staleTime: 20_000,
     });
 
     const parentOptions = useMemo(() => {
@@ -531,6 +582,14 @@ function StrategyLinker(
     }, [fundamentals, selectedFundamental]);
 
     const showParentAndFundamentals = objective.level !== "COMPANY";
+
+    const annualKrValue = showAnnualKrLinker
+        ? (annualKrOptions.data?.some(k => k.id === objectiveLinkedKrId) ? (objectiveLinkedKrId as string) : "__none__")
+        : "__none__";
+
+    const quarterKrValue = showQuarterKrLinker
+        ? (quarterTier1Krs.data?.some(k => k.id === objectiveLinkedKrId) ? (objectiveLinkedKrId as string) : "__none__")
+        : "__none__";
 
     return (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
@@ -588,6 +647,102 @@ function StrategyLinker(
                         </SelectContent>
                     </Select>
                 </div>
+
+                {showAnnualKrLinker ? (
+                    <div className="grid gap-2">
+                        <Label>Resultado-chave do ano (KR Tier 1)</Label>
+                        <Select
+                            disabled={!canEdit || saving || annualKrOptions.isLoading}
+                            value={annualKrValue}
+                            onValueChange={async (v) => {
+                                setSaving(true);
+                                try {
+                                    await clearKrLinksForObjective(objective.id);
+
+                                    if (v !== "__none__") {
+                                        await linkObjectiveToKr(v, objective.id);
+                                    }
+
+                                    toast({ title: "Alinhamento por KR atualizado" });
+                                    await onSaved();
+                                } catch (e) {
+                                    toast({
+                                        title: "Não foi possível salvar",
+                                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                                        variant: "destructive"
+                                    });
+                                } finally {
+                                    setSaving(false);
+                                }
+                            }}>
+                            <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                <SelectValue placeholder="Selecione…" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                                <SelectItem value="__none__">Sem vínculo</SelectItem>
+                                {(annualKrOptions.data ?? [])
+                                    .slice()
+                                    .sort((a, b) => (a.objectiveTitle.localeCompare(b.objectiveTitle, "pt-BR") || a.label.localeCompare(b.label, "pt-BR")))
+                                    .map((kr) => (
+                                        <SelectItem key={kr.id} value={kr.id}>
+                                            {kr.objectiveTitle} — {kr.label}
+                                        </SelectItem>
+                                    ))}
+                            </SelectContent>
+                        </Select>
+                        <div className="text-[11px] text-muted-foreground">Esse vínculo coloca o objetivo do trimestre abaixo do KR do ano no mapa.</div>
+                    </div>
+                ) : null}
+
+                {showQuarterKrLinker ? (
+                    <div className="grid gap-2">
+                        <Label>Resultado-chave do trimestre (KR do Tier 1)</Label>
+                        <Select
+                            disabled={!canEdit || saving || quarterTier1Krs.isLoading}
+                            value={quarterKrValue}
+                            onValueChange={async (v) => {
+                                setSaving(true);
+                                try {
+                                    await clearKrLinksForObjective(objective.id);
+
+                                    if (v !== "__none__") {
+                                        await linkObjectiveToKr(v, objective.id);
+                                    }
+
+                                    toast({ title: "Alinhamento por KR atualizado" });
+                                    await onSaved();
+                                } catch (e) {
+                                    toast({
+                                        title: "Não foi possível salvar",
+                                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                                        variant: "destructive"
+                                    });
+                                } finally {
+                                    setSaving(false);
+                                }
+                            }}>
+                            <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                <SelectValue placeholder="Selecione…" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                                <SelectItem value="__none__">Sem vínculo</SelectItem>
+                                {(quarterTier1Krs.data ?? [])
+                                    .slice()
+                                    .sort((a, b) => (a.objectiveTitle.localeCompare(b.objectiveTitle, "pt-BR") || a.label.localeCompare(b.label, "pt-BR")))
+                                    .map((kr) => (
+                                        <SelectItem key={kr.id} value={kr.id}>
+                                            {kr.objectiveTitle} — {kr.label}
+                                        </SelectItem>
+                                    ))}
+                            </SelectContent>
+                        </Select>
+                        {(quarterTier1Krs.data ?? []).length ? (
+                            <div className="text-[11px] text-muted-foreground">Use isso para alinhar OKRs de time/individual aos KRs estratégicos do trimestre.</div>
+                        ) : (
+                            <div className="text-[11px] text-muted-foreground">Primeiro crie um objetivo Tier 1 no trimestre e adicione pelo menos um KR.</div>
+                        )}
+                    </div>
+                ) : null}
 
                 {showParentAndFundamentals ? (
                   <>
