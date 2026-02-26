@@ -399,7 +399,8 @@ export function OkrStrategyMapCanvas(props: {
     setCreateKrKind("METRIC");
     setCreateKrTitle("");
     setCreateKrUnit("");
-    setCreateKrStart("");
+    // Default start to 0 to avoid confusing placeholder-only input.
+    setCreateKrStart("0");
     setCreateKrTarget("");
     setCreateKrDue("");
     setCreateKrOwner(null);
@@ -1043,7 +1044,11 @@ export function OkrStrategyMapCanvas(props: {
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label>Tipo</Label>
-              <Select value={createKrKind} onValueChange={(v) => setCreateKrKind(v as KrKind)} disabled={creatingKr}>
+              <Select value={createKrKind} onValueChange={(v) => {
+                const next = v as KrKind;
+                setCreateKrKind(next);
+                if (next === "METRIC" && !createKrStart.trim()) setCreateKrStart("0");
+              }} disabled={creatingKr}>
                 <SelectTrigger className="h-11 rounded-2xl bg-white">
                   <SelectValue />
                 </SelectTrigger>
@@ -1141,10 +1146,10 @@ export function OkrStrategyMapCanvas(props: {
                   const kind: KrKind = createKrKind;
                   const confidence: KrConfidence = "ON_TRACK";
 
-                  const start = kind === "METRIC" ? toNum(createKrStart) : null;
+                  const start = kind === "METRIC" ? (toNum(createKrStart) ?? 0) : null;
                   const target = kind === "METRIC" ? toNum(createKrTarget) : null;
-                  if (kind === "METRIC" && (start === null || target === null)) {
-                    throw new Error("Preencha origem e meta com números válidos.");
+                  if (kind === "METRIC" && target === null) {
+                    throw new Error("Preencha a meta com um número válido.");
                   }
 
                   const created = await createKeyResult({
