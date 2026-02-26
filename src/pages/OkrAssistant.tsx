@@ -55,6 +55,7 @@ import {
   type WorkStatus,
 } from "@/lib/okrDb";
 import { linkObjectiveToKr } from "@/lib/okrAlignmentDb";
+import { parseDescribedItems, serializeDescribedItems, type DescribedItem } from "@/lib/fundamentalsFormat";
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
@@ -295,6 +296,10 @@ export default function OkrAssistant() {
   const [fundVision, setFundVision] = useState("");
   const [fundValues, setFundValues] = useState("");
   const [fundCulture, setFundCulture] = useState("");
+  const [fundValuesItems, setFundValuesItems] = useState<DescribedItem[]>([]);
+  const [fundCultureItems, setFundCultureItems] = useState<DescribedItem[]>([]);
+  const [valuesImport, setValuesImport] = useState("");
+  const [cultureImport, setCultureImport] = useState("");
   const [fundSaved, setFundSaved] = useState(false);
   const [fundSaving, setFundSaving] = useState(false);
 
@@ -302,8 +307,14 @@ export default function OkrAssistant() {
     setFundPurpose((fundFromDb?.purpose ?? "").trim());
     setFundMission((fundFromDb?.mission ?? "").trim());
     setFundVision((fundFromDb?.vision ?? "").trim());
-    setFundValues((fundFromDb?.values ?? "").trim());
-    setFundCulture((fundFromDb?.culture ?? "").trim());
+
+    const valuesRaw = (fundFromDb?.values ?? "").trim();
+    const cultureRaw = (fundFromDb?.culture ?? "").trim();
+
+    setFundValues(valuesRaw);
+    setFundCulture(cultureRaw);
+    setFundValuesItems(parseDescribedItems(valuesRaw));
+    setFundCultureItems(parseDescribedItems(cultureRaw));
 
     const hasAny =
       !!(fundFromDb?.purpose ?? "").trim() ||
@@ -314,12 +325,15 @@ export default function OkrAssistant() {
     setFundSaved(hasAny);
   }, [fundFromDb?.culture, fundFromDb?.mission, fundFromDb?.purpose, fundFromDb?.values, fundFromDb?.vision]);
 
+  const valuesOk =
+    fundValuesItems.length >= 1 &&
+    fundValuesItems.every((it) => (it.title ?? "").trim().length >= 3 || (it.description ?? "").trim().length >= 6);
+  const cultureOk =
+    fundCultureItems.length >= 1 &&
+    fundCultureItems.every((it) => (it.title ?? "").trim().length >= 3 || (it.description ?? "").trim().length >= 6);
+
   const fundamentalsCanSave =
-    fundPurpose.trim().length >= 12 &&
-    fundMission.trim().length >= 12 &&
-    fundVision.trim().length >= 12 &&
-    fundValues.trim().length >= 8 &&
-    fundCulture.trim().length >= 8;
+    fundPurpose.trim().length >= 12 && fundMission.trim().length >= 12 && fundVision.trim().length >= 12 && valuesOk && cultureOk;
 
   // --- STEP 2: Long-term direction (strategy_objectives) ---
   const qStrategy = useQuery({
@@ -640,17 +654,105 @@ export default function OkrAssistant() {
                   <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
                     como decidimos
                   </Badge>
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] hover:bg-[color:var(--sinaxys-tint)]">
+                    {fundValuesItems.length} itens
+                  </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Valores são princípios de decisão — o "filtro" para escolhas difíceis quando o custo de errar é alto.
                 </p>
                 <p className="text-xs text-muted-foreground">Ex.: "Foco no cliente", "Franqueza com respeito", "Alta barra".</p>
-                <Textarea
-                  className="min-h-[92px] rounded-2xl"
-                  value={fundValues}
-                  onChange={(e) => setFundValues(e.target.value)}
-                  placeholder="Você pode usar linhas (um valor por linha)."
-                />
+
+                <div className="grid gap-3">
+                  {fundValuesItems.length ? (
+                    fundValuesItems.map((it, idx) => (
+                      <div key={idx} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <div className="grid gap-2">
+                                <Label className="text-xs">Valor</Label>
+                                <Input
+                                  className="h-11 rounded-xl"
+                                  value={it.title}
+                                  onChange={(e) =>
+                                    setFundValuesItems((arr) =>
+                                      arr.map((x, i) => (i === idx ? { ...x, title: e.target.value } : x)),
+                                    )
+                                  }
+                                  placeholder="Ex.: Clareza radical"
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label className="text-xs">Como isso aparece no dia a dia (opcional)</Label>
+                                <Input
+                                  className="h-11 rounded-xl"
+                                  value={it.description}
+                                  onChange={(e) =>
+                                    setFundValuesItems((arr) =>
+                                      arr.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x)),
+                                    )
+                                  }
+                                  placeholder="Ex.: decisões por escrito, sem ruído"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-bg)]"
+                            onClick={() => setFundValuesItems((arr) => arr.filter((_, i) => i !== idx))}
+                            title="Remover"
+                          >
+                            Remover
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                      Adicione seus valores como itens (fica mais legível do que um texto corrido).
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-2xl bg-white"
+                      onClick={() => setFundValuesItems((arr) => [...arr, { title: "", description: "" }])}
+                    >
+                      + Adicionar valor
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-2xl bg-white"
+                      disabled={!valuesImport.trim()}
+                      onClick={() => {
+                        const parsed = parseDescribedItems(valuesImport);
+                        if (!parsed.length) return;
+                        setFundValuesItems(parsed);
+                        setValuesImport("");
+                      }}
+                    >
+                      Importar colagem
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label className="text-xs">Colar aqui (aceita lista ou JSON — converte automaticamente)</Label>
+                    <Textarea
+                      className="min-h-[84px] rounded-2xl"
+                      value={valuesImport}
+                      onChange={(e) => setValuesImport(e.target.value)}
+                      placeholder={'Ex.:\n- Foco no cliente — Decidir pelo impacto no cliente\n- Clareza radical\n\n(ou cole o JSON se já tiver)'}
+                    />
+                  </div>
+                </div>
               </div>
 
               <Separator />
@@ -661,12 +763,105 @@ export default function OkrAssistant() {
                   <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
                     como trabalhamos
                   </Badge>
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] hover:bg-[color:var(--sinaxys-tint)]">
+                    {fundCultureItems.length} itens
+                  </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Cultura é o comportamento padrão: como a empresa opera de verdade quando ninguém está olhando.
                 </p>
                 <p className="text-xs text-muted-foreground">Ex.: "Ritmo semanal", "Escrita antes de reunião", "Aprendizado contínuo".</p>
-                <Textarea className="min-h-[92px] rounded-2xl" value={fundCulture} onChange={(e) => setFundCulture(e.target.value)} />
+
+                <div className="grid gap-3">
+                  {fundCultureItems.length ? (
+                    fundCultureItems.map((it, idx) => (
+                      <div key={idx} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <div className="grid gap-2 sm:grid-cols-2">
+                              <div className="grid gap-2">
+                                <Label className="text-xs">Comportamento / regra cultural</Label>
+                                <Input
+                                  className="h-11 rounded-xl"
+                                  value={it.title}
+                                  onChange={(e) =>
+                                    setFundCultureItems((arr) =>
+                                      arr.map((x, i) => (i === idx ? { ...x, title: e.target.value } : x)),
+                                    )
+                                  }
+                                  placeholder="Ex.: Menos discurso, mais entrega"
+                                />
+                              </div>
+                              <div className="grid gap-2">
+                                <Label className="text-xs">Como isso aparece (opcional)</Label>
+                                <Input
+                                  className="h-11 rounded-xl"
+                                  value={it.description}
+                                  onChange={(e) =>
+                                    setFundCultureItems((arr) =>
+                                      arr.map((x, i) => (i === idx ? { ...x, description: e.target.value } : x)),
+                                    )
+                                  }
+                                  placeholder="Ex.: reuniões curtas, check-ins semanais"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-bg)]"
+                            onClick={() => setFundCultureItems((arr) => arr.filter((_, i) => i !== idx))}
+                            title="Remover"
+                          >
+                            Remover
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                      Descreva a cultura em comportamentos observáveis (itens). Isso ajuda a empresa a executar de forma consistente.
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-2xl bg-white"
+                      onClick={() => setFundCultureItems((arr) => [...arr, { title: "", description: "" }])}
+                    >
+                      + Adicionar item de cultura
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 rounded-2xl bg-white"
+                      disabled={!cultureImport.trim()}
+                      onClick={() => {
+                        const parsed = parseDescribedItems(cultureImport);
+                        if (!parsed.length) return;
+                        setFundCultureItems(parsed);
+                        setCultureImport("");
+                      }}
+                    >
+                      Importar colagem
+                    </Button>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label className="text-xs">Colar aqui (aceita lista ou JSON — converte automaticamente)</Label>
+                    <Textarea
+                      className="min-h-[84px] rounded-2xl"
+                      value={cultureImport}
+                      onChange={(e) => setCultureImport(e.target.value)}
+                      placeholder={'Ex.:\n- Execução acima de intenção — Planejamento sem execução é ruído\n- Escrita antes de reunião\n\n(ou cole o JSON se já tiver)'}
+                    />
+                  </div>
+                </div>
               </div>
 
               <Separator />
@@ -689,8 +884,8 @@ export default function OkrAssistant() {
                         purpose: fundPurpose.trim() || null,
                         mission: fundMission.trim() || null,
                         vision: fundVision.trim() || null,
-                        values: fundValues.trim() || null,
-                        culture: fundCulture.trim() || null,
+                        values: serializeDescribedItems(fundValuesItems) || null,
+                        culture: serializeDescribedItems(fundCultureItems) || null,
                       };
                       await upsertCompanyFundamentals(cid, patch);
                       await qc.invalidateQueries({ queryKey: ["okr-fundamentals", cid] });
