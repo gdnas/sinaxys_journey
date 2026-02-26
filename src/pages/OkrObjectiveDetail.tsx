@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Circle, Layers, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp, ListChecks, KeyRound, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -1216,11 +1216,17 @@ function KrCard({
   const unit = kr.metric_unit?.trim() ?? "";
   const unitSuffix = unit ? ` ${unit}` : "";
 
+  const [open, setOpen] = useState(true);
+
   return (
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
+            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+              <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+              KR
+            </Badge>
             {kr.kind === "DELIVERABLE" ? (
               <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
                 Entregável
@@ -1313,6 +1319,18 @@ function KrCard({
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 rounded-xl bg-white"
+            onClick={() => setOpen((v) => !v)}
+            title={open ? "Recolher" : "Expandir"}
+            aria-label={open ? "Recolher" : "Expandir"}
+          >
+            {open ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+            {open ? "Recolher" : "Expandir"}
+          </Button>
+
           {canWrite ? (
             <Button
               variant="outline"
@@ -1355,129 +1373,149 @@ function KrCard({
         </div>
       </div>
 
-      <Separator className="my-5" />
+      {open ? (
+        <>
+          <Separator className="my-5" />
 
-      {isTier1 ? (
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entregáveis</div>
-          {canWrite ? (
-            <Button variant="outline" className="h-10 rounded-xl" onClick={onAddDeliverable} title="Criar entregável">
-              <Plus className="mr-2 h-4 w-4" />
-              Entregável
-            </Button>
+          {isTier1 ? (
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entregáveis</div>
+              {canWrite ? (
+                <Button variant="outline" className="h-10 rounded-xl" onClick={onAddDeliverable} title="Criar entregável">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Entregável
+                </Button>
+              ) : null}
+            </div>
           ) : null}
-        </div>
-      ) : null}
 
-      <div className="grid gap-3">
-        {deliverables.length ? (
-          deliverables.map((d) => (
-            <div key={d.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
-                      <Layers className="h-3.5 w-3.5" />
-                      {d.tier}
-                    </span>
-                    <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
-                  </div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    Status: {statusLabel(d.status)}
-                    {d.owner_user_id ? ` • Resp.: ${byUserId.get(d.owner_user_id) ?? "—"}` : ""}
-                    {d.due_at ? ` • Prazo: ${fmtDate(d.due_at) ?? d.due_at}` : ""}
-                  </div>
-                  {d.description?.trim() ? <p className="mt-2 text-sm text-muted-foreground">{d.description}</p> : null}
-                </div>
+          <div className="grid gap-3">
+            {deliverables.length ? (
+              deliverables.map((d) => (
+                <Link
+                  key={d.id}
+                  to={`/okr/entregaveis/${d.id}`}
+                  className="block rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 transition hover:bg-[color:var(--sinaxys-tint)]/35"
+                >
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
+                          <ListChecks className="h-3.5 w-3.5" />
+                          {d.tier}
+                        </span>
+                        <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                      </div>
+                      <div className="mt-1 text-xs text-muted-foreground">
+                        Status: {statusLabel(d.status)}
+                        {d.owner_user_id ? ` • Resp.: ${byUserId.get(d.owner_user_id) ?? "—"}` : ""}
+                        {d.due_at ? ` • Prazo: ${fmtDate(d.due_at) ?? d.due_at}` : ""}
+                      </div>
+                      {d.description?.trim() ? <p className="mt-2 text-sm text-muted-foreground">{d.description}</p> : null}
+                    </div>
 
-                {canWrite ? (
-                  <Button variant="outline" className="h-11 rounded-xl" onClick={() => onAddTask(d.id)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Tarefa
-                  </Button>
-                ) : null}
-              </div>
-
-              <div className="mt-4 grid gap-2">
-                {(tasksByDeliverableId.get(d.id) ?? []).length ? (
-                  (tasksByDeliverableId.get(d.id) ?? []).map((t) => {
-                    const editable = canEditTask(t);
-                    return (
-                      <div
-                        key={t.id}
-                        role={editable ? "button" : undefined}
-                        tabIndex={editable ? 0 : -1}
-                        className={
-                          "group flex w-full items-start gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left transition" +
-                          (editable ? " cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/40" : " opacity-80")
-                        }
-                        onClick={() => {
-                          if (!editable) return;
-                          onToggleTask(t);
+                    {canWrite ? (
+                      <Button
+                        variant="outline"
+                        className="h-11 rounded-xl"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          onAddTask(d.id);
                         }}
-                        title={
-                          t.status === "DONE"
-                            ? `Concluída em ${fmtDate(t.completed_at) ?? "—"}`
-                            : editable
-                              ? "Clique para alternar concluído"
-                              : "Sem permissão para editar esta tarefa"
-                        }
                       >
-                        <div className="mt-0.5 text-[color:var(--sinaxys-primary)]">
-                          {t.status === "DONE" ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
-                            <div className="flex items-center gap-2">
-                              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{statusLabel(t.status)}</Badge>
-                              {editable ? (
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onEditTask(t);
-                                    }}
-                                    title="Editar tarefa"
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onDeleteTask(t);
-                                    }}
-                                    title="Excluir tarefa"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Tarefa
+                      </Button>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-4 grid gap-2">
+                    {(tasksByDeliverableId.get(d.id) ?? []).length ? (
+                      (tasksByDeliverableId.get(d.id) ?? []).map((t) => {
+                        const editable = canEditTask(t);
+                        return (
+                          <div
+                            key={t.id}
+                            role={editable ? "button" : undefined}
+                            tabIndex={editable ? 0 : -1}
+                            className={
+                              "group flex w-full items-start gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left transition" +
+                              (editable ? " cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/40" : " opacity-80")
+                            }
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              if (!editable) return;
+                              onToggleTask(t);
+                            }}
+                            title={
+                              t.status === "DONE"
+                                ? `Concluída em ${fmtDate(t.completed_at) ?? "—"}`
+                                : editable
+                                  ? "Clique para alternar concluído"
+                                  : "Sem permissão para editar esta tarefa"
+                            }
+                          >
+                            <div className="mt-0.5 text-[color:var(--sinaxys-primary)]">
+                              {t.status === "DONE" ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
+                                <div className="flex items-center gap-2">
+                                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{statusLabel(t.status)}</Badge>
+                                  {editable ? (
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          onEditTask(t);
+                                        }}
+                                        title="Editar tarefa"
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
+                                          onDeleteTask(t);
+                                        }}
+                                        title="Excluir tarefa"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ) : null}
                                 </div>
-                              ) : null}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">Resp.: {byUserId.get(t.owner_user_id) ?? "—"}</div>
                             </div>
                           </div>
-                          <div className="mt-1 text-xs text-muted-foreground">Resp.: {byUserId.get(t.owner_user_id) ?? "—"}</div>
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="rounded-2xl bg-white p-3 text-sm text-muted-foreground">Sem tarefas ainda.</div>
-                )}
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem entregáveis ainda.</div>
-        )}
-      </div>
+                        );
+                      })
+                    ) : (
+                      <div className="rounded-2xl bg-white p-3 text-sm text-muted-foreground">Sem tarefas ainda.</div>
+                    )}
+                  </div>
+                </Link>
+              ))
+            ) : (
+              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Sem entregáveis ainda.</div>
+            )}
+          </div>
+        </>
+      ) : null}
     </Card>
   );
 }

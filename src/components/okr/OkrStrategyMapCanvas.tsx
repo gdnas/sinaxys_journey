@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, Eye, Flag, Layers, Package, Plus, Target, UserRound } from "lucide-react";
+import { CalendarClock, Eye, Flag, ListChecks, Plus, Target, UserRound, KeyRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
@@ -967,7 +967,7 @@ export function OkrStrategyMapCanvas(props: {
                       </div>
                     </div>
                     <div className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-                      <Package className="h-4 w-4" />
+                      <ListChecks className="h-4 w-4" />
                     </div>
                   </div>
                 </div>
@@ -1006,7 +1006,7 @@ export function OkrStrategyMapCanvas(props: {
                         <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.kr.title}</div>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
                           <span className="inline-flex items-center gap-1">
-                            <Target className="h-3.5 w-3.5" /> KR
+                            <KeyRound className="h-3.5 w-3.5" /> KR
                           </span>
                           <span>•</span>
                           <span>{d.kr.kind === "DELIVERABLE" ? "Entregável" : "Métrico"}</span>

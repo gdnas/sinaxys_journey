@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ChevronDown, ChevronUp, Link2, Pencil, Plus, Trash2 } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, KeyRound, Link2, Pencil, Plus, Trash2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -302,6 +302,10 @@ export function OkrObjectiveCard(props: {
                           >
                             <div className="flex flex-wrap items-center gap-2">
                               <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                                <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+                                KR
+                              </Badge>
+                              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
                                 {kindLabel(kr.kind)}
                               </Badge>
                               <span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold " + confidenceClass(kr.confidence)}>
@@ -336,8 +340,8 @@ export function OkrObjectiveCard(props: {
                               variant="outline"
                               size="icon"
                               className="h-10 w-10 rounded-xl bg-white"
-                              aria-label={isKrOpen ? "Recolher alinhamentos" : "Ver alinhamentos"}
-                              title={isKrOpen ? "Recolher alinhamentos" : "Ver OKRs alinhados"}
+                              aria-label={isKrOpen ? "Recolher alinhamentos" : "Expandir alinhamentos"}
+                              title={isKrOpen ? "Recolher alinhamentos" : "Expandir alinhamentos"}
                               onClick={() => {
                                 setOpenKrIds((prev) => {
                                   const next = new Set(prev);

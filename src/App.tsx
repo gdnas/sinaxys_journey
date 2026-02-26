@@ -45,6 +45,7 @@ import OkrYear from "./pages/OkrYear";
 import OkrLongTerm from "./pages/OkrLongTerm";
 import OkrAssistant from "./pages/OkrAssistant";
 import OkrObjectiveDetail from "./pages/OkrObjectiveDetail";
+import OkrDeliverableDetail from "./pages/OkrDeliverableDetail";
 import PdiPerformance from "./pages/PdiPerformance";
 import VacationRequests from "./pages/VacationRequests";
 import VacationApprovals from "./pages/VacationApprovals";
@@ -268,6 +269,17 @@ const App = () => (
                   />
 
                   <Route
+                    path="/okr/deliverables/:deliverableId"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="OKR">
+                          <OkrDeliverableDetail />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
                     path="/okr/assistant"
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
@@ -329,6 +341,17 @@ const App = () => (
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="OKR">
                           <OkrObjectiveDetail />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/okr/entregaveis/:deliverableId"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="OKR">
+                          <OkrDeliverableDetail />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
