@@ -1120,12 +1120,13 @@ export function OkrStrategyMapCanvas(props: {
 
                     // Accept pt-BR formatting and accidental suffixes (e.g., "%", spaces)
                     // Examples accepted: "30", "30,5", "1.200", "1.200,50", "30%"
-                    let cleaned = raw.replace(/[^\d,.-]/g, "");
-                    if (!cleaned) return null;
+                    const token = raw.match(/-?\d+(?:[\.,]\d+)?/)?.[0] ?? "";
+                    if (!token) return null;
 
-                    const hasComma = cleaned.includes(",");
-                    const hasDot = cleaned.includes(".");
+                    const hasComma = token.includes(",");
+                    const hasDot = token.includes(".");
 
+                    let cleaned = token;
                     if (hasComma && hasDot) {
                       // assume dot is thousands separator and comma is decimal separator
                       cleaned = cleaned.replace(/\./g, "").replace(",", ".");
