@@ -3230,13 +3230,18 @@ export function OkrMapExplorer(
     };
 
     const onInvalidate = async () => {
-        await Promise.all([qc.invalidateQueries({
-            queryKey: ["okr-fundamentals", companyId]
-        }), qc.invalidateQueries({
-            queryKey: ["okr-strategy", companyId]
-        }), qc.invalidateQueries({
-            queryKey: ["okr-cycles", companyId]
-        })]);
+        await Promise.all([
+            qc.invalidateQueries({ queryKey: ["okr-fundamentals", companyId] }),
+            qc.invalidateQueries({ queryKey: ["okr-strategy", companyId] }),
+            qc.invalidateQueries({ queryKey: ["okr-cycles", companyId] }),
+
+            // Keep the map canvas live without requiring a full page refresh.
+            // We invalidate by prefix so it matches the currently selected cycles inside the canvas.
+            qc.invalidateQueries({ queryKey: ["okr-map-canvas-annual-objectives", companyId] }),
+            qc.invalidateQueries({ queryKey: ["okr-map-canvas-quarter-objectives", companyId] }),
+            qc.invalidateQueries({ queryKey: ["okr-map-canvas-krs", companyId] }),
+            qc.invalidateQueries({ queryKey: ["okr-map-canvas-quarter-kr-links", companyId] }),
+        ]);
     };
 
     return (
