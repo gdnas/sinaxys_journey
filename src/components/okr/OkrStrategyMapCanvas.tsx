@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarClock, Eye, Flag, Layers, ListChecks, Plus, Target, UserRound, KeyRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
 import { KrEditDialog } from "@/components/okr/KrEditDialog";
@@ -124,6 +125,7 @@ export function OkrStrategyMapCanvas(props: {
 
   const { toast } = useToast();
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const annualOptions = useMemo(() => [...cycles].filter((c) => c.type === "ANNUAL").sort((a, b) => b.year - a.year), [cycles]);
   const quarterOptions = useMemo(
@@ -952,7 +954,14 @@ export function OkrStrategyMapCanvas(props: {
                     : "bg-slate-50 text-slate-700 ring-1 ring-slate-200";
 
               return (
-                <div className="w-[240px] rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/okr/entregaveis/${d.deliverable.id}`)}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="group w-[240px] rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left shadow-sm transition hover:bg-[color:var(--sinaxys-tint)]/35 hover:shadow-md"
+                  aria-label={`Abrir entregável: ${d.deliverable.title}`}
+                  title={d.deliverable.title}
+                >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{d.deliverable.title}</div>
@@ -970,7 +979,7 @@ export function OkrStrategyMapCanvas(props: {
                       <ListChecks className="h-4 w-4" />
                     </div>
                   </div>
-                </div>
+                </button>
               );
             }
 
