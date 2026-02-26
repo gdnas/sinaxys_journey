@@ -204,7 +204,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
   const [cycleSaving, setCycleSaving] = useState(false);
 
   const resetCycle = () => {
-    setCycleType("QUARTERLY");
+    setCycleType(scope === "year" ? "ANNUAL" : "QUARTERLY");
     setCycleYear(new Date().getFullYear());
     setCycleQuarter(1);
     setCycleStatus("ACTIVE");
@@ -440,6 +440,38 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
               </SelectContent>
             </Select>
 
+            {isAdminish && scope === "quarter" ? (
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl bg-white"
+                onClick={() => {
+                  resetCycle();
+                  setCycleType("QUARTERLY");
+                  setCycleOpen(true);
+                }}
+                title="Adicionar outro trimestre"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Novo trimestre
+              </Button>
+            ) : null}
+
+            {isAdminish && scope === "year" ? (
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl bg-white"
+                onClick={() => {
+                  resetCycle();
+                  setCycleType("ANNUAL");
+                  setCycleOpen(true);
+                }}
+                title="Adicionar outro ano"
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Novo ano
+              </Button>
+            ) : null}
+
             {selected ? (
               <Badge className="h-11 justify-center rounded-xl bg-[color:var(--sinaxys-tint)] px-4 text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                 {selected.status}
@@ -454,6 +486,127 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
           </div>
         ) : null}
       </Card>
+
+      <Dialog
+        open={cycleOpen}
+        onOpenChange={(v) => {
+          if (!cycleSaving) setCycleOpen(v);
+          if (!v) resetCycle();
+        }}
+      >
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{cycleType === "ANNUAL" ? "Novo ano" : "Novo trimestre"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Tipo</Label>
+              <Select value={cycleType} onValueChange={(v) => setCycleType(v as CycleType)} disabled>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="QUARTERLY">Trimestre</SelectItem>
+                  <SelectItem value="ANNUAL">Ano</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className={cycleType === "QUARTERLY" ? "grid gap-4 md:grid-cols-2" : "grid gap-4"}>
+              <div className="grid gap-2">
+                <Label>Ano</Label>
+                <Input
+                  className="h-11 rounded-xl"
+                  type="number"
+                  inputMode="numeric"
+                  value={String(cycleYear)}
+                  onChange={(e) => setCycleYear(Number(e.target.value) || new Date().getFullYear())}
+                  disabled={cycleSaving}
+                />
+              </div>
+
+              {cycleType === "QUARTERLY" ? (
+                <div className="grid gap-2">
+                  <Label>Trimestre</Label>
+                  <Select value={String(cycleQuarter)} onValueChange={(v) => setCycleQuarter(Number(v) as 1 | 2 | 3 | 4)} disabled={cycleSaving}>
+                    <SelectTrigger className="h-11 rounded-xl bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl">
+                      <SelectItem value="1">Q1</SelectItem>
+                      <SelectItem value="2">Q2</SelectItem>
+                      <SelectItem value="3">Q3</SelectItem>
+                      <SelectItem value="4">Q4</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Status</Label>
+              <Select value={cycleStatus} onValueChange={(v) => setCycleStatus(v as CycleStatus)} disabled={cycleSaving}>
+                <SelectTrigger className="h-11 rounded-xl bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="PLANNING">PLANNING</SelectItem>
+                  <SelectItem value="ACTIVE">ACTIVE</SelectItem>
+                  <SelectItem value="CLOSED">CLOSED</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Nome (opcional)</Label>
+              <Input className="h-11 rounded-xl" value={cycleName} onChange={(e) => setCycleName(e.target.value)} disabled={cycleSaving} placeholder="Ex.: Planejamento 2026" />
+            </div>
+
+            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+              Dica: crie trimestres futuros como <span className="font-medium text-[color:var(--sinaxys-ink)]">PLANNING</span> e ative quando o ciclo começar.
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="h-11 rounded-xl" onClick={() => setCycleOpen(false)} disabled={cycleSaving}>
+              Cancelar
+            </Button>
+            <Button
+              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={cycleSaving}
+              onClick={async () => {
+                if (cycleSaving) return;
+                setCycleSaving(true);
+                try {
+                  const ensured = await ensureOkrCycle({
+                    type: cycleType,
+                    year: cycleYear,
+                    quarter: cycleType === "QUARTERLY" ? cycleQuarter : null,
+                    status: cycleStatus,
+                    name: cycleName.trim() || null,
+                  });
+
+                  await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
+                  setCycleId(ensured.id);
+                  setCycleOpen(false);
+                  toast({ title: cycleType === "ANNUAL" ? "Ano criado" : "Trimestre criado" });
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível criar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                } finally {
+                  setCycleSaving(false);
+                }
+              }}
+            >
+              Criar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
