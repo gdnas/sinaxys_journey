@@ -502,6 +502,17 @@ export async function deleteOkrObjectiveCascade(objectiveId: string) {
   await deleteOkrObjective(objectiveId);
 }
 
+export async function listKeyResultsByObjectiveIds(objectiveIds: string[]) {
+  if (!objectiveIds.length) return [] as DbOkrKeyResult[];
+  const { data, error } = await supabase
+    .from("okr_key_results")
+    .select(krSelect)
+    .in("objective_id", objectiveIds)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as DbOkrKeyResult[];
+}
+
 export type KrConfidence = "ON_TRACK" | "AT_RISK" | "OFF_TRACK";
 export type KrKind = "METRIC" | "DELIVERABLE";
 
@@ -617,6 +628,27 @@ export async function updateKeyResult(
 
   if (error) throw error;
   return (data ?? null) as DbOkrKeyResult | null;
+}
+
+export async function updateDeliverable(
+  deliverableId: string,
+  patch: Partial<Pick<DbDeliverable, "title" | "description" | "owner_user_id" | "status" | "due_at" | "tier">>,
+) {
+  const { data, error } = await supabase
+    .from("okr_deliverables")
+    .update({
+      title: patch.title?.trim(),
+      description: patch.description ?? null,
+      owner_user_id: patch.owner_user_id ?? null,
+      status: patch.status,
+      due_at: patch.due_at ?? null,
+      tier: patch.tier,
+    })
+    .eq("id", deliverableId)
+    .select("id,key_result_id,tier,title,description,owner_user_id,status,due_at,created_at,updated_at")
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as DbDeliverable | null;
 }
 
 export type DeliverableTier = "TIER1" | "TIER2";

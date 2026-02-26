@@ -1,86 +1,357 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { ArrowRight, Check, Sparkles, Target } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CheckCircle2,
+  KeyRound,
+  ListChecks,
+  Sparkles,
+  Target,
+  Users,
+  Waypoints,
+} from "lucide-react";
+
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
-import { brl, brlPerHourFromMonthly, hourlyFromMonthly } from "@/lib/costs";
-import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
-import { listDepartments, type DbDepartment } from "@/lib/departmentsDb";
-import { listProfilesByCompany } from "@/lib/profilesDb";
+import { listDepartments } from "@/lib/departmentsDb";
+import { listProfilesByCompany, type DbProfile } from "@/lib/profilesDb";
 import {
   createDeliverable,
   createKeyResult,
   createOkrObjective,
-  createTask,
+  createStrategyObjective,
+  ensureOkrCycle,
   getCompanyFundamentals,
-  listKeyResults,
+  listDeliverablesByKeyResultIds,
+  listKeyResultsByObjectiveIds,
   listOkrCycles,
   listOkrObjectives,
   listStrategyObjectives,
+  updateDeliverable,
+  updateOkrObjective,
+  updateStrategyObjective,
+  upsertCompanyFundamentals,
+  type DbCompanyFundamentals,
+  type DbDeliverable,
   type DbOkrCycle,
+  type DbOkrKeyResult,
   type DbOkrObjective,
-  type DeliverableTier,
+  type DbStrategyObjective,
   type KrKind,
   type ObjectiveLevel,
-  type DbStrategyObjective,
+  type WorkStatus,
 } from "@/lib/okrDb";
 import { linkObjectiveToKr } from "@/lib/okrAlignmentDb";
+
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 
+type StepId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+type DraftKr =
+  | {
+      title: string;
+      kind: "METRIC";
+      metric_unit: string;
+      start_value: string;
+      target_value: string;
+    }
+  | {
+      title: string;
+      kind: "DELIVERABLE";
+    };
+
+type DraftObjective = {
+  title: string;
+  description: string;
+  krs: DraftKr[];
+  // Alignment
+  alignToKrId: string;
+};
+
+type DraftTacticalObjective = DraftObjective & {
+  departmentId: string;
+  ownerUserId: string;
+};
+
+type DraftDeliverable = {
+  keyResultId: string;
+  title: string;
+  description: string;
+  ownerUserId: string;
+  dueAt: string;
+  status: WorkStatus;
+};
+
 const SELECT_NONE = "__none__";
 
-function looksLikeVerbPt(text: string) {
-  const first = text.trim().split(/\s+/)[0]?.toLowerCase();
-  if (!first) return false;
-  // Heurística simples: infinitivo (aumentar / reduzir / construir / entregar / lançar / gerar / elevar...)
-  return /(?:ar|er|ir|or)$/.test(first) || ["lançar", "entregar", "construir", "elevar", "gerar", "reduzir", "aumentar"].includes(first);
+function clsx(...v: Array<string | false | null | undefined>) {
+  return v.filter(Boolean).join(" ");
 }
 
 function cycleLabel(c: DbOkrCycle) {
-  const base = c.type === "ANNUAL" ? `${c.year}` : `Q${c.quarter ?? "?"} / ${c.year}`;
+  const base = c.type === "ANNUAL" ? `${c.year}` : `Q${c.quarter ?? "?"}/${c.year}`;
   return c.name?.trim() ? `${c.name} · ${base}` : base;
 }
 
-type DraftTask = {
+function tokenizePt(s: string) {
+  const stop = new Set([
+    "de",
+    "do",
+    "da",
+    "dos",
+    "das",
+    "a",
+    "o",
+    "as",
+    "os",
+    "para",
+    "por",
+    "com",
+    "em",
+    "na",
+    "no",
+    "nas",
+    "nos",
+    "um",
+    "uma",
+    "e",
+    "ou",
+    "que",
+    "ao",
+    "à",
+    "se",
+    "ser",
+    "estar",
+    "ter",
+  ]);
+
+  return Array.from(
+    new Set(
+      s
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9\s-]/g, " ")
+        .split(/\s+/)
+        .map((w) => w.trim())
+        .filter((w) => w.length >= 4 && !stop.has(w)),
+    ),
+  );
+}
+
+function semanticCoherenceHint(parent: string, child: string) {
+  const a = tokenizePt(parent);
+  const b = tokenizePt(child);
+  if (child.trim().length < 30) return { kind: "warn" as const, text: "Texto muito curto — pode ficar difícil garantir coerência." };
+  if (!a.length || !b.length) return { kind: "warn" as const, text: "Faltam palavras-chave suficientes para avaliar coerência." };
+
+  const setA = new Set(a);
+  const overlap = b.filter((w) => setA.has(w));
+  const ratio = overlap.length / Math.max(1, Math.min(a.length, b.length));
+
+  if (ratio < 0.12) {
+    return {
+      kind: "warn" as const,
+      text: "Pode estar desconexo: poucas palavras-chave se repetem entre as duas declarações. Considere ajustar para reforçar a linha estratégica.",
+    };
+  }
+
+  return { kind: "ok" as const, text: "Coerência aparente: há continuidade de termos/temas entre as declarações." };
+}
+
+function StepHeader({
+  title,
+  subtitle,
+  badge,
+}: {
   title: string;
-  due?: string;
-  estimate_minutes: number | null;
-  estimated_value_brl: number | null;
-  estimated_cost_brl: number | null;
-  estimated_roi_pct: number | null;
-};
+  subtitle: string;
+  badge?: { label: string; icon?: React.ReactNode };
+}) {
+  return (
+    <div className="grid gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <h2 className="text-base font-semibold text-[color:var(--sinaxys-ink)] sm:text-lg">{title}</h2>
+        {badge ? (
+          <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] hover:bg-[color:var(--sinaxys-tint)]">
+            <span className="mr-1 inline-flex items-center">{badge.icon}</span>
+            {badge.label}
+          </Badge>
+        ) : null}
+      </div>
+      <p className="text-sm text-muted-foreground">{subtitle}</p>
+    </div>
+  );
+}
+
+function CoachCard({ title, lines }: { title: string; lines: string[] }) {
+  return (
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Consultor</div>
+          <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{title}</div>
+          <div className="mt-2 grid gap-1 text-sm text-muted-foreground">
+            {lines.slice(0, 3).map((t, idx) => (
+              <div key={idx} className="leading-relaxed">
+                {t}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+          <Sparkles className="h-5 w-5" />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function WizardProgress({ step }: { step: StepId }) {
+  const items = [
+    { id: 1 as const, label: "Fundamentos" },
+    { id: 2 as const, label: "Longo prazo" },
+    { id: 3 as const, label: "Ano" },
+    { id: 4 as const, label: "Trimestre" },
+    { id: 5 as const, label: "Tático" },
+    { id: 6 as const, label: "Entregáveis" },
+    { id: 7 as const, label: "Mapa" },
+  ];
+
+  const pct = Math.round(((step - 1) / (items.length - 1)) * 100);
+
+  return (
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Progresso</div>
+        <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
+          Etapa {step}/7
+        </Badge>
+      </div>
+      <Progress value={pct} className="mt-3 h-2.5 rounded-full bg-[color:var(--sinaxys-bg)]" />
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+        {items.map((it) => {
+          const active = it.id === step;
+          const done = it.id < step;
+          return (
+            <div
+              key={it.id}
+              className={clsx(
+                "rounded-2xl border p-2 text-center text-xs font-medium transition",
+                active
+                  ? "border-[color:var(--sinaxys-primary)] bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]"
+                  : done
+                    ? "border-[color:var(--sinaxys-border)] bg-white text-[color:var(--sinaxys-ink)]"
+                    : "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] text-muted-foreground",
+              )}
+            >
+              {it.label}
+            </div>
+          );
+        })}
+      </div>
+    </Card>
+  );
+}
 
 export default function OkrAssistant() {
   const { toast } = useToast();
-  const navigate = useNavigate();
   const qc = useQueryClient();
   const { user } = useAuth();
   const { companyId } = useCompany();
-  const isAdminish = user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN";
-
-  if (!user) return null;
 
   const cid = companyId ?? "";
   const hasCompany = !!companyId;
 
-  const { data: fundamentals } = useQuery({
+  const isAdminish = user?.role === "ADMIN" || user?.role === "HEAD" || user?.role === "MASTERADMIN";
+
+  const [step, setStep] = useState<StepId>(1);
+
+  // --- STEP 1: Fundamentals ---
+  const qFund = useQuery({
     queryKey: ["okr-fundamentals", cid],
     enabled: hasCompany,
     queryFn: () => getCompanyFundamentals(cid),
   });
 
+  const fundFromDb = qFund.data;
+
+  const [fundPurpose, setFundPurpose] = useState("");
+  const [fundMission, setFundMission] = useState("");
+  const [fundVision, setFundVision] = useState("");
+  const [fundValues, setFundValues] = useState("");
+  const [fundCulture, setFundCulture] = useState("");
+  const [fundSaved, setFundSaved] = useState(false);
+  const [fundSaving, setFundSaving] = useState(false);
+
+  useEffect(() => {
+    setFundPurpose((fundFromDb?.purpose ?? "").trim());
+    setFundMission((fundFromDb?.mission ?? "").trim());
+    setFundVision((fundFromDb?.vision ?? "").trim());
+    setFundValues((fundFromDb?.values ?? "").trim());
+    setFundCulture((fundFromDb?.culture ?? "").trim());
+
+    const hasAny =
+      !!(fundFromDb?.purpose ?? "").trim() ||
+      !!(fundFromDb?.mission ?? "").trim() ||
+      !!(fundFromDb?.vision ?? "").trim() ||
+      !!(fundFromDb?.values ?? "").trim() ||
+      !!(fundFromDb?.culture ?? "").trim();
+    setFundSaved(hasAny);
+  }, [fundFromDb?.culture, fundFromDb?.mission, fundFromDb?.purpose, fundFromDb?.values, fundFromDb?.vision]);
+
+  const fundamentalsCanSave =
+    fundPurpose.trim().length >= 12 &&
+    fundMission.trim().length >= 12 &&
+    fundVision.trim().length >= 12 &&
+    fundValues.trim().length >= 8 &&
+    fundCulture.trim().length >= 8;
+
+  // --- STEP 2: Long-term direction (strategy_objectives) ---
+  const qStrategy = useQuery({
+    queryKey: ["okr-strategy-objectives", cid],
+    enabled: hasCompany,
+    queryFn: () => listStrategyObjectives(cid),
+  });
+
+  const strategyObjectives = qStrategy.data ?? [];
+  const so10 = strategyObjectives.find((s) => s.horizon_years === 10) ?? null;
+  const so5 = strategyObjectives.find((s) => s.horizon_years === 5) ?? null;
+  const so2 = strategyObjectives.find((s) => s.horizon_years === 2) ?? null;
+
+  const [so10Text, setSo10Text] = useState("");
+  const [so5Text, setSo5Text] = useState("");
+  const [so2Text, setSo2Text] = useState("");
+  const [soSaved, setSoSaved] = useState(false);
+  const [soSaving, setSoSaving] = useState(false);
+
+  useEffect(() => {
+    setSo10Text((so10?.title ?? "").trim());
+    setSo5Text((so5?.title ?? "").trim());
+    setSo2Text((so2?.title ?? "").trim());
+    setSoSaved(!!(so10?.id && so5?.id && so2?.id));
+  }, [so10?.id, so10?.title, so2?.id, so2?.title, so5?.id, so5?.title]);
+
+  const coherence10to5 = useMemo(() => semanticCoherenceHint(so10Text, so5Text), [so10Text, so5Text]);
+  const coherence5to2 = useMemo(() => semanticCoherenceHint(so5Text, so2Text), [so5Text, so2Text]);
+
+  const longTermCanSave = so10Text.trim().length >= 18 && so5Text.trim().length >= 18 && so2Text.trim().length >= 18;
+
+  // --- Cycles ---
   const qCycles = useQuery({
     queryKey: ["okr-cycles", cid],
     enabled: hasCompany,
@@ -89,252 +360,184 @@ export default function OkrAssistant() {
 
   const cycles = qCycles.data ?? [];
 
-  const activeQuarterId = cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE")?.id ?? null;
+  // --- STEP 3: Annual strategic objectives ---
+  const [annualYear, setAnnualYear] = useState(() => String(new Date().getFullYear()));
+  const [annualCycleId, setAnnualCycleId] = useState<string>("");
+  const [annualDrafts, setAnnualDrafts] = useState<DraftObjective[]>([]);
+  const [annualSaving, setAnnualSaving] = useState(false);
 
-  const [cycleId, setCycleId] = useState<string>("");
-  const [level, setLevel] = useState<ObjectiveLevel>("INDIVIDUAL");
-
-  useEffect(() => {
-    if (!hasCompany) return;
-    if (!qCycles.isFetched) return;
-    if (activeQuarterId) return;
-
-    // Não cria ciclo automaticamente: só deixa o usuário selecionar/criar em Trimestre.
-  }, [activeQuarterId, cid, hasCompany, qCycles.isFetched]);
+  const annualCycles = useMemo(() => cycles.filter((c) => c.type === "ANNUAL"), [cycles]);
 
   useEffect(() => {
-    if (cycleId) return;
-    if (!activeQuarterId) return;
-    setCycleId(activeQuarterId);
-  }, [activeQuarterId, cycleId]);
+    const y = Number(annualYear);
+    const found = annualCycles.find((c) => c.year === y)?.id ?? "";
+    setAnnualCycleId(found);
+  }, [annualCycles, annualYear]);
 
-  const cycleOptions = useMemo(() => {
-    // Assistente trabalha no trimestre (execução) — mostra apenas QUARTERLY.
-    return cycles.filter((c) => c.type === "QUARTERLY");
-  }, [cycles]);
-
-  const selectedCycle = useMemo(() => cycleOptions.find((c) => c.id === cycleId) ?? null, [cycleOptions, cycleId]);
-
-  const annualCycleIdForSelected = useMemo(() => {
-    if (!selectedCycle) return null;
-    return cycles.find((c) => c.type === "ANNUAL" && c.year === selectedCycle.year)?.id ?? null;
-  }, [cycles, selectedCycle]);
-
-  const { data: cycleObjectives = [] } = useQuery({
-    queryKey: ["okr-objectives", cid, cycleId],
-    enabled: hasCompany && !!cycleId,
-    queryFn: () => listOkrObjectives(cid, cycleId),
+  const qAnnualObjectives = useQuery({
+    queryKey: ["okr-annual-objectives", cid, annualCycleId],
+    enabled: hasCompany && !!annualCycleId,
+    queryFn: () => listOkrObjectives(cid, annualCycleId),
   });
 
-  const { data: annualObjectives = [] } = useQuery({
-    queryKey: ["okr-objectives", cid, annualCycleIdForSelected],
-    enabled: hasCompany && !!annualCycleIdForSelected,
-    queryFn: () => listOkrObjectives(cid, annualCycleIdForSelected as string),
-    staleTime: 20_000,
+  const annualObjectives = useMemo(() => {
+    const all = qAnnualObjectives.data ?? [];
+    return all.filter((o) => o.level === "COMPANY");
+  }, [qAnnualObjectives.data]);
+
+  const qAnnualKrs = useQuery({
+    queryKey: ["okr-annual-krs", annualObjectives.map((o) => o.id).join(",")],
+    enabled: annualObjectives.length > 0,
+    queryFn: () => listKeyResultsByObjectiveIds(annualObjectives.map((o) => o.id)),
   });
 
-  const { data: strategyObjectives = [] } = useQuery({
-    queryKey: ["okr-strategy", cid],
-    enabled: hasCompany,
-    queryFn: () => listStrategyObjectives(cid),
-    staleTime: 20_000,
+  const annualKrs = qAnnualKrs.data ?? [];
+
+  const annualKrCountsByObjective = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const kr of annualKrs) map.set(kr.objective_id, (map.get(kr.objective_id) ?? 0) + 1);
+    return map;
+  }, [annualKrs]);
+
+  // --- STEP 4: Quarterly strategic objectives (aligned to annual KRs) ---
+  const [qYear, setQYear] = useState(() => String(new Date().getFullYear()));
+  const [qQuarter, setQQuarter] = useState<"1" | "2" | "3" | "4">("1");
+  const [quarterCycleId, setQuarterCycleId] = useState<string>("");
+  const [quarterDrafts, setQuarterDrafts] = useState<DraftObjective[]>([]);
+  const [quarterSaving, setQuarterSaving] = useState(false);
+
+  const quarterlyCycles = useMemo(() => cycles.filter((c) => c.type === "QUARTERLY"), [cycles]);
+
+  useEffect(() => {
+    const y = Number(qYear);
+    const q = Number(qQuarter);
+    const found = quarterlyCycles.find((c) => c.year === y && c.quarter === q)?.id ?? "";
+    setQuarterCycleId(found);
+  }, [qQuarter, qYear, quarterlyCycles]);
+
+  const qQuarterObjectives = useQuery({
+    queryKey: ["okr-quarter-objectives", cid, quarterCycleId],
+    enabled: hasCompany && !!quarterCycleId,
+    queryFn: () => listOkrObjectives(cid, quarterCycleId),
   });
 
-  const { data: departments = [] } = useQuery({
-    queryKey: ["departments", cid],
+  const quarterObjectives = useMemo(() => (qQuarterObjectives.data ?? []).filter((o) => o.level === "COMPANY"), [qQuarterObjectives.data]);
+
+  const qQuarterKrs = useQuery({
+    queryKey: ["okr-quarter-krs", quarterObjectives.map((o) => o.id).join(",")],
+    enabled: quarterObjectives.length > 0,
+    queryFn: () => listKeyResultsByObjectiveIds(quarterObjectives.map((o) => o.id)),
+  });
+  const quarterKrs = qQuarterKrs.data ?? [];
+
+  // --- STEP 5: Tactical objectives (by department, aligned to quarterly strategic KRs) ---
+  const qDepts = useQuery({
+    queryKey: ["okr-departments", cid],
     enabled: hasCompany,
     queryFn: () => listDepartments(cid),
-    staleTime: 60_000,
   });
 
-  const { data: profiles = [] } = useQuery({
-    queryKey: ["profiles", cid],
+  const departments = qDepts.data ?? [];
+
+  const qProfiles = useQuery({
+    queryKey: ["okr-profiles", cid],
     enabled: hasCompany,
     queryFn: () => listProfilesByCompany(cid),
-    staleTime: 60_000,
   });
 
-  const [participatingDeptId, setParticipatingDeptId] = useState<string>(user.departmentId ?? "");
+  const profiles = qProfiles.data ?? [];
 
-  useEffect(() => {
-    // keep a reasonable default when user has a dept
-    if (!participatingDeptId && user.departmentId) setParticipatingDeptId(user.departmentId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user.departmentId]);
+  const [tacticalDrafts, setTacticalDrafts] = useState<DraftTacticalObjective[]>([]);
+  const [tacticalSaving, setTacticalSaving] = useState(false);
 
-  const deptMembers = useMemo(() => {
-    if (!participatingDeptId) return [] as typeof profiles;
-    return profiles.filter((p) => p.department_id === participatingDeptId && p.active);
-  }, [participatingDeptId, profiles]);
+  const tacticalObjectives = useMemo(() => {
+    const all = qQuarterObjectives.data ?? [];
+    return all.filter((o) => o.level === "DEPARTMENT");
+  }, [qQuarterObjectives.data]);
 
-  const deptAvgHourly = useMemo(() => {
-    const rates = deptMembers
-      .map((p) => (typeof p.monthly_cost_brl === "number" ? hourlyFromMonthly(p.monthly_cost_brl) : null))
-      .filter((v): v is number => typeof v === "number" && Number.isFinite(v) && v > 0);
-    if (!rates.length) return null;
-    return rates.reduce((a, b) => a + b, 0) / rates.length;
-  }, [deptMembers]);
+  const qTacticalKrs = useQuery({
+    queryKey: ["okr-tactical-krs", tacticalObjectives.map((o) => o.id).join(",")],
+    enabled: tacticalObjectives.length > 0,
+    queryFn: () => listKeyResultsByObjectiveIds(tacticalObjectives.map((o) => o.id)),
+  });
+  const tacticalKrs = qTacticalKrs.data ?? [];
 
-  const companyObjectives = useMemo(() => cycleObjectives.filter((o) => o.level === "COMPANY"), [cycleObjectives]);
+  // --- STEP 6: Individual deliverables inside tactical KRs ---
+  const [deliverableDrafts, setDeliverableDrafts] = useState<DraftDeliverable[]>([]);
+  const [deliverablesSaving, setDeliverablesSaving] = useState(false);
 
-  const [parentId, setParentId] = useState<string>("");
-  const [strategyObjectiveId, setStrategyObjectiveId] = useState<string>("");
-
-  const deliverableTierAuto: DeliverableTier = useMemo(() => {
-    // Tier 2: vinculado a OKR estratégico (objetivo de longo prazo)
-    if (strategyObjectiveId) return "TIER2";
-
-    // Tier 1: no trimestre, vinculado ao OKR do ano
-    if (selectedCycle?.type === "QUARTERLY" && parentId) return "TIER1";
-
-    return "TIER1";
-  }, [parentId, selectedCycle?.type, strategyObjectiveId]);
-
-  const requiresQuarterKrLink = useMemo(() => {
-    // A regra do produto: dentro do trimestre, OKR de time/individual precisa se alinhar a um KR Tier 1 do mesmo trimestre.
-    return selectedCycle?.type === "QUARTERLY" && level !== "COMPANY";
-  }, [level, selectedCycle?.type]);
-
-  const { data: quarterKrOptions = [] } = useQuery({
-    queryKey: ["okr-assistant-quarter-strategy-krs", cid, cycleId, companyObjectives.map((o) => o.id).join(",")],
-    enabled: hasCompany && !!cycleId && requiresQuarterKrLink && companyObjectives.length > 0,
-    queryFn: async () => {
-      const out: Array<{ id: string; label: string; objectiveTitle: string }> = [];
-      for (const o of companyObjectives) {
-        const krs = await listKeyResults(o.id);
-        for (const kr of krs) out.push({ id: kr.id, label: kr.title, objectiveTitle: o.title });
-      }
-      return out;
-    },
-    staleTime: 20_000,
+  const qExistingDeliverables = useQuery({
+    queryKey: ["okr-tactical-deliverables", tacticalKrs.map((k) => k.id).join(",")],
+    enabled: tacticalKrs.length > 0,
+    queryFn: () => listDeliverablesByKeyResultIds(tacticalKrs.map((k) => k.id)),
   });
 
-  const [alignKrId, setAlignKrId] = useState<string>(SELECT_NONE);
+  const existingDeliverables = qExistingDeliverables.data ?? [];
 
-  useEffect(() => {
-    if (!requiresQuarterKrLink) {
-      setAlignKrId(SELECT_NONE);
-    }
-  }, [requiresQuarterKrLink]);
+  // --- gating ---
+  const canGoStep2 = fundSaved;
+  const canGoStep3 = soSaved;
 
-  const [objectiveTitle, setObjectiveTitle] = useState("");
-  const [objectiveDesc, setObjectiveDesc] = useState("");
-  const [objectiveReason, setObjectiveReason] = useState("");
+  const annualReady = useMemo(() => {
+    if (!annualCycleId) return false;
+    if (!so2?.id) return false;
 
-  const [fund, setFund] = useState<DbOkrObjective["linked_fundamental"]>(null);
-  const [fundText, setFundText] = useState("");
+    const targets = annualObjectives.filter((o) => o.strategy_objective_id === so2.id);
+    if (!targets.length) return false;
 
-  const [objectiveExpected, setObjectiveExpected] = useState("80");
-  const [objectiveValue, setObjectiveValue] = useState("");
-  const [objectiveEffortHours, setObjectiveEffortHours] = useState("");
+    // Each annual objective should have 2-4 KRs.
+    return targets.every((o) => {
+      const n = annualKrCountsByObjective.get(o.id) ?? 0;
+      return n >= 2 && n <= 4;
+    });
+  }, [annualCycleId, annualKrCountsByObjective, annualObjectives, so2?.id]);
 
-  const [krKind, setKrKind] = useState<KrKind>("METRIC");
-  const [krTitle, setKrTitle] = useState("");
-  const [krUnit, setKrUnit] = useState("");
-  const [krStart, setKrStart] = useState("");
-  const [krTarget, setKrTarget] = useState("");
-  const [krDue, setKrDue] = useState("");
+  const quarterReady = useMemo(() => {
+    if (!quarterCycleId) return false;
+    if (!annualKrs.length) return false;
 
-  const [deliverableTitle, setDeliverableTitle] = useState("");
-  const [deliverableDesc, setDeliverableDesc] = useState("");
-  const [deliverableDue, setDeliverableDue] = useState("");
+    // Each quarterly objective must be aligned to some annual KR.
+    // We ensure this by requiring alignToKrId on drafts and creating link.
+    // For existing objectives, we consider them ok if they have at least 2 KRs.
+    if (!quarterObjectives.length) return false;
 
-  const [taskTitle, setTaskTitle] = useState("");
-  const [taskDue, setTaskDue] = useState("");
-  const [taskEstimate, setTaskEstimate] = useState("");
-  const [taskValue, setTaskValue] = useState("");
-  const [tasks, setTasks] = useState<DraftTask[]>([]);
+    const counts = new Map<string, number>();
+    for (const kr of quarterKrs) counts.set(kr.objective_id, (counts.get(kr.objective_id) ?? 0) + 1);
 
-  const [publishing, setPublishing] = useState(false);
+    return quarterObjectives.every((o) => {
+      const n = counts.get(o.id) ?? 0;
+      return n >= 2 && n <= 4;
+    });
+  }, [annualKrs.length, quarterCycleId, quarterKrs, quarterObjectives.length, quarterObjectives]);
 
-  const requiresBusinessCase = level === "COMPANY" ? true : !!user.departmentId;
-  const myMonthly = user.monthlyCostBRL ?? null;
-  const { enabled: okrRoiEnabled } = useCompanyModuleEnabled("OKR_ROI");
+  const tacticalReady = useMemo(() => {
+    if (!quarterCycleId) return false;
+    if (!quarterKrs.length) return false;
+    if (!tacticalObjectives.length) return false;
 
-  const expectedAtt = parsePtNumber(objectiveExpected);
-  const objectiveValueBRL = parsePtNumber(objectiveValue);
-  const objectiveHours = parsePtNumber(objectiveEffortHours);
+    const counts = new Map<string, number>();
+    for (const kr of tacticalKrs) counts.set(kr.objective_id, (counts.get(kr.objective_id) ?? 0) + 1);
 
-  const objectiveCostBRL = useMemo(() => {
-    if (level === "COMPANY") {
-      if (!objectiveHours || objectiveHours <= 0) return null;
-      if (deptAvgHourly) return deptAvgHourly * objectiveHours;
-      // fallback: usa o custo do criador
-      return laborCostFromMonthly(myMonthly, objectiveHours);
-    }
-    return laborCostFromMonthly(myMonthly, objectiveHours);
-  }, [deptAvgHourly, level, myMonthly, objectiveHours]);
+    return tacticalObjectives.every((o) => {
+      const n = counts.get(o.id) ?? 0;
+      return n >= 1;
+    });
+  }, [quarterCycleId, quarterKrs.length, tacticalKrs, tacticalObjectives.length, tacticalObjectives]);
 
-  const objectiveRoi = roiPct(objectiveValueBRL, objectiveCostBRL);
+  const deliverablesReady = useMemo(() => {
+    // At least one deliverable created for the tactical layer.
+    return existingDeliverables.length > 0;
+  }, [existingDeliverables.length]);
 
-  const businessCaseOk =
-    (!requiresBusinessCase ||
-      (expectedAtt !== null &&
-        expectedAtt >= 0 &&
-        expectedAtt <= 100 &&
-        !!objectiveValueBRL &&
-        objectiveValueBRL > 0 &&
-        !!objectiveHours &&
-        objectiveHours > 0 &&
-        ((level === "COMPANY" ? !!participatingDeptId : true)) &&
-        ((level === "COMPANY" ? (deptAvgHourly !== null || (!!myMonthly && myMonthly > 0)) : (!!myMonthly && myMonthly > 0))) &&
-        objectiveCostBRL !== null &&
-        objectiveRoi !== null &&
-        tasks.length >= 1 &&
-        tasks.every((t) => t.estimated_value_brl !== null && t.estimated_cost_brl !== null && t.estimated_roi_pct !== null))) &&
-    (!requiresBusinessCase || tasks.length >= 1);
+  const onPrev = () => setStep((s) => (s > 1 ? ((s - 1) as StepId) : s));
+  const onNext = () => setStep((s) => (s < 7 ? ((s + 1) as StepId) : s));
 
-  const objectiveQuality = useMemo(() => {
-    const t = objectiveTitle.trim();
-    if (!t) return { ok: false, msg: "Dê nome ao objetivo." };
-    if (t.length < 10) return { ok: false, msg: "Deixe o objetivo um pouco mais específico (10+ caracteres)." };
-    if (!looksLikeVerbPt(t)) return { ok: false, msg: "Comece com um verbo no infinitivo (ex.: Aumentar / Reduzir / Lançar / Construir)." };
-    return { ok: true, msg: "Bom objetivo: claro e orientado a resultado." };
-  }, [objectiveTitle]);
-
-  const krQuality = useMemo(() => {
-    const t = krTitle.trim();
-    if (!t) return { ok: false, msg: "Defina um KR." };
-
-    if (krKind === "DELIVERABLE") {
-      return { ok: true, msg: "KR do tipo entregável." };
-    }
-
-    const start = Number(String(krStart).replace(",", "."));
-    const target = Number(String(krTarget).replace(",", "."));
-    if (!Number.isFinite(start) || !Number.isFinite(target)) {
-      return { ok: false, msg: "Preencha início e meta com números para facilitar acompanhamento." };
-    }
-    if (start === target) return { ok: false, msg: "Início e meta não podem ser iguais." };
-    return { ok: true, msg: "KR pronto para tracking." };
-  }, [krTitle, krStart, krTarget, krKind]);
-
-  const canSubmit =
-    hasCompany &&
-    !!cycleId &&
-    objectiveQuality.ok &&
-    (!!fund && fundText.trim().length >= 6) &&
-    expectedAtt !== null &&
-    expectedAtt >= 0 &&
-    expectedAtt <= 100 &&
-    krQuality.ok &&
-    deliverableTitle.trim().length >= 4 &&
-    tasks.length >= 1 &&
-    businessCaseOk &&
-    (!requiresQuarterKrLink || (alignKrId !== SELECT_NONE && quarterKrOptions.length > 0)) &&
-    !publishing;
+  if (!user) return null;
 
   if (!hasCompany) {
     return (
       <div className="grid gap-6">
-        <OkrPageHeader
-          title="Assistente de criação de OKRs"
-          subtitle="Carregando contexto da empresa…"
-          icon={<Sparkles className="h-5 w-5" />}
-        />
-
         <OkrSubnav />
-
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
         </Card>
@@ -342,683 +545,1677 @@ export default function OkrAssistant() {
     );
   }
 
+  if (!isAdminish) {
+    return (
+      <div className="grid gap-6">
+        <OkrSubnav />
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Assistente estratégico</div>
+          <p className="mt-1 text-sm text-muted-foreground">Este fluxo é voltado para admins (definição e governança de estratégia).</p>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-6">
-      <OkrPageHeader
-        title="Assistente de criação de OKRs"
-        subtitle="Um copiloto simples: você cria o objetivo certo, define KRs mensuráveis e já sai com tarefas conectadas."
-        icon={<Sparkles className="h-5 w-5" />}
-        actions={
-          <Button asChild variant="outline" className="h-11 rounded-xl">
-            <Link to="/okr">Voltar</Link>
-          </Button>
-        }
-      />
-
       <OkrSubnav />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+      <OkrPageHeader
+        title="Assistente estratégico (OKRs + Fundamentos)"
+        subtitle="Um fluxo guiado para estruturar fundamentos, direção e execução com alinhamento automático."
+      />
+
+      <WizardProgress step={step} />
+
+      {/* STEP CONTENT */}
+      {step === 1 ? (
         <div className="grid gap-6">
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">1) Contexto</div>
-                <p className="mt-1 text-sm text-muted-foreground">Escolha o ciclo e o nível do seu OKR.</p>
-              </div>
-              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">Passo 1</Badge>
-            </div>
+          <StepHeader
+            title="Etapa 1 — Fundamentos da empresa"
+            subtitle="Vamos construir a base cultural e estratégica. Sem isso, o restante vira execução desconexa."
+            badge={{ label: "Base", icon: <Target className="h-3.5 w-3.5" /> }}
+          />
 
-            <Separator className="my-5" />
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>Ciclo (trimestre)</Label>
-                <Select value={cycleId} onValueChange={setCycleId}>
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue placeholder={cycleOptions.length ? "Selecione um trimestre" : "Sem trimestres cadastrados"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {cycleOptions.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {cycleLabel(c)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {!cycleOptions.length ? (
-                  <div className="text-xs text-muted-foreground">
-                    Não há trimestres ainda. Peça para um admin criar em <Link className="underline" to="/okr/quarter">Trimestre</Link>.
-                  </div>
-                ) : null}
-
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Nível</Label>
-                <Select value={level} onValueChange={(v) => setLevel(v as ObjectiveLevel)}>
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="INDIVIDUAL">Individual</SelectItem>
-                    <SelectItem value="DEPARTMENT">Time</SelectItem>
-                    <SelectItem value="COMPANY">Empresa</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-4">
-              <div className="grid gap-2">
-                <Label>Vincular a objetivo de longo prazo (Tier 2, opcional)</Label>
-                <Select
-                  value={strategyObjectiveId}
-                  onValueChange={(v) => setStrategyObjectiveId(v === SELECT_NONE ? "" : v)}
-                >
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue placeholder={strategyObjectives.length ? "Selecione…" : "Sem objetivos de longo prazo"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={SELECT_NONE}>Sem vínculo</SelectItem>
-                    {strategyObjectives.map((so: DbStrategyObjective) => (
-                      <SelectItem key={so.id} value={so.id}>
-                        {so.title}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="text-xs text-muted-foreground">Se vincular, os entregáveis serão automaticamente Tier 2.</div>
-              </div>
-
-              {selectedCycle?.type === "QUARTERLY" ? (
-                <div className="grid gap-2">
-                  <Label>Vincular ao OKR do ano (Tier 1, opcional)</Label>
-                  <Select
-                    value={parentId}
-                    onValueChange={(v) => {
-                      setParentId(v === SELECT_NONE ? "" : v);
-                    }}
-                  >
-                    <SelectTrigger className="h-11 rounded-xl">
-                      <SelectValue placeholder={annualObjectives.length ? "Selecione um objetivo anual" : "Sem objetivo anual para este ano"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={SELECT_NONE}>Sem objetivo anual</SelectItem>
-                      {annualObjectives.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>
-                          {o.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="text-xs text-muted-foreground">Esse vínculo define o Tier 1 automaticamente no trimestre.</div>
-                </div>
-              ) : (
-                <div className="grid gap-2">
-                  <Label>Objetivo pai (opcional)</Label>
-                  <Select
-                    value={parentId}
-                    onValueChange={(v) => {
-                      setParentId(v === SELECT_NONE ? "" : v);
-                    }}
-                  >
-                    <SelectTrigger className="h-11 rounded-xl">
-                      <SelectValue placeholder={companyObjectives.length ? "Escolha um objetivo da empresa" : "Nenhum objetivo da empresa neste ciclo"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={SELECT_NONE}>Sem objetivo pai</SelectItem>
-                      {companyObjectives.map((o) => (
-                        <SelectItem key={o.id} value={o.id}>
-                          {o.title}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="text-xs text-muted-foreground">Opcional — ajuda a manter alinhamento entre objetivos.</div>
-
-                </div>
-              )}
-
-              {level === "COMPANY" ? (
-                <div className="mt-4 grid gap-2">
-                  <Label>Time participante (para orçamento)</Label>
-                  <Select value={participatingDeptId} onValueChange={setParticipatingDeptId}>
-                    <SelectTrigger className="h-11 rounded-xl">
-                      <SelectValue placeholder={departments.length ? "Selecione…" : "Sem times cadastrados"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((d: DbDepartment) => (
-                        <SelectItem key={d.id} value={d.id}>
-                          {d.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="text-xs text-muted-foreground">Para Empresa, o custo é calculado pela média de custo/h dos colaboradores do time selecionado.</div>
-                </div>
-              ) : null}
-
-              {requiresQuarterKrLink ? (
-                <div className="grid gap-2">
-                  <Label>Alinhar a um KR estratégico (Tier 1) deste trimestre</Label>
-                  <Select value={alignKrId} onValueChange={setAlignKrId}>
-                    <SelectTrigger className="h-11 rounded-xl bg-white">
-                      <SelectValue placeholder={quarterKrOptions.length ? "Selecione um KR" : "Sem KRs estratégicos neste trimestre"} />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-2xl">
-                      <SelectItem value={SELECT_NONE}>Selecione um KR</SelectItem>
-                      {quarterKrOptions
-                        .slice()
-                        .sort((a, b) => (a.objectiveTitle.localeCompare(b.objectiveTitle, "pt-BR") || a.label.localeCompare(b.label, "pt-BR")))
-                        .map((kr) => (
-                          <SelectItem key={kr.id} value={kr.id}>
-                            {kr.objectiveTitle} — {kr.label}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                  {quarterKrOptions.length ? (
-                    <div className="text-xs text-muted-foreground">Isso posiciona seu OKR (Tier 2) abaixo do KR no mapa.</div>
-                  ) : (
-                    <div className="text-xs text-muted-foreground">Crie primeiro um objetivo Empresa (Tier 1) neste trimestre e adicione um KR.</div>
-                  )}
-                </div>
-              ) : null}
-
-              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3 text-sm">
-                <span className="font-semibold text-[color:var(--sinaxys-ink)]">Tier automático do entregável:</span>{" "}
-                <span className="font-semibold text-[color:var(--sinaxys-ink)]">{deliverableTierAuto === "TIER2" ? "Tier 2" : "Tier 1"}</span>
-                <span className="text-muted-foreground"> • baseado no vínculo acima</span>
-              </div>
-            </div>
-          </Card>
+          <CoachCard
+            title="Como usar esta etapa"
+            lines={[
+              "Fundamentos são a âncora: eles definem o 'porquê', o 'como' e o 'pra quê' da empresa.",
+              "Eu vou explicar rapidamente cada item e em seguida pedir o preenchimento.",
+              "Você só avança depois de salvar — isso evita 'pular base'.",
+            ]}
+          />
 
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">2) Objetivo</div>
-                <p className="mt-1 text-sm text-muted-foreground">Escreva um objetivo claro, defina o atingimento esperado e conecte aos fundamentos.</p>
-              </div>
-              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{objectiveQuality.ok ? <Check className="h-4 w-4" /> : "Passo 2"}</Badge>
-            </div>
-
-            <Separator className="my-5" />
-
-            <div className="grid gap-2">
-              <Label>Objetivo</Label>
-              <Input
-                className="h-11 rounded-xl"
-                value={objectiveTitle}
-                onChange={(e) => setObjectiveTitle(e.target.value)}
-                placeholder="Ex.: Aumentar previsibilidade do delivery"
-              />
-              <div className={`text-xs ${objectiveQuality.ok ? "text-[color:var(--sinaxys-ink)]" : "text-muted-foreground"}`}>{objectiveQuality.msg}</div>
-            </div>
-
-            <div className="mt-4 grid gap-2">
-              <Label>Atingimento esperado (%)</Label>
-              <Input className="h-11 rounded-xl" value={objectiveExpected} onChange={(e) => setObjectiveExpected(e.target.value)} placeholder="80" />
-              <div className="text-xs text-muted-foreground">Ex.: 70–85% costuma ser meta realista para objetivos aspiracionais.</div>
-            </div>
-
-            <div className="mt-4 grid gap-2">
-              <Label>Descrição (opcional)</Label>
-              <Textarea className="min-h-[88px] rounded-2xl" value={objectiveDesc} onChange={(e) => setObjectiveDesc(e.target.value)} />
-            </div>
-
-            <div className="mt-4 grid gap-2">
-              <Label>Motivo estratégico (opcional)</Label>
-              <Textarea className="min-h-[88px] rounded-2xl" value={objectiveReason} onChange={(e) => setObjectiveReason(e.target.value)} />
-            </div>
-
-            {requiresBusinessCase && okrRoiEnabled ? (
-              <div className="mt-4 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {level === "COMPANY"
-                    ? "Para objetivos de Empresa, o orçamento usa o time participante (não apenas o custo do dono)."
-                    : "Como esse objetivo retorna dinheiro — e qual o ROI, baseado no seu custo/hora."}
+            <div className="grid gap-5">
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Propósito</div>
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
+                    por quê existimos
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  O propósito é a razão de existir da empresa — o impacto que ela busca deixar no mundo.
                 </p>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label>Impacto estimado (R$)</Label>
-                    <Input className="h-11 rounded-xl" value={objectiveValue} onChange={(e) => setObjectiveValue(e.target.value)} placeholder="50000" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Esforço estimado (horas)</Label>
-                    <Input
-                      className="h-11 rounded-xl"
-                      value={objectiveEffortHours}
-                      onChange={(e) => setObjectiveEffortHours(e.target.value)}
-                      placeholder="40"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                  <div className="text-xs text-muted-foreground">
-                    {level === "COMPANY"
-                      ? `Custo/h do time: ${deptAvgHourly ? `${brl(deptAvgHourly)}/h` : `${brlPerHourFromMonthly(myMonthly ?? 0)}`}`
-                      : `Seu custo/h: ${brlPerHourFromMonthly(myMonthly ?? 0)}`}
-                  </div>
-                  {level === "COMPANY" ? (
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Base: {deptMembers.length} colaboradores ativos no time • {deptMembers.filter((p) => typeof p.monthly_cost_brl === "number" && p.monthly_cost_brl > 0).length} com custo cadastrado.
-                    </div>
-                  ) : null}
-                  {!myMonthly ? (
-                    <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]">Para calcular ROI, cadastre seu custo mensal em <span className="font-semibold">Custos</span>.</div>
-                  ) : null}
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Custo estimado:</span>
-                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{objectiveCostBRL !== null ? brl(objectiveCostBRL) : "—"}</span>
-                    <span className="text-muted-foreground">• ROI:</span>
-                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{objectiveRoi !== null ? `${objectiveRoi.toFixed(1)}%` : "—"}</span>
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground">Ex.: "Democratizar acesso a educação de qualidade."</p>
+                <Textarea className="min-h-[92px] rounded-2xl" value={fundPurpose} onChange={(e) => setFundPurpose(e.target.value)} />
               </div>
-            ) : null}
 
-            <div className="mt-4 grid gap-2">
-              <Label>Esse objetivo está conectado a…</Label>
-              <Select value={fund ?? ""} onValueChange={(v) => setFund((v || null) as any)}>
-                <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Propósito / Visão / Missão…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="PURPOSE">Propósito</SelectItem>
-                  <SelectItem value="VISION">Visão</SelectItem>
-                  <SelectItem value="MISSION">Missão</SelectItem>
-                  <SelectItem value="VALUES">Valores</SelectItem>
-                  <SelectItem value="CULTURE">Cultura</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Textarea
-                className="min-h-[72px] rounded-2xl"
-                value={fundText}
-                onChange={(e) => setFundText(e.target.value)}
-                placeholder={
-                  fund === "VISION" && fundamentals?.vision?.trim()
-                    ? `Ex.: ${fundamentals.vision}`
-                    : "Cole aqui a frase do fundamento (ou escreva o trecho que esse objetivo atende)."
-                }
-              />
-            </div>
-          </Card>
-
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">3) Key Result</div>
-                <p className="mt-1 text-sm text-muted-foreground">Escolha KR de métrica (de → para) ou KR entregável (até data).</p>
-              </div>
-              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{krQuality.ok ? <Check className="h-4 w-4" /> : "Passo 3"}</Badge>
-            </div>
-
-            <Separator className="my-5" />
-
-            <div className="grid gap-3">
-              <div className="grid gap-2">
-                <Label>Tipo</Label>
-                <Select value={krKind} onValueChange={(v) => setKrKind(v as KrKind)}>
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="METRIC">Métrica (de → para)</SelectItem>
-                    <SelectItem value="DELIVERABLE">Entregável (até uma data)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <Separator />
 
               <div className="grid gap-2">
-                <Label>KR</Label>
-                <Input
-                  className="h-11 rounded-xl"
-                  value={krTitle}
-                  onChange={(e) => setKrTitle(e.target.value)}
-                  placeholder={krKind === "DELIVERABLE" ? "Ex.: Entregar novo fluxo de onboarding" : "Ex.: Reduzir lead time médio de 12 para 7 dias"}
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Missão</div>
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
+                    o que fazemos
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  A missão traduz o propósito em ação — o que vocês fazem hoje para gerar o impacto.
+                </p>
+                <p className="text-xs text-muted-foreground">Ex.: "Ajudar PMEs a vender melhor com automação simples."</p>
+                <Textarea className="min-h-[92px] rounded-2xl" value={fundMission} onChange={(e) => setFundMission(e.target.value)} />
+              </div>
+
+              <Separator />
+
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visão</div>
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
+                    onde queremos chegar
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">A visão descreve o futuro desejado — o "norte" de longo prazo.</p>
+                <p className="text-xs text-muted-foreground">Ex.: "Ser a plataforma nº1 de … na América Latina."</p>
+                <Textarea className="min-h-[92px] rounded-2xl" value={fundVision} onChange={(e) => setFundVision(e.target.value)} />
+              </div>
+
+              <Separator />
+
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Valores</div>
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
+                    como decidimos
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Valores são princípios de decisão — o "filtro" para escolhas difíceis quando o custo de errar é alto.
+                </p>
+                <p className="text-xs text-muted-foreground">Ex.: "Foco no cliente", "Franqueza com respeito", "Alta barra".</p>
+                <Textarea
+                  className="min-h-[92px] rounded-2xl"
+                  value={fundValues}
+                  onChange={(e) => setFundValues(e.target.value)}
+                  placeholder="Você pode usar linhas (um valor por linha)."
                 />
-                <div className={`text-xs ${krQuality.ok ? "text-[color:var(--sinaxys-ink)]" : "text-muted-foreground"}`}>{krQuality.msg}</div>
               </div>
 
-              {krKind === "METRIC" ? (
-                <div className="grid gap-4 md:grid-cols-3">
-                  <div className="grid gap-2">
-                    <Label>Início</Label>
-                    <Input className="h-11 rounded-xl" value={krStart} onChange={(e) => setKrStart(e.target.value)} placeholder="12" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Meta</Label>
-                    <Input className="h-11 rounded-xl" value={krTarget} onChange={(e) => setKrTarget(e.target.value)} placeholder="7" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Unidade (opcional)</Label>
-                    <Input className="h-11 rounded-xl" value={krUnit} onChange={(e) => setKrUnit(e.target.value)} placeholder="dias" />
-                  </div>
-                </div>
-              ) : (
-                <div className="grid gap-2">
-                  <Label>Prazo (opcional)</Label>
-                  <Input className="h-11 rounded-xl" type="date" value={krDue} onChange={(e) => setKrDue(e.target.value)} />
-                </div>
-              )}
-            </div>
+              <Separator />
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {[
-                "Aumentar ____ de __ para __",
-                "Reduzir ____ de __ para __",
-                "Elevar ____ de __ para __",
-                "Gerar ____ (R$) de __ para __",
-                "Entregar ____ até __",
-              ].map((tpl) => (
-                <Button key={tpl} type="button" variant="outline" className="h-9 rounded-full" onClick={() => setKrTitle(tpl)}>
-                  {tpl}
+              <div className="grid gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Cultura</div>
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
+                    como trabalhamos
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Cultura é o comportamento padrão: como a empresa opera de verdade quando ninguém está olhando.
+                </p>
+                <p className="text-xs text-muted-foreground">Ex.: "Ritmo semanal", "Escrita antes de reunião", "Aprendizado contínuo".</p>
+                <Textarea className="min-h-[92px] rounded-2xl" value={fundCulture} onChange={(e) => setFundCulture(e.target.value)} />
+              </div>
+
+              <Separator />
+
+              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                Empresas que revisam seus fundamentos periodicamente mantêm coerência cultural e estratégica. Recomendamos revisão a cada 2 anos.
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">
+                  Para avançar: preencha todos os campos e clique em <span className="font-medium text-[color:var(--sinaxys-ink)]">Salvar fundamentos</span>.
+                </div>
+                <Button
+                  className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={!fundamentalsCanSave || fundSaving}
+                  onClick={async () => {
+                    try {
+                      setFundSaving(true);
+                      const patch: Partial<DbCompanyFundamentals> = {
+                        purpose: fundPurpose.trim() || null,
+                        mission: fundMission.trim() || null,
+                        vision: fundVision.trim() || null,
+                        values: fundValues.trim() || null,
+                        culture: fundCulture.trim() || null,
+                      };
+                      await upsertCompanyFundamentals(cid, patch);
+                      await qc.invalidateQueries({ queryKey: ["okr-fundamentals", cid] });
+                      setFundSaved(true);
+                      toast({ title: "Fundamentos salvos" });
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível salvar",
+                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setFundSaving(false);
+                    }
+                  }}
+                >
+                  Salvar fundamentos
+                  <CheckCircle2 className="ml-2 h-4 w-4" />
                 </Button>
-              ))}
+              </div>
             </div>
           </Card>
+        </div>
+      ) : null}
+
+      {step === 2 ? (
+        <div className="grid gap-6">
+          <StepHeader
+            title="Etapa 2 — Visão e objetivos de longo prazo"
+            subtitle="Agora vamos transformar fundamentos em direção: 10 anos → 5 anos → 2 anos."
+            badge={{ label: "Direção", icon: <Waypoints className="h-3.5 w-3.5" /> }}
+          />
+
+          <CoachCard
+            title="Visão vs objetivo (em 10s)"
+            lines={[
+              "Visão é imagem de futuro (qual posição/realidade queremos ver).",
+              "Objetivo é um resultado concreto (o que precisa ser verdade até lá).",
+              "Vamos construir em cascata para manter coerência.",
+            ]}
+          />
 
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">4) Entregável + tarefas</div>
-                <p className="mt-1 text-sm text-muted-foreground">O KR vira execução real: entregáveis e tarefas do dia.</p>
+            <div className="grid gap-5">
+              <div className="grid gap-2">
+                <Label>1) Visão de 10 anos</Label>
+                <p className="text-sm text-muted-foreground">Como a empresa será percebida / qual realidade terá ajudado a criar?</p>
+                <Input className="h-11 rounded-xl" value={so10Text} onChange={(e) => setSo10Text(e.target.value)} placeholder="Ex.: Ser referência em…" />
               </div>
-              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">Passo 4</Badge>
+
+              <Separator />
+
+              <div className="grid gap-2">
+                <Label>2) Objetivo de 5 anos</Label>
+                <p className="text-sm text-muted-foreground">O que precisa ser verdade em 5 anos para sustentar a visão?</p>
+                <Input className="h-11 rounded-xl" value={so5Text} onChange={(e) => setSo5Text(e.target.value)} placeholder="Ex.: Atingir … clientes / … receita / … presença" />
+                <div
+                  className={clsx(
+                    "rounded-2xl border p-3 text-sm",
+                    coherence10to5.kind === "ok"
+                      ? "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]"
+                      : "border-amber-200 bg-amber-50",
+                  )}
+                >
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Coerência 10 → 5</div>
+                  <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)]">{coherence10to5.text}</div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid gap-2">
+                <Label>3) Objetivo de 2 anos</Label>
+                <p className="text-sm text-muted-foreground">Qual é o "degrau" de 2 anos que te coloca no trilho do objetivo de 5?</p>
+                <Input className="h-11 rounded-xl" value={so2Text} onChange={(e) => setSo2Text(e.target.value)} placeholder="Ex.: Construir … / Atingir … / Expandir …" />
+                <div
+                  className={clsx(
+                    "rounded-2xl border p-3 text-sm",
+                    coherence5to2.kind === "ok" ? "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]" : "border-amber-200 bg-amber-50",
+                  )}
+                >
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Coerência 5 → 2</div>
+                  <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)]">{coherence5to2.text}</div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                Recomendamos revisão dos objetivos de longo prazo a cada 2 anos.
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">Dica: texto curto costuma gerar desalinhamento. Prefira frases completas.</div>
+                <Button
+                  className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={!longTermCanSave || soSaving}
+                  onClick={async () => {
+                    try {
+                      setSoSaving(true);
+
+                      const upsertOne = async (existing: DbStrategyObjective | null, horizon: 2 | 5 | 10, title: string) => {
+                        if (existing?.id) {
+                          await updateStrategyObjective(existing.id, { title });
+                          return existing.id;
+                        }
+                        const created = await createStrategyObjective({ company_id: cid, horizon_years: horizon, title });
+                        return created.id;
+                      };
+
+                      await upsertOne(so10, 10, so10Text.trim());
+                      await upsertOne(so5, 5, so5Text.trim());
+                      await upsertOne(so2, 2, so2Text.trim());
+
+                      await qc.invalidateQueries({ queryKey: ["okr-strategy-objectives", cid] });
+                      setSoSaved(true);
+                      toast({ title: "Direção de longo prazo salva" });
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível salvar",
+                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setSoSaving(false);
+                    }
+                  }}
+                >
+                  Salvar direção
+                  <CheckCircle2 className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
             </div>
+          </Card>
+        </div>
+      ) : null}
 
-            <Separator className="my-5" />
+      {step === 3 ? (
+        <div className="grid gap-6">
+          <StepHeader
+            title="Etapa 3 — Objetivos estratégicos do ano"
+            subtitle="Planejamento anual: até 5 objetivos estratégicos, cada um com 2 a 4 KRs."
+            badge={{ label: "Ano", icon: <Target className="h-3.5 w-3.5" /> }}
+          />
 
+          <CoachCard
+            title="Objetivo vs KR (em 10s)"
+            lines={[
+              "Objetivo: direção qualitativa (mudança que importa).",
+              "KR: evidência quantitativa/observável de que a mudança aconteceu.",
+              "Aqui, cada objetivo anual se conecta ao objetivo de 2 anos.",
+            ]}
+          />
+
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label>Entregável</Label>
-                <Input
-                  className="h-11 rounded-xl"
-                  value={deliverableTitle}
-                  onChange={(e) => setDeliverableTitle(e.target.value)}
-                  placeholder="Ex.: Checklist de QA do onboarding"
-                />
-              </div>
-
-              <div className="grid gap-2 md:grid-cols-2">
-                <div className="grid gap-2">
-                  <Label>Prazo do entregável (opcional)</Label>
-                  <Input className="h-11 rounded-xl" type="date" value={deliverableDue} onChange={(e) => setDeliverableDue(e.target.value)} />
-                </div>
-                <div className="grid gap-2">
-                  <Label className="text-muted-foreground">&nbsp;</Label>
-                  <div className="flex h-11 items-center rounded-xl border border-dashed border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 text-sm text-muted-foreground">
-                    Dica: use prazo no entregável; as tarefas ficam no dia a dia.
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid gap-2">
-                <Label>Descrição do entregável (opcional)</Label>
-                <Textarea className="min-h-[88px] rounded-2xl" value={deliverableDesc} onChange={(e) => setDeliverableDesc(e.target.value)} />
-              </div>
-
-              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Tarefas</div>
-                <p className="mt-1 text-sm text-muted-foreground">Inclua pelo menos 1 tarefa para sair com execução pronta.</p>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <Input className="h-11 rounded-xl" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} placeholder="Ex.: Mapear etapas do fluxo" />
-                  <Input className="h-11 rounded-xl" type="date" value={taskDue} onChange={(e) => setTaskDue(e.target.value)} />
-                </div>
-
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label>Tempo estimado (min{requiresBusinessCase ? ", obrigatório" : ", opcional"})</Label>
-                    <Input className="h-11 rounded-xl" value={taskEstimate} onChange={(e) => setTaskEstimate(e.target.value)} placeholder="60" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Impacto estimado (R$){requiresBusinessCase ? " (obrigatório)" : " (opcional)"}</Label>
-                    <Input className="h-11 rounded-xl" value={taskValue} onChange={(e) => setTaskValue(e.target.value)} placeholder="5000" />
-                  </div>
-                </div>
-
-                <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                  <div className="text-xs text-muted-foreground">Custo/h base: {brlPerHourFromMonthly(myMonthly ?? 0)}</div>
+                <Label>Ano</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Input className="h-11 w-[140px] rounded-xl" value={annualYear} onChange={(e) => setAnnualYear(e.target.value)} />
                   <Button
-                    type="button"
-                    className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                    onClick={() => {
-                      if (taskTitle.trim().length < 3) return;
-
-                      const minutes = parsePtNumber(taskEstimate);
-                      const value = parsePtNumber(taskValue);
-                      const hours = minutes !== null ? minutes / 60 : null;
-                      const cost = laborCostFromMonthly(myMonthly, hours);
-                      const r = roiPct(value, cost);
-
-                      if (requiresBusinessCase) {
-                        if (!myMonthly || myMonthly <= 0) return;
-                        if (!minutes || minutes <= 0) return;
-                        if (!value || value <= 0) return;
-                        if (cost === null || r === null) return;
+                    variant="outline"
+                    className="h-11 rounded-2xl bg-white"
+                    onClick={async () => {
+                      const y = Number(annualYear);
+                      if (!Number.isFinite(y) || y < 2000 || y > 2100) {
+                        toast({ title: "Ano inválido", variant: "destructive" });
+                        return;
                       }
-
-                      setTasks((prev) => [
-                        ...prev,
-                        {
-                          title: taskTitle.trim(),
-                          due: taskDue.trim() || undefined,
-                          estimate_minutes: minutes && minutes > 0 ? minutes : null,
-                          estimated_value_brl: value && value > 0 ? value : null,
-                          estimated_cost_brl: cost !== null ? Number(cost.toFixed(2)) : null,
-                          estimated_roi_pct: r !== null ? Number(r.toFixed(2)) : null,
-                        },
-                      ]);
-                      setTaskTitle("");
-                      setTaskDue("");
-                      setTaskEstimate("");
-                      setTaskValue("");
+                      try {
+                        await ensureOkrCycle({ type: "ANNUAL", year: y, status: "ACTIVE", name: null });
+                        await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
+                        toast({ title: "Ciclo anual garantido" });
+                      } catch (e) {
+                        toast({
+                          title: "Não foi possível criar/encontrar o ciclo",
+                          description: e instanceof Error ? e.message : "Erro inesperado.",
+                          variant: "destructive",
+                        });
+                      }
                     }}
                   >
-                    + adicionar
+                    Criar/garantir ciclo anual
                   </Button>
                 </div>
+                <div className="text-xs text-muted-foreground">O ciclo anual organiza o planejamento do ano e alimenta os trimestres.</div>
+              </div>
 
-                <div className="mt-3 grid gap-2">
-                  {tasks.length ? (
-                    tasks.map((t, idx) => (
-                      <div key={idx} className="flex items-center justify-between gap-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
-                          <div className="text-xs text-muted-foreground">{t.due ? `Vence: ${t.due}` : "Sem data"}</div>
-                          {t.estimated_cost_brl !== null && t.estimated_value_brl !== null ? (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                              Custo: {brl(t.estimated_cost_brl)} • ROI: {t.estimated_roi_pct !== null ? `${t.estimated_roi_pct.toFixed(1)}%` : "—"}
-                            </div>
-                          ) : null}
+              <Separator />
+
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conexão obrigatória</div>
+                <div className="mt-1 font-semibold text-[color:var(--sinaxys-ink)]">Objetivo de 2 anos</div>
+                <div className="mt-1 text-sm text-muted-foreground">{so2?.title ?? "(crie na etapa 2)"}</div>
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivos existentes</div>
+                  <div className="mt-1 text-sm text-muted-foreground">No ciclo selecionado.</div>
+                </div>
+                <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] hover:bg-[color:var(--sinaxys-tint)]">
+                  {annualObjectives.length} objetivos
+                </Badge>
+              </div>
+
+              <div className="grid gap-3">
+                {annualObjectives.length ? (
+                  annualObjectives.map((o) => {
+                    const n = annualKrCountsByObjective.get(o.id) ?? 0;
+                    return (
+                      <div key={o.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">Conectado ao 2 anos: {o.strategy_objective_id === so2?.id ? "Sim" : "Não"}</div>
+                          </div>
+                          <Badge
+                            className={clsx(
+                              "rounded-full",
+                              n >= 2 && n <= 4
+                                ? "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]"
+                                : "bg-amber-100 text-amber-900",
+                            )}
+                          >
+                            {n} KRs
+                          </Badge>
                         </div>
-                        <Button type="button" variant="outline" className="h-9 rounded-xl" onClick={() => setTasks((prev) => prev.filter((_, i) => i !== idx))}>
-                          Remover
-                        </Button>
                       </div>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl bg-white p-3 text-sm text-muted-foreground ring-1 ring-[color:var(--sinaxys-border)]">Sem tarefas ainda.</div>
-                  )}
+                    );
+                  })
+                ) : (
+                  <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                    Nenhum objetivo anual ainda. Crie abaixo.
+                  </div>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Criar objetivos do ano</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Até 5 objetivos. Cada um com 2–4 KRs.</div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-2xl bg-white"
+                  disabled={annualDrafts.length >= 5}
+                  onClick={() =>
+                    setAnnualDrafts((d) => [
+                      ...d,
+                      {
+                        title: "",
+                        description: "",
+                        alignToKrId: SELECT_NONE,
+                        krs: [
+                          { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
+                          { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
+                        ],
+                      },
+                    ])
+                  }
+                >
+                  Adicionar objetivo
+                </Button>
+              </div>
+
+              <div className="grid gap-4">
+                {annualDrafts.map((d, idx) => (
+                  <div key={idx} className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivo anual #{idx + 1}</div>
+                      <Button
+                        variant="ghost"
+                        className="h-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-bg)]"
+                        onClick={() => setAnnualDrafts((arr) => arr.filter((_, i) => i !== idx))}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+
+                    <div className="mt-4 grid gap-3">
+                      <div className="grid gap-2">
+                        <Label>Título</Label>
+                        <Input
+                          className="h-11 rounded-xl"
+                          value={d.title}
+                          onChange={(e) =>
+                            setAnnualDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, title: e.target.value } : it)))
+                          }
+                          placeholder="Ex.: Aumentar retenção de clientes"
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Descrição (opcional)</Label>
+                        <Textarea
+                          className="min-h-[88px] rounded-2xl"
+                          value={d.description}
+                          onChange={(e) =>
+                            setAnnualDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, description: e.target.value } : it)))
+                          }
+                          placeholder="Contexto, tese estratégica, restrições…"
+                        />
+                      </div>
+
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                        Conexão visual: este objetivo anual será automaticamente conectado ao objetivo de 2 anos.
+                      </div>
+
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label>KRs (2 a 4)</Label>
+                          <Button
+                            variant="outline"
+                            className="h-9 rounded-xl bg-white"
+                            disabled={d.krs.length >= 4}
+                            onClick={() =>
+                              setAnnualDrafts((arr) =>
+                                arr.map((it, i) =>
+                                  i === idx
+                                    ? {
+                                        ...it,
+                                        krs: [...it.krs, { title: "", kind: "DELIVERABLE" }],
+                                      }
+                                    : it,
+                                ),
+                              )
+                            }
+                          >
+                            + KR
+                          </Button>
+                        </div>
+
+                        <div className="grid gap-3">
+                          {d.krs.map((kr, kIdx) => (
+                            <div key={kIdx} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">KR #{kIdx + 1}</div>
+                                <Button
+                                  variant="ghost"
+                                  className="h-8 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-bg)]"
+                                  onClick={() =>
+                                    setAnnualDrafts((arr) =>
+                                      arr.map((it, i) =>
+                                        i === idx ? { ...it, krs: it.krs.filter((_, j) => j !== kIdx) } : it,
+                                      ),
+                                    )
+                                  }
+                                  disabled={d.krs.length <= 2}
+                                >
+                                  Remover
+                                </Button>
+                              </div>
+
+                              <div className="mt-3 grid gap-2">
+                                <Label>Título do KR</Label>
+                                <Input
+                                  className="h-11 rounded-xl"
+                                  value={kr.title}
+                                  onChange={(e) =>
+                                    setAnnualDrafts((arr) =>
+                                      arr.map((it, i) => {
+                                        if (i !== idx) return it;
+                                        const next = [...it.krs];
+                                        next[kIdx] = { ...next[kIdx], title: e.target.value } as DraftKr;
+                                        return { ...it, krs: next };
+                                      }),
+                                    )
+                                  }
+                                  placeholder="Ex.: reduzir churn de 8% para 5%"
+                                />
+                              </div>
+
+                              <div className="mt-3 grid gap-2">
+                                <Label>Tipo</Label>
+                                <Select
+                                  value={kr.kind}
+                                  onValueChange={(v) =>
+                                    setAnnualDrafts((arr) =>
+                                      arr.map((it, i) => {
+                                        if (i !== idx) return it;
+                                        const next = [...it.krs];
+                                        if (v === "METRIC") {
+                                          next[kIdx] = { title: kr.title, kind: "METRIC", metric_unit: "", start_value: "", target_value: "" };
+                                        } else {
+                                          next[kIdx] = { title: kr.title, kind: "DELIVERABLE" };
+                                        }
+                                        return { ...it, krs: next };
+                                      }),
+                                    )
+                                  }
+                                >
+                                  <SelectTrigger className="h-11 rounded-xl">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent className="rounded-2xl">
+                                    <SelectItem value="METRIC">Métrica</SelectItem>
+                                    <SelectItem value="DELIVERABLE">Entregável</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              {kr.kind === "METRIC" ? (
+                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                  <div className="grid gap-2">
+                                    <Label>Unidade</Label>
+                                    <Input
+                                      className="h-11 rounded-xl"
+                                      value={kr.metric_unit}
+                                      onChange={(e) =>
+                                        setAnnualDrafts((arr) =>
+                                          arr.map((it, i) => {
+                                            if (i !== idx) return it;
+                                            const next = [...it.krs];
+                                            const cur = next[kIdx] as Extract<DraftKr, { kind: "METRIC" }>;
+                                            next[kIdx] = { ...cur, metric_unit: e.target.value };
+                                            return { ...it, krs: next };
+                                          }),
+                                        )
+                                      }
+                                      placeholder="% / R$ / #"
+                                    />
+                                  </div>
+                                  <div className="grid gap-2">
+                                    <Label>Início</Label>
+                                    <Input
+                                      className="h-11 rounded-xl"
+                                      value={kr.start_value}
+                                      onChange={(e) =>
+                                        setAnnualDrafts((arr) =>
+                                          arr.map((it, i) => {
+                                            if (i !== idx) return it;
+                                            const next = [...it.krs];
+                                            const cur = next[kIdx] as Extract<DraftKr, { kind: "METRIC" }>;
+                                            next[kIdx] = { ...cur, start_value: e.target.value };
+                                            return { ...it, krs: next };
+                                          }),
+                                        )
+                                      }
+                                      placeholder="0"
+                                    />
+                                  </div>
+                                  <div className="grid gap-2">
+                                    <Label>Meta</Label>
+                                    <Input
+                                      className="h-11 rounded-xl"
+                                      value={kr.target_value}
+                                      onChange={(e) =>
+                                        setAnnualDrafts((arr) =>
+                                          arr.map((it, i) => {
+                                            if (i !== idx) return it;
+                                            const next = [...it.krs];
+                                            const cur = next[kIdx] as Extract<DraftKr, { kind: "METRIC" }>;
+                                            next[kIdx] = { ...cur, target_value: e.target.value };
+                                            return { ...it, krs: next };
+                                          }),
+                                        )
+                                      }
+                                      placeholder="100"
+                                    />
+                                  </div>
+                                </div>
+                              ) : null}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Separator />
+
+              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                Revise os objetivos estratégicos do ano a cada trimestre.
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">Para avançar: tenha ao menos 1 objetivo anual conectado ao 2 anos, com 2–4 KRs.</div>
+                <Button
+                  className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={annualSaving || !annualCycleId || !so2?.id}
+                  onClick={async () => {
+                    if (!annualCycleId || !so2?.id) return;
+
+                    const trimmed = annualDrafts
+                      .map((o) => ({
+                        ...o,
+                        title: o.title.trim(),
+                        description: o.description.trim(),
+                        krs: o.krs
+                          .map((k) => (k.kind === "METRIC" ? { ...k, title: k.title.trim(), metric_unit: k.metric_unit.trim() } : { ...k, title: k.title.trim() }))
+                          .filter((k) => k.title.length >= 6),
+                      }))
+                      .filter((o) => o.title.length >= 6);
+
+                    const invalid = trimmed.some((o) => o.krs.length < 2 || o.krs.length > 4);
+                    if (invalid) {
+                      toast({ title: "Ajuste os KRs", description: "Cada objetivo precisa de 2 a 4 KRs.", variant: "destructive" });
+                      return;
+                    }
+
+                    try {
+                      setAnnualSaving(true);
+                      for (const o of trimmed) {
+                        const created = await createOkrObjective({
+                          company_id: cid,
+                          cycle_id: annualCycleId,
+                          parent_objective_id: null,
+                          strategy_objective_id: so2.id,
+                          level: "COMPANY" as ObjectiveLevel,
+                          department_id: null,
+                          owner_user_id: user.id,
+                          title: o.title,
+                          description: o.description || null,
+                          strategic_reason: null,
+                          linked_fundamental: null,
+                          linked_fundamental_text: null,
+                          due_at: null,
+                          expected_attainment_pct: null,
+                          estimated_value_brl: null,
+                          estimated_effort_hours: null,
+                          estimated_cost_brl: null,
+                          estimated_roi_pct: null,
+                          expected_profit_brl: null,
+                          profit_thesis: null,
+                          expected_revenue_at: null,
+                        });
+
+                        for (const kr of o.krs) {
+                          const kind = kr.kind as KrKind;
+                          const start = kind === "METRIC" ? Number(String((kr as Extract<DraftKr, { kind: "METRIC" }>).start_value).replace(",", ".")) : null;
+                          const target = kind === "METRIC" ? Number(String((kr as Extract<DraftKr, { kind: "METRIC" }>).target_value).replace(",", ".")) : null;
+
+                          await createKeyResult({
+                            objective_id: created.id,
+                            title: kr.title,
+                            kind,
+                            due_at: null,
+                            achieved: false,
+                            metric_unit: kind === "METRIC" ? (kr as Extract<DraftKr, { kind: "METRIC" }>).metric_unit || null : null,
+                            start_value: kind === "METRIC" && Number.isFinite(start) ? start : null,
+                            current_value: kind === "METRIC" && Number.isFinite(start) ? start : null,
+                            target_value: kind === "METRIC" && Number.isFinite(target) ? target : null,
+                            owner_user_id: user.id,
+                            confidence: "ON_TRACK",
+                          });
+                        }
+                      }
+
+                      setAnnualDrafts([]);
+                      await qc.invalidateQueries({ queryKey: ["okr-annual-objectives", cid, annualCycleId] });
+                      await qc.invalidateQueries({ queryKey: ["okr-annual-krs", annualObjectives.map((o) => o.id).join(",")] });
+
+                      toast({ title: "Planejamento anual salvo" });
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível salvar",
+                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setAnnualSaving(false);
+                    }
+                  }}
+                >
+                  Salvar objetivos do ano
+                  <CheckCircle2 className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {step === 4 ? (
+        <div className="grid gap-6">
+          <StepHeader
+            title="Etapa 4 — OKRs estratégicos trimestrais"
+            subtitle="O trimestre é execução estratégica: mudanças relevantes no negócio."
+            badge={{ label: "Trimestre", icon: <KeyRound className="h-3.5 w-3.5" /> }}
+          />
+
+          <CoachCard
+            title="Estratégico (neste trimestre)"
+            lines={[
+              "Estratégico = mudança que move o negócio (não apenas 'manter a operação').",
+              "Aqui, cada objetivo trimestral se conecta a um KR anual.",
+              "Governança: revisão mensal e acompanhamento semanal dos KRs.",
+            ]}
+          />
+
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label>Ciclo do trimestre</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Input className="h-11 w-[140px] rounded-xl" value={qYear} onChange={(e) => setQYear(e.target.value)} />
+                  <Select value={qQuarter} onValueChange={(v) => setQQuarter(v as any)}>
+                    <SelectTrigger className="h-11 w-[160px] rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-2xl">
+                      <SelectItem value="1">Q1</SelectItem>
+                      <SelectItem value="2">Q2</SelectItem>
+                      <SelectItem value="3">Q3</SelectItem>
+                      <SelectItem value="4">Q4</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    className="h-11 rounded-2xl bg-white"
+                    onClick={async () => {
+                      const y = Number(qYear);
+                      const q = Number(qQuarter);
+                      if (!Number.isFinite(y) || y < 2000 || y > 2100) {
+                        toast({ title: "Ano inválido", variant: "destructive" });
+                        return;
+                      }
+                      try {
+                        await ensureOkrCycle({ type: "QUARTERLY", year: y, quarter: q, status: "ACTIVE", name: null });
+                        await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
+                        toast({ title: "Trimestre garantido" });
+                      } catch (e) {
+                        toast({
+                          title: "Não foi possível criar/encontrar o trimestre",
+                          description: e instanceof Error ? e.message : "Erro inesperado.",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                  >
+                    Criar/garantir trimestre
+                  </Button>
                 </div>
               </div>
-            </div>
-          </Card>
 
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Publicar</div>
-                <p className="mt-1 text-sm text-muted-foreground">Cria objetivo, KR, entregável e tarefas já conectados.</p>
+              <Separator />
+
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vínculo obrigatório</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  Objetivos do trimestre devem se conectar aos <span className="font-medium text-[color:var(--sinaxys-ink)]">KRs anuais</span>.
+                </div>
               </div>
-              <Button
-                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                disabled={!canSubmit}
-                onClick={async () => {
-                  if (publishing) return;
-                  setPublishing(true);
-                  try {
-                    const start = Number(String(krStart).replace(",", "."));
-                    const target = Number(String(krTarget).replace(",", "."));
 
-                    const obj = await createOkrObjective({
-                      company_id: cid,
-                      cycle_id: cycleId,
-                      parent_objective_id: parentId || null,
-                      strategy_objective_id: strategyObjectiveId || null,
-                      level,
-                      department_id: level === "COMPANY" ? (participatingDeptId || null) : user.departmentId ?? null,
-                      owner_user_id: user.id,
-                      title: objectiveTitle,
-                      description: objectiveDesc,
-                      strategic_reason: objectiveReason,
-                      linked_fundamental: fund,
-                      linked_fundamental_text: fundText,
-                      due_at: null,
-                      expected_attainment_pct: expectedAtt,
-                      estimated_value_brl: objectiveValueBRL,
-                      estimated_effort_hours: objectiveHours,
-                      estimated_cost_brl: objectiveCostBRL !== null ? Number(objectiveCostBRL.toFixed(2)) : null,
-                      estimated_roi_pct: objectiveRoi !== null ? Number(objectiveRoi.toFixed(2)) : null,
-                      expected_profit_brl: null,
-                      profit_thesis: null,
-                      expected_revenue_at: null,
-                    });
+              <Separator />
 
-                    // Regra do trimestre: criar link OKR->KR quando for Tier 2.
-                    if (requiresQuarterKrLink && alignKrId !== SELECT_NONE) {
-                      await linkObjectiveToKr(alignKrId, obj.id);
-                    }
-
-                    const kr = await createKeyResult({
-                      objective_id: obj.id,
-                      title: krTitle,
-                      kind: krKind,
-                      due_at: krKind === "DELIVERABLE" ? (krDue.trim() || null) : null,
-                      achieved: false,
-                      metric_unit: krKind === "METRIC" ? krUnit.trim() || null : null,
-                      start_value: krKind === "METRIC" && Number.isFinite(start) ? start : null,
-                      current_value: krKind === "METRIC" && Number.isFinite(start) ? start : null,
-                      target_value: krKind === "METRIC" && Number.isFinite(target) ? target : null,
-                      owner_user_id: user.id,
-                      confidence: "ON_TRACK",
-                    });
-
-                    const del = await createDeliverable({
-                      key_result_id: kr.id,
-                      tier: deliverableTierAuto,
-                      title: deliverableTitle,
-                      description: deliverableDesc,
-                      owner_user_id: user.id,
-                      status: "TODO",
-                      due_at: deliverableDue.trim() || null,
-                    });
-
-                    for (const t of tasks) {
-                      await createTask({
-                        deliverable_id: del.id,
-                        title: t.title,
-                        description: null,
-                        owner_user_id: user.id,
-                        status: "TODO",
-                        due_date: t.due ?? null,
-                        estimate_minutes: t.estimate_minutes,
-                        checklist: null,
-                        estimated_value_brl: t.estimated_value_brl,
-                        estimated_cost_brl: t.estimated_cost_brl,
-                        estimated_roi_pct: t.estimated_roi_pct,
-                      });
-                    }
-
-                    toast({ title: "OKR criado", description: "Tudo conectado: objetivo → KR → entregável → tarefas." });
-                    navigate(`/okr/objetivos/${obj.id}`);
-                  } catch (e) {
-                    toast({
-                      title: "Não foi possível criar",
-                      description: e instanceof Error ? e.message : "Erro inesperado.",
-                      variant: "destructive",
-                    });
-                    setPublishing(false);
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Criar objetivos estratégicos do trimestre</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Cada um com 2–4 KRs e alinhamento a um KR anual.</div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-2xl bg-white"
+                  onClick={() =>
+                    setQuarterDrafts((d) => [
+                      ...d,
+                      {
+                        title: "",
+                        description: "",
+                        alignToKrId: SELECT_NONE,
+                        krs: [
+                          { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
+                          { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
+                        ],
+                      },
+                    ])
                   }
-                }}
-              >
-                {publishing ? "Criando…" : "Criar OKR"}
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </div>
+                >
+                  Adicionar objetivo
+                </Button>
+              </div>
 
-            <Separator className="my-5" />
+              {!annualKrs.length ? (
+                <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
+                  Você ainda não tem KRs anuais para conectar. Conclua a etapa 3.
+                </div>
+              ) : null}
 
-            <div className="text-sm text-muted-foreground">
-              Se faltar algum campo, o botão fica desabilitado. A ideia é garantir clareza e alinhamento sem virar burocracia.
+              <div className="grid gap-4">
+                {quarterDrafts.map((d, idx) => (
+                  <div key={idx} className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivo trimestral #{idx + 1}</div>
+                      <Button
+                        variant="ghost"
+                        className="h-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-bg)]"
+                        onClick={() => setQuarterDrafts((arr) => arr.filter((_, i) => i !== idx))}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+
+                    <div className="mt-4 grid gap-3">
+                      <div className="grid gap-2">
+                        <Label>Título</Label>
+                        <Input
+                          className="h-11 rounded-xl"
+                          value={d.title}
+                          onChange={(e) => setQuarterDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, title: e.target.value } : it)))}
+                          placeholder="Ex.: Acelerar ativação no onboarding"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Alinhar ao KR anual</Label>
+                        <Select value={d.alignToKrId} onValueChange={(v) => setQuarterDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, alignToKrId: v } : it)))}>
+                          <SelectTrigger className="h-11 rounded-xl bg-white">
+                            <SelectValue placeholder="Selecione um KR anual" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                            <SelectItem value={SELECT_NONE}>Selecione…</SelectItem>
+                            {annualKrs.map((kr) => (
+                              <SelectItem key={kr.id} value={kr.id}>
+                                {kr.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="text-xs text-muted-foreground">Isso cria o vínculo visual (KR anual → objetivo do trimestre).</div>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label>KRs do trimestre (2 a 4)</Label>
+                          <Button
+                            variant="outline"
+                            className="h-9 rounded-xl bg-white"
+                            disabled={d.krs.length >= 4}
+                            onClick={() =>
+                              setQuarterDrafts((arr) =>
+                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
+                              )
+                            }
+                          >
+                            + KR
+                          </Button>
+                        </div>
+
+                        <div className="grid gap-3">
+                          {d.krs.map((kr, kIdx) => (
+                            <div key={kIdx} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">KR #{kIdx + 1}</div>
+                                <Button
+                                  variant="ghost"
+                                  className="h-8 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-bg)]"
+                                  onClick={() =>
+                                    setQuarterDrafts((arr) =>
+                                      arr.map((it, i) => (i === idx ? { ...it, krs: it.krs.filter((_, j) => j !== kIdx) } : it)),
+                                    )
+                                  }
+                                  disabled={d.krs.length <= 2}
+                                >
+                                  Remover
+                                </Button>
+                              </div>
+                              <div className="mt-3 grid gap-2">
+                                <Label>Título do KR</Label>
+                                <Input
+                                  className="h-11 rounded-xl"
+                                  value={kr.title}
+                                  onChange={(e) =>
+                                    setQuarterDrafts((arr) =>
+                                      arr.map((it, i) => {
+                                        if (i !== idx) return it;
+                                        const next = [...it.krs];
+                                        next[kIdx] = { ...next[kIdx], title: e.target.value } as DraftKr;
+                                        return { ...it, krs: next };
+                                      }),
+                                    )
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Separator />
+
+              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                Governança: revisão mensal e acompanhamento semanal dos KRs.
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">Para avançar: ao menos 1 objetivo trimestral com 2–4 KRs e alinhamento a KR anual.</div>
+                <Button
+                  className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={quarterSaving || !quarterCycleId || !annualKrs.length}
+                  onClick={async () => {
+                    if (!quarterCycleId) return;
+
+                    const trimmed = quarterDrafts
+                      .map((o) => ({
+                        ...o,
+                        title: o.title.trim(),
+                        description: o.description.trim(),
+                        krs: o.krs.map((k) => ({ ...k, title: k.title.trim() })).filter((k) => k.title.length >= 6),
+                      }))
+                      .filter((o) => o.title.length >= 6);
+
+                    if (!trimmed.length) {
+                      toast({ title: "Crie ao menos 1 objetivo", variant: "destructive" });
+                      return;
+                    }
+
+                    const invalid = trimmed.some((o) => o.alignToKrId === SELECT_NONE || o.krs.length < 2 || o.krs.length > 4);
+                    if (invalid) {
+                      toast({ title: "Ajuste os campos", description: "Alinhe cada objetivo a um KR anual e mantenha 2–4 KRs.", variant: "destructive" });
+                      return;
+                    }
+
+                    const annualKrById = new Map(annualKrs.map((k) => [k.id, k] as const));
+
+                    try {
+                      setQuarterSaving(true);
+                      for (const o of trimmed) {
+                        const parentKr = annualKrById.get(o.alignToKrId);
+                        const parentObjectiveId = parentKr?.objective_id ?? null;
+
+                        const created = await createOkrObjective({
+                          company_id: cid,
+                          cycle_id: quarterCycleId,
+                          parent_objective_id: parentObjectiveId,
+                          strategy_objective_id: null,
+                          level: "COMPANY" as ObjectiveLevel,
+                          department_id: null,
+                          owner_user_id: user.id,
+                          title: o.title,
+                          description: o.description || null,
+                          strategic_reason: null,
+                          linked_fundamental: null,
+                          linked_fundamental_text: null,
+                          due_at: null,
+                          expected_attainment_pct: null,
+                          estimated_value_brl: null,
+                          estimated_effort_hours: null,
+                          estimated_cost_brl: null,
+                          estimated_roi_pct: null,
+                          expected_profit_brl: null,
+                          profit_thesis: null,
+                          expected_revenue_at: null,
+                        });
+
+                        await linkObjectiveToKr(o.alignToKrId, created.id);
+
+                        for (const kr of o.krs) {
+                          await createKeyResult({
+                            objective_id: created.id,
+                            title: kr.title,
+                            kind: "METRIC",
+                            due_at: null,
+                            achieved: false,
+                            metric_unit: null,
+                            start_value: null,
+                            current_value: null,
+                            target_value: null,
+                            owner_user_id: user.id,
+                            confidence: "ON_TRACK",
+                          });
+                        }
+                      }
+
+                      setQuarterDrafts([]);
+                      await qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid, quarterCycleId] });
+                      toast({ title: "OKRs estratégicos do trimestre salvos" });
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível salvar",
+                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setQuarterSaving(false);
+                    }
+                  }}
+                >
+                  Salvar OKRs do trimestre
+                  <CheckCircle2 className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </Card>
         </div>
+      ) : null}
 
+      {step === 5 ? (
         <div className="grid gap-6">
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-6">
-            <div className="flex items-start gap-3">
-              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-                <Target className="h-5 w-5" />
-              </div>
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Como o assistente pensa</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Você não preenche um formulário. Você define um objetivo conectado à estratégia e sai com execução real.
-                </p>
-              </div>
-            </div>
+          <StepHeader
+            title="Etapa 5 — OKRs tático-operacionais (por time)"
+            subtitle="Tático = execução que move a estratégia. Aqui criamos OKRs por departamento alinhados ao trimestre estratégico."
+            badge={{ label: "Times", icon: <Users className="h-3.5 w-3.5" /> }}
+          />
 
-            <div className="mt-4 grid gap-2">
-              <Hint ok={objectiveQuality.ok} title="Objetivo" text={objectiveQuality.msg} />
-              <Hint ok={expectedAtt !== null && expectedAtt >= 0 && expectedAtt <= 100} title="Atingimento" text="Defina o % esperado do objetivo." />
-              <Hint ok={!!fund && fundText.trim().length >= 6} title="Alinhamento" text="Conecte explicitamente ao propósito/visão." />
-              <Hint ok={krQuality.ok} title="KR" text={krQuality.msg} />
-              <Hint ok={tasks.length >= 1} title="Execução" text="Tenha pelo menos 1 tarefa conectada." />
-              {requiresBusinessCase ? (
-                <Hint
-                  ok={businessCaseOk}
-                  title="ROI"
-                  text={myMonthly ? "Inclua impacto + esforço para calcular ROI (objetivo e tarefas)." : "Cadastre seu custo mensal para liberar o cálculo de ROI."}
-                />
-              ) : null}
-            </div>
-          </Card>
+          <CoachCard
+            title="Como alinhar (simples)"
+            lines={[
+              "Cada objetivo tático deve 'descer' de um KR estratégico do trimestre.",
+              "O alinhamento cria uma árvore: KR estratégico → OKR do time → KRs táticos.",
+              "Governança: revisão mensal e acompanhamento semanal.",
+            ]}
+          />
 
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Depois</div>
-            <p className="mt-1 text-sm text-muted-foreground">Sua rotina diária puxa as tarefas que você criar aqui.</p>
-            <Button asChild variant="outline" className="mt-4 h-11 w-full rounded-xl">
-              <Link to="/okr/hoje">Ver minha rotina</Link>
-            </Button>
+            <div className="grid gap-4">
+              {!quarterCycleId ? (
+                <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">Selecione/crie um trimestre na etapa 4.</div>
+              ) : null}
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Criar objetivos táticos por departamento</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Cada objetivo deve alinhar a um KR estratégico trimestral.</div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-2xl bg-white"
+                  disabled={!quarterCycleId}
+                  onClick={() =>
+                    setTacticalDrafts((d) => [
+                      ...d,
+                      {
+                        departmentId: departments[0]?.id ?? SELECT_NONE,
+                        ownerUserId: user.id,
+                        title: "",
+                        description: "",
+                        alignToKrId: SELECT_NONE,
+                        krs: [{ title: "", kind: "DELIVERABLE" }],
+                      },
+                    ])
+                  }
+                >
+                  Adicionar objetivo tático
+                </Button>
+              </div>
+
+              {!quarterKrs.length ? (
+                <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">Você precisa de KRs estratégicos do trimestre para alinhar (etapa 4).</div>
+              ) : null}
+
+              <div className="grid gap-4">
+                {tacticalDrafts.map((d, idx) => (
+                  <div key={idx} className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Objetivo tático #{idx + 1}</div>
+                      <Button
+                        variant="ghost"
+                        className="h-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-bg)]"
+                        onClick={() => setTacticalDrafts((arr) => arr.filter((_, i) => i !== idx))}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+
+                    <div className="mt-4 grid gap-3">
+                      <div className="grid gap-2">
+                        <Label>Departamento</Label>
+                        <Select value={d.departmentId} onValueChange={(v) => setTacticalDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, departmentId: v } : it)))}>
+                          <SelectTrigger className="h-11 rounded-xl">
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                            {departments.map((dep) => (
+                              <SelectItem key={dep.id} value={dep.id}>
+                                {dep.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Responsável</Label>
+                        <Select value={d.ownerUserId} onValueChange={(v) => setTacticalDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, ownerUserId: v } : it)))}>
+                          <SelectTrigger className="h-11 rounded-xl bg-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                            {profiles.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {(p.name ?? p.email) || p.id}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Título</Label>
+                        <Input
+                          className="h-11 rounded-xl"
+                          value={d.title}
+                          onChange={(e) => setTacticalDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, title: e.target.value } : it)))}
+                          placeholder="Ex.: Reduzir tempo de implantação no time de CS"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Alinhar ao KR estratégico do trimestre</Label>
+                        <Select value={d.alignToKrId} onValueChange={(v) => setTacticalDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, alignToKrId: v } : it)))}>
+                          <SelectTrigger className="h-11 rounded-xl bg-white">
+                            <SelectValue placeholder="Selecione um KR" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                            <SelectItem value={SELECT_NONE}>Selecione…</SelectItem>
+                            {quarterKrs.map((kr) => (
+                              <SelectItem key={kr.id} value={kr.id}>
+                                {kr.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label>KRs táticos (mínimo 1)</Label>
+                          <Button
+                            variant="outline"
+                            className="h-9 rounded-xl bg-white"
+                            onClick={() =>
+                              setTacticalDrafts((arr) =>
+                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
+                              )
+                            }
+                          >
+                            + KR
+                          </Button>
+                        </div>
+                        <div className="grid gap-3">
+                          {d.krs.map((kr, kIdx) => (
+                            <div key={kIdx} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">KR #{kIdx + 1}</div>
+                                <Button
+                                  variant="ghost"
+                                  className="h-8 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-bg)]"
+                                  disabled={d.krs.length <= 1}
+                                  onClick={() =>
+                                    setTacticalDrafts((arr) =>
+                                      arr.map((it, i) => (i === idx ? { ...it, krs: it.krs.filter((_, j) => j !== kIdx) } : it)),
+                                    )
+                                  }
+                                >
+                                  Remover
+                                </Button>
+                              </div>
+                              <div className="mt-3 grid gap-2">
+                                <Label>Título do KR</Label>
+                                <Input
+                                  className="h-11 rounded-xl"
+                                  value={kr.title}
+                                  onChange={(e) =>
+                                    setTacticalDrafts((arr) =>
+                                      arr.map((it, i) => {
+                                        if (i !== idx) return it;
+                                        const next = [...it.krs];
+                                        next[kIdx] = { ...next[kIdx], title: e.target.value } as DraftKr;
+                                        return { ...it, krs: next };
+                                      }),
+                                    )
+                                  }
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Separator />
+
+              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                Governança: revisão mensal e acompanhamento semanal.
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">Para avançar: ao menos 1 objetivo tático alinhado, com pelo menos 1 KR.</div>
+                <Button
+                  className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={tacticalSaving || !quarterCycleId || !quarterKrs.length}
+                  onClick={async () => {
+                    if (!quarterCycleId) return;
+
+                    const trimmed = tacticalDrafts
+                      .map((o) => ({
+                        ...o,
+                        title: o.title.trim(),
+                        description: o.description.trim(),
+                        krs: o.krs.map((k) => ({ ...k, title: k.title.trim() })).filter((k) => k.title.length >= 6),
+                      }))
+                      .filter((o) => o.title.length >= 6);
+
+                    if (!trimmed.length) {
+                      toast({ title: "Crie ao menos 1 objetivo tático", variant: "destructive" });
+                      return;
+                    }
+
+                    const invalid = trimmed.some((o) => o.alignToKrId === SELECT_NONE || o.departmentId === SELECT_NONE || !o.krs.length);
+                    if (invalid) {
+                      toast({ title: "Ajuste os campos", description: "Escolha departamento, alinhamento e ao menos 1 KR.", variant: "destructive" });
+                      return;
+                    }
+
+                    const qKrById = new Map(quarterKrs.map((k) => [k.id, k] as const));
+
+                    try {
+                      setTacticalSaving(true);
+                      for (const o of trimmed) {
+                        const parentKr = qKrById.get(o.alignToKrId);
+                        const parentObjectiveId = parentKr?.objective_id ?? null;
+
+                        const created = await createOkrObjective({
+                          company_id: cid,
+                          cycle_id: quarterCycleId,
+                          parent_objective_id: parentObjectiveId,
+                          strategy_objective_id: null,
+                          level: "DEPARTMENT" as ObjectiveLevel,
+                          department_id: o.departmentId,
+                          owner_user_id: o.ownerUserId,
+                          title: o.title,
+                          description: o.description || null,
+                          strategic_reason: null,
+                          linked_fundamental: null,
+                          linked_fundamental_text: null,
+                          due_at: null,
+                          expected_attainment_pct: null,
+                          estimated_value_brl: null,
+                          estimated_effort_hours: null,
+                          estimated_cost_brl: null,
+                          estimated_roi_pct: null,
+                          expected_profit_brl: null,
+                          profit_thesis: null,
+                          expected_revenue_at: null,
+                        });
+
+                        await linkObjectiveToKr(o.alignToKrId, created.id);
+
+                        for (const kr of o.krs) {
+                          await createKeyResult({
+                            objective_id: created.id,
+                            title: kr.title,
+                            kind: "DELIVERABLE",
+                            due_at: null,
+                            achieved: false,
+                            metric_unit: null,
+                            start_value: null,
+                            current_value: null,
+                            target_value: null,
+                            owner_user_id: o.ownerUserId,
+                            confidence: "ON_TRACK",
+                          });
+                        }
+                      }
+
+                      setTacticalDrafts([]);
+                      await qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid, quarterCycleId] });
+                      toast({ title: "OKRs táticos salvos" });
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível salvar",
+                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setTacticalSaving(false);
+                    }
+                  }}
+                >
+                  Salvar OKRs táticos
+                  <CheckCircle2 className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
           </Card>
         </div>
-      </div>
-    </div>
-  );
-}
+      ) : null}
 
-function Hint({ ok, title, text }: { ok: boolean; title: string; text: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-      <div>
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
-        <div className="mt-1 text-sm font-medium text-[color:var(--sinaxys-ink)]">{text}</div>
-      </div>
-      <div
-        className={
-          ok
-            ? "grid h-9 w-9 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]"
-            : "grid h-9 w-9 place-items-center rounded-2xl bg-white text-muted-foreground ring-1 ring-[color:var(--sinaxys-border)]"
-        }
-      >
-        {ok ? <Check className="h-4 w-4" /> : <span className="text-xs font-semibold">!</span>}
-      </div>
+      {step === 6 ? (
+        <div className="grid gap-6">
+          <StepHeader
+            title="Etapa 6 — Entregáveis individuais (dentro do KR tático)"
+            subtitle="Entregável é a ação concreta que impacta o KR. Aqui NÃO criamos módulo separado de tarefas."
+            badge={{ label: "Entregáveis", icon: <ListChecks className="h-3.5 w-3.5" /> }}
+          />
+
+          <CoachCard
+            title="Como pensar em entregáveis"
+            lines={[
+              "Entregável = output verificável (o que será produzido/entregue).",
+              "É a menor unidade de execução que ainda tem 'dono' e prazo.",
+              "Vamos criar entregáveis dentro dos KRs táticos.",
+            ]}
+          />
+
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="grid gap-4">
+              {!tacticalKrs.length ? (
+                <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">Você precisa criar KRs táticos na etapa 5.</div>
+              ) : null}
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Adicionar entregável</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Escolha um KR tático e defina responsável, prazo e status.</div>
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-2xl bg-white"
+                  disabled={!tacticalKrs.length}
+                  onClick={() =>
+                    setDeliverableDrafts((d) => [
+                      ...d,
+                      {
+                        keyResultId: tacticalKrs[0]?.id ?? SELECT_NONE,
+                        title: "",
+                        description: "",
+                        ownerUserId: user.id,
+                        dueAt: "",
+                        status: "TODO",
+                      },
+                    ])
+                  }
+                >
+                  Adicionar entregável
+                </Button>
+              </div>
+
+              <div className="grid gap-4">
+                {deliverableDrafts.map((d, idx) => (
+                  <div key={idx} className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Entregável #{idx + 1}</div>
+                      <Button
+                        variant="ghost"
+                        className="h-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-bg)]"
+                        onClick={() => setDeliverableDrafts((arr) => arr.filter((_, i) => i !== idx))}
+                      >
+                        Remover
+                      </Button>
+                    </div>
+
+                    <div className="mt-4 grid gap-3">
+                      <div className="grid gap-2">
+                        <Label>KR tático</Label>
+                        <Select
+                          value={d.keyResultId}
+                          onValueChange={(v) => setDeliverableDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, keyResultId: v } : it)))}
+                        >
+                          <SelectTrigger className="h-11 rounded-xl bg-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                            {tacticalKrs.map((kr) => (
+                              <SelectItem key={kr.id} value={kr.id}>
+                                {kr.title}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Título</Label>
+                        <Input
+                          className="h-11 rounded-xl"
+                          value={d.title}
+                          onChange={(e) => setDeliverableDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, title: e.target.value } : it)))}
+                          placeholder="Ex.: Implementar novo playbook de onboarding"
+                        />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Descrição</Label>
+                        <Textarea
+                          className="min-h-[88px] rounded-2xl"
+                          value={d.description}
+                          onChange={(e) => setDeliverableDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, description: e.target.value } : it)))}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div className="grid gap-2">
+                          <Label>Responsável</Label>
+                          <Select
+                            value={d.ownerUserId}
+                            onValueChange={(v) => setDeliverableDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, ownerUserId: v } : it)))}
+                          >
+                            <SelectTrigger className="h-11 rounded-xl bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                              {profiles.map((p) => (
+                                <SelectItem key={p.id} value={p.id}>
+                                  {(p.name ?? p.email) || p.id}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>Prazo (YYYY-MM-DD)</Label>
+                          <Input
+                            className="h-11 rounded-xl"
+                            value={d.dueAt}
+                            onChange={(e) => setDeliverableDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, dueAt: e.target.value } : it)))}
+                            placeholder="2026-03-15"
+                          />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>Status</Label>
+                          <Select
+                            value={d.status}
+                            onValueChange={(v) => setDeliverableDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, status: v as WorkStatus } : it)))}
+                          >
+                            <SelectTrigger className="h-11 rounded-xl bg-white">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                              <SelectItem value="TODO">A fazer</SelectItem>
+                              <SelectItem value="IN_PROGRESS">Em andamento</SelectItem>
+                              <SelectItem value="DONE">Concluído</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Entregáveis já criados</div>
+                  <div className="mt-1 text-sm text-muted-foreground">(dentro dos KRs táticos)</div>
+                </div>
+                <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] hover:bg-[color:var(--sinaxys-tint)]">
+                  {existingDeliverables.length} entregáveis
+                </Badge>
+              </div>
+
+              <div className="grid gap-3">
+                {existingDeliverables.length ? (
+                  existingDeliverables.map((d) => (
+                    <div key={d.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">KR: {tacticalKrs.find((k) => k.id === d.key_result_id)?.title ?? "—"}</div>
+                        </div>
+                        <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">{d.status}</Badge>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum entregável ainda.</div>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-xs text-muted-foreground">Para avançar: salve ao menos 1 entregável.</div>
+                <Button
+                  className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  disabled={deliverablesSaving || !deliverableDrafts.length}
+                  onClick={async () => {
+                    const trimmed = deliverableDrafts
+                      .map((d) => ({
+                        ...d,
+                        title: d.title.trim(),
+                        description: d.description.trim(),
+                        dueAt: d.dueAt.trim(),
+                      }))
+                      .filter((d) => d.keyResultId !== SELECT_NONE && d.title.length >= 6 && d.ownerUserId);
+
+                    if (!trimmed.length) {
+                      toast({ title: "Ajuste os entregáveis", description: "Escolha KR, título (>=6) e responsável.", variant: "destructive" });
+                      return;
+                    }
+
+                    try {
+                      setDeliverablesSaving(true);
+                      for (const d of trimmed) {
+                        await createDeliverable({
+                          key_result_id: d.keyResultId,
+                          tier: "TIER2",
+                          title: d.title,
+                          description: d.description || null,
+                          owner_user_id: d.ownerUserId,
+                          status: d.status,
+                          due_at: d.dueAt || null,
+                        });
+                      }
+
+                      setDeliverableDrafts([]);
+                      await qc.invalidateQueries({ queryKey: ["okr-tactical-deliverables", tacticalKrs.map((k) => k.id).join(",")] });
+                      toast({ title: "Entregáveis salvos" });
+                    } catch (e) {
+                      toast({
+                        title: "Não foi possível salvar",
+                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setDeliverablesSaving(false);
+                    }
+                  }}
+                >
+                  Salvar entregáveis
+                  <CheckCircle2 className="ml-2 h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {step === 7 ? (
+        <div className="grid gap-6">
+          <StepHeader
+            title="Mapa completo — Fundamentos → Estratégia → Execução"
+            subtitle="Quando a empresa vê isso com clareza, a execução vira consequência."
+            badge={{ label: "Mapa", icon: <Waypoints className="h-3.5 w-3.5" /> }}
+          />
+
+          <CoachCard
+            title="Próximo passo"
+            lines={[
+              "Agora você tem uma espinha dorsal estratégica: fundamentos, direção, anual, trimestre e tático.",
+              "Use o Mapa para acompanhar alinhamento e pontos de risco.",
+              "A partir daqui, a rotina de cadência (semanal/mensal) é o diferencial.",
+            ]}
+          />
+
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+            <div className="grid gap-3">
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Abrir o mapa</div>
+              <div className="text-sm text-muted-foreground">
+                O mapa visual completo fica em <Link className="underline" to="/okr/mapa">/okr/mapa</Link>.
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+                  <Link to="/okr/mapa">Abrir mapa</Link>
+                </Button>
+                <Button asChild variant="outline" className="h-11 rounded-2xl bg-white">
+                  <Link to="/okr/hoje">Ver execução (Hoje)</Link>
+                </Button>
+              </div>
+
+              <Separator className="my-2" />
+
+              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                Se algo ficou desalinhado, ajuste o vínculo nos detalhes do objetivo (ou refaça o trimestre). O importante é manter a árvore limpa.
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
+
+      {/* FOOTER NAV */}
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <Button variant="outline" className="h-11 rounded-2xl bg-white" onClick={onPrev} disabled={step === 1}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar
+          </Button>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {step === 1 ? (
+              <Badge className={clsx("rounded-full", fundSaved ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{fundSaved ? "Salvo" : "Pendente"}</Badge>
+            ) : null}
+            {step === 2 ? (
+              <Badge className={clsx("rounded-full", soSaved ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{soSaved ? "Salvo" : "Pendente"}</Badge>
+            ) : null}
+            {step === 3 ? (
+              <Badge className={clsx("rounded-full", annualReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{annualReady ? "OK" : "Ajustar"}</Badge>
+            ) : null}
+            {step === 4 ? (
+              <Badge className={clsx("rounded-full", quarterReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{quarterReady ? "OK" : "Ajustar"}</Badge>
+            ) : null}
+            {step === 5 ? (
+              <Badge className={clsx("rounded-full", tacticalReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{tacticalReady ? "OK" : "Ajustar"}</Badge>
+            ) : null}
+            {step === 6 ? (
+              <Badge className={clsx("rounded-full", deliverablesReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{deliverablesReady ? "OK" : "Ajustar"}</Badge>
+            ) : null}
+          </div>
+
+          <Button
+            className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+            onClick={onNext}
+            disabled={
+              (step === 1 && !canGoStep2) ||
+              (step === 2 && !canGoStep3) ||
+              (step === 3 && !annualReady) ||
+              (step === 4 && !quarterReady) ||
+              (step === 5 && !tacticalReady) ||
+              (step === 6 && !deliverablesReady) ||
+              step === 7
+            }
+          >
+            Avançar
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }
