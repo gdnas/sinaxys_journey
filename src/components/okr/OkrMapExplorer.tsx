@@ -492,49 +492,47 @@ function StrategyLinker(
         staleTime: 20_000
     });
 
+    const annualObjectives = useMemo(() => (qAnnualParents.data ?? []).slice().sort((a, b) => a.title.localeCompare(b.title, "pt-BR")), [qAnnualParents.data]);
+    const annualObjectiveById = useMemo(() => {
+        const m = new Map<string, DbOkrObjective>();
+        for (const o of annualObjectives) m.set(o.id, o);
+        return m;
+    }, [annualObjectives]);
+
     const qObjectiveKrLinks = useQuery({
         queryKey: ["okr-map-objective-kr-links", objective.id],
         queryFn: () => listKrLinksByObjectiveId(objective.id),
         staleTime: 20_000,
     });
 
-    const objectiveKrLinkId = qObjectiveKrLinks.data?.[0]?.id ?? null;
     const objectiveLinkedKrId = qObjectiveKrLinks.data?.[0]?.key_result_id ?? null;
 
-    const showAnnualKrLinker = isQuarter && objective.level === "COMPANY";
-    const showQuarterKrLinker = isQuarter && objective.level !== "COMPANY";
+    // Quarter alignment: pick annual Tier 1 objective first, then pick its KR.
+    const [annualTier1ObjectiveId, setAnnualTier1ObjectiveId] = useState<string>("__none__");
 
-    const annualKrOptions = useQuery({
-        queryKey: ["okr-map-annual-kr-options", cid, annualCycleId, (qAnnualParents.data ?? []).map(o => o.id).join(",")],
-        enabled: !!annualCycleId && (qAnnualParents.data ?? []).length > 0,
+    useEffect(() => {
+        if (!isQuarter) return;
+        const pid = objective.parent_objective_id;
+        setAnnualTier1ObjectiveId(pid && annualObjectiveById.has(pid) ? pid : "__none__");
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isQuarter, objective.id, objective.parent_objective_id, annualObjectives.length]);
+
+    const qAnnualTier1Krs = useQuery({
+        queryKey: ["okr-map-annual-tier1-krs", annualTier1ObjectiveId],
+        enabled: isQuarter && annualTier1ObjectiveId !== "__none__",
         queryFn: async () => {
-            const annualObjectives = qAnnualParents.data ?? [];
-            const rows: Array<{ id: string; label: string; objectiveTitle: string }> = [];
-            for (const o of annualObjectives) {
-                const krs = await listKeyResults(o.id);
-                for (const kr of krs) {
-                    rows.push({ id: kr.id, label: kr.title, objectiveTitle: o.title });
-                }
-            }
-            return rows;
+            const krs = await listKeyResults(annualTier1ObjectiveId);
+            return krs;
         },
         staleTime: 20_000,
     });
 
-    const quarterTier1Krs = useQuery({
-        queryKey: ["okr-map-quarter-tier1-kr-options", cid, objective.cycle_id, objectivesInCycle.filter(o => o.level === "COMPANY").map(o => o.id).join(",")],
-        enabled: isQuarter && objectivesInCycle.some(o => o.level === "COMPANY"),
-        queryFn: async () => {
-            const tier1 = objectivesInCycle.filter(o => o.level === "COMPANY");
-            const rows: Array<{ id: string; label: string; objectiveTitle: string }> = [];
-            for (const o of tier1) {
-                const krs = await listKeyResults(o.id);
-                for (const kr of krs) rows.push({ id: kr.id, label: kr.title, objectiveTitle: o.title });
-            }
-            return rows;
-        },
-        staleTime: 20_000,
-    });
+    const annualTier1KrValue = useMemo(() => {
+        if (!isQuarter) return "__none__";
+        const opts = qAnnualTier1Krs.data ?? [];
+        if (!objectiveLinkedKrId) return "__none__";
+        return opts.some((k) => k.id === objectiveLinkedKrId) ? objectiveLinkedKrId : "__none__";
+    }, [isQuarter, objectiveLinkedKrId, qAnnualTier1Krs.data]);
 
     const parentOptions = useMemo(() => {
         if (cycle?.type === "QUARTERLY") {
@@ -583,23 +581,17 @@ function StrategyLinker(
 
     const showParentAndFundamentals = objective.level !== "COMPANY";
 
-    const annualKrValue = showAnnualKrLinker
-        ? (annualKrOptions.data?.some(k => k.id === objectiveLinkedKrId) ? (objectiveLinkedKrId as string) : "__none__")
-        : "__none__";
-
-    const quarterKrValue = showQuarterKrLinker
-        ? (quarterTier1Krs.data?.some(k => k.id === objectiveLinkedKrId) ? (objectiveLinkedKrId as string) : "__none__")
-        : "__none__";
-
     return (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
             <div className="flex items-start justify-between gap-4">
                 <div>
                     <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Conexões</div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {showParentAndFundamentals
-                        ? "Vincule este objetivo a um pai e/ou a uma estratégia da empresa (e também a um fundamento específico)."
-                        : "Vincule este objetivo à estratégia da empresa. Objetivos estratégicos (Tier 1) não possuem objetivo pai nem vínculo com fundamentos."}
+                      {isQuarter
+                        ? "Escolha o objetivo Tier 1 do ano e depois o KR Tier 1 para posicionar este objetivo no mapa."
+                        : (showParentAndFundamentals
+                          ? "Vincule este objetivo a um pai e/ou a uma estratégia da empresa (e também a um fundamento específico)."
+                          : "Vincule este objetivo à estratégia da empresa. Objetivos estratégicos (Tier 1) não possuem objetivo pai nem vínculo com fundamentos.")}
                     </div>
                 </div>
                 <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
@@ -607,63 +599,115 @@ function StrategyLinker(
                 </div>
             </div>
             <Separator className="my-4" />
-            <div className="grid gap-4">
-                <div className="grid gap-2">
-                    <Label>Estratégia (objetivo de longo prazo)</Label>
-                    <Select
-                        disabled={!canEdit || saving}
-                        value={objective.strategy_objective_id ?? "__none__"}
-                        onValueChange={async v => {
-                            setSaving(true);
 
-                            try {
-                                await updateOkrObjective(objective.id, {
-                                    strategy_objective_id: v === "__none__" ? null : v
-                                });
+            {isQuarter ? (
+                <div className="grid gap-4">
+                    <div className="grid gap-2">
+                        <Label>Objetivo Tier 1 (do ano)</Label>
+                        <Select
+                            disabled={!canEdit || saving}
+                            value={annualTier1ObjectiveId}
+                            onValueChange={async (v) => {
+                                setAnnualTier1ObjectiveId(v);
 
-                                toast({
-                                    title: "Vínculo com estratégia atualizado"
-                                });
+                                if (!canEdit) return;
+                                setSaving(true);
+                                try {
+                                    // Always keep Tier 2 aligned to the selected Tier 1 objective.
+                                    await updateOkrObjective(objective.id, { parent_objective_id: v === "__none__" ? null : v });
 
-                                await onSaved();
-                            } catch (e) {
-                                toast({
-                                    title: "Não foi possível salvar",
-                                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                                    variant: "destructive"
-                                });
-                            } finally {
-                                setSaving(false);
-                            }
-                        }}>
-                        <SelectTrigger className="h-11 rounded-2xl bg-white">
-                            <SelectValue placeholder="Selecione…" />
-                        </SelectTrigger>
-                        <SelectContent className="rounded-2xl">
-                            <SelectItem value="__none__">Sem vínculo</SelectItem>
-                            {strategy.map(so => (<SelectItem key={so.id} value={so.id}>
-                                {so.title}
-                            </SelectItem>))}
-                        </SelectContent>
-                    </Select>
+                                    // If the objective changed, clear the KR link so the user can pick a KR from that objective.
+                                    await clearKrLinksForObjective(objective.id);
+
+                                    toast({ title: "Alinhamento atualizado" });
+                                    await onSaved();
+                                } catch (e) {
+                                    toast({
+                                        title: "Não foi possível salvar",
+                                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                                        variant: "destructive"
+                                    });
+                                } finally {
+                                    setSaving(false);
+                                }
+                            }}>
+                            <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                <SelectValue placeholder="Selecione…" />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                                <SelectItem value="__none__">Selecione</SelectItem>
+                                {annualObjectives.map((o) => (
+                                    <SelectItem key={o.id} value={o.id}>
+                                        {o.title}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="grid gap-2">
+                        <Label>Resultado-chave Tier 1 (KR)</Label>
+                        <Select
+                            disabled={!canEdit || saving || annualTier1ObjectiveId === "__none__"}
+                            value={annualTier1KrValue}
+                            onValueChange={async (v) => {
+                                if (!canEdit) return;
+                                setSaving(true);
+                                try {
+                                    await clearKrLinksForObjective(objective.id);
+                                    if (v !== "__none__") {
+                                        await linkObjectiveToKr(v, objective.id);
+                                    }
+
+                                    toast({ title: "Alinhamento por KR atualizado" });
+                                    await onSaved();
+                                } catch (e) {
+                                    toast({
+                                        title: "Não foi possível salvar",
+                                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                                        variant: "destructive"
+                                    });
+                                } finally {
+                                    setSaving(false);
+                                }
+                            }}>
+                            <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                <SelectValue placeholder={annualTier1ObjectiveId === "__none__" ? "Selecione o objetivo Tier 1 primeiro" : "Selecione…"} />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-2xl">
+                                <SelectItem value="__none__">Selecione</SelectItem>
+                                {(qAnnualTier1Krs.data ?? [])
+                                    .slice()
+                                    .sort((a, b) => a.title.localeCompare(b.title, "pt-BR"))
+                                    .map((kr) => (
+                                        <SelectItem key={kr.id} value={kr.id}>
+                                            {kr.title}
+                                        </SelectItem>
+                                    ))}
+                            </SelectContent>
+                        </Select>
+                        <div className="text-[11px] text-muted-foreground">No mapa, este objetivo ficará abaixo do KR selecionado.</div>
+                    </div>
                 </div>
-
-                {showAnnualKrLinker ? (
+            ) : (
+                <div className="grid gap-4">
                     <div className="grid gap-2">
-                        <Label>Resultado-chave do ano (KR Tier 1)</Label>
+                        <Label>Estratégia (objetivo de longo prazo)</Label>
                         <Select
-                            disabled={!canEdit || saving || annualKrOptions.isLoading}
-                            value={annualKrValue}
-                            onValueChange={async (v) => {
+                            disabled={!canEdit || saving}
+                            value={objective.strategy_objective_id ?? "__none__"}
+                            onValueChange={async v => {
                                 setSaving(true);
+
                                 try {
-                                    await clearKrLinksForObjective(objective.id);
+                                    await updateOkrObjective(objective.id, {
+                                        strategy_objective_id: v === "__none__" ? null : v
+                                    });
 
-                                    if (v !== "__none__") {
-                                        await linkObjectiveToKr(v, objective.id);
-                                    }
+                                    toast({
+                                        title: "Vínculo com estratégia atualizado"
+                                    });
 
-                                    toast({ title: "Alinhamento por KR atualizado" });
                                     await onSaved();
                                 } catch (e) {
                                     toast({
@@ -680,202 +724,146 @@ function StrategyLinker(
                             </SelectTrigger>
                             <SelectContent className="rounded-2xl">
                                 <SelectItem value="__none__">Sem vínculo</SelectItem>
-                                {(annualKrOptions.data ?? [])
-                                    .slice()
-                                    .sort((a, b) => (a.objectiveTitle.localeCompare(b.objectiveTitle, "pt-BR") || a.label.localeCompare(b.label, "pt-BR")))
-                                    .map((kr) => (
-                                        <SelectItem key={kr.id} value={kr.id}>
-                                            {kr.objectiveTitle} — {kr.label}
-                                        </SelectItem>
-                                    ))}
+                                {strategy.map(so => (<SelectItem key={so.id} value={so.id}>
+                                    {so.title}
+                                </SelectItem>))}
                             </SelectContent>
                         </Select>
-                        <div className="text-[11px] text-muted-foreground">Esse vínculo coloca o objetivo do trimestre abaixo do KR do ano no mapa.</div>
                     </div>
-                ) : null}
 
-                {showQuarterKrLinker ? (
-                    <div className="grid gap-2">
-                        <Label>Resultado-chave do trimestre (KR do Tier 1)</Label>
-                        <Select
-                            disabled={!canEdit || saving || quarterTier1Krs.isLoading}
-                            value={quarterKrValue}
-                            onValueChange={async (v) => {
-                                setSaving(true);
-                                try {
-                                    await clearKrLinksForObjective(objective.id);
+                    {showParentAndFundamentals ? (
+                      <>
+                        <div className="grid gap-2">
+                            <Label>{parentLabel}</Label>
+                            <Select
+                                disabled={!canEdit || saving}
+                                value={objective.parent_objective_id ?? "__none__"}
+                                onValueChange={async v => {
+                                    setSaving(true);
 
-                                    if (v !== "__none__") {
-                                        await linkObjectiveToKr(v, objective.id);
+                                    try {
+                                        await updateOkrObjective(objective.id, {
+                                            parent_objective_id: v === "__none__" ? null : v
+                                        });
+
+                                        toast({
+                                            title: "Alinhamento atualizado"
+                                        });
+
+                                        await onSaved();
+                                    } catch (e) {
+                                        toast({
+                                            title: "Não foi possível salvar",
+                                            description: e instanceof Error ? e.message : "Erro inesperado.",
+                                            variant: "destructive"
+                                        });
+                                    } finally {
+                                        setSaving(false);
                                     }
+                                }}>
+                                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                    <SelectValue placeholder="Selecione…" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl">
+                                    <SelectItem value="__none__">Sem pai</SelectItem>
+                                    {parentOptions.map(o => (<SelectItem key={o.id} value={o.id}>
+                                        {o.title}
+                                    </SelectItem>))}
+                                </SelectContent>
+                            </Select>
+                            {cycle?.type === "QUARTERLY" ? (
+                                <div className="text-[11px] text-muted-foreground">Mostra objetivos do ciclo anual do mesmo ano.</div>
+                            ) : (
+                                <div className="text-[11px] text-muted-foreground">Mostra objetivos do mesmo ciclo (trimestre/ano).</div>
+                            )}
+                        </div>
+                        <div className="grid gap-2">
+                            <Label>Fundamento (missão/visão/valores etc.)</Label>
+                            <Select
+                                disabled={!canEdit || saving}
+                                value={objective.linked_fundamental ?? "__none__"}
+                                onValueChange={async v => {
+                                    setSaving(true);
 
-                                    toast({ title: "Alinhamento por KR atualizado" });
-                                    await onSaved();
-                                } catch (e) {
-                                    toast({
-                                        title: "Não foi possível salvar",
-                                        description: e instanceof Error ? e.message : "Erro inesperado.",
-                                        variant: "destructive"
-                                    });
-                                } finally {
-                                    setSaving(false);
-                                }
-                            }}>
-                            <SelectTrigger className="h-11 rounded-2xl bg-white">
-                                <SelectValue placeholder="Selecione…" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl">
-                                <SelectItem value="__none__">Sem vínculo</SelectItem>
-                                {(quarterTier1Krs.data ?? [])
-                                    .slice()
-                                    .sort((a, b) => (a.objectiveTitle.localeCompare(b.objectiveTitle, "pt-BR") || a.label.localeCompare(b.label, "pt-BR")))
-                                    .map((kr) => (
-                                        <SelectItem key={kr.id} value={kr.id}>
-                                            {kr.objectiveTitle} — {kr.label}
-                                        </SelectItem>
-                                    ))}
-                            </SelectContent>
-                        </Select>
-                        {(quarterTier1Krs.data ?? []).length ? (
-                            <div className="text-[11px] text-muted-foreground">Use isso para alinhar OKRs de time/individual aos KRs estratégicos do trimestre.</div>
-                        ) : (
-                            <div className="text-[11px] text-muted-foreground">Primeiro crie um objetivo Tier 1 no trimestre e adicione pelo menos um KR.</div>
-                        )}
-                    </div>
-                ) : null}
+                                    try {
+                                        const next = v === "__none__" ? null : (v as DbOkrObjective["linked_fundamental"]);
 
-                {showParentAndFundamentals ? (
-                  <>
-                    <div className="grid gap-2">
-                        <Label>{parentLabel}</Label>
-                        <Select
-                            disabled={!canEdit || saving}
-                            value={objective.parent_objective_id ?? "__none__"}
-                            onValueChange={async v => {
-                                setSaving(true);
+                                        await updateOkrObjective(objective.id, {
+                                            linked_fundamental: next,
+                                            linked_fundamental_text: null
+                                        });
 
-                                try {
-                                    await updateOkrObjective(objective.id, {
-                                        parent_objective_id: v === "__none__" ? null : v
-                                    });
+                                        toast({
+                                            title: "Fundamento atualizado"
+                                        });
 
-                                    toast({
-                                        title: "Alinhamento atualizado"
-                                    });
+                                        await onSaved();
+                                    } catch (e) {
+                                        toast({
+                                            title: "Não foi possível salvar",
+                                            description: e instanceof Error ? e.message : "Erro inesperado.",
+                                            variant: "destructive"
+                                        });
+                                    } finally {
+                                        setSaving(false);
+                                    }
+                                }}>
+                                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                    <SelectValue placeholder="Selecione…" />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl">
+                                    <SelectItem value="__none__">Sem fundamento</SelectItem>
+                                    {fundamentalOptions.map(o => (<SelectItem key={o.key} value={o.key}>
+                                        {o.label}
+                                    </SelectItem>))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {objective.linked_fundamental ? (<div className="grid gap-2">
+                            <Label>Item do fundamento</Label>
+                            <Select
+                                disabled={!canEdit || saving}
+                                value={objective.linked_fundamental_text ?? "__none__"}
+                                onValueChange={async v => {
+                                    setSaving(true);
 
-                                    await onSaved();
-                                } catch (e) {
-                                    toast({
-                                        title: "Não foi possível salvar",
-                                        description: e instanceof Error ? e.message : "Erro inesperado.",
-                                        variant: "destructive"
-                                    });
-                                } finally {
-                                    setSaving(false);
-                                }
-                            }}>
-                            <SelectTrigger className="h-11 rounded-2xl bg-white">
-                                <SelectValue placeholder="Selecione…" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl">
-                                <SelectItem value="__none__">Sem pai</SelectItem>
-                                {parentOptions.map(o => (<SelectItem key={o.id} value={o.id}>
-                                    {o.title}
-                                </SelectItem>))}
-                            </SelectContent>
-                        </Select>
-                        {cycle?.type === "QUARTERLY" ? (
-                            <div className="text-[11px] text-muted-foreground">Mostra objetivos do ciclo anual do mesmo ano.</div>
-                        ) : (
-                            <div className="text-[11px] text-muted-foreground">Mostra objetivos do mesmo ciclo (trimestre/ano).</div>
-                        )}
-                    </div>
-                    <div className="grid gap-2">
-                        <Label>Fundamento (missão/visão/valores etc.)</Label>
-                        <Select
-                            disabled={!canEdit || saving}
-                            value={objective.linked_fundamental ?? "__none__"}
-                            onValueChange={async v => {
-                                setSaving(true);
+                                    try {
+                                        await updateOkrObjective(objective.id, {
+                                            linked_fundamental_text: v === "__none__" ? null : v
+                                        });
 
-                                try {
-                                    const next = v === "__none__" ? null : (v as DbOkrObjective["linked_fundamental"]);
+                                        toast({
+                                            title: "Item do fundamento atualizado"
+                                        });
 
-                                    await updateOkrObjective(objective.id, {
-                                        linked_fundamental: next,
-                                        linked_fundamental_text: null
-                                    });
-
-                                    toast({
-                                        title: "Fundamento atualizado"
-                                    });
-
-                                    await onSaved();
-                                } catch (e) {
-                                    toast({
-                                        title: "Não foi possível salvar",
-                                        description: e instanceof Error ? e.message : "Erro inesperado.",
-                                        variant: "destructive"
-                                    });
-                                } finally {
-                                    setSaving(false);
-                                }
-                            }}>
-                            <SelectTrigger className="h-11 rounded-2xl bg-white">
-                                <SelectValue placeholder="Selecione…" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl">
-                                <SelectItem value="__none__">Sem fundamento</SelectItem>
-                                {fundamentalOptions.map(o => (<SelectItem key={o.key} value={o.key}>
-                                    {o.label}
-                                </SelectItem>))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    {objective.linked_fundamental ? (<div className="grid gap-2">
-                        <Label>Item do fundamento</Label>
-                        <Select
-                            disabled={!canEdit || saving}
-                            value={objective.linked_fundamental_text ?? "__none__"}
-                            onValueChange={async v => {
-                                setSaving(true);
-
-                                try {
-                                    await updateOkrObjective(objective.id, {
-                                        linked_fundamental_text: v === "__none__" ? null : v
-                                    });
-
-                                    toast({
-                                        title: "Item do fundamento atualizado"
-                                    });
-
-                                    await onSaved();
-                                } catch (e) {
-                                    toast({
-                                        title: "Não foi possível salvar",
-                                        description: e instanceof Error ? e.message : "Erro inesperado.",
-                                        variant: "destructive"
-                                    });
-                                } finally {
-                                    setSaving(false);
-                                }
-                            }}>
-                            <SelectTrigger className="h-11 rounded-2xl bg-white">
-                                <SelectValue
-                                    placeholder={selectedFundamentalItems.length ? "Selecione…" : "Sem itens cadastrados"} />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl">
-                                <SelectItem value="__none__">Sem item</SelectItem>
-                                {selectedFundamentalItems.map(it => (<SelectItem key={it} value={it}>
-                                    {it}
-                                </SelectItem>))}
-                            </SelectContent>
-                        </Select>
-                        {!selectedFundamentalItems.length ? (<div className="text-[11px] text-muted-foreground">Cadastre itens nesse fundamento para poder vincular.</div>) : null}
-                    </div>) : null}
-                  </>
-                ) : null}
-            </div>
+                                        await onSaved();
+                                    } catch (e) {
+                                        toast({
+                                            title: "Não foi possível salvar",
+                                            description: e instanceof Error ? e.message : "Erro inesperado.",
+                                            variant: "destructive"
+                                        });
+                                    } finally {
+                                        setSaving(false);
+                                    }
+                                }}>
+                                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                                    <SelectValue
+                                        placeholder={selectedFundamentalItems.length ? "Selecione…" : "Sem itens cadastrados"} />
+                                </SelectTrigger>
+                                <SelectContent className="rounded-2xl">
+                                    <SelectItem value="__none__">Sem item</SelectItem>
+                                    {selectedFundamentalItems.map(it => (<SelectItem key={it} value={it}>
+                                        {it}
+                                    </SelectItem>))}
+                                </SelectContent>
+                            </Select>
+                            {!selectedFundamentalItems.length ? (<div className="text-[11px] text-muted-foreground">Cadastre itens nesse fundamento para poder vincular.</div>) : null}
+                        </div>) : null}
+                      </>
+                    ) : null}
+                </div>
+            )}
         </Card>
     );
 }
@@ -1111,13 +1099,11 @@ function ObjectiveEditor(
     const qc = useQueryClient();
     const [title, setTitle] = useState(objective.title);
     const [desc, setDesc] = useState(objective.description ?? "");
-    const [reason, setReason] = useState(objective.strategic_reason ?? "");
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         setTitle(objective.title);
         setDesc(objective.description ?? "");
-        setReason(objective.strategic_reason ?? "");
         setSaving(false);
     }, [objective.id, objective.updated_at]);
 
@@ -1207,15 +1193,6 @@ function ObjectiveEditor(
                             onChange={e => setDesc(e.target.value)}
                             placeholder="Contexto do objetivo…" />
                     </div>
-                    <div className="grid gap-2">
-                        <Label>Razão estratégica</Label>
-                        <Textarea
-                            className="min-h-[100px] rounded-2xl"
-                            value={reason}
-                            disabled={!canEdit || saving}
-                            onChange={e => setReason(e.target.value)}
-                            placeholder="Por que isso importa agora?" />
-                    </div>
                     {canEdit ? (<div className="flex justify-end">
                         <Button
                             className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -1228,7 +1205,6 @@ function ObjectiveEditor(
                                         title: title.trim(),
                                         owner_user_id: ownerId,
                                         description: desc.trim() || null,
-                                        strategic_reason: reason.trim() || null
                                     });
 
                                     toast({
