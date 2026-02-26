@@ -860,6 +860,13 @@ export function OkrStrategyMapCanvas(props: {
           }
 
           const pct = d.pct;
+          const unit = d.kr.metric_unit?.trim() ?? "";
+          const unitSuffix = unit ? ` ${unit}` : "";
+          const fmt = (v: number | null) => {
+            if (typeof v !== "number" || !Number.isFinite(v)) return "—";
+            return v.toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+          };
+
           return (
             <button
               type="button"
@@ -894,6 +901,30 @@ export function OkrStrategyMapCanvas(props: {
                     <Target className="h-4 w-4" />
                   </div>
                 </div>
+
+                {d.kr.kind === "METRIC" ? (
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    <div className="rounded-xl bg-white/70 px-2 py-1 ring-1 ring-[color:var(--map-objectives-border)]">
+                      <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Partida</div>
+                      <div className="text-[11px] font-semibold text-[color:var(--sinaxys-ink)]">
+                        {fmt(d.kr.start_value)}{unitSuffix}
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-white/70 px-2 py-1 ring-1 ring-[color:var(--map-objectives-border)]">
+                      <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Atual</div>
+                      <div className="text-[11px] font-semibold text-[color:var(--sinaxys-ink)]">
+                        {fmt(d.kr.current_value)}{unitSuffix}
+                      </div>
+                    </div>
+                    <div className="rounded-xl bg-white/70 px-2 py-1 ring-1 ring-[color:var(--map-objectives-border)]">
+                      <div className="text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">Destino</div>
+                      <div className="text-[11px] font-semibold text-[color:var(--sinaxys-ink)]">
+                        {fmt(d.kr.target_value)}{unitSuffix}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {typeof pct === "number" ? (
                   <div className="mt-2">
                     <Progress value={pct} className="h-2 rounded-full bg-white/60" />
