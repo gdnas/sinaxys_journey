@@ -33,6 +33,7 @@ import {
   type KrConfidence,
   type KrKind,
 } from "@/lib/okrDb";
+import { listLinksByObjectiveIds } from "@/lib/okrAlignmentDb";
 import type { DbProfilePublic } from "@/lib/profilePublicDb";
 import type { DbDepartment } from "@/lib/departmentsDb";
 
@@ -164,56 +165,27 @@ export function OkrStrategyMapCanvas(props: {
   const allAnnualObjectives = qAnnualObjectives.data ?? [];
   const allQuarterObjectives = qQuarterObjectives.data ?? [];
 
+  const allObjectivesById = useMemo(() => {
+    const m = new Map<string, DbOkrObjective>();
+    for (const o of allAnnualObjectives) m.set(o.id, o);
+    for (const o of allQuarterObjectives) m.set(o.id, o);
+    return m;
+  }, [allAnnualObjectives, allQuarterObjectives]);
+
   const cycleById = useMemo(() => new Map(cycles.map((c) => [c.id, c] as const)), [cycles]);
 
-  const { annualObjectives, quarterObjectives } = useMemo(() => {
-    if (!filterActive) return { annualObjectives: allAnnualObjectives, quarterObjectives: allQuarterObjectives };
-
-    const deptId = teamId;
-
-    const annualById = new Map(allAnnualObjectives.map((o) => [o.id, o] as const));
-    const quarterById = new Map(allQuarterObjectives.map((o) => [o.id, o] as const));
-
-    const include = new Set<string>();
-
-    // Seeds: objectives that belong to the selected team
-    for (const o of allAnnualObjectives) {
-      if (o.department_id === deptId) include.add(o.id);
-    }
-    for (const o of allQuarterObjectives) {
-      if (o.department_id === deptId) include.add(o.id);
-    }
-
-    // Add ancestry so we keep the "path" up to the team objectives (e.g., quarter -> annual)
-    const queue = Array.from(include);
-    while (queue.length) {
-      const id = queue.pop()!;
-      const o = annualById.get(id) ?? quarterById.get(id);
-      const parentId = o?.parent_objective_id ?? null;
-      if (parentId && !include.has(parentId)) {
-        include.add(parentId);
-        queue.push(parentId);
-      }
-    }
-
-    return {
-      annualObjectives: allAnnualObjectives.filter((o) => include.has(o.id)),
-      quarterObjectives: allQuarterObjectives.filter((o) => include.has(o.id)),
-    };
-  }, [allAnnualObjectives, allQuarterObjectives, filterActive, teamId]);
-
-  const objectiveIds = useMemo(() => {
-    const ids = [...annualObjectives.map((o) => o.id), ...quarterObjectives.map((o) => o.id)];
+  const allObjectiveIds = useMemo(() => {
+    const ids = [...allAnnualObjectives.map((o) => o.id), ...allQuarterObjectives.map((o) => o.id)];
     return Array.from(new Set(ids));
-  }, [annualObjectives, quarterObjectives]);
+  }, [allAnnualObjectives, allQuarterObjectives]);
 
   const qKrs = useQuery({
-    queryKey: ["okr-map-canvas-krs", companyId, objectiveIds.join(",")],
-    enabled: objectiveIds.length > 0,
+    queryKey: ["okr-map-canvas-krs", companyId, allObjectiveIds.join(",")],
+    enabled: allObjectiveIds.length > 0,
     queryFn: async () => {
       const m = new Map<string, DbOkrKeyResult[]>();
       await Promise.all(
-        objectiveIds.map(async (oid) => {
+        allObjectiveIds.map(async (oid) => {
           const krs = await listKeyResults(oid);
           m.set(oid, krs);
         }),
@@ -225,17 +197,111 @@ export function OkrStrategyMapCanvas(props: {
 
   const krsByObjectiveId = qKrs.data ?? new Map<string, DbOkrKeyResult[]>();
 
-  const quarterChildrenByAnnualId = useMemo(() => {
-    const m = new Map<string, DbOkrObjective[]>();
-    for (const o of quarterObjectives) {
-      if (!o.parent_objective_id) continue;
-      const arr = m.get(o.parent_objective_id) ?? [];
-      arr.push(o);
-      m.set(o.parent_objective_id, arr);
+  const qQuarterLinks = useQuery({
+    queryKey: ["okr-map-canvas-quarter-kr-links", companyId, allQuarterObjectives.map((o) => o.id).join(",")],
+    enabled: allQuarterObjectives.length > 0,
+    queryFn: () => listLinksByObjectiveIds(allQuarterObjectives.map((o) => o.id)),
+    staleTime: 20_000,
+  });
+
+  const quarterLinks = qQuarterLinks.data ?? [];
+
+  const annualKrToAnnualObjectiveId = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const o of allAnnualObjectives) {
+      const krs = krsByObjectiveId.get(o.id) ?? [];
+      for (const kr of krs) m.set(kr.id, o.id);
     }
+    return m;
+  }, [allAnnualObjectives, krsByObjectiveId]);
+
+  const { annualObjectives, quarterObjectives } = useMemo(() => {
+    if (!filterActive) return { annualObjectives: allAnnualObjectives, quarterObjectives: allQuarterObjectives };
+
+    const deptId = teamId;
+
+    const include = new Set<string>();
+
+    // Seeds: objectives that belong to the selected team
+    for (const o of allAnnualObjectives) {
+      if (o.department_id === deptId) include.add(o.id);
+    }
+    for (const o of allQuarterObjectives) {
+      if (o.department_id === deptId) include.add(o.id);
+    }
+
+    const quarterIdSet = new Set(allQuarterObjectives.map((o) => o.id));
+
+    // Add ancestry so we keep the "path" up to the team objectives.
+    // - Parent chain is kept ONLY within the same cycle (avoid using cross-cycle parent links for annual alignment).
+    // - Quarter objectives can pull in the annual objective via KR alignment (annual KR -> quarterly objective).
+    const queue = Array.from(include);
+    while (queue.length) {
+      const id = queue.pop()!;
+      const o = allObjectivesById.get(id);
+      if (!o) continue;
+
+      const parentId = o.parent_objective_id ?? null;
+      if (parentId) {
+        const parent = allObjectivesById.get(parentId);
+        if (parent && parent.cycle_id === o.cycle_id && !include.has(parentId)) {
+          include.add(parentId);
+          queue.push(parentId);
+        }
+      }
+
+      // If this is a quarterly objective, include the annual objective that owns any linked annual KR.
+      if (quarterIdSet.has(id)) {
+        for (const l of quarterLinks) {
+          if (l.objective_id !== id) continue;
+          const annualObjectiveId = annualKrToAnnualObjectiveId.get(l.key_result_id) ?? null;
+          if (annualObjectiveId && !include.has(annualObjectiveId)) {
+            include.add(annualObjectiveId);
+            queue.push(annualObjectiveId);
+          }
+        }
+      }
+    }
+
+    return {
+      annualObjectives: allAnnualObjectives.filter((o) => include.has(o.id)),
+      quarterObjectives: allQuarterObjectives.filter((o) => include.has(o.id)),
+    };
+  }, [
+    allAnnualObjectives,
+    allObjectivesById,
+    allQuarterObjectives,
+    annualKrToAnnualObjectiveId,
+    filterActive,
+    quarterLinks,
+    teamId,
+  ]);
+
+  const quarterChildrenByAnnualKrId = useMemo(() => {
+    const quarterById = new Map(quarterObjectives.map((o) => [o.id, o] as const));
+
+    const m = new Map<string, DbOkrObjective[]>();
+    for (const l of quarterLinks) {
+      const q = quarterById.get(l.objective_id);
+      if (!q) continue;
+
+      // Only links to annual KRs are used to place quarter objectives under the year.
+      if (!annualKrToAnnualObjectiveId.has(l.key_result_id)) continue;
+
+      const arr = m.get(l.key_result_id) ?? [];
+      if (!arr.some((x) => x.id === q.id)) arr.push(q);
+      m.set(l.key_result_id, arr);
+    }
+
     for (const arr of m.values()) arr.sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
     return m;
-  }, [quarterObjectives]);
+  }, [annualKrToAnnualObjectiveId, quarterLinks, quarterObjectives]);
+
+  const orphanQuarterObjectives = useMemo(() => {
+    const linked = new Set<string>();
+    for (const arr of quarterChildrenByAnnualKrId.values()) for (const o of arr) linked.add(o.id);
+    return quarterObjectives.filter((o) => !linked.has(o.id));
+  }, [quarterChildrenByAnnualKrId, quarterObjectives]);
 
   const annualByStrategyId = useMemo(() => {
     const m = new Map<string | null, DbOkrObjective[]>();
@@ -248,11 +314,6 @@ export function OkrStrategyMapCanvas(props: {
     for (const arr of m.values()) arr.sort((a, b) => a.title.localeCompare(b.title, "pt-BR"));
     return m;
   }, [annualObjectives]);
-
-  const orphanQuarterObjectives = useMemo(() => {
-    const annualIdSet = new Set(annualObjectives.map((o) => o.id));
-    return quarterObjectives.filter((o) => !o.parent_objective_id || !annualIdSet.has(o.parent_objective_id));
-  }, [annualObjectives, quarterObjectives]);
 
   const [krDialogOpen, setKrDialogOpen] = useState(false);
   const [editingKr, setEditingKr] = useState<DbOkrKeyResult | null>(null);
@@ -377,7 +438,7 @@ export function OkrStrategyMapCanvas(props: {
       return s;
     })();
 
-    const makeObjectiveNode = (o: DbOkrObjective): OrgNode<MapItem> => {
+    const makeQuarterObjectiveNode = (o: DbOkrObjective): OrgNode<MapItem> => {
       const krs = krsByObjectiveId.get(o.id) ?? [];
       const pct = objectiveProgressPct(krs);
       const ownerName = peopleById.get(o.owner_user_id)?.name ?? "Responsável";
@@ -388,13 +449,22 @@ export function OkrStrategyMapCanvas(props: {
         return node(`kr:${kr.id}`, { kind: "kr", kr, pct: typeof kpct === "number" ? kpct : null });
       });
 
-      const quarterChildren = (quarterChildrenByAnnualId.get(o.id) ?? []).map(makeObjectiveNode);
+      return node(`o:${o.id}`, { kind: "objective", objective: o, cycle, pct, ownerName }, krChildren);
+    };
 
-      return node(
-        `o:${o.id}`,
-        { kind: "objective", objective: o, cycle, pct, ownerName },
-        [...quarterChildren, ...krChildren],
-      );
+    const makeAnnualObjectiveNode = (o: DbOkrObjective): OrgNode<MapItem> => {
+      const krs = krsByObjectiveId.get(o.id) ?? [];
+      const pct = objectiveProgressPct(krs);
+      const ownerName = peopleById.get(o.owner_user_id)?.name ?? "Responsável";
+      const cycle = cycleById.get(o.cycle_id) ?? null;
+
+      const krChildren: OrgNode<MapItem>[] = krs.map((kr) => {
+        const kpct = krProgressPct(kr);
+        const quarterKids = (quarterChildrenByAnnualKrId.get(kr.id) ?? []).map(makeQuarterObjectiveNode);
+        return node(`kr:${kr.id}`, { kind: "kr", kr, pct: typeof kpct === "number" ? kpct : null }, quarterKids);
+      });
+
+      return node(`o:${o.id}`, { kind: "objective", objective: o, cycle, pct, ownerName }, krChildren);
     };
 
     const seen = new Set<string>();
@@ -407,7 +477,7 @@ export function OkrStrategyMapCanvas(props: {
         .map(makeStrategyNodeMaybe)
         .filter((x): x is OrgNode<MapItem> => !!x);
 
-      const annualKids = (annualByStrategyId.get(so.id) ?? []).map(makeObjectiveNode);
+      const annualKids = (annualByStrategyId.get(so.id) ?? []).map(makeAnnualObjectiveNode);
 
       if (requiredStrategyIds) {
         const hasContent = requiredStrategyIds.has(so.id) || childSos.length > 0 || annualKids.length > 0;
@@ -431,14 +501,20 @@ export function OkrStrategyMapCanvas(props: {
       if (!has2) placeholders.push(node("ph:2", { kind: "placeholderStrategy", horizon: 2 }));
     }
 
-    const unlinkedAnnual = (annualByStrategyId.get(null) ?? []).map(makeObjectiveNode);
+    const unlinkedAnnual = (annualByStrategyId.get(null) ?? []).map(makeAnnualObjectiveNode);
 
     const groups: OrgNode<MapItem>[] = [];
     if (unlinkedAnnual.length) {
       groups.push(node("g:annual-unlinked", { kind: "group", title: "Ano (sem vínculo com longo prazo)", subtitle: `${unlinkedAnnual.length} objetivos` }, unlinkedAnnual));
     }
     if (orphanQuarterObjectives.length) {
-      groups.push(node("g:quarter-orphans", { kind: "group", title: "Trimestre (sem vínculo com o ano)", subtitle: `${orphanQuarterObjectives.length} objetivos` }, orphanQuarterObjectives.map(makeObjectiveNode)));
+      groups.push(
+        node(
+          "g:quarter-orphans",
+          { kind: "group", title: "Trimestre (sem vínculo com o ano)", subtitle: `${orphanQuarterObjectives.length} objetivos` },
+          orphanQuarterObjectives.map(makeQuarterObjectiveNode),
+        ),
+      );
     }
 
     const strategyRoot = node("strategy-root", { kind: "strategyRoot" }, [...placeholders, ...topStrategy, ...groups]);
@@ -451,7 +527,7 @@ export function OkrStrategyMapCanvas(props: {
     krsByObjectiveId,
     orphanQuarterObjectives,
     peopleById,
-    quarterChildrenByAnnualId,
+    quarterChildrenByAnnualKrId,
     quarterObjectives,
     strategy,
   ]);
