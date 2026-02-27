@@ -1,7 +1,18 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, Circle, ListChecks, Pencil, Plus, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Check,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  Circle,
+  ListChecks,
+  Pencil,
+  Plus,
+  Trash2,
+} from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +48,73 @@ import {
   updateTask,
 } from "@/lib/okrDb";
 import { supabase } from "@/integrations/supabase/client";
+
+type ExecStep = {
+  id: string;
+  title: string;
+  done: boolean;
+  children?: ExecStep[];
+};
+
+const EXECUTION_DEPTH_LIMIT = 3;
+
+function makeId() {
+  return typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+}
+
+function normalizeExec(raw: any): ExecStep[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((it) => {
+      if (!it || typeof it !== "object") return null;
+      const id = typeof (it as any).id === "string" ? (it as any).id : makeId();
+      const title = typeof (it as any).title === "string" ? (it as any).title : "";
+      const done = !!(it as any).done;
+      const children = normalizeExec((it as any).children);
+      return {
+        id,
+        title: title.trim(),
+        done,
+        children: children.length ? children : undefined,
+      } satisfies ExecStep;
+    })
+    .filter((x) => !!x && (!!x.title || ((x as any).children?.length ?? 0) > 0)) as ExecStep[];
+
+}
+
+function execCount(nodes: ExecStep[]) {
+  let n = 0;
+  for (const it of nodes) {
+    n += 1;
+    if (it.children?.length) n += execCount(it.children);
+  }
+  return n;
+}
+
+function updateExec(nodes: ExecStep[], id: string, updater: (x: ExecStep) => ExecStep): ExecStep[] {
+  return nodes
+    .map((n) => {
+      if (n.id === id) return updater(n);
+      if (n.children?.length) return { ...n, children: updateExec(n.children, id, updater) };
+      return n;
+    })
+    .filter(Boolean);
+}
+
+function removeExec(nodes: ExecStep[], id: string): ExecStep[] {
+  return nodes
+    .filter((n) => n.id !== id)
+    .map((n) => (n.children?.length ? { ...n, children: removeExec(n.children, id) } : n));
+}
+
+function addExec(nodes: ExecStep[], parentId: string | null, child: ExecStep): ExecStep[] {
+  if (!parentId) return [...nodes, child];
+  return nodes.map((n) => {
+    if (n.id !== parentId) return n.children?.length ? { ...n, children: addExec(n.children, parentId, child) } : n;
+    const nextChildren = [...(n.children ?? []), child];
+    return { ...n, children: nextChildren };
+  });
+}
 
 function statusLabel(s: DbTask["status"]) {
   if (s === "DONE") return "Concluído";
@@ -86,6 +164,17 @@ export default function OkrDeliverableDetail() {
   const [taskDesc, setTaskDesc] = useState("");
   const [taskOwner, setTaskOwner] = useState<string | null>(null);
   const [taskDue, setTaskDue] = useState<string>("");
+
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
+
+  const [stepOpen, setStepOpen] = useState(false);
+  const [stepMode, setStepMode] = useState<"add" | "edit">("add");
+  const [stepTaskId, setStepTaskId] = useState<string | null>(null);
+  const [stepParentId, setStepParentId] = useState<string | null>(null);
+  const [stepEditId, setStepEditId] = useState<string | null>(null);
+  const [stepDepth, setStepDepth] = useState<number>(1);
+  const [stepTitle, setStepTitle] = useState("");
+  const [stepSaving, setStepSaving] = useState(false);
 
   if (!deliverableId || !user) return null;
 
@@ -157,6 +246,188 @@ export default function OkrDeliverableDetail() {
   };
 
   const canEditTask = (t: DbTask) => canWrite || t.owner_user_id === user.id;
+
+  const openAddStep = (taskId: string, parentId: string | null, depth: number) => {
+    setStepMode("add");
+    setStepTaskId(taskId);
+    setStepParentId(parentId);
+    setStepEditId(null);
+    setStepDepth(depth);
+    setStepTitle("");
+    setStepOpen(true);
+  };
+
+  const openEditStep = (taskId: string, node: ExecStep, depth: number) => {
+    setStepMode("edit");
+    setStepTaskId(taskId);
+    setStepParentId(null);
+    setStepEditId(node.id);
+    setStepDepth(depth);
+    setStepTitle(node.title);
+    setStepOpen(true);
+  };
+
+  const saveStep = async () => {
+    if (!stepTaskId) return;
+    const title = stepTitle.trim();
+    if (title.length < 3) {
+      toast({ title: "Título muito curto", description: "Use pelo menos 3 caracteres.", variant: "destructive" });
+      return;
+    }
+
+    const t = tasks.find((x) => x.id === stepTaskId);
+    if (!t) return;
+    if (!canEditTask(t)) return;
+
+    const current = normalizeExec(t.checklist);
+    const next =
+      stepMode === "add"
+        ? addExec(current, stepParentId, { id: makeId(), title, done: false, children: undefined })
+        : stepEditId
+          ? updateExec(current, stepEditId, (x) => ({ ...x, title }))
+          : current;
+
+    try {
+      setStepSaving(true);
+      await updateTask(stepTaskId, { checklist: next });
+      await qc.invalidateQueries({ queryKey: ["okr-tasks-for-deliverable", deliverableId] });
+      setStepOpen(false);
+    } catch (e) {
+      toast({
+        title: "Não foi possível salvar",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    } finally {
+      setStepSaving(false);
+    }
+  };
+
+  const toggleStep = async (taskId: string, nodeId: string) => {
+    const t = tasks.find((x) => x.id === taskId);
+    if (!t) return;
+    if (!canEditTask(t)) return;
+
+    const current = normalizeExec(t.checklist);
+    const next = updateExec(current, nodeId, (x) => ({ ...x, done: !x.done }));
+    try {
+      await updateTask(taskId, { checklist: next });
+      await qc.invalidateQueries({ queryKey: ["okr-tasks-for-deliverable", deliverableId] });
+    } catch (e) {
+      toast({
+        title: "Não foi possível atualizar",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const deleteStep = async (taskId: string, nodeId: string) => {
+    const t = tasks.find((x) => x.id === taskId);
+    if (!t) return;
+    if (!canEditTask(t)) return;
+
+    const current = normalizeExec(t.checklist);
+    const next = removeExec(current, nodeId);
+    try {
+      await updateTask(taskId, { checklist: next });
+      await qc.invalidateQueries({ queryKey: ["okr-tasks-for-deliverable", deliverableId] });
+    } catch (e) {
+      toast({
+        title: "Não foi possível excluir",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const StepTree = ({ taskId, nodes, depth }: { taskId: string; nodes: ExecStep[]; depth: number }) => {
+    const canAddChild = depth < EXECUTION_DEPTH_LIMIT;
+    return (
+      <div className="grid gap-2">
+        {nodes.map((n) => (
+          <div key={n.id} className="grid gap-2">
+            <div className={"flex items-start gap-2 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 " + (depth > 1 ? "ml-" + String((depth - 1) * 4) : "")}
+              style={depth > 1 ? { marginLeft: (depth - 1) * 14 } : undefined}
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-xl text-[color:var(--sinaxys-primary)] hover:bg-[color:var(--sinaxys-tint)]"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void toggleStep(taskId, n.id);
+                }}
+                disabled={!canEditTask(tasks.find((x) => x.id === taskId) as DbTask)}
+                title={n.done ? "Marcar como não concluído" : "Marcar como concluído"}
+              >
+                {n.done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+              </Button>
+
+              <div className="min-w-0 flex-1">
+                <div className={"text-sm font-semibold " + (n.done ? "text-muted-foreground line-through" : "text-[color:var(--sinaxys-ink)]")}>{n.title}</div>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>{depth === 1 ? "Passo" : depth === 2 ? "Subpasso" : "Micro-passos"}</span>
+                  {n.children?.length ? <span>• {execCount(n.children)} itens abaixo</span> : null}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openEditStep(taskId, n, depth);
+                  }}
+                  title="Editar"
+                  disabled={!canEditTask(tasks.find((x) => x.id === taskId) as DbTask)}
+                >
+                  <Pencil className="h-4 w-4" />
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    void deleteStep(taskId, n.id);
+                  }}
+                  title="Excluir"
+                  disabled={!canEditTask(tasks.find((x) => x.id === taskId) as DbTask)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+
+                {canAddChild ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="ml-1 h-9 rounded-xl bg-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openAddStep(taskId, n.id, depth + 1);
+                    }}
+                    disabled={!canEditTask(tasks.find((x) => x.id === taskId) as DbTask)}
+                  >
+                    <Plus className="mr-1 h-4 w-4" />
+                    {depth === 1 ? "Subpasso" : "Micro"}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+
+            {n.children?.length ? <StepTree taskId={taskId} nodes={n.children} depth={depth + 1} /> : null}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   if (!hasCompany) {
     return (
@@ -245,92 +516,154 @@ export default function OkrDeliverableDetail() {
 
         <Separator className="my-5" />
 
-        <div className="grid gap-2">
+        <div className="grid gap-3">
           {tasksSorted.length ? (
             tasksSorted.map((t) => {
               const editable = canEditTask(t);
+              const exec = normalizeExec(t.checklist);
+              const nExec = execCount(exec);
+              const open = expandedTaskId === t.id;
+
               return (
-                <div
-                  key={t.id}
-                  role={editable ? "button" : undefined}
-                  tabIndex={editable ? 0 : -1}
-                  className={
-                    "group flex w-full items-start gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left transition" +
-                    (editable ? " cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/40" : " opacity-80")
-                  }
-                  onClick={() => {
-                    if (!editable) return;
-                    void (async () => {
-                      try {
-                        const next = t.status === "DONE" ? "TODO" : "DONE";
-                        await updateTask(t.id, { status: next });
-                        await qc.invalidateQueries({ queryKey: ["okr-tasks-for-deliverable", deliverableId] });
-                      } catch (e) {
-                        toast({
-                          title: "Não foi possível atualizar",
-                          description: e instanceof Error ? e.message : "Erro inesperado.",
-                          variant: "destructive",
-                        });
+                <div key={t.id} className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-3">
+                  <div className="flex w-full items-start gap-3">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="mt-0.5 h-9 w-9 rounded-xl text-[color:var(--sinaxys-primary)] hover:bg-[color:var(--sinaxys-tint)]"
+                      disabled={!editable}
+                      onClick={() => {
+                        if (!editable) return;
+                        void (async () => {
+                          try {
+                            const next = t.status === "DONE" ? "TODO" : "DONE";
+                            await updateTask(t.id, { status: next });
+                            await qc.invalidateQueries({ queryKey: ["okr-tasks-for-deliverable", deliverableId] });
+                          } catch (e) {
+                            toast({
+                              title: "Não foi possível atualizar",
+                              description: e instanceof Error ? e.message : "Erro inesperado.",
+                              variant: "destructive",
+                            });
+                          }
+                        })();
+                      }}
+                      title={
+                        t.status === "DONE"
+                          ? `Concluída em ${fmtDate(t.completed_at) ?? "—"}`
+                          : editable
+                            ? "Marcar como concluído"
+                            : "Sem permissão para editar esta tarefa"
                       }
-                    })();
-                  }}
-                  title={
-                    t.status === "DONE"
-                      ? `Concluída em ${fmtDate(t.completed_at) ?? "—"}`
-                      : editable
-                        ? "Clique para alternar concluído"
-                        : "Sem permissão para editar esta tarefa"
-                  }
-                >
-                  <div className="mt-0.5 text-[color:var(--sinaxys-primary)]">
-                    {t.status === "DONE" ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
-                      <div className="flex items-center gap-2">
-                        <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{statusLabel(t.status)}</Badge>
-                        {t.due_date ? <span className="text-xs text-muted-foreground">{fmtDate(t.due_date)}</span> : null}
-                        {editable ? (
-                          <div className="flex items-center gap-1">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setTaskMode("edit");
-                                setTaskEditingId(t.id);
-                                setTaskTitle(t.title);
-                                setTaskDesc(t.description ?? "");
-                                setTaskOwner(t.owner_user_id);
-                                setTaskDue(t.due_date ?? "");
-                                setTaskOpen(true);
-                              }}
-                              title="Editar tarefa"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setTaskDeleteId(t.id);
-                                setTaskDeleteOpen(true);
-                              }}
-                              title="Excluir tarefa"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                    >
+                      {t.status === "DONE" ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                    </Button>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>Resp.: {byUserId.get(t.owner_user_id) ?? "—"}</span>
+                            <span>•</span>
+                            <span>{statusLabel(t.status)}</span>
+                            {t.due_date ? (
+                              <>
+                                <span>•</span>
+                                <span>{fmtDate(t.due_date)}</span>
+                              </>
+                            ) : null}
                           </div>
-                        ) : null}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 rounded-xl bg-white"
+                            onClick={() => setExpandedTaskId((cur) => (cur === t.id ? null : t.id))}
+                          >
+                            {open ? <ChevronDown className="mr-2 h-4 w-4" /> : <ChevronRight className="mr-2 h-4 w-4" />}
+                            Desdobramentos
+                            <Badge className="ml-2 rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
+                              {nExec}
+                            </Badge>
+                          </Button>
+
+                          {editable ? (
+                            <>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                                onClick={() => {
+                                  setTaskMode("edit");
+                                  setTaskEditingId(t.id);
+                                  setTaskTitle(t.title);
+                                  setTaskDesc(t.description ?? "");
+                                  setTaskOwner(t.owner_user_id);
+                                  setTaskDue(t.due_date ?? "");
+                                  setTaskOpen(true);
+                                }}
+                                title="Editar tarefa"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                                onClick={() => {
+                                  setTaskDeleteId(t.id);
+                                  setTaskDeleteOpen(true);
+                                }}
+                                title="Excluir tarefa"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
                       </div>
+
+                      {open ? (
+                        <div className="mt-4 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div>
+                              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Desdobramentos (até 3 níveis)</div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                Um jeito limpo de quebrar a tarefa em passos, subpassos e micro-passos.
+                              </div>
+                            </div>
+
+                            {editable ? (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-10 rounded-xl bg-white"
+                                onClick={() => openAddStep(t.id, null, 1)}
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Adicionar passo
+                              </Button>
+                            ) : null}
+                          </div>
+
+                          <Separator className="my-4" />
+
+                          {exec.length ? (
+                            <StepTree taskId={t.id} nodes={exec} depth={1} />
+                          ) : (
+                            <div className="rounded-2xl bg-white p-4 text-sm text-muted-foreground">
+                              Ainda sem desdobramentos. Comece adicionando o primeiro passo.
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="mt-1 text-xs text-muted-foreground">Resp.: {byUserId.get(t.owner_user_id) ?? "—"}</div>
                   </div>
                 </div>
               );
@@ -340,6 +673,43 @@ export default function OkrDeliverableDetail() {
           )}
         </div>
       </Card>
+
+      <Dialog
+        open={stepOpen}
+        onOpenChange={(v) => {
+          if (!stepSaving) setStepOpen(v);
+        }}
+      >
+        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{stepMode === "add" ? "Novo desdobramento" : "Editar desdobramento"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-2">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-3 text-sm text-muted-foreground">
+              {stepDepth === 1
+                ? "Passo: a ação principal dentro da tarefa."
+                : stepDepth === 2
+                  ? "Subpasso: uma parte do passo."
+                  : "Micro-passo: detalhe de execução (último nível)."}
+            </div>
+
+            <Label>Título</Label>
+            <Input className="h-11 rounded-2xl" value={stepTitle} onChange={(e) => setStepTitle(e.target.value)} disabled={stepSaving} />
+          </div>
+
+          <DialogFooter>
+            <Button
+              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={stepSaving || stepTitle.trim().length < 3}
+              onClick={() => void saveStep()}
+            >
+              Salvar
+              <Check className="ml-2 h-4 w-4" />
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={taskOpen}
