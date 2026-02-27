@@ -10,6 +10,7 @@ import Signup from "./pages/Signup";
 import ChangePassword from "./pages/ChangePassword";
 import ForgotPassword from "./pages/ForgotPassword";
 import AppDashboard from "./pages/AppDashboard";
+import AppHome from "./pages/AppHome";
 import TrackPlayer from "./pages/TrackPlayer";
 import AppCertificates from "./pages/AppCertificates";
 import CertificateView from "./pages/CertificateView";
@@ -94,7 +95,7 @@ const App = () => (
                     path="/app"
                     element={
                       <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <AppDashboard />
+                        <AppHome />
                       </RequireAuth>
                     }
                   />

@@ -94,7 +94,14 @@ const nav: NavItem[] = [
     to: "/app",
     label: "Minha jornada",
     icon: <LayoutDashboard className="h-4 w-4" />,
-    roles: ["COLABORADOR", "HEAD", "ADMIN"],
+    roles: ["COLABORADOR", "HEAD"],
+  },
+  {
+    type: "link",
+    to: "/app",
+    label: "Início",
+    icon: <LayoutDashboard className="h-4 w-4" />,
+    roles: ["ADMIN"],
   },
 
   // PDI & Performance
