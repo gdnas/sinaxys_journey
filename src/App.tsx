@@ -592,6 +592,14 @@ const App = () => (
                     }
                   />
                   <Route
+                    path="/admin/tracks/:trackId/edit"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD"]}>
+                        <HeadTrackEdit />
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
                     path="/admin/rewards"
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD"]}>
