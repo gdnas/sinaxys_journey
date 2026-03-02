@@ -69,9 +69,6 @@ function ActionCard({
 }) {
   return (
     <Card className="group relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white">
-      <div className="absolute inset-0 opacity-[0.14]">
-        <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-      </div>
       <Link to={to} className="relative block p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -135,9 +132,6 @@ export default function HeadHome() {
   return (
     <div className="grid gap-6">
       <Card className="relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="absolute inset-0 opacity-[0.16]">
-          <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-        </div>
         <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
@@ -217,12 +211,7 @@ export default function HeadHome() {
         <ActionCard title="Head — Usuários" desc="Acompanhe o time e eventos de acesso." to="/head/users" icon={<Shield className="h-5 w-5" />} />
         <ActionCard title="Pessoas" desc="Abrir perfil e jornada de qualquer pessoa do org." to="/org" icon={<Users className="h-5 w-5" />} />
         <ActionCard title="OKRs do trimestre" desc="Saúde do trimestre e prioridades." to="/okr/quarter" icon={<Target className="h-5 w-5" />} />
-        <ActionCard
-          title="Férias"
-          desc="Aprove ou recuse pedidos quando necessário."
-          to="/vacation/approvals"
-          icon={<CalendarCheck2 className="h-5 w-5" />}
-        />
+        <ActionCard title="Time" desc="Gerencie o contexto do seu depto." to="/org" icon={<Users className="h-5 w-5" />} />
       </div>
     </div>
   );

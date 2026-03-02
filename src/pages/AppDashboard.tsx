@@ -83,7 +83,6 @@ function ShortcutCard({
   icon,
   to,
   badge,
-  img,
   tourId,
 }: {
   title: string;
@@ -91,16 +90,10 @@ function ShortcutCard({
   icon: React.ReactNode;
   to: string;
   badge?: string;
-  img?: string;
   tourId?: string;
 }) {
   return (
     <Card className="group relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white">
-      {img ? (
-        <div className="absolute inset-0 opacity-[0.18]">
-          <img src={img} alt="" className="h-full w-full object-cover" />
-        </div>
-      ) : null}
       <Link to={to} className="relative block p-6" data-tour={tourId}>
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -302,9 +295,6 @@ export default function AppDashboard() {
   return (
     <div className="grid gap-6">
       <Card data-tour="dash-hero" className="relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="absolute inset-0 opacity-[0.16]">
-          <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-        </div>
         <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
@@ -439,7 +429,6 @@ export default function AppDashboard() {
               icon={<Handshake className="h-5 w-5" />}
               to="/pdi-performance"
               badge="pessoas"
-              img="/placeholder.svg"
               tourId="dash-pdi"
             />
           ) : null}
@@ -449,7 +438,6 @@ export default function AppDashboard() {
             icon={<MapPinned className="h-5 w-5" />}
             to={isCollaborator ? "/okr/hoje" : "/okr/quarter"}
             badge="execução"
-            img="/placeholder.svg"
             tourId="dash-okr"
           />
           <ShortcutCard
@@ -458,7 +446,6 @@ export default function AppDashboard() {
             icon={<BookOpen className="h-5 w-5" />}
             to={isHead ? "/head/tracks" : "/tracks"}
             badge="evolução"
-            img="/placeholder.svg"
             tourId="dash-trilhas"
           />
           <ShortcutCard
@@ -467,7 +454,6 @@ export default function AppDashboard() {
             icon={<Sparkles className="h-5 w-5" />}
             to={isAdmin ? "/rankings?tab=rules" : "/rankings"}
             badge="reconhecimento"
-            img="/placeholder.svg"
             tourId="dash-points"
           />
           <ShortcutCard
@@ -476,7 +462,6 @@ export default function AppDashboard() {
             icon={<Network className="h-5 w-5" />}
             to="/org"
             badge="contexto"
-            img="/placeholder.svg"
             tourId="dash-org"
           />
           {isAdmin || isHead ? <VacationSummaryCard /> : null}
@@ -521,65 +506,120 @@ export default function AppDashboard() {
 
           <Separator className="my-5" />
 
-          <div className="grid gap-4 md:grid-cols-3">
-            {isAdmin ? (
-              <>
-                <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
-                  <Link to="/admin/users">
-                    <Users className="mr-2 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                    Usuários
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
-                  <Link to="/admin/costs">
-                    <Wallet className="mr-2 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                    Custos
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
-                  <Link to="/admin/tracks">
-                    <Building2 className="mr-2 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                    Montar trilhas
-                  </Link>
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
-                  <Link to="/head/users">
-                    <Users className="mr-2 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                    Pessoas
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
-                  <Link to="/head/costs">
-                    <Wallet className="mr-2 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                    Custos
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
-                  <Link to="/head/tracks">
-                    <Building2 className="mr-2 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                    Trilhas do time
-                  </Link>
-                </Button>
-              </>
-            )}
-          </div>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Link
+              to="/admin/users"
+              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Usuários</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Ativação, roles e permissões.</div>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                  <Users className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
+                Abrir
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
 
-          <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
-              <Link to="/app/certificates">
-                <Award className="mr-2 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                Certificados
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="h-11 justify-start rounded-2xl bg-white">
-              <Link to="/okr/quarter">
-                <Target className="mr-2 h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                Ciclos & OKRs
-              </Link>
-            </Button>
+            <Link
+              to="/admin/import-users"
+              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Importar usuários</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Suba uma planilha e provisiona o time rapidamente.</div>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                  <Users className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
+                Abrir
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/departments"
+              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Departamentos</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Estrutura do organograma e owners.</div>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                  <Users className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
+                Abrir
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/costs"
+              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Budget, centros de custo e ROI.</div>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                  <Wallet className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
+                Abrir
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
+
+            <Link
+              to="/admin/brand"
+              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Marca & Módulos</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Personalize a experiência e habilite recursos.</div>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                  <Building2 className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
+                Abrir
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
+
+            <Link
+              to="/okr/quarter"
+              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">OKRs do trimestre</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Prioridades e saúde da execução.</div>
+                </div>
+                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                  <Target className="h-5 w-5" />
+                </div>
+              </div>
+              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
+                Abrir
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
           </div>
         </Card>
       ) : null}

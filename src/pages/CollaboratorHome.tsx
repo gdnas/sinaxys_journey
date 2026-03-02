@@ -67,15 +67,12 @@ function ShortcutCard({
 }: {
   title: string;
   desc: string;
-  icon: React.ReactNode;
   to: string;
+  icon: React.ReactNode;
   badge?: string;
 }) {
   return (
     <Card className="group relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white">
-      <div className="absolute inset-0 opacity-[0.14]">
-        <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-      </div>
       <Link to={to} className="relative block p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -138,9 +135,6 @@ export default function CollaboratorHome() {
   return (
     <div className="grid gap-6">
       <Card className="relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="absolute inset-0 opacity-[0.16]">
-          <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-        </div>
         <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">

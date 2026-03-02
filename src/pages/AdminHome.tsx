@@ -70,9 +70,6 @@ function ActionCard({
 }) {
   return (
     <Card className="group relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white">
-      <div className="absolute inset-0 opacity-[0.14]">
-        <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-      </div>
       <Link to={to} className="relative block p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -132,9 +129,6 @@ export default function AdminHome() {
   return (
     <div className="grid gap-6">
       <Card className="relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="absolute inset-0 opacity-[0.16]">
-          <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-        </div>
         <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
@@ -218,38 +212,19 @@ export default function AdminHome() {
           to="/admin/import-users"
           icon={<UploadCloud className="h-5 w-5" />}
         />
-        <ActionCard title="Departamentos" desc="Estrutura do organograma e owners." to="/admin/departments" icon={<Users className="h-5 w-5" />} />
-        <ActionCard title="Marca & Módulos" desc="Personalize a experiência e habilite recursos." to="/admin/brand" icon={<Wand2 className="h-5 w-5" />} />
+        <ActionCard
+          title="Departamentos"
+          desc="Estrutura do organograma e owners."
+          to="/admin/departments"
+          icon={<Wand2 className="h-5 w-5" />}
+        />
+        <ActionCard
+          title="Marca & Módulos"
+          desc="Personalize a experiência e habilite recursos."
+          to="/admin/brand"
+          icon={<Settings2 className="h-5 w-5" />}
+        />
       </div>
-
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Atalhos úteis</div>
-            <p className="mt-1 text-sm text-muted-foreground">Pontos de entrada rápidos para operar a empresa.</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-              <Link to="/vacation/approvals">
-                Aprovar férias
-                <CalendarCheck2 className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-              <Link to="/org">
-                Organograma
-                <Building2 className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-              <Link to="/okr/map">
-                Mapa de OKRs
-                <Settings2 className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }

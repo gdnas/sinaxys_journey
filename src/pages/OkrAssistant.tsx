@@ -56,6 +56,7 @@ import {
 } from "@/lib/okrDb";
 import { linkObjectiveToKr } from "@/lib/okrAlignmentDb";
 import { parseDescribedItems, serializeDescribedItems, type DescribedItem } from "@/lib/fundamentalsFormat";
+import { getErrorMessage } from "@/lib/errorMessage";
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
@@ -894,7 +895,7 @@ export default function OkrAssistant() {
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
-                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        description: getErrorMessage(e),
                         variant: "destructive",
                       });
                     } finally {
@@ -1006,7 +1007,7 @@ export default function OkrAssistant() {
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
-                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        description: getErrorMessage(e),
                         variant: "destructive",
                       });
                     } finally {
@@ -1062,7 +1063,7 @@ export default function OkrAssistant() {
                       } catch (e) {
                         toast({
                           title: "Não foi possível criar/encontrar o ciclo",
-                          description: e instanceof Error ? e.message : "Erro inesperado.",
+                          description: getErrorMessage(e),
                           variant: "destructive",
                         });
                       }
@@ -1448,7 +1449,7 @@ export default function OkrAssistant() {
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
-                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        description: getErrorMessage(e),
                         variant: "destructive",
                       });
                     } finally {
@@ -1516,7 +1517,7 @@ export default function OkrAssistant() {
                       } catch (e) {
                         toast({
                           title: "Não foi possível criar/encontrar o trimestre",
-                          description: e instanceof Error ? e.message : "Erro inesperado.",
+                          description: getErrorMessage(e),
                           variant: "destructive",
                         });
                       }
@@ -1766,7 +1767,7 @@ export default function OkrAssistant() {
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
-                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        description: getErrorMessage(e),
                         variant: "destructive",
                       });
                     } finally {
@@ -2061,7 +2062,7 @@ export default function OkrAssistant() {
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
-                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        description: getErrorMessage(e),
                         variant: "destructive",
                       });
                     } finally {
@@ -2305,7 +2306,7 @@ export default function OkrAssistant() {
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
-                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        description: getErrorMessage(e),
                         variant: "destructive",
                       });
                     } finally {
