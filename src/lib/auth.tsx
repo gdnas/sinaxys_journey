@@ -153,6 +153,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // ignore
         }
       })();
+
+      // Best-effort: create storage bucket used for user documents automatically once per browser.
+      // We attempt to invoke the edge function that creates the bucket (idempotent). This avoids
+      // failing uploads when the bucket is missing. Keep errors silent.
+      try {
+        const flagKey = "_user_docs_bucket_created";
+        const already = typeof window !== "undefined" && window.localStorage?.getItem(flagKey);
+        if (!already) {
+          try {
+            await supabase.functions.invoke("create-user-documents-bucket");
+            try {
+              window.localStorage?.setItem(flagKey, "1");
+            } catch {
+              // ignore
+            }
+          } catch {
+            // ignore errors — upload will retry and attempt to create on demand
+          }
+        }
+      } catch {
+        // ignore
+      }
+
     } finally {
       if (mountedRef.current) setLoading(false);
     }
