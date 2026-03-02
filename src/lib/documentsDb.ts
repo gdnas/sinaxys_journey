@@ -189,7 +189,29 @@ export async function uploadUserDocumentFile(params: {
     contentType,
   } as any);
 
-  if (uploadError) throw uploadError;
+  // If bucket is not found, attempt to create it via an edge function and retry once.
+  if (uploadError) {
+    const message = String(uploadError.message || uploadError.message || uploadError);
+    if (/bucket not found/i.test(message) || /no such bucket/i.test(message) || /Bucket not found/i.test(message)) {
+      try {
+        // Invoke Supabase Edge Function to create the bucket using service role key.
+        // The function is expected at supabase/functions/create-user-documents-bucket
+        const fn = await supabase.functions.invoke("create-user-documents-bucket");
+        // fn.data may be present; check for error
+        // Retry upload once
+        const { error: retryError } = await storage.upload(path, uploadBlob as Blob, {
+          cacheControl: "3600",
+          upsert: false,
+          contentType,
+        } as any);
+        if (retryError) throw retryError;
+      } catch (e) {
+        throw uploadError;
+      }
+    } else {
+      throw uploadError;
+    }
+  }
 
   // Return storage path encoded so caller can store it in DB and later request signed URL.
   return `storage://${path}`;
@@ -204,7 +226,6 @@ export async function createSignedUrlForStoragePath(storageUrl: string, expiresI
   const { data, error } = await supabase.storage.from("user-documents").createSignedUrl(path, expiresInSeconds);
   if (error) throw error;
   // v1 returns { signedURL } or data?.signedUrl depending on SDK; normalize
-  // Type as any to access probable fields
   const anyData: any = data;
   return anyData.signedURL || anyData.signedUrl || anyData.publicUrl || "";
 }
