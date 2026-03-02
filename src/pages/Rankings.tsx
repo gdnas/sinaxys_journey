@@ -261,7 +261,7 @@ function AdminBonusCard({ companyId, people }: { companyId: string; people: Publ
             }
 
             try {
-              await addPointsBonus({ userId: targetId, points: n, note: note.trim() || null });
+              await addPointsBonus({ companyId, userId: targetId, points: n, note: note.trim() || null });
               setNote("");
               toast({ title: "Bônus aplicado." });
               await qc.invalidateQueries({ queryKey: ["points", "leaderboard", companyId] });
@@ -416,7 +416,7 @@ function TiersAdmin({ companyId, tiers }: { companyId: string; tiers: RewardTier
                   }
                   try {
                     await createRewardTier({
-                      companyId,
+                      company_id: companyId,
                       name: name.trim(),
                       minPoints: Math.max(0, safeInt(minPoints)),
                       prize: prize.trim(),

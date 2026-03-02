@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import type { PublicProfileRow } from "@/lib/pointsDb";
 
 function validatePublicProfileRowShape(obj: any): obj is PublicProfileRow {

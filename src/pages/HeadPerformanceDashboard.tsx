@@ -18,10 +18,10 @@ export default function HeadPerformanceDashboard() {
   const [departmentFilter, setDepartmentFilter] = useState<string>("all");
 
   useEffect(() => {
-    if (params.cycleId) {
-      setCycleId(params.cycleId);
+    if (cycleIdParam) {
+      setCycleId(cycleIdParam);
     }
-  }, [params.cycleId]);
+  }, [cycleIdParam]);
 
   const fetchScores = async () => {
     setLoading(true);
@@ -84,39 +84,30 @@ export default function HeadPerformanceDashboard() {
             {/* Ciclo */}
             <div>
               <label className="text-sm font-medium mb-2 block">Ciclo</label>
-              <Select
+              <input
+                type="text"
+                className="w-full h-11 rounded-xl border border-[color:var(--sinaxys-border)] px-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--sinaxys-primary)]/20"
                 value={cycleId}
-                onValueChange={setCycleId}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {/* TODO: Fetch cycles from API */}
-                  <SelectItem value="current">Atual</SelectItem>
-                </SelectContent>
-              </Select>
+                onChange={(e) => setCycleId(e.target.value)}
+                placeholder="ID do ciclo"
+              />
             </div>
 
             {/* Departamento */}
             <div>
-              <label className="text-recommendation-sm font-medium mb-2 block">Departamento</label>
-              <Select
+              <label className="text-sm font-medium mb-2 block">Departamento</label>
+              <select
+                className="w-full h-11 rounded-xl border border-[color:var(--sinaxys-border)] px-3 text-sm outline-none focus:ring-2 focus:ring-[color:var(--sinaxys-primary)]/20"
                 value={departmentFilter}
-                onValueChange={setDepartmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {departments.map(dept => (
-                    <SelectItem key={dept} value={dept}>
-                      {dept}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <option value="all">Todos</option>
+                {departments.map(dept => (
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </CardContent>
@@ -140,88 +131,47 @@ export default function HeadPerformanceDashboard() {
           </CardContent>
         </Card>
       ) : (
-        <Tabs defaultValue="ranking">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="ranking">
-              <TrendingUp className="mr-2 h-4 w-4" />
-              Ranking
-            </TabsTrigger>
-            <TabsTrigger value="details">
-              <Users className="mr-2 h-4 w-4" />
-              Detalhes
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="ranking" className="space-y-4">
-            {filteredScores.map((score, index) => (
-              <Card key={score.id}>
-                <CardContent className="py-4">
-                  <div className="flex items-center gap-4">
-                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
-                      {index + 1}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between mb-4">
+            <div className="text-sm text-muted-foreground">
+              {filteredScores.length} colaboradores encontrados
+            </div>
+          </div>
+          {filteredScores.map((score, index) => (
+            <Card key={score.id}>
+              <CardContent className="py-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold truncate">
+                        {score.user_name || score.user_id}
+                      </span>
+                      {score.breakdown && (
+                        <Badge variant="outline" className="text-xs">
+                          {Object.keys(score.breakdown).length} dimensões
+                        </Badge>
+                      )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold truncate">
-                          {score.user_name}
-                        </span>
-                        {score.breakdown && (
-                          <Badge variant="outline" className="text-xs">
-                            {Object.keys(score.breakdown).length} dimensões
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {score.department_id || "Sem departamento"}
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className={`text-2xl font-bold ${getScoreColor(score.score)}`}>
-                        {score.score.toFixed(1)}
-                      </div>
-                      <Badge {...getScoreBadge(score.score)}>
-                        {getScoreBadge(score.score).label}
-                      </Badge>
+                    <div className="text-sm text-muted-foreground">
+                      {score.department_id || "Sem departamento"}
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-
-          <TabsContent value="details" className="space-y-4">
-            {filteredScores.map((score) => (
-              <Card key={score.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">{score.user_name}</CardTitle>
+                  <div className="text-right flex-shrink-0">
+                    <div className={`text-2xl font-bold ${getScoreColor(score.score)}`}>
+                      {score.score.toFixed(1)}
+                    </div>
                     <Badge {...getScoreBadge(score.score)}>
-                      {score.score.toFixed(1)} - {getScoreBadge(score.score).label}
+                      {getScoreBadge(score.score).label}
                     </Badge>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {score.breakdown ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {Object.entries(score.breakdown).map(([key, value]) => (
-                        <div key={key} className="rounded-lg bg-muted/50 p-3">
-                          <div className="text-sm font-medium mb-1">
-                            {key.replace(/_/g, " ")}
-                          </div>
-                          <div className="text-xl font-bold">
-                            {typeof value === "number" ? value.toFixed(1) : String(value)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <CardDescription>Sem dados de breakdown disponíveis.</CardDescription>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </TabsContent>
-        </Tabs>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
       {/* Voltar */}
