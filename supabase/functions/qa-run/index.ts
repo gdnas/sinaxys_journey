@@ -207,6 +207,22 @@ serve(async (req) => {
     }
 
     const repo = repoEnv || "your-repo-owner/your-repo";
+
+    // VALIDATION: ensure repo looks like owner/repo and user didn't accidentally paste the token there
+    const repoLooksLikeToken = /^ghp_[A-Za-z0-9_-]{20,}$/.test(repo);
+    const repoFormatOk = /^[^/\s]+\/[^/\s]+$/.test(repo);
+    if (!repoFormatOk || repoLooksLikeToken) {
+      log("Invalid GITHUB_REPOSITORY value", { repo });
+      return new Response(
+        JSON.stringify({
+          error: "Invalid GITHUB_REPOSITORY configured",
+          details: "Please set GITHUB_REPOSITORY as 'owner/repo' and ensure GITHUB_TOKEN stores the token. It looks like the repository value is incorrect or contains a token.",
+          debug: { repo },
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const workflowPath = "qa_on_demand.yml";
 
     // Dispatch workflow
