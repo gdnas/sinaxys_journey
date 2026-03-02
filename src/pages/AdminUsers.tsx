@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MailPlus, Pencil, Search, Shield, UploadCloud, UserRound } from "lucide-react";
+import { MailPlus, Pencil, Search, Shield, UploadCloud, UserRound, CalendarDays } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,6 +21,8 @@ import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany, updateProfile, type DbProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
 import { ImportUsersPanel } from "@/components/admin/ImportUsersPanel";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const ROLE_OPTIONS = [
   { value: "ADMIN", label: "Admin" },
@@ -142,6 +144,7 @@ export default function AdminUsers() {
   const [editMonthlyCost, setEditMonthlyCost] = useState<string>("");
   const [editContractUrl, setEditContractUrl] = useState<string>("");
   const [saving, setSaving] = useState(false);
+  const [editJoinedAt, setEditJoinedAt] = useState<Date | undefined>(undefined);
 
   const openEdit = (p: DbProfile) => {
     setEditing(p);
@@ -153,6 +156,7 @@ export default function AdminUsers() {
     setEditPhone(p.phone ?? "");
     setEditMonthlyCost(typeof p.monthly_cost_brl === "number" ? String(p.monthly_cost_brl) : "");
     setEditContractUrl(p.contract_url ?? "");
+    setEditJoinedAt(p.joined_at ? new Date(p.joined_at) : undefined);
     setEditOpen(true);
   };
 
@@ -583,6 +587,24 @@ export default function AdminUsers() {
                 <Input className="h-11 rounded-xl" value={editContractUrl} onChange={(e) => setEditContractUrl(e.target.value)} inputMode="url" placeholder="https://..." />
               </div>
 
+              <div className="grid gap-2">
+                <Label>Data de admissão</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className={`flex w-full items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white px-4 py-3 text-left text-sm text-[color:var(--sinaxys-ink)] ${!editJoinedAt ? "text-muted-foreground" : ""}`}
+                    >
+                      <span>{editJoinedAt ? editJoinedAt.toLocaleDateString("pt-BR") : "Selecionar data"}</span>
+                      <CalendarDays className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto rounded-3xl border-[color:var(--sinaxys-border)] p-2" align="start">
+                    <Calendar mode="single" selected={editJoinedAt} onSelect={setEditJoinedAt} initialFocus />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
               <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
                 <div>
                   <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Ativo</div>
@@ -615,6 +637,7 @@ export default function AdminUsers() {
                     contract_url: editContractUrl.trim() || null,
                     monthly_cost_brl: toMonthlyCostNumber(editMonthlyCost),
                     active: editActive,
+                    joined_at: editJoinedAt ? editJoinedAt.toISOString().slice(0, 10) : null,
                   });
                   await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
                   toast({ title: "Usuário atualizado" });
