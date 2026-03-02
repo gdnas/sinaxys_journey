@@ -36,7 +36,6 @@ jobs:
       - name: Locate package.json
         id: find_pkg
         run: |
-          # find the nearest package.json (limit depth to 4)
           pkg=$(find . -maxdepth 4 -name package.json | head -n 1 || true)
           if [ -z "$pkg" ]; then
             echo "PACKAGE_DIR=." >> $GITHUB_ENV
@@ -47,11 +46,20 @@ jobs:
             echo "Found package.json in $dir";
           fi
           echo "--- files at PACKAGE_DIR ---"; ls -la "$PACKAGE_DIR" || true
+          echo "--- package.json content ---"; cat "$PACKAGE_DIR/package.json" || true
 
-      - name: Install dependencies
+      - name: Install dependencies (verbose)
         run: |
           echo "Installing dependencies in $PACKAGE_DIR"
-          npm --prefix "$PACKAGE_DIR" install --silent || (echo "npm install failed with exit $?" && npm --version && node --version && ls -la "$PACKAGE_DIR" && cat "$PACKAGE_DIR/package.json" || true ; exit 1)
+          echo "npm registry: $(npm --prefix "$PACKAGE_DIR" config get registry)";
+          # prefer npm ci when lockfile exists
+          if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
+            echo "Found package-lock.json — running npm ci (verbose)"
+            npm --prefix "$PACKAGE_DIR" ci --loglevel=verbose || (echo "npm ci failed with exit $?"; ls -la "$PACKAGE_DIR"; cat "$PACKAGE_DIR/package.json" || true; exit 1)
+          else
+            echo "No lockfile — running npm install (verbose)"
+            npm --prefix "$PACKAGE_DIR" install --loglevel=verbose || (echo "npm install failed with exit $?"; ls -la "$PACKAGE_DIR"; cat "$PACKAGE_DIR/package.json" || true; exit 1)
+          fi
 
       - name: Run Lint
         run: |
