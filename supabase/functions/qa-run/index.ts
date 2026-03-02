@@ -63,6 +63,8 @@ serve(async (req) => {
     const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY");
     const githubToken = Deno.env.get("GITHUB_TOKEN");
     const repoEnv = Deno.env.get("GITHUB_REPOSITORY");
+    // Allow overriding the workflow filename via env var; default to the V2 workflow we created
+    const workflowFile = Deno.env.get("GITHUB_WORKFLOW_FILE") || "qa_on_demand_v2.yml";
 
     log("Environment check", {
       hasSupabaseUrl: !!supabaseUrl,
@@ -70,6 +72,7 @@ serve(async (req) => {
       hasGithubToken: !!githubToken,
       hasRepoEnv: !!repoEnv,
       repo: repoEnv || "your-repo-owner/your-repo (default)",
+      workflowFile,
     });
 
     if (!supabaseUrl || !supabaseAnon) {
@@ -223,7 +226,30 @@ serve(async (req) => {
       );
     }
 
-    const workflowPath = "qa_on_demand.yml";
+    const workflowPath = workflowFile;
+
+    // Pre-check: validate repo access with a quick GET to the repo API
+    const repoUrl = `https://api.github.com/repos/${repo}`;
+    try {
+      const repoCheck = await fetch(repoUrl, {
+        headers: { Authorization: `Bearer ${githubToken}`, Accept: "application/vnd.github+json" },
+      });
+      log('Repo check', { status: repoCheck.status });
+      if (!repoCheck.ok) {
+        const txt = await repoCheck.text().catch(() => '');
+        log('Repo check failed', { status: repoCheck.status, body: safeTrim(txt) });
+        return new Response(
+          JSON.stringify({ error: 'Repository access check failed', status: repoCheck.status, details: safeTrim(txt) }),
+          { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    } catch (err) {
+      log('Repo check network error', String(err));
+      return new Response(
+        JSON.stringify({ error: 'Network error while checking repository', details: String(err) }),
+        { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Dispatch workflow
     const dispatchUrl = `https://api.github.com/repos/${repo}/actions/workflows/${workflowPath}/dispatches`;
@@ -260,7 +286,7 @@ serve(async (req) => {
           error: "Failed to dispatch workflow",
           status: workflowResp.status,
           details: raw,
-          debug: { dispatchUrl, repo },
+          debug: { dispatchUrl, repo, workflowPath },
         }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );

@@ -20,7 +20,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: WORKFLOW MARKER
+      - name: WORKFLOW_MARKER
         run: |
           echo "WORKFLOW_MARKER: updated-no-setup-node-$(date -u +%Y%m%dT%H%M%SZ)"
           echo "COMMIT:"; git rev-parse --short HEAD || echo "no-commit"
@@ -28,10 +28,10 @@ jobs:
       - name: Debug workspace (list files)
         run: |
           echo "PWD: $(pwd)"
-          echo "Node (preinstalled): $(node -v || echo 'node not found')";
-          echo "NPM (preinstalled): $(npm -v || echo 'npm not found')";
+          echo "Node: $(node -v || echo 'node not found')";
+          echo "NPM: $(npm -v || echo 'npm not found')";
           echo "Listing root files:"; ls -la
-          echo "Listing src files:"; ls -la src || true
+          echo "Listing repo tree:"; find . -maxdepth 3 -type f -print | sed -n '1,200p'
 
       - name: Locate package.json
         id: find_pkg
@@ -51,8 +51,9 @@ jobs:
       - name: Install dependencies (verbose)
         run: |
           echo "Installing dependencies in $PACKAGE_DIR"
+          echo "npm --version: $(npm --version)";
+          echo "node --version: $(node --version)";
           echo "npm registry: $(npm --prefix "$PACKAGE_DIR" config get registry)";
-          # prefer npm ci when lockfile exists
           if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
             echo "Found package-lock.json — running npm ci (verbose)"
             npm --prefix "$PACKAGE_DIR" ci --loglevel=verbose || (echo "npm ci failed with exit $?"; ls -la "$PACKAGE_DIR"; cat "$PACKAGE_DIR/package.json" || true; exit 1)
