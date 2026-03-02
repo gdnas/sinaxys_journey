@@ -513,6 +513,18 @@ export async function listKeyResultsByObjectiveIds(objectiveIds: string[]) {
   return (data ?? []) as DbOkrKeyResult[];
 }
 
+export async function listKeyResultsByIds(keyResultIds: string[]) {
+  if (!keyResultIds.length) return [] as DbOkrKeyResult[];
+  const { data, error } = await supabase
+    .from("okr_key_results")
+    .select(krSelect)
+    .in("id", keyResultIds)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as DbOkrKeyResult[];
+}
+
 export type KrConfidence = "ON_TRACK" | "AT_RISK" | "OFF_TRACK";
 export type KrKind = "METRIC" | "DELIVERABLE";
 

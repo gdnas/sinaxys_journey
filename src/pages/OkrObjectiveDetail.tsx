@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp, ListChecks, KeyRound, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp, ChevronRight, ListChecks, KeyRound, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,9 +38,10 @@ import {
   krProgressPct,
   listDeliverablesByKeyResultIds,
   listKeyResults,
-  listTasksByDeliverableIds,
+  listKeyResultsByIds,
   listOkrCycles,
   listOkrObjectives,
+  listOkrObjectivesByIds,
   updateKeyResult,
   updateOkrObjective,
   updateTask,
@@ -51,7 +53,7 @@ import {
   deleteKeyResultCascade,
   deleteOkrObjectiveCascade,
 } from "@/lib/okrDb";
-import { linkObjectiveToKr, listLinkedObjectivesByKrIds, unlinkObjectiveFromKr } from "@/lib/okrAlignmentDb";
+import { linkObjectiveToKr, listLinkedObjectivesByKrIds, listKrLinksByObjectiveId, unlinkObjectiveFromKr } from "@/lib/okrAlignmentDb";
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
@@ -141,15 +143,29 @@ export default function OkrObjectiveDetail() {
     queryFn: () => listLinkedObjectivesByKrIds(krIds),
   });
 
-  const linkedObjectiveIdsByKrId = useMemo(() => {
-    const m = new Map<string, Set<string>>();
-    for (const l of krObjectiveLinks) {
-      const set = m.get(l.key_result_id) ?? new Set<string>();
-      set.add(l.objective_id);
-      m.set(l.key_result_id, set);
-    }
-    return m;
-  }, [krObjectiveLinks]);
+  const { data: myObjectiveKrLinks = [] } = useQuery({
+    queryKey: ["okr-objective-kr-links", objectiveId],
+    enabled: !!objectiveId,
+    queryFn: () => listKrLinksByObjectiveId(objectiveId),
+  });
+
+  const yearKrIds = useMemo(() => Array.from(new Set(myObjectiveKrLinks.map((l) => l.key_result_id))), [myObjectiveKrLinks]);
+
+  const { data: yearKrs = [] } = useQuery({
+    queryKey: ["okr-year-krs-by-ids", yearKrIds.join(",")],
+    enabled: yearKrIds.length > 0,
+    queryFn: () => listKeyResultsByIds(yearKrIds),
+  });
+
+  const yearObjectiveIds = useMemo(() => Array.from(new Set(yearKrs.map((k) => k.objective_id))), [yearKrs]);
+
+  const { data: yearObjectives = [] } = useQuery({
+    queryKey: ["okr-year-objectives-by-ids", yearObjectiveIds.join(",")],
+    enabled: yearObjectiveIds.length > 0,
+    queryFn: () => listOkrObjectivesByIds(yearObjectiveIds),
+  });
+
+  const yearObjectiveById = useMemo(() => new Map(yearObjectives.map((o) => [o.id, o] as const)), [yearObjectives]);
 
   const linkedObjectiveLinksByKrId = useMemo(() => {
     const m = new Map<string, { id: string; objectiveId: string }[]>();
@@ -519,6 +535,68 @@ export default function OkrObjectiveDetail() {
           <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando…</div>
         ) : objective ? (
           <div className="grid gap-4">
+            {yearKrs.length ? (
+              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] hover:bg-[color:var(--sinaxys-tint)]">
+                        <Target className="mr-1.5 h-3.5 w-3.5" />
+                        Ano
+                      </Badge>
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Vínculo com OKR do ano</div>
+                    </div>
+                    <div className="mt-2 grid gap-2">
+                      {yearKrs.map((kr) => {
+                        const yObj = yearObjectiveById.get(kr.objective_id);
+                        const yTitle = yObj?.title ?? "Objetivo do ano";
+                        const pct = krProgressPct(kr);
+                        return (
+                          <Link
+                            key={kr.id}
+                            to={yObj?.id ? `/okr/objetivos/${yObj.id}` : "#"}
+                            className={
+                              "block rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 transition " +
+                              (yObj?.id ? "hover:bg-[color:var(--sinaxys-tint)]/30" : "")
+                            }
+                            title={yObj?.id ? "Abrir objetivo anual" : undefined}
+                          >
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Objetivo do ano</div>
+                                <div className="mt-1 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{yTitle}</div>
+                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                  <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
+                                    <KeyRound className="mr-1.5 h-3.5 w-3.5" />
+                                    KR do ano
+                                  </Badge>
+                                  {typeof pct === "number" ? (
+                                    <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                                      {pct}%
+                                    </Badge>
+                                  ) : null}
+                                </div>
+                                <div className="mt-2 text-sm text-muted-foreground">{kr.title}</div>
+                              </div>
+                              {yObj?.id ? (
+                                <span className="inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
+                                  Abrir
+                                  <ChevronRight className="h-4 w-4" />
+                                </span>
+                              ) : null}
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white ring-1 ring-[color:var(--sinaxys-border)]">
+                    <Link2 className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
               <div className="min-w-0">
                 <div className="text-lg font-semibold leading-tight text-[color:var(--sinaxys-ink)]">{objective.title}</div>

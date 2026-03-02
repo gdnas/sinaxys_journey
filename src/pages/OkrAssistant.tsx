@@ -1119,10 +1119,20 @@ export default function OkrAssistant() {
                   annualObjectives.map((o) => {
                     const n = annualKrCountsByObjective.get(o.id) ?? 0;
                     return (
-                      <div key={o.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                      <Link
+                        key={o.id}
+                        to={`/okr/objetivos/${o.id}`}
+                        className="block rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 transition hover:bg-[color:var(--sinaxys-tint)]/30"
+                        title="Abrir objetivo"
+                      >
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
+                            <div className="flex items-center gap-2">
+                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
+                              <span className="hidden items-center gap-1 text-xs font-semibold text-[color:var(--sinaxys-primary)] sm:inline-flex">
+                                Abrir <ArrowRight className="h-3.5 w-3.5" />
+                              </span>
+                            </div>
                             <div className="mt-1 text-xs text-muted-foreground">Conectado ao 2 anos: {o.strategy_objective_id === so2?.id ? "Sim" : "Não"}</div>
                           </div>
                           <Badge
@@ -1136,7 +1146,7 @@ export default function OkrAssistant() {
                             {n} KRs
                           </Badge>
                         </div>
-                      </div>
+                      </Link>
                     );
                   })
                 ) : (
