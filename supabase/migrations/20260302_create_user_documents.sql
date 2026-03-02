@@ -25,10 +25,15 @@ CREATE POLICY "user_documents_select" ON public.user_documents
     (auth.role() IS NOT NULL AND UPPER(auth.role()) IN ('ADMIN','MASTERADMIN','HEAD'))
   );
 
+-- Allow the document owner OR admins/heads to INSERT rows (so admins/heads can add documents on behalf of users).
+DROP POLICY IF EXISTS "user_documents_insert" ON public.user_documents;
 CREATE POLICY "user_documents_insert" ON public.user_documents
   FOR INSERT
   TO authenticated
-  WITH CHECK (auth.uid() = user_id);
+  WITH CHECK (
+    auth.uid() = user_id OR
+    (auth.role() IS NOT NULL AND UPPER(auth.role()) IN ('ADMIN','MASTERADMIN','HEAD'))
+  );
 
 CREATE POLICY "user_documents_update" ON public.user_documents
   FOR UPDATE
