@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   Crown,
+  Flask,
   GraduationCap,
   Handshake,
   LayoutDashboard,
@@ -85,6 +86,13 @@ const nav: NavItem[] = [
     to: "/master/users",
     label: "Usuários",
     icon: <Shield className="h-4 w-4" />,
+    roles: ["MASTERADMIN"],
+  },
+  {
+    type: "link",
+    to: "/test-runner",
+    label: "QA Pipeline",
+    icon: <Flask className="h-4 w-4" />,
     roles: ["MASTERADMIN"],
   },
 
