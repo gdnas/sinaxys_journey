@@ -36,7 +36,7 @@ import {
   listContractAttachments,
   listUserDocuments,
 } from "@/lib/documentsDb";
-import { getProfile, updateProfile } from "@/lib/profilesDb";
+import { getProfile, listProfilesByCompany, updateProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
 
 function initials(name: string) {
@@ -90,7 +90,29 @@ export default function AdminUserCard() {
     enabled: !!cid,
   });
 
+  const { data: people = [] } = useQuery({
+    queryKey: ["profiles", cid],
+    queryFn: () => listProfilesByCompany(cid),
+    enabled: !!cid,
+  });
+
   const allowed = !!profile && profile.company_id === cid;
+
+  const managerOptions = useMemo(() => {
+    const me = userId ?? "";
+    return (people ?? [])
+      .filter((p) => p.id !== me)
+      .filter((p) => !!p.active)
+      .map((p) => ({ id: p.id, label: p.name?.trim() ? p.name.trim() : p.email }))
+      .sort((a, b) => a.label.localeCompare(b.label, "pt-BR"));
+  }, [people, userId]);
+
+  const managerLabel = useMemo(() => {
+    const mid = profile?.manager_id;
+    if (!mid) return null;
+    const p = (people ?? []).find((x) => x.id === mid);
+    return p ? (p.name?.trim() ? p.name.trim() : p.email) : null;
+  }, [people, profile?.manager_id]);
 
   const departmentName = useMemo(() => {
     if (!profile?.department_id) return null;
@@ -114,6 +136,7 @@ export default function AdminUserCard() {
   // Editable state
   const [name, setName] = useState("");
   const [role, setRole] = useState("COLABORADOR");
+  const [managerId, setManagerId] = useState<string>("__none__");
   const [phone, setPhone] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [deptId, setDeptId] = useState<string>("");
@@ -138,6 +161,7 @@ export default function AdminUserCard() {
     if (!profile) return false;
     const baseName = profile.name ?? "";
     const baseRole = profile.role ?? "";
+    const baseManager = profile.manager_id ?? "__none__";
     const basePhone = profile.phone ?? "";
     const baseJob = profile.job_title ?? "";
     const baseDept = profile.department_id ?? "";
@@ -147,6 +171,7 @@ export default function AdminUserCard() {
     return (
       name.trim() !== baseName ||
       role !== baseRole ||
+      managerId !== baseManager ||
       phone.trim() !== basePhone ||
       jobTitle.trim() !== baseJob ||
       deptId !== baseDept ||
@@ -154,13 +179,14 @@ export default function AdminUserCard() {
       monthlyCost.trim() !== baseMonthly ||
       contractUrl.trim() !== baseContract
     );
-  }, [profile, name, role, phone, jobTitle, deptId, active, monthlyCost, contractUrl]);
+  }, [profile, name, role, managerId, phone, jobTitle, deptId, active, monthlyCost, contractUrl]);
 
   // Sync state from profile
   useMemo(() => {
     if (!profile) return;
     setName(profile.name ?? "");
     setRole(profile.role ?? "COLABORADOR");
+    setManagerId(profile.manager_id ?? "__none__");
     setPhone(profile.phone ?? "");
     setJobTitle(profile.job_title ?? "");
     setDeptId(profile.department_id ?? "");
@@ -214,6 +240,15 @@ export default function AdminUserCard() {
                   <div className="mt-2 flex flex-wrap gap-2">
                     <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">{roleLabel(profile.role as any)}</Badge>
                     <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{departmentName ?? "Sem departamento"}</Badge>
+                    {managerLabel ? (
+                      <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                        Líder: {managerLabel}
+                      </Badge>
+                    ) : (
+                      <Badge className="rounded-full bg-white text-muted-foreground ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                        Sem líder
+                      </Badge>
+                    )}
                     {profile.active ? (
                       <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
                         <BadgeCheck className="mr-1.5 h-3.5 w-3.5" />
@@ -284,6 +319,29 @@ export default function AdminUserCard() {
                       </div>
 
                       <div className="grid gap-2">
+                        <Label>Nome</Label>
+                        <Input className="h-11 rounded-2xl" value={name} onChange={(e) => setName(e.target.value)} disabled={saving} />
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Líder direto</Label>
+                        <Select value={managerId} onValueChange={setManagerId} disabled={saving}>
+                          <SelectTrigger className="h-11 rounded-2xl bg-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                            <SelectItem value="__none__">Sem líder</SelectItem>
+                            {managerOptions.map((p) => (
+                              <SelectItem key={p.id} value={p.id}>
+                                {p.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="text-xs text-muted-foreground">Define quem aparece como "Líder direto" no organograma e no card da pessoa.</div>
+                      </div>
+
+                      <div className="grid gap-2">
                         <Label>Celular</Label>
                         <Input className="h-11 rounded-2xl" value={phone} onChange={(e) => setPhone(e.target.value)} disabled={saving} placeholder="(11) 99999-9999" />
                       </div>
@@ -344,6 +402,7 @@ export default function AdminUserCard() {
                               await updateProfile(profile.id, {
                                 name: name.trim() || null,
                                 role,
+                                manager_id: managerId === "__none__" ? null : managerId,
                                 phone: phone.trim() || null,
                                 job_title: jobTitle.trim() || null,
                                 department_id: deptId || null,

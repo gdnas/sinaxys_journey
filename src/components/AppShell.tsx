@@ -25,6 +25,7 @@ import {
   Video,
   Wallet,
   Wrench,
+  Users,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -162,6 +163,14 @@ const nav: NavItem[] = [
         label: "Organograma",
         icon: <Network className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "ORG",
+      },
+      {
+        type: "link",
+        to: "/admin/org",
+        label: "Definir líderes",
+        icon: <Users className="h-4 w-4" />,
+        roles: ["ADMIN"],
         moduleKey: "ORG",
       },
       {
