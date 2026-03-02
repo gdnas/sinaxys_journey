@@ -189,6 +189,26 @@ export async function fetchLeaderboard(
   companyId: string,
   limit: number = 50
 ) {
+  // Prefer the denormalized profiles.total_points column (added for fast reads).
+  // Fall back to the existing RPC when the column/table isn't available or the query fails.
+  try {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id: id, total_points")
+      .eq("company_id", companyId)
+      .eq("active", true)
+      .order("total_points", { ascending: false })
+      .limit(limit as number);
+
+    if (!error && data) {
+      // Map rows to LeaderboardRow
+      return (data as any[]).map((r) => ({ user_id: r.id as string, total_points: Number(r.total_points ?? 0) } as LeaderboardRow));
+    }
+  } catch (e) {
+    // ignore and fallback
+  }
+
+  // Fallback to RPC (existing behavior)
   const { data, error } = await supabase.rpc("points_leaderboard", {
     p_company_id: companyId,
     p_limit: limit,

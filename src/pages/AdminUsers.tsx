@@ -21,8 +21,6 @@ import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany, updateProfile, type DbProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
 import { ImportUsersPanel } from "@/components/admin/ImportUsersPanel";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 const ROLE_OPTIONS = [
   { value: "ADMIN", label: "Admin" },
@@ -45,6 +43,26 @@ function fmtDateTime(ts: string | null | undefined) {
   const d = new Date(ts);
   if (Number.isNaN(d.getTime())) return "—";
   return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
+}
+
+function displayFromIso(iso?: string | null) {
+  if (!iso) return "";
+  const parts = iso.split("-");
+  if (parts.length !== 3) return "";
+  const [y, m, d] = parts;
+  return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
+}
+
+function parseDisplayToIso(s: string) {
+  const t = s.trim();
+  if (!t) return null;
+  const m = t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy] = m;
+  const iso = `${yyyy}-${mm}-${dd}`;
+  const d = new Date(iso + "T00:00:00");
+  if (Number.isNaN(d.getTime())) return null;
+  return iso;
 }
 
 async function describeFunctionError(e: unknown): Promise<string> {
@@ -144,7 +162,7 @@ export default function AdminUsers() {
   const [editMonthlyCost, setEditMonthlyCost] = useState<string>("");
   const [editContractUrl, setEditContractUrl] = useState<string>("");
   const [saving, setSaving] = useState(false);
-  const [editJoinedAt, setEditJoinedAt] = useState<Date | undefined>(undefined);
+  const [editJoinedAtStr, setEditJoinedAtStr] = useState("");
 
   const openEdit = (p: DbProfile) => {
     setEditing(p);
@@ -156,7 +174,7 @@ export default function AdminUsers() {
     setEditPhone(p.phone ?? "");
     setEditMonthlyCost(typeof p.monthly_cost_brl === "number" ? String(p.monthly_cost_brl) : "");
     setEditContractUrl(p.contract_url ?? "");
-    setEditJoinedAt(p.joined_at ? new Date(p.joined_at) : undefined);
+    setEditJoinedAtStr(displayFromIso(p.joined_at));
     setEditOpen(true);
   };
 
@@ -589,20 +607,18 @@ export default function AdminUsers() {
 
               <div className="grid gap-2">
                 <Label>Data de admissão</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      className={`flex w-full items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white px-4 py-3 text-left text-sm text-[color:var(--sinaxys-ink)] ${!editJoinedAt ? "text-muted-foreground" : ""}`}
-                    >
-                      <span>{editJoinedAt ? editJoinedAt.toLocaleDateString("pt-BR") : "Selecionar data"}</span>
-                      <CalendarDays className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto rounded-3xl border-[color:var(--sinaxys-border)] p-2" align="start">
-                    <Calendar mode="single" selected={editJoinedAt} onSelect={setEditJoinedAt} initialFocus />
-                  </PopoverContent>
-                </Popover>
+                <div className="relative">
+                  <Input
+                    className="h-11 rounded-xl pr-10"
+                    value={editJoinedAtStr}
+                    onChange={(e) => setEditJoinedAtStr(e.target.value)}
+                    placeholder="dd/mm/yyyy"
+                  />
+                  <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <CalendarDays className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">Digite a data no formato dd/mm/yyyy</div>
               </div>
 
               <div className="flex items-center justify-between rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
@@ -627,6 +643,13 @@ export default function AdminUsers() {
               onClick={async () => {
                 if (!editing) return;
                 try {
+                  // validate joined_at format if provided
+                  const joinedIso = editJoinedAtStr.trim() ? parseDisplayToIso(editJoinedAtStr) : null;
+                  if (editJoinedAtStr.trim() && !joinedIso) {
+                    toast({ title: "Data inválida", description: "Use o formato dd/mm/yyyy.", variant: "destructive" });
+                    return;
+                  }
+
                   setSaving(true);
                   await updateProfile(editing.id, {
                     name: editName.trim(),
@@ -637,7 +660,7 @@ export default function AdminUsers() {
                     contract_url: editContractUrl.trim() || null,
                     monthly_cost_brl: toMonthlyCostNumber(editMonthlyCost),
                     active: editActive,
-                    joined_at: editJoinedAt ? editJoinedAt.toISOString().slice(0, 10) : null,
+                    joined_at: joinedIso,
                   });
                   await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
                   toast({ title: "Usuário atualizado" });
