@@ -24,7 +24,7 @@ type PerformanceWithProfile = PerformanceScoreRow & {
 };
 
 export default function HeadPerformanceDashboard() {
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const cycleIdParam = searchParams.get("cycleId");
   
   const { toast } = useToast();

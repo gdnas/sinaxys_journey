@@ -17,7 +17,7 @@ import {
 import { getPublicProfile } from "@/lib/profilePublicDb";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Filter, Calendar, Cube } from "lucide-react";
+import { Filter, Calendar, Box } from "lucide-react";
 
 type UserProfile = {
   id: string;
@@ -28,7 +28,7 @@ type UserProfile = {
 
 export default function UserEventLedger() {
   const params = useParams();
-  const searchParams = useSearchParams();
+  const [searchParams] = useSearchParams();
   const userId = params.userId;
   
   const [loading, setLoading] = useState(true);
@@ -262,7 +262,7 @@ export default function UserEventLedger() {
                 <div className="flex items-start gap-4">
                   {/* Icone de módulo */}
                   <div className={`w-10 h-10 rounded-lg ${getEventColor(event.source_module)} flex items-center justify-center text-white`}>
-                    <Cube className="h-5 w-5" />
+                    <Box className="h-5 w-5" />
                   </div>
 
                   <div className="flex-1 space-y-2">
