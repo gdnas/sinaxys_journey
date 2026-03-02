@@ -1,59 +1,52 @@
-import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  Activity,
+  ArrowRight,
   CalendarDays,
+  ChartLine,
   CheckCircle2,
-  ClipboardList,
+  ChevronDown,
+  ChevronRight,
   Handshake,
   LineChart,
-  MessageSquareText,
-  Pencil,
+  MessageSquare,
   Plus,
+  Search,
+  Settings2,
   Sparkles,
+  Star,
   Users,
 } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { format, startOfWeek } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Slider } from "@/components/ui/slider";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { supabase } from "@/integrations/supabase/client";
 import { isCompanyModuleEnabled } from "@/lib/modulesDb";
 import {
-  createCheckin,
-  createFeedback,
-  createOneOnOne,
-  ensurePdiPlan,
-  listCareerEvents,
-  listCheckinsForUser,
-  listFeedbackForUser,
-  listOneOnOnesForUser,
-  listPdiSkills,
-  listRecentCheckinsForUsers,
-  listOneOnOnesForEmployees,
+  createPdi,
+  fetchPdiByUser,
+  listCheckins,
+  listFeedback,
+  listOneOnOnes,
+  listPublicProfilesForCompany,
+  upsertCheckin,
+  upsertFeedback,
+  upsertOneOnOne,
   type DbCheckin,
   type DbFeedback,
   type DbOneOnOne,
-  type DbPdiPlan,
-  type DbPdiSkill,
-  type FeedbackKind,
-  updatePdiPlan,
-  upsertPdiSkill,
-  deletePdiSkill,
 } from "@/lib/pdiPerformanceDb";
-import { getCertificatesForUser } from "@/lib/journeyDb";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const MODULE_KEY = "PDI_PERFORMANCE" as const;
 
@@ -667,7 +660,7 @@ function FeedbackComposer({
           <p className="mt-1 text-sm text-muted-foreground">Registre agora. Curto e objetivo.</p>
         </div>
         <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-          <MessageSquareText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+          <MessageSquare className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
         </div>
       </div>
 
@@ -928,19 +921,19 @@ export default function PdiPerformance() {
 
   const { data: myCheckins = [] } = useQuery({
     queryKey: ["pdi", "checkins", companyId, selectedUserId],
-    queryFn: () => listCheckinsForUser(companyId, selectedUserId, { limit: 40 }),
+    queryFn: () => listCheckins(companyId, selectedUserId, { limit: 40 }),
     enabled: moduleEnabled,
   });
 
   const { data: myFeedbacks = [] } = useQuery({
     queryKey: ["pdi", "feedbacks", companyId, selectedUserId],
-    queryFn: () => listFeedbackForUser(companyId, selectedUserId, { limit: 40 }),
+    queryFn: () => listFeedback(companyId, selectedUserId, { limit: 40 }),
     enabled: moduleEnabled,
   });
 
   const { data: myOneOnOnes = [] } = useQuery({
     queryKey: ["pdi", "1on1", companyId, selectedUserId],
-    queryFn: () => listOneOnOnesForUser(companyId, selectedUserId, { limit: 40 }),
+    queryFn: () => listOneOnOnes(companyId, selectedUserId, { limit: 40 }),
     enabled: moduleEnabled,
   });
 
@@ -1167,9 +1160,6 @@ export default function PdiPerformance() {
     return (
       <div className="grid gap-6">
         <Card className="relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="absolute inset-0 opacity-[0.14]">
-            <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-          </div>
           <div className="relative">
             <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
               <span className="grid h-5 w-5 place-items-center rounded-full bg-white ring-1 ring-[color:var(--sinaxys-border)]">
@@ -1226,9 +1216,6 @@ export default function PdiPerformance() {
   return (
     <div className="grid gap-6">
       <Card className="relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="absolute inset-0 opacity-[0.16]">
-          <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-        </div>
         <div className="relative flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
@@ -1497,7 +1484,7 @@ export default function PdiPerformance() {
       </Tabs>
 
       <div className="text-xs text-muted-foreground">
-        Dica: o módulo é independente de OKRs e Trilhas — mas quando existirem, marcos como “meta atingida” e “trilha concluída” entram automaticamente no histórico.
+        Dica: o módulo é independente de OKRs e Trilhas — mas quando existirem, marcos como "meta atingida" e "trilha concluída" entram automaticamente no histórico.
       </div>
     </div>
   );
