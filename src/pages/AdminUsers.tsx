@@ -65,6 +65,29 @@ function parseDisplayToIso(s: string) {
   return iso;
 }
 
+// Simple mask for dd/mm/yyyy. Accepts input and returns formatted string as the user types.
+function maskDateInput(value: string) {
+  // keep only digits
+  const digits = value.replace(/\D/g, "");
+  if (!digits) return "";
+  const parts: string[] = [];
+  // day
+  if (digits.length <= 2) {
+    parts.push(digits);
+  } else {
+    parts.push(digits.slice(0, 2));
+    // month
+    if (digits.length <= 4) {
+      parts.push(digits.slice(2));
+    } else {
+      parts.push(digits.slice(2, 4));
+      // year
+      parts.push(digits.slice(4, 8));
+    }
+  }
+  return parts.filter(Boolean).join("/").slice(0, 10);
+}
+
 async function describeFunctionError(e: unknown): Promise<string> {
   // Supabase Functions errors (FunctionsHttpError/FunctionsRelayError/FunctionsFetchError)
   const anyErr = e as any;
@@ -611,8 +634,10 @@ export default function AdminUsers() {
                   <Input
                     className="h-11 rounded-xl pr-10"
                     value={editJoinedAtStr}
-                    onChange={(e) => setEditJoinedAtStr(e.target.value)}
+                    onChange={(e) => setEditJoinedAtStr(maskDateInput(e.target.value))}
                     placeholder="dd/mm/yyyy"
+                    inputMode="numeric"
+                    maxLength={10}
                   />
                   <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                     <CalendarDays className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
