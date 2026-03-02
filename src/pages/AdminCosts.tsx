@@ -96,7 +96,7 @@ export default function AdminCosts() {
     return result;
   }, [profiles, profileById]);
 
-  const activeWithCost = useMemo((): CostPerson[] => {
+  const activePeople = useMemo((): CostPerson[] => {
     return profiles
       .filter((p) => p.active)
       .map((p) => ({
@@ -107,17 +107,18 @@ export default function AdminCosts() {
         avatar_url: p.avatar_url,
         department_id: p.department_id,
         monthly_cost_brl: p.monthly_cost_brl,
-      }))
-      .filter((p) => n(p.monthly_cost_brl) > 0);
+      }));
   }, [profiles]);
 
-  const companyMonthly = useMemo(() => activeWithCost.reduce((acc, p) => acc + n(p.monthly_cost_brl), 0), [activeWithCost]);
+  const activeWithCost = useMemo(() => activePeople.filter((p) => n(p.monthly_cost_brl) > 0), [activePeople]);
+
+  const companyMonthly = useMemo(() => activeWithCost.reduce((acc, p) => acc + Math.max(0, n(p.monthly_cost_brl)), 0), [activeWithCost]);
 
   const peopleByDept = useMemo(() => {
     const m = new Map<string, CostPerson[]>();
     const memberIdByDept = new Map<string, Set<string>>();
 
-    for (const p of activeWithCost) {
+    for (const p of activePeople) {
       const deptId = p.department_id ?? "__none__";
       const arr = m.get(deptId) ?? [];
       arr.push(p);
@@ -133,7 +134,6 @@ export default function AdminCosts() {
       const head = headByDeptId.get(d.id);
       if (!head) continue;
       if (!head.active) continue;
-      if (n(head.monthly_cost_brl) <= 0) continue;
 
       const deptId = d.id;
       const already = memberIdByDept.get(deptId);
@@ -155,28 +155,30 @@ export default function AdminCosts() {
 
     for (const [k, arr] of m.entries()) {
       const head = arr.find((p) => p.isHead);
-      const rest = arr.filter((p) => !p.isHead).sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+      const rest = arr
+        .filter((p) => !p.isHead)
+        .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
       m.set(k, head ? [head, ...rest] : rest);
     }
 
     return m;
-  }, [activeWithCost, departments, headByDeptId]);
+  }, [activePeople, departments, headByDeptId]);
 
   const byDept = useMemo(() => {
     const m = new Map<string, { deptId: string; deptName: string; people: number; total: number }>();
     const memberIds = new Map<string, Set<string>>();
 
-    // Start with all departments so head-only departments can appear in the report.
+    // Start with all departments so empty-cost departments can still appear when they have people.
     for (const d of departments) {
       m.set(d.id, { deptId: d.id, deptName: d.name, people: 0, total: 0 });
     }
 
-    for (const p of activeWithCost) {
+    for (const p of activePeople) {
       const deptId = p.department_id ?? "__none__";
       const deptName = p.department_id ? deptById.get(p.department_id)?.name ?? "(departamento)" : "Sem departamento";
       const row = m.get(deptId) ?? { deptId, deptName, people: 0, total: 0 };
       row.people += 1;
-      row.total += n(p.monthly_cost_brl);
+      row.total += Math.max(0, n(p.monthly_cost_brl));
       m.set(deptId, row);
 
       const s = memberIds.get(deptId) ?? new Set<string>();
@@ -184,12 +186,11 @@ export default function AdminCosts() {
       memberIds.set(deptId, s);
     }
 
-    // Add inferred head cost per department (if not already counted).
+    // Add inferred head per department (if not already counted).
     for (const d of departments) {
       const head = headByDeptId.get(d.id);
       if (!head) continue;
       if (!head.active) continue;
-      if (n(head.monthly_cost_brl) <= 0) continue;
 
       const deptId = d.id;
       const already = memberIds.get(deptId);
@@ -197,14 +198,14 @@ export default function AdminCosts() {
 
       const row = m.get(deptId) ?? { deptId, deptName: d.name, people: 0, total: 0 };
       row.people += 1;
-      row.total += n(head.monthly_cost_brl);
+      row.total += Math.max(0, n(head.monthly_cost_brl));
       m.set(deptId, row);
     }
 
     return Array.from(m.values())
-      .filter((r) => r.total > 0)
-      .sort((a, b) => b.total - a.total);
-  }, [activeWithCost, departments, deptById, headByDeptId]);
+      .filter((r) => r.people > 0)
+      .sort((a, b) => (b.total !== a.total ? b.total - a.total : a.deptName.localeCompare(b.deptName)));
+  }, [activePeople, departments, deptById, headByDeptId]);
 
   const myDeptTotal = useMemo(() => {
     if (!user.departmentId) return 0;
@@ -226,18 +227,6 @@ export default function AdminCosts() {
 
   return (
     <div className="grid gap-6">
-      <div className="rounded-3xl border bg-white p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Custos</div>
-            <p className="mt-1 text-sm text-muted-foreground">Resumo de custo mensal (baseado em profiles.monthly_cost_brl). Inclui o próprio admin.</p>
-          </div>
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-            <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-          </div>
-        </div>
-      </div>
-
       <div className="grid gap-4 md:grid-cols-3">
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="flex items-start justify-between gap-4">
@@ -308,8 +297,8 @@ export default function AdminCosts() {
                         </div>
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">{d.people}</TableCell>
-                      <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{brl(d.total)}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{brlPerHourFromMonthly(d.total)}</TableCell>
+                      <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{d.total > 0 ? brl(d.total) : "—"}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{d.total > 0 ? brlPerHourFromMonthly(d.total) : "—"}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -317,7 +306,7 @@ export default function AdminCosts() {
                 {!byDept.length ? (
                   <TableRow>
                     <TableCell colSpan={4} className="py-10 text-center text-sm text-muted-foreground">
-                      Nenhum custo cadastrado ainda. Edite usuários e preencha "custo mensal".
+                      Nenhum colaborador ativo encontrado.
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -345,15 +334,15 @@ export default function AdminCosts() {
                 {selectedDept?.people ?? 0} pessoa(s)
               </Badge>
               <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                Total: {selectedDept ? brl(selectedDept.total) : "—"}
+                Total: {selectedDept ? (selectedDept.total > 0 ? brl(selectedDept.total) : "—") : "—"}
               </Badge>
               <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                {selectedDept ? brlPerHourFromMonthly(selectedDept.total) : "—"}
+                {selectedDept ? (selectedDept.total > 0 ? brlPerHourFromMonthly(selectedDept.total) : "—") : "—"}
               </Badge>
             </div>
 
             <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-              Mostrando apenas perfis ativos com <span className="font-semibold">custo mensal &gt; 0</span>.
+              Mostrando perfis ativos. Pessoas sem custo cadastrado aparecem como <span className="font-semibold">—</span>.
             </div>
           </div>
 
@@ -361,61 +350,64 @@ export default function AdminCosts() {
 
           <ScrollArea className="h-[calc(100vh-220px)] px-6 py-5">
             <div className="grid gap-3">
-              {selectedPeople.map((p) => (
-                <button
-                  key={p.id}
-                  className="group w-full rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/35"
-                  onClick={() => {
-                    setOpenDept(false);
-                    nav(`/admin/users/${p.id}`);
-                  }}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-                        <span className="text-xs font-bold">{initials(p.name)}</span>
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{p.name}</div>
-                          {p.isHead ? (
-                            <Badge className="h-5 rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">Head</Badge>
-                          ) : null}
+              {selectedPeople.map((p) => {
+                const cost = Math.max(0, n(p.monthly_cost_brl));
+                return (
+                  <button
+                    key={p.id}
+                    className="group w-full rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-left transition hover:bg-[color:var(--sinaxys-tint)]/35"
+                    onClick={() => {
+                      setOpenDept(false);
+                      nav(`/admin/users/${p.id}`);
+                    }}
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                          <span className="text-xs font-bold">{initials(p.name)}</span>
                         </div>
-                        <div className="mt-1 truncate text-xs text-muted-foreground">{p.job_title?.trim() ? p.job_title.trim() : "Cargo não informado"}</div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{p.name}</div>
+                            {p.isHead ? (
+                              <Badge className="h-5 rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">Head</Badge>
+                            ) : null}
+                          </div>
+                          <div className="mt-1 truncate text-xs text-muted-foreground">{p.job_title?.trim() ? p.job_title.trim() : "Cargo não informado"}</div>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{cost > 0 ? brl(cost) : "—"}</div>
+                        <div className="mt-1 text-xs text-muted-foreground">{cost > 0 ? brlPerHourFromMonthly(cost) : "—"}</div>
                       </div>
                     </div>
 
-                    <div className="shrink-0 text-right">
-                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{brl(n(p.monthly_cost_brl))}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">{brlPerHourFromMonthly(n(p.monthly_cost_brl))}</div>
+                    <div className="mt-3 grid gap-2 rounded-xl bg-white/60 p-3 ring-1 ring-[color:var(--sinaxys-border)]/60 sm:grid-cols-3">
+                      <div className="text-xs text-muted-foreground">
+                        <div className="font-semibold text-[color:var(--sinaxys-ink)]">Nome</div>
+                        <div className="mt-0.5 truncate">{p.name}</div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        <div className="font-semibold text-[color:var(--sinaxys-ink)]">Ordenado</div>
+                        <div className="mt-0.5 truncate">{cost > 0 ? brl(cost) : "—"}</div>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        <div className="font-semibold text-[color:var(--sinaxys-ink)]">Custo / hora</div>
+                        <div className="mt-0.5 truncate">{cost > 0 ? brlPerHourFromMonthly(cost) : "—"}</div>
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="mt-3 grid gap-2 rounded-xl bg-white/60 p-3 ring-1 ring-[color:var(--sinaxys-border)]/60 sm:grid-cols-3">
-                    <div className="text-xs text-muted-foreground">
-                      <div className="font-semibold text-[color:var(--sinaxys-ink)]">Nome</div>
-                      <div className="mt-0.5 truncate">{p.name}</div>
+                    <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="truncate">{p.email}</span>
+                      <span className="font-semibold text-[color:var(--sinaxys-primary)] opacity-0 transition group-hover:opacity-100">Abrir card</span>
                     </div>
-                    <div className="text-xs text-muted-foreground">
-                      <div className="font-semibold text-[color:var(--sinaxys-ink)]">Ordenado</div>
-                      <div className="mt-0.5 truncate">{brl(n(p.monthly_cost_brl))}</div>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      <div className="font-semibold text-[color:var(--sinaxys-ink)]">Custo / hora</div>
-                      <div className="mt-0.5 truncate">{brlPerHourFromMonthly(n(p.monthly_cost_brl))}</div>
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="truncate">{p.email}</span>
-                    <span className="font-semibold text-[color:var(--sinaxys-primary)] opacity-0 transition group-hover:opacity-100">Abrir card</span>
-                  </div>
-                </button>
-              ))}
+                  </button>
+                );
+              })}
 
               {!selectedPeople.length ? (
-                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhuma pessoa com custo neste departamento.</div>
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhuma pessoa ativa neste departamento.</div>
               ) : null}
             </div>
           </ScrollArea>
