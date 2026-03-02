@@ -21,7 +21,7 @@ export type PointsRuleRow = {
   label: string;
   points: number;
   description: string | null;
-  public: active: boolean;
+  active: boolean;
   created_at: string;
 };
 
@@ -66,4 +66,134 @@ export async function listPublicProfiles(companyId: string) {
 
   if (error) throw error;
   return (data ?? []) as PublicProfileRow[];
+}
+
+// Points rules
+export async function listPointsRules(companyId: string) {
+  const { data, error } = await supabase
+    .from("points_rules")
+    .select("*")
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as PointsRuleRow[];
+}
+
+export async function updatePointsRule(
+  ruleId: string,
+  patch: Partial<Pick<PointsRuleRow, "points" | "active">>
+) {
+  const { data, error } = await supabase
+    .from("points_rules")
+    .update(patch)
+    .eq("id", ruleId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as PointsRuleRow;
+}
+
+// Reward tiers
+export async function listRewardTiers(companyId: string) {
+  const { data, error } = await supabase
+    .from("reward_tiers")
+    .select("*")
+    .eq("company_id", companyId)
+    .order("min_points", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as RewardTierRow[];
+}
+
+export async function createRewardTier(
+  payload: Omit<RewardTierRow, "id" | "created_at">
+) {
+  const { data, error } = await supabase
+    .from("reward_tiers")
+    .insert({
+      company_id: payload.company_id,
+      name: payload.name,
+      min_points: payload.min_points,
+      prize: payload.prize,
+      description: payload.description,
+      active: payload.active ?? true,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as RewardTierRow;
+}
+
+export async function updateRewardTier(
+  tierId: string,
+  patch: Partial<Pick<RewardTierRow, "active">>
+) {
+  const { data, error } = await supabase
+    .from("reward_tiers")
+    .update(patch)
+    .eq("id", tierId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as RewardTierRow;
+}
+
+export async function deleteRewardTier(tierId: string) {
+  const { error } = await supabase
+    .from("reward_tiers")
+    .delete()
+    .eq("id", tierId);
+
+  if (error) throw error;
+}
+
+// Points events
+export async function getMyPointsEvents(
+  companyId: string,
+  userId: string,
+  limit: number = 50
+) {
+  const { data, error } = await supabase
+    .from("points_events")
+    .select("*")
+    .eq("company_id", companyId)
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+  return (data ?? []) as PointsEventRow[];
+}
+
+export async function addPointsBonus(params: {
+  companyId: string;
+  userId: string;
+  points: number;
+  note?: string | null;
+}) {
+  const { error } = await supabase.rpc("add_points_bonus", {
+    p_user_id: params.userId,
+    p_points: params.points,
+    p_note: params.note ?? null,
+  });
+
+  if (error) throw error;
+}
+
+// Leaderboard
+export async function fetchLeaderboard(
+  companyId: string,
+  limit: number = 50
+) {
+  const { data, error } = await supabase.rpc("points_leaderboard", {
+    p_company_id: companyId,
+    p_limit: limit,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as LeaderboardRow[];
 }
