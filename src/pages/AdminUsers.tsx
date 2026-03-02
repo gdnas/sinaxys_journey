@@ -45,9 +45,12 @@ function fmtDateTime(ts: string | null | undefined) {
   return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
+// Normalize various ISO-like strings and return dd/mm/yyyy
 function displayFromIso(iso?: string | null) {
   if (!iso) return "";
-  const parts = iso.split("-");
+  // Accept full ISO (2026-02-09T00:00:00+00:00) or simple date (2026-02-09)
+  const core = iso.length >= 10 ? iso.slice(0, 10) : iso;
+  const parts = core.split("-");
   if (parts.length !== 3) return "";
   const [y, m, d] = parts;
   return `${d.padStart(2, "0")}/${m.padStart(2, "0")}/${y}`;
