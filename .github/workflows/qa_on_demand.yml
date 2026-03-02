@@ -25,25 +25,58 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Debug workspace (list files)
+        run: |
+          echo "PWD: $(pwd)"
+          echo "Node: $(node -v)";
+          echo "NPM: $(npm -v)";
+          echo "Listing root files:"; ls -la
+          echo "Listing src files:"; ls -la src || true
+
+      - name: Locate package.json
+        id: find_pkg
+        run: |
+          # find the nearest package.json (limit depth to 4)
+          pkg=$(find . -maxdepth 4 -name package.json | head -n 1 || true)
+          if [ -z "$pkg" ]; then
+            echo "PACKAGE_DIR=." >> $GITHUB_ENV
+            echo "No package.json found in repository root or subfolders (depth 4). Using project root.";
+          else
+            dir=$(dirname "$pkg")
+            echo "PACKAGE_DIR=$dir" >> $GITHUB_ENV
+            echo "Found package.json in $dir";
+          fi
+          echo "--- files at PACKAGE_DIR ---"; ls -la "$PACKAGE_DIR" || true
+
       - name: Install dependencies
         run: |
-          echo "Running npm install (no lockfile required)"
-          npm install --silent
+          echo "Installing dependencies in $PACKAGE_DIR"
+          npm --prefix "$PACKAGE_DIR" install --silent || (echo "npm install failed with exit $?" && npm --version && node --version && ls -la "$PACKAGE_DIR" && cat "$PACKAGE_DIR/package.json" || true ; exit 1)
 
       - name: Run Lint
-        run: npm run lint
+        run: |
+          echo "Running lint in $PACKAGE_DIR"
+          npm --prefix "$PACKAGE_DIR" run lint
 
       - name: Run Type Check
-        run: npm run typecheck
+        run: |
+          echo "Running typecheck in $PACKAGE_DIR"
+          npm --prefix "$PACKAGE_DIR" run typecheck
 
       - name: Run Unit Tests
-        run: npm run test
+        run: |
+          echo "Running unit tests in $PACKAGE_DIR"
+          npm --prefix "$PACKAGE_DIR" run test
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: |
+          echo "Installing Playwright browsers"
+          npx playwright install --with-deps
 
       - name: Run E2E Tests
-        run: npm run e2e
+        run: |
+          echo "Running E2E tests in $PACKAGE_DIR"
+          npm --prefix "$PACKAGE_DIR" run e2e
 
       - name: Upload Playwright Report
         if: always()
