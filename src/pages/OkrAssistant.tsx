@@ -155,36 +155,24 @@ function tokenizePt(s: string) {
   );
 }
 
+// Coerência aqui é apenas informativa. O vínculo (cascata) é criado automaticamente ao salvar.
 function semanticCoherenceHint(parent: string, child: string) {
   const parentTrim = parent.trim();
   const childTrim = child.trim();
 
-  // Avoid showing a "warning" when the user is simply still typing.
-  if (parentTrim.length < 18 || childTrim.length < 18) {
+  if (!parentTrim || !childTrim) {
     return {
       kind: "note" as const,
-      text: "Preencha os dois campos com frases completas para avaliar coerência.",
+      text: "Vínculo automático será criado ao salvar.",
     };
   }
 
-  const a = tokenizePt(parentTrim);
-  const b = tokenizePt(childTrim);
-
-  if (childTrim.length < 30) return { kind: "note" as const, text: "Texto curto — pode ficar difícil avaliar coerência." };
-  if (!a.length || !b.length) return { kind: "note" as const, text: "Ainda não dá para avaliar coerência (poucas palavras-chave)." };
-
-  const setA = new Set(a);
-  const overlap = b.filter((w) => setA.has(w));
-  const ratio = overlap.length / Math.max(1, Math.min(a.length, b.length));
-
-  if (ratio < 0.12) {
-    return {
-      kind: "warn" as const,
-      text: "Pode estar desconexo: poucas palavras-chave se repetem entre as duas declarações. Considere ajustar para reforçar a linha estratégica.",
-    };
-  }
-
-  return { kind: "ok" as const, text: "Coerência aparente: há continuidade de termos/temas entre as declarações." };
+  // Se ambos estão preenchidos, assumimos coerência suficiente para avançar.
+  // A heurística de palavras-chave confundia usuários e não deve bloquear o fluxo.
+  return {
+    kind: "ok" as const,
+    text: "Vínculo automático: este objetivo será salvo como dependente do anterior.",
+  };
 }
 
 function StepHeader({
@@ -958,12 +946,12 @@ export default function OkrAssistant() {
                 <div
                   className={clsx(
                     "rounded-2xl border p-3 text-sm",
-                    coherence10to5.kind === "warn"
-                      ? "border-amber-200 bg-amber-50"
+                    coherence10to5.kind === "ok"
+                      ? "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]"
                       : "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]",
                   )}
                 >
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Coerência 10 → 5</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vínculo 10 → 5</div>
                   <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)]">{coherence10to5.text}</div>
                 </div>
               </div>
@@ -977,12 +965,12 @@ export default function OkrAssistant() {
                 <div
                   className={clsx(
                     "rounded-2xl border p-3 text-sm",
-                    coherence5to2.kind === "warn"
-                      ? "border-amber-200 bg-amber-50"
+                    coherence5to2.kind === "ok"
+                      ? "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]"
                       : "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]",
                   )}
                 >
-                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Coerência 5 → 2</div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Vínculo 5 → 2</div>
                   <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)]">{coherence5to2.text}</div>
                 </div>
               </div>
@@ -1002,18 +990,35 @@ export default function OkrAssistant() {
                     try {
                       setSoSaving(true);
 
-                      const upsertOne = async (existing: DbStrategyObjective | null, horizon: 2 | 5 | 10, title: string) => {
+                      const upsertOne = async (
+                        existing: DbStrategyObjective | null,
+                        horizon: 2 | 5 | 10,
+                        title: string,
+                        parentId: string | null,
+                      ) => {
+                        const trimmed = title.trim();
                         if (existing?.id) {
-                          await updateStrategyObjective(existing.id, { title });
+                          await updateStrategyObjective(existing.id, {
+                            title: trimmed,
+                            parent_strategy_objective_id: parentId,
+                          });
                           return existing.id;
                         }
-                        const created = await createStrategyObjective({ company_id: cid, horizon_years: horizon, title });
+                        const created = await createStrategyObjective({
+                          company_id: cid,
+                          horizon_years: horizon,
+                          title: trimmed,
+                          parent_strategy_objective_id: parentId,
+                          created_by_user_id: user.id,
+                          owner_user_id: user.id,
+                        });
                         return created.id;
                       };
 
-                      await upsertOne(so10, 10, so10Text.trim());
-                      await upsertOne(so5, 5, so5Text.trim());
-                      await upsertOne(so2, 2, so2Text.trim());
+                      // Cascata: 10 anos → 5 anos → 2 anos
+                      const id10 = await upsertOne(so10, 10, so10Text, null);
+                      const id5 = await upsertOne(so5, 5, so5Text, id10);
+                      await upsertOne(so2, 2, so2Text, id5);
 
                       await qc.invalidateQueries({ queryKey: ["okr-strategy-objectives", cid] });
                       setSoSaved(true);
