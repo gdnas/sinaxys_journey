@@ -170,7 +170,7 @@ export default function UserEventLedger() {
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="OKR">OKR</SelectItem>
                   <SelectItem value="TRACKS">Trilhas</SelectItem>
-                  <SelectItem value="POINTS">Pontos</SelectItem>
+                  <selectItem value="POINTS">Pontos</SelectItem>
                   <SelectItem value="PDI">PDI</SelectItem>
                 </SelectContent>
               </Select>

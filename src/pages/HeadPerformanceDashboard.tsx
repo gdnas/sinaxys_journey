@@ -1,335 +1,236 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Skeleton } from "@/components/ui/skeleton";
-import { supabase } from "@/integrations/supabase/client";
-import {
-  listPerformanceScores,
-  recalculateAllPerformances,
-  getPerformanceScore,
-  type PerformanceScoreRow,
-} from "@/lib/eventLedgerDb";
-import { listOkrCycles, type DbOkrCycle } from "@/lib/okrDb";
-import { listPublicProfiles, type PublicProfileRow } from "@/lib/pointsDb";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, TrendingUp, Target, BookOpen, Clock } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-
-type PerformanceWithProfile = PerformanceScoreRow & {
-  profile: PublicProfileRow | null;
-};
+import { useSearchParams } from "react-router-dom";
+import { listPerformanceScores } from "@/lib/performanceDb";
+import { ArrowLeft, TrendingUp, Award, Calendar, Users, Funnel } from "lucide-react";
 
 export default function HeadPerformanceDashboard() {
   const [searchParams] = useSearchParams();
   const cycleIdParam = searchParams.get("cycleId");
-  
-  const { toast } = useToast();
-  const [companyId, setCompanyId] = useState<string | null>(null);
+  const [cycleId, setCycleId] = useState<string>("");
   const [loading, setLoading] = useState(true);
-  const [recalculating, setRecalculating] = useState(false);
-  const [cycles, setCycles] = useState<DbOkrCycle[]>([]);
-  const [selectedCycleId, setSelectedCycleId] = useState<string | null>(cycleIdParam);
-  const [performances, setPerformances] = useState<PerformanceWithProfile[]>([]);
-  const [profiles, setProfiles] = useState<Map<string, PublicProfileRow>>(new Map());
+  const [scores, setScores] = useState<any[]>([]);
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all");
 
-  // Buscar company_id
   useEffect(() => {
-    async function fetchCompanyId() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("company_id")
-        .eq("id", user.id)
-        .single();
-
-      if (profile?.company_id) {
-        setCompanyId(profile.company_id);
-      }
+    if (params.cycleId) {
+      setCycleId(params.cycleId);
     }
-    fetchCompanyId();
-  }, []);
+  }, [params.cycleId]);
 
-  // Buscar ciclos
-  useEffect(() => {
-    if (!companyId) return;
-    
-    async function fetchCycles() {
-      try {
-        const data = await listOkrCycles(companyId);
-        setCycles(data);
-        
-        // Selecionar ciclo ativo se nenhum estiver selecionado
-        const activeCycle = data.find(c => c.status === "ACTIVE");
-        if (!selectedCycleId && activeCycle) {
-          setSelectedCycleId(activeCycle.id);
-        }
-      } catch (error) {
-        console.error("Erro ao buscar ciclos:", error);
-      }
-    }
-    fetchCycles();
-  }, [companyId, selectedCycleId]);
-
-  // Buscar profiles
-  useEffect(() => {
-    if (!companyId) return;
-
-    async function fetchProfiles() {
-      try {
-        const data = await listPublicProfiles(companyId);
-        const profileMap = new Map(data.map(p => [p.id, p]));
-        setProfiles(profileMap);
-      } catch (error) {
-        console.error("Erro ao buscar profiles:", error);
-      }
-    }
-    fetchProfiles();
-  }, [companyId]);
-
-  // Buscar performances
-  useEffect(() => {
-    if (!companyId || !selectedCycleId) return;
-
-    async function fetchPerformances() {
-      setLoading(true);
-      try {
-        const data = await listPerformanceScores(companyId, selectedCycleId);
-        
-        const withProfiles = data.map(p => ({
-          ...p,
-          profile: profiles.get(p.user_id) || null,
-        }));
-        
-        setPerformances(withProfiles);
-      } catch (error) {
-        console.error("Erro ao buscar performances:", error);
-        toast({
-          title: "Erro",
-          description: "Não foi possível carregar os dados de performance.",
-          variant: "destructive",
-        });
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchPerformances();
-  }, [companyId, selectedCycleId, profiles]);
-
-  const handleRecalculate = async () => {
-    if (!companyId) return;
-    
-    setRecalculating(true);
+  const fetchScores = async () => {
+    setLoading(true);
     try {
-      await recalculateAllPerformances(companyId, selectedCycleId ?? undefined);
-      
-      // Recarregar performances
-      const data = await listPerformanceScores(companyId, selectedCycleId ?? undefined);
-      const withProfiles = data.map(p => ({
-        ...p,
-        profile: profiles.get(p.user_id) || null,
-      }));
-      setPerformances(withProfiles);
-      
-      toast({
-        title: "Sucesso",
-        description: "Scores recalculados com sucesso.",
-      });
+      const data = await listPerformanceScores("", cycleId);
+      setScores(data);
     } catch (error) {
-      console.error("Erro ao recalcular:", error);
-      toast({
-        title: "Erro",
-        description: "Não foi possível recalcular os scores.",
-        variant: "destructive",
-      });
+      console.error("Erro ao buscar scores:", error);
     } finally {
-      setRecalculating(false);
+      setLoading(false);
     }
   };
 
-  const selectedCycle = cycles.find(c => c.id === selectedCycleId);
+  useEffect(() => {
+    if (cycleId) {
+      fetchScores();
+    }
+  }, [cycleId]);
 
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-8 w-64" />
-          <Skeleton className="h-10 w-32" />
-        </div>
-        <div className="grid gap-4">
-          {[1, 2, 3, 4, 5].map(i => (
-            <Skeleton key={i} className="h-32" />
-          ))}
-        </div>
-      </div>
-    );
-  }
+  const filteredScores = departmentFilter === "all"
+    ? scores
+    : scores.filter(s => s.department_id === departmentFilter);
+
+  const departments = Array.from(new Set(scores.map(s => s.department_id).filter(Boolean)));
+
+  const getScoreColor = (score: number) => {
+    if (score >= 90) return "text-green-600";
+    if (score >= 70) return "text-yellow-600";
+    if (score >= 50) return "text-orange-600";
+    return "text-red-600";
+  };
+
+  const getScoreBadge = (score: number) => {
+    if (score >= 90) return { label: "Excelente", variant: "default" as const };
+    if (score >= 70) return { label: "Bom", variant: "secondary" as const };
+    if (score >= 50) return { label: "Regular", variant: "outline" as const };
+    return { label: "Crítico", variant: "destructive" as const };
+  };
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard de Performance</h1>
-          <p className="text-muted-foreground mt-1">
-            Acompanhe a performance dos colaboradores
-          </p>
-        </div>
-        <Button
-          onClick={handleRecalculate}
-          disabled={recalculating}
-          variant="outline"
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${recalculating ? "animate-spin" : ""}`} />
-          Recalcular
-        </Button>
+      {/* Header */}
+      <div className="space-y-2">
+        <h1 className="text-3xl font-bold">Scores de Performance</h1>
+        <p className="text-muted-foreground">
+          Visualize o desempenho dos colaboradores neste ciclo
+        </p>
       </div>
 
       {/* Filtros */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Filtros</CardTitle>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Funnel className="h-5 w-5" />
+            Filtros
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <label className="text-sm font-medium mb-2 block">Ciclo OKR</label>
-            <select
-              value={selectedCycleId ?? ""}
-              onChange={(e) => setSelectedCycleId(e.target.value || null)}
-              className="w-full max-w-xs px-3 py-2 border rounded-md"
-            >
-              <option value="">Todos os períodos</option>
-              {cycles.map(cycle => (
-                <option key={cycle.id} value={cycle.id}>
-                  {cycle.name || `${cycle.type === "ANNUAL" ? "Anual" : "Trimestral"} ${cycle.year}${cycle.quarter ? ` - Q${cycle.quarter}` : ""}`}
-                  {cycle.status === "ACTIVE" && " (Ativo)"}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Ciclo */}
+            <div>
+              <label className="text-sm font-medium mb-2 block">Ciclo</label>
+              <Select
+                value={cycleId}
+                onValueChange={setCycleId}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* TODO: Fetch cycles from API */}
+                  <SelectItem value="current">Atual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Departamento */}
+            <div>
+              <label className="text-recommendation-sm font-medium mb-2 block">Departamento</label>
+              <Select
+                value={departmentFilter}
+                onValueChange={setDepartmentFilter}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  {departments.map(dept => (
+                    <SelectItem key={dept} value={dept}>
+                      {dept}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Lista de performances */}
-      <div className="space-y-4">
-        {performances.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              Nenhum dado de performance encontrado para este período.
-            </CardContent>
-          </Card>
-        ) : (
-          performances.map((performance) => (
-            <Card key={performance.id}>
-              <CardContent className="py-6">
-                <div className="flex items-start gap-4">
-                  {/* Avatar */}
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-white font-bold text-lg">
-                    {performance.profile?.name?.charAt(0).toUpperCase() || "?"}
-                  </div>
-
-                  <div className="flex-1 space-y-3">
-                    {/* Header */}
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold text-lg">
-                          {performance.profile?.name || "Usuário desconhecido"}
-                        </h3>
-                        <p className="text-sm text-muted-foreground">
-                          {performance.profile?.job_title || "Sem cargo definido"}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-3xl font-bold text-purple-600">
-                          {performance.score.toFixed(1)}
-                        </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {selectedCycle?.name || "Total"}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Breakdown */}
-                    <div className="grid grid-cols-4 gap-4">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Target className="h-4 w-4" />
-                          Execução
-                        </div>
-                        <div className="text-lg font-semibold">
-                          {performance.execution_score.toFixed(0)}
-                        </div>
-                        <Progress value={Math.min(100, performance.execution_score * 2)} className="h-2" />
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <TrendingUp className="h-4 w-4" />
-                          Resultado
-                        </div>
-                        <div className="text-lg font-semibold">
-                          {performance.result_score.toFixed(0)}
-                        </div>
-                        <Progress value={Math.min(100, performance.result_score * 2)} className="h-2" />
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <BookOpen className="h-4 w-4" />
-                          Aprendizado
-                        </div>
-                        <div className="text-lg font-semibold">
-                          {performance.learning_score.toFixed(0)}
-                        </div>
-                        <Progress value={Math.min(100, performance.learning_score * 2)} className="h-2" />
-                      </div>
-
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Clock className="h-4 w-4" />
-                          Consistência
-                        </div>
-                        <div className="text-lg font-semibold">
-                          {performance.consistency_score.toFixed(0)}
-                        </div>
-                        <Progress value={Math.min(100, performance.consistency_score * 2)} className="h-2" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+      {/* Lista de scores */}
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3, ].map(i => (
+            <Card key={i}>
+              <CardContent className="py-12">
+                <div className="h-6 bg-muted rounded animate-pulse" />
               </CardContent>
             </Card>
-          ))
-        )}
-      </div>
+          ))}
+        </div>
+      ) : filteredScores.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            Nenhum score encontrado para os filtros selecionados.
+          </CardContent>
+        </Card>
+      ) : (
+        <Tabs defaultValue="ranking">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="ranking">
+              <TrendingUp className="mr-2 h-4 w-4" />
+              Ranking
+            </TabsTrigger>
+            <TabsTrigger value="details">
+              <Users className="mr-2 h-4 w-4" />
+              Detalhes
+            </TabsTrigger>
+          </TabsList>
 
-      {/* Legenda */}
-      <Card>
-        <CardContent className="py-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-purple-500" />
-              <span><strong>Execução:</strong> Tarefas e entregáveis OKR concluídos</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-blue-500" />
-              <span><strong>Resultado:</strong> Key Results atingidos e progresso</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-green-500" />
-              <span><strong>Aprendizado:</strong> Módulos e quizzes concluídos</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-orange-500" />
-              <span><strong>Consistência:</strong> Check-ins e 1:1 realizados</span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          <TabsContent value="ranking" className="space-y-4">
+            {filteredScores.map((score, index) => (
+              <Card key={score.id}>
+                <CardContent className="py-4">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                      {index + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold truncate">
+                          {score.user_name}
+                        </span>
+                        {score.breakdown && (
+                          <Badge variant="outline" className="text-xs">
+                            {Object.keys(score.breakdown).length} dimensões
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {score.department_id || "Sem departamento"}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className={`text-2xl font-bold ${getScoreColor(score.score)}`}>
+                        {score.score.toFixed(1)}
+                      </div>
+                      <Badge {...getScoreBadge(score.score)}>
+                        {getScoreBadge(score.score).label}
+                      </Badge>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+
+          <TabsContent value="details" className="space-y-4">
+            {filteredScores.map((score) => (
+              <Card key={score.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">{score.user_name}</CardTitle>
+                    <Badge {...getScoreBadge(score.score)}>
+                      {score.score.toFixed(1)} - {getScoreBadge(score.score).label}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {score.breakdown ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {Object.entries(score.breakdown).map(([key, value]) => (
+                        <div key={key} className="rounded-lg bg-muted/50 p-3">
+                          <div className="text-sm font-medium mb-1">
+                            {key.replace(/_/g, " ")}
+                          </div>
+                          <div className="text-xl font-bold">
+                            {typeof value === "number" ? value.toFixed(1) : String(value)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <CardDescription>Sem dados de breakdown disponíveis.</CardDescription>
+                  )}
+                </CardContent>
+              </Card>
+            ))}
+          </TabsContent>
+        </Tabs>
+      )}
+
+      {/* Voltar */}
+      <Button asChild variant="outline" className="w-full md:w-auto">
+        <Link to="/head">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Voltar para Head Dashboard
+        </Link>
+      </Button>
     </div>
   );
 }
