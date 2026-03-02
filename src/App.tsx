@@ -606,10 +606,18 @@ const App = () => (
 
                   {/* PDI */}
                   <Route
-                    path="/pdi"
+                    path="/pdi-performance"
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <PdiPerformance />
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/pdi"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <Navigate to="/pdi-performance" replace />
                       </RequireAuth>
                     }
                   />
