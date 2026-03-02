@@ -140,7 +140,7 @@ function LeaderboardList({ leaderboard, profiles, myUserId }: { leaderboard: Lea
       <div className="grid gap-3">
         {leaderboard.map((r, idx) => {
           const p = byId.get(r.user_id);
-          const label = p?.name?.trim() || p?.email || "Usuário";
+          const label = p?.name?.trim() || "Usuário";
           const highlight = r.user_id === myUserId;
           return (
             <div
@@ -162,7 +162,6 @@ function LeaderboardList({ leaderboard, profiles, myUserId }: { leaderboard: Lea
                 </Avatar>
                 <div className="min-w-0">
                   <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{label}</div>
-                  {p?.department_name ? <div className="truncate text-xs text-muted-foreground">{p.department_name}</div> : null}
                 </div>
               </div>
               <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{formatPts(r.total_points)}</Badge>

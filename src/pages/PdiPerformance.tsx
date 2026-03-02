@@ -1,6 +1,8 @@
 import { Link, useSearchParams } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { format, startOfWeek } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import {
   Activity,
   ArrowRight,
@@ -9,9 +11,11 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
   Handshake,
   LineChart,
   MessageSquare,
+  Pencil,
   Plus,
   Search,
   Settings2,
@@ -28,24 +32,36 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { isCompanyModuleEnabled } from "@/lib/modulesDb";
+import { getCertificatesForUser } from "@/lib/journeyDb";
 import {
-  createPdi,
-  fetchPdiByUser,
-  listCheckins,
-  listFeedback,
-  listOneOnOnes,
-  listPublicProfilesForCompany,
-  upsertCheckin,
-  upsertFeedback,
-  upsertOneOnOne,
+  createCareerEvent,
+  createCheckin,
+  createFeedback,
+  createOneOnOne,
+  deletePdiSkill,
+  ensurePdiPlan,
+  listCareerEvents,
+  listCheckinsForUser,
+  listFeedbackForUser,
+  listOneOnOnesForEmployees,
+  listOneOnOnesForUser,
+  listPdiSkills,
+  listRecentCheckinsForUsers,
+  updatePdiPlan,
+  upsertPdiSkill,
   type DbCheckin,
-  type DbFeedback,
   type DbOneOnOne,
+  type DbPdiPlan,
+  type DbPdiSkill,
+  type FeedbackKind,
 } from "@/lib/pdiPerformanceDb";
-import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 const MODULE_KEY = "PDI_PERFORMANCE" as const;
