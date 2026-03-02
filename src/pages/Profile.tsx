@@ -15,6 +15,7 @@ import { ScrollableTabsList } from "@/components/ScrollableTabsList";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { supabase } from "@/integrations/supabase/client";
 import { getCompany } from "@/lib/companiesDb";
 import { brl } from "@/lib/costs";
 import { listDepartments } from "@/lib/departmentsDb";
@@ -874,6 +875,22 @@ export default function Profile() {
                     if (!isUrl(finalUrl)) throw new Error("URL inválida.");
                   }
 
+                  // DEBUG: log auth session and payload to help diagnose RLS failures
+                  try {
+                    const session = await supabase.auth.getUser();
+                    console.log("[debug] supabase.auth.getUser ->", session);
+                  } catch (e) {
+                    console.warn("[debug] supabase.auth.getUser failed", e);
+                  }
+                  console.log("[debug] createUserDocument payload", {
+                    companyId: user.companyId,
+                    userId: user.id,
+                    category: docCategory.trim(),
+                    title: docTitle.trim(),
+                    url: finalUrl,
+                    kind,
+                  });
+
                   await createUserDocument({
                     companyId: user.companyId!,
                     userId: user.id,
@@ -888,6 +905,7 @@ export default function Profile() {
                   setDocFile(null);
                   setDocUrl("");
                 } catch (e) {
+                  console.error("[debug] createUserDocument error:", e);
                   toast({
                     title: "Não foi possível adicionar",
                     description: e instanceof Error ? e.message : "Erro inesperado.",
