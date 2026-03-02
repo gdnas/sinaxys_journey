@@ -323,10 +323,14 @@ export default function TrackDetail() {
                           </span>
                         </div>
                         {m.description ? <div className="mt-1 truncate text-xs text-muted-foreground">{m.description}</div> : null}
+                        <div className="text-right">
+                          <div className="text-xs text-muted-foreground">Recompensa</div>
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">+{m.xp_reward} Pontos</div>
+                        </div>
                       </div>
 
                       <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                        +{m.xp_reward} XP
+                        +{m.xp_reward} Pontos
                       </Badge>
                     </div>
                   </AccordionTrigger>

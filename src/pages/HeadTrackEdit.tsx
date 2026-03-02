@@ -418,7 +418,7 @@ export default function HeadTrackEdit() {
                         <span className="ml-2">{typeLabel(m.type)}</span>
                       </Badge>
                       <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{m.title}</div>
-                      <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">+{m.xpReward} XP</Badge>
+                      <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">+{m.xpReward} Pontos</Badge>
                     </div>
                     {m.description ? <div className="mt-2 text-sm text-muted-foreground">{m.description}</div> : null}
                   </div>
@@ -540,7 +540,7 @@ export default function HeadTrackEdit() {
             </div>
 
             <div className="grid gap-2">
-              <Label>XP</Label>
+              <Label>Pontos</Label>
               <Input className="h-11 rounded-xl" value={mXp} onChange={(e) => setMXp(e.target.value.replace(/[^0-9]/g, ""))} inputMode="numeric" />
             </div>
 

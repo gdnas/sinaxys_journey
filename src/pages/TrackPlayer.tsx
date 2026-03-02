@@ -246,7 +246,7 @@ export default function TrackPlayer() {
             </div>
             <div className="text-right">
               <div className="text-xs text-muted-foreground">Recompensa</div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">+{module.xpReward} XP</div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">+{module.xpReward} Pontos</div>
             </div>
           </div>
 
@@ -453,9 +453,9 @@ export default function TrackPlayer() {
         />
 
         <Card className="rounded-2xl border-[color:var(--sinaxys-border)] bg-white p-4">
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">XP acumulado</div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Pontos acumulados</div>
           <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{stats.xp}</div>
-          <div className="mt-1 text-xs text-muted-foreground">XP é somatório de módulos concluídos.</div>
+          <div className="mt-1 text-xs text-muted-foreground">Pontos é somatório de módulos concluídos.</div>
         </Card>
       </div>
     </div>

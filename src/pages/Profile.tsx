@@ -25,6 +25,7 @@ import {
   deleteUserDocument,
   listContractAttachments,
   listUserDocuments,
+  uploadUserDocumentFile,
 } from "@/lib/documentsDb";
 import { getProfile, updateProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
@@ -57,6 +58,7 @@ export default function Profile() {
   const { user, refresh } = useAuth();
 
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const docFileRef = useRef<HTMLInputElement | null>(null);
 
   if (!user) return null;
 
@@ -203,6 +205,9 @@ export default function Profile() {
   const [docTitle, setDocTitle] = useState("");
   const [docCategory, setDocCategory] = useState("EMPRESA");
   const [docUrl, setDocUrl] = useState("");
+  const [docFile, setDocFile] = useState<File | null>(null);
+  const [docIsFile, setDocIsFile] = useState(false);
+  const [docUploading, setDocUploading] = useState(false);
 
   return (
     <div className="grid gap-6">
@@ -607,6 +612,8 @@ export default function Profile() {
                     setDocTitle("");
                     setDocUrl("");
                     setDocCategory("EMPRESA");
+                    setDocFile(null);
+                    setDocIsFile(false);
                     setAddDocOpen(true);
                   }}
                   disabled={!user.companyId}
@@ -773,10 +780,53 @@ export default function Profile() {
               <Label>Título</Label>
               <Input className="h-11 rounded-xl" value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="Ex.: RG" />
             </div>
+
             <div className="grid gap-2">
-              <Label>URL</Label>
-              <Input className="h-11 rounded-xl" value={docUrl} onChange={(e) => setDocUrl(e.target.value)} placeholder="https://..." inputMode="url" />
+              <Label>Tipo</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className={`h-10 rounded-xl px-4 ${docIsFile ? "bg-[color:var(--sinaxys-primary)] text-white" : "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]"}`}
+                  onClick={() => setDocIsFile(true)}
+                >
+                  Arquivo
+                </button>
+                <button
+                  type="button"
+                  className={`h-10 rounded-xl px-4 ${!docIsFile ? "bg-[color:var(--sinaxys-primary)] text-white" : "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]"}`}
+                  onClick={() => setDocIsFile(false)}
+                >
+                  Link
+                </button>
+              </div>
             </div>
+
+            {docIsFile ? (
+              <div className="grid gap-2">
+                <Label>Arquivo (imagem ou PDF)</Label>
+                <input
+                  ref={docFileRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] ?? null;
+                    setDocFile(f);
+                  }}
+                />
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" className="h-11 rounded-xl" onClick={() => docFileRef.current?.click()}>
+                    Escolher arquivo
+                  </Button>
+                  <div className="text-sm text-muted-foreground">{docFile ? docFile.name : "Nenhum arquivo selecionado"}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label>URL</Label>
+                <Input className="h-11 rounded-xl" value={docUrl} onChange={(e) => setDocUrl(e.target.value)} placeholder="https://..." inputMode="url" />
+              </div>
+            )}
           </div>
 
           <DialogFooter>
@@ -785,29 +835,50 @@ export default function Profile() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!user.companyId || docTitle.trim().length < 2 || docCategory.trim().length < 2 || !isUrl(docUrl)}
+              disabled={
+                !user.companyId ||
+                docTitle.trim().length < 2 ||
+                (docIsFile ? !docFile || docUploading : !isUrl(docUrl))
+              }
               onClick={async () => {
                 try {
+                  setDocUploading(true);
+                  let finalUrl = docUrl.trim();
+                  let kind: any = "LINK";
+
+                  if (docIsFile) {
+                    if (!docFile) throw new Error("Selecione um arquivo para subir.");
+                    finalUrl = await uploadUserDocumentFile({ companyId: user.companyId!, userId: user.id, file: docFile });
+                    kind = "FILE";
+                  } else {
+                    if (!isUrl(finalUrl)) throw new Error("URL inválida.");
+                  }
+
                   await createUserDocument({
                     companyId: user.companyId!,
                     userId: user.id,
                     category: docCategory.trim(),
-                    title: docTitle,
-                    url: docUrl,
+                    title: docTitle.trim(),
+                    url: finalUrl,
+                    kind,
                   });
                   await qc.invalidateQueries({ queryKey: ["user-documents", user.companyId, user.id] });
                   toast({ title: "Documento adicionado" });
                   setAddDocOpen(false);
+                  setDocFile(null);
+                  setDocUrl("");
                 } catch (e) {
                   toast({
                     title: "Não foi possível adicionar",
                     description: e instanceof Error ? e.message : "Erro inesperado.",
                     variant: "destructive",
                   });
+                } finally {
+                  setDocUploading(false);
                 }
               }}
             >
-              Adicionar
+              {docUploading ? "Enviando…" : "Adicionar"}
             </Button>
           </DialogFooter>
         </DialogContent>

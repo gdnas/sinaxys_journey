@@ -70,7 +70,7 @@ export function ModuleChecklist({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2">
                   <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">{m.title}</div>
-                  <div className="text-xs text-muted-foreground">+{m.xpReward} XP</div>
+                  <div className="text-xs text-muted-foreground">+{m.xpReward} Pontos</div>
                 </div>
                 <div className="mt-0.5 text-xs text-muted-foreground">
                   {completed ? "Concluído" : available ? "Disponível" : "Bloqueado"}

@@ -98,3 +98,93 @@ export async function deleteUserDocument(id: string) {
   const { error } = await supabase.from("user_documents").delete().eq("id", id);
   if (error) throw error;
 }
+
+// Upload a file to the 'user-documents' storage bucket.
+// For images we perform a client-side resize + JPEG compression to reduce size.
+// Returns a public URL to the uploaded file.
+export async function uploadUserDocumentFile(params: {
+  companyId: string;
+  userId: string;
+  file: File;
+}): Promise<string> {
+  const { companyId, userId, file } = params;
+
+  // Helper: compress images via canvas
+  async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<Blob> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          const canvas = document.createElement("canvas");
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            const ratio = width / height;
+            if (ratio > 1) {
+              width = maxDim;
+              height = Math.round(maxDim / ratio);
+            } else {
+              height = maxDim;
+              width = Math.round(maxDim * ratio);
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas not supported");
+          ctx.drawImage(img, 0, 0, width, height);
+          canvas.toBlob(
+            (b) => {
+              if (!b) return reject(new Error("Compression failed"));
+              resolve(b);
+            },
+            "image/jpeg",
+            quality
+          );
+        } catch (e) {
+          reject(e);
+        }
+      };
+      img.onerror = (e) => reject(new Error("Failed to load image for compression"));
+      img.src = URL.createObjectURL(file);
+    });
+  }
+
+  const isImage = file.type.startsWith("image/");
+  let uploadBlob: Blob | File = file;
+  let contentType = file.type || "application/octet-stream";
+
+  if (isImage) {
+    try {
+      const compressed = await compressImage(file);
+      uploadBlob = compressed;
+      contentType = "image/jpeg";
+    } catch (e) {
+      // If compression fails, fall back to original file
+      uploadBlob = file;
+      contentType = file.type || "application/octet-stream";
+    }
+  }
+
+  const ext = isImage ? "jpg" : file.name.split(".").pop() ?? "bin";
+  const filename = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}.${ext}`;
+  const path = `${companyId}/${userId}/${filename}`;
+
+  // Upload to storage bucket 'user-documents'
+  const storage = supabase.storage.from("user-documents");
+  const { error: uploadError } = await storage.upload(path, uploadBlob as Blob, {
+    cacheControl: "3600",
+    upsert: false,
+    contentType,
+  } as any);
+
+  if (uploadError) throw uploadError;
+
+  // Get public URL
+  const {
+    data: { publicUrl },
+    error: publicUrlError,
+  } = storage.getPublicUrl(path) as any;
+
+  if (publicUrlError) throw publicUrlError;
+  return publicUrl as string;
+}
