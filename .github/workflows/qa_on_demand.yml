@@ -20,16 +20,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Debug workspace (list files)
         run: |
           echo "PWD: $(pwd)"
-          echo "Node: $(node -v)";
-          echo "NPM: $(npm -v)";
+          echo "Node (preinstalled): $(node -v || echo 'node not found')";
+          echo "NPM (preinstalled): $(npm -v || echo 'npm not found')";
           echo "Listing root files:"; ls -la
           echo "Listing src files:"; ls -la src || true
 
