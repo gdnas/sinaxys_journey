@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, FileText, KeyRound, Plus, Save, Sparkles, Trash2, UserRound } from "lucide-react";
+import { ExternalLink, FileText, KeyRound, Plus, Save, Trash2, UserRound } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -29,7 +29,6 @@ import {
 import { getProfile, updateProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
 import { FinanceiroPanel } from "@/components/FinanceiroPanel";
-import { useOnboardingTour } from "@/components/OnboardingTour";
 import VacationRequests from "@/pages/VacationRequests";
 import VacationApprovals from "@/pages/VacationApprovals";
 
@@ -56,7 +55,6 @@ export default function Profile() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user, refresh } = useAuth();
-  const { start: startTour } = useOnboardingTour();
 
   const fileRef = useRef<HTMLInputElement | null>(null);
 
@@ -272,18 +270,6 @@ export default function Profile() {
             <Button variant="outline" className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto" onClick={() => fileRef.current?.click()}>
               Enviar foto
             </Button>
-            {!isMaster ? (
-              <Button
-                variant="outline"
-                className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto"
-                data-tour="profile-redo-onboarding"
-                onClick={() => startTour()}
-                title="Refazer o tour guiado"
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                Refazer onboarding
-              </Button>
-            ) : null}
             <Button asChild variant="outline" className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto">
               <Link to="/password">
                 <KeyRound className="mr-2 h-4 w-4" />

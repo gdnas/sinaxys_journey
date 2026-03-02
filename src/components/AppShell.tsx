@@ -41,7 +41,6 @@ import { getCompanyFundamentals } from "@/lib/okrDb";
 import { describedItemsToLines, parseDescribedItems, textPreview } from "@/lib/fundamentalsFormat";
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
-import { OnboardingTourProvider } from "@/components/OnboardingTour";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 type Role = "MASTERADMIN" | "ADMIN" | "HEAD" | "COLABORADOR";
@@ -570,9 +569,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const jobTitleLabel = user.jobTitle?.trim() || "Sem cargo";
 
   return (
-    <OnboardingTourProvider>
-      <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
-        <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur dark:bg-[hsl(var(--background))]/85">
+    <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
+      <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur dark:bg-[hsl(var(--background))]/85">
           <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
             <div className="flex items-center gap-3">
               <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -659,12 +657,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 items-start gap-6">
-            <main className="min-w-0 max-w-full">{children}</main>
-          </div>
+      <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 items-start gap-6">
+          <main className="min-w-0 max-w-full">{children}</main>
         </div>
       </div>
-    </OnboardingTourProvider>
+    </div>
   );
 }
