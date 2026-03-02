@@ -11,13 +11,20 @@ const corsHeaders = {
 const recentRuns = new Map<string, number>();
 const RATE_LIMIT_MS = 60000; // 1 minute
 
+function log(msg: string, data?: any) {
+  console.log(`[qa-run] ${msg}`, data ?? "");
+}
+
 serve(async (req) => {
+  log("Request received", { method: req.method, url: req.url });
+
   // CORS preflight
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
+    log("Method not allowed", { method: req.method });
     return new Response("Method not allowed", { status: 405, headers: corsHeaders });
   }
 
@@ -25,16 +32,54 @@ serve(async (req) => {
     // Auth header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Unauthorized: No Authorization header" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      log("Missing auth header");
+      return new Response(
+        JSON.stringify({ 
+          error: "Unauthorized: No Authorization header",
+          debug: { hasAuthHeader: false }
+        }), 
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
-    const token = authHeader.replace("Bearer ", "");
+
+    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i);
+    if (!tokenMatch) {
+      log("Invalid auth header format", { header: authHeader });
+      return new Response(
+        JSON.stringify({ 
+          error: "Unauthorized: Invalid Authorization header format",
+          debug: { authHeader }
+        }), 
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    const token = tokenMatch[1];
+
+    // Check environment variables
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY");
+    const githubToken = Deno.env.get("GITHUB_TOKEN");
+    const repoEnv = Deno.env.get("GITHUB_REPOSITORY");
+
+    log("Environment check", { 
+      hasSupabaseUrl: !!supabaseUrl,
+      hasSupabaseAnon: !!supabaseAnon,
+      hasGithubToken: !!githubToken,
+      hasRepoEnv: !!repoEnv,
+      repo: repoEnv || "your-repo-owner/your-repo (default)"
+    });
+
+    if (!supabaseUrl || !supabaseAnon) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Server misconfiguration: SUPABASE_URL or SUPABASE_ANON_KEY not set",
+          debug: { hasSupabaseUrl: !!supabaseUrl, hasSupabaseAnon: !!supabaseAnon }
+        }), 
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Verify user via Supabase auth endpoint
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://gohcnlyonuoeszaqjsxw.supabase.co";
-    const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY") || "";
     const userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -42,21 +87,49 @@ serve(async (req) => {
       },
     });
 
+    log("Supabase user check", { 
+      url: `${supabaseUrl}/auth/v1/user`,
+      status: userResp.status,
+      ok: userResp.ok
+    });
+
     if (!userResp.ok) {
-      const t = await userResp.text().catch(() => "");
-      return new Response(JSON.stringify({ error: "Unauthorized: invalid token", details: t }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const errorText = await userResp.text().catch(() => "Unknown error");
+      log("Supabase auth failed", { status: userResp.status, error: errorText });
+      return new Response(
+        JSON.stringify({ 
+          error: "Unauthorized: invalid token",
+          details: errorText.substring(0, 500),
+          debug: { supabaseStatus: userResp.status }
+        }), 
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const userData = await userResp.json();
+    let userData;
+    try {
+      userData = await userResp.json();
+    } catch (parseError) {
+      log("Failed to parse user response", { error: String(parseError) });
+      return new Response(
+        JSON.stringify({ 
+          error: "Unauthorized: invalid user data (parse error)",
+          debug: { parseError: String(parseError) }
+        }), 
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const userId = userData?.id;
     if (!userId) {
-      return new Response(JSON.stringify({ error: "Unauthorized: invalid user data" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      log("Missing userId in user data", { userData });
+      return new Response(
+        JSON.stringify({ 
+          error: "Unauthorized: invalid user data (no id)",
+          debug: { userData }
+        }), 
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Ensure MASTERADMIN role
@@ -67,59 +140,99 @@ serve(async (req) => {
       },
     });
 
+    log("Profile check", { 
+      url: `${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=role`,
+      status: profilesResp.status,
+      ok: profilesResp.ok
+    });
+
     if (!profilesResp.ok) {
-      const t = await profilesResp.text().catch(() => "");
-      return new Response(JSON.stringify({ error: "Error checking user role", details: t }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const errorText = await profilesResp.text().catch(() => "Unknown error");
+      log("Profile fetch failed", { status: profilesResp.status, error: errorText });
+      return new Response(
+        JSON.stringify({ 
+          error: "Error checking user role",
+          details: errorText.substring(0, 500),
+          debug: { profilesStatus: profilesResp.status }
+        }), 
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const profiles = await profilesResp.json();
+    let profiles;
+    try {
+      profiles = await profilesResp.json();
+    } catch (parseError) {
+      log("Failed to parse profiles response", { error: String(parseError) });
+      return new Response(
+        JSON.stringify({ 
+          error: "Error parsing profiles data (parse error)",
+          debug: { parseError: String(parseError) }
+        }), 
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const userRole = profiles?.[0]?.role;
+    log("User role check", { userId, role: userRole });
+
     if (userRole !== "MASTERADMIN") {
-      return new Response(JSON.stringify({ error: "Forbidden: Only MASTERADMIN can trigger QA" }), {
-        status: 403,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      log("Forbidden: not MASTERADMIN", { role: userRole });
+      return new Response(
+        JSON.stringify({ 
+          error: "Forbidden: Only MASTERADMIN can trigger QA",
+          debug: { userRole }
+        }), 
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Rate limiting per user
+    // Rate limiting check
     const now = Date.now();
     const lastRun = recentRuns.get(userId);
-    if (lastRun && now - lastRun < RATE_LIMIT_MS) {
-      return new Response(JSON.stringify({ error: "Too many requests: wait before triggering another QA run" }), {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+    if (lastRun && (now - lastRun) < RATE_LIMIT_MS) {
+      log("Rate limit exceeded", { userId, lastRun, now });
+      return new Response(
+        JSON.stringify({ 
+          error: "Too many requests: Please wait before triggering another QA run",
+          debug: { lastRun: lastRun, now: now, diff: now - lastRun }
+        }), 
+        { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
     recentRuns.set(userId, now);
+
+    // Clean up old entries (keep only last 100 entries)
     if (recentRuns.size > 100) {
       const oldestKey = Array.from(recentRuns.keys())[0];
       recentRuns.delete(oldestKey);
     }
 
-    // GitHub token and repo
-    const githubToken = Deno.env.get("GITHUB_TOKEN");
+    // GitHub token check
     if (!githubToken) {
-      return new Response(JSON.stringify({ error: "Server misconfiguration: GITHUB_TOKEN not set" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      log("Missing GITHUB_TOKEN");
+      return new Response(
+        JSON.stringify({ 
+          error: "Server misconfiguration: GITHUB_TOKEN not set",
+          debug: { hasGithubToken: false }
+        }), 
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Repository (support env var to avoid hardcoding)
-    const repo = Deno.env.get("GITHUB_REPOSITORY") || "your-repo-owner/your-repo";
+    const repo = repoEnv || "your-repo-owner/your-repo";
     const workflowPath = "qa_on_demand.yml";
 
     // Dispatch workflow
     const dispatchUrl = `https://api.github.com/repos/${repo}/actions/workflows/${workflowPath}/dispatches`;
+    log("Dispatching workflow", { dispatchUrl });
+
     const workflowResp = await fetch(dispatchUrl, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${githubToken}`,
         Accept: "application/vnd.github+json",
-        "User-Agent": "supabase-edge-function",
+        "User-Agent": "Supabase-Edge-Function",
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -131,21 +244,33 @@ serve(async (req) => {
       }),
     });
 
+    log("Dispatch response", { status: workflowResp.status });
+
     if (!workflowResp.ok) {
-      const txt = await workflowResp.text().catch(() => "");
-      console.error("[qa-run] dispatch failed", workflowResp.status, txt);
-      return new Response(JSON.stringify({ error: "Failed to dispatch workflow", status: workflowResp.status, details: txt }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      const errorText = await workflowResp.text().catch(() => "Unknown error");
+      log("Dispatch failed", { status: workflowResp.status, error: errorText });
+      return new Response(
+        JSON.stringify({ 
+          error: "Failed to dispatch workflow",
+          details: errorText.substring(0, 500),
+          debug: { workflowStatus: workflowResp.status }
+        }), 
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
+
+    // Wait a moment for run to be created
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Try to find the created run (race condition possible) — retry a few times
     const runsListUrl = `https://api.github.com/repos/${repo}/actions/workflows/${workflowPath}/runs`;
     const maxAttempts = 6;
     const attemptDelayMs = 2000;
     let foundRun = null;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      log(`Attempt ${attempt} to find run`, { attemptDelayMs });
+
       try {
         const runsResp = await fetch(`${runsListUrl}?per_page=10`, {
           headers: {
@@ -155,11 +280,22 @@ serve(async (req) => {
         });
 
         if (!runsResp.ok) {
-          const txt = await runsResp.text().catch(() => "");
-          console.warn("[qa-run] runs list non-ok", runsResp.status, txt);
+          const errorText = await runsResp.text().catch(() => "Unknown error");
+          log(`Runs fetch failed (attempt ${attempt})`, { status: runsResp.status, error: errorText });
         } else {
           const runsData = await runsResp.json();
-          const workflow_runs = runsData?.workflow_runs ?? [];
+          
+          // Defensive: check if runsData is valid before accessing properties
+          if (!runsData || typeof runsData !== "object") {
+            log("Invalid runsData response", { runsData });
+            // Continue to next attempt
+            await new Promise((resolve) => setTimeout(resolve, attemptDelayMs));
+            continue;
+          }
+
+          const workflow_runs = runsData.workflow_runs || [];
+          
+          log(`Attempt ${attempt} - runs found`, { count: workflow_runs.length });
 
           // prefer a recent run (created within last 3 minutes)
           const nowTs = Date.now();
@@ -168,30 +304,32 @@ serve(async (req) => {
               const created = new Date(r.created_at).getTime();
               return nowTs - created < 3 * 60 * 1000; // 3 minutes
             } catch {
+              log("Failed to parse created_at", { created_at: r.created_at });
               return false;
             }
           });
 
           if (recent) {
             foundRun = recent;
+            log("Found recent run", { id: recent.id, created_at: recent.created_at });
             break;
           }
         }
       } catch (err) {
-        console.warn("[qa-run] runs fetch attempt error", String(err));
+        log(`Attempt ${attempt} error`, { error: String(err) });
       }
 
-      // wait before next attempt
-      await new Promise((res) => setTimeout(res, attemptDelayMs));
+      // Wait before next attempt
+      await new Promise((resolve) => setTimeout(resolve, attemptDelayMs));
     }
 
-    const workflowPage = `https://github.com/${repo}/actions/runs`;
     if (foundRun) {
+      log("Returning run details", { runId: foundRun.id, status: foundRun.status });
       return new Response(
         JSON.stringify({
           runId: String(foundRun.id),
           status: foundRun.status,
-          htmlUrl: foundRun.html_url || workflowPage,
+          htmlUrl: foundRun.html_url,
           createdAt: foundRun.created_at,
         }),
         {
@@ -202,10 +340,13 @@ serve(async (req) => {
     }
 
     // If we couldn't find the run, still return dispatched=true and a link to actions page
+    const workflowPage = `https://github.com/${repo}/actions/runs`;
+    log("Run not found, returning workflow page link", { workflowPage });
+
     return new Response(
       JSON.stringify({
         dispatched: true,
-        note: "Workflow dispatched but run not yet found; check GitHub Actions page. The function retried looking for the run and did not find a recent run entry.",
+        note: "Workflow dispatched but run not yet found; check GitHub Actions page. The function retried looking for the run.",
         workflowUrl: workflowPage,
       }),
       {
@@ -214,10 +355,14 @@ serve(async (req) => {
       }
     );
   } catch (err) {
-    console.error("[qa-run] unexpected error", String(err));
-    return new Response(JSON.stringify({ error: "Internal server error", details: String(err) }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    log("Unexpected error", { error: String(err), stack: err.stack });
+    return new Response(
+      JSON.stringify({ 
+        error: "Internal server error",
+        details: String(err),
+        type: err.constructor.name
+      }), 
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
 });
