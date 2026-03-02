@@ -937,19 +937,19 @@ export default function PdiPerformance() {
 
   const { data: myCheckins = [] } = useQuery({
     queryKey: ["pdi", "checkins", companyId, selectedUserId],
-    queryFn: () => listCheckins(companyId, selectedUserId, { limit: 40 }),
+    queryFn: () => listCheckinsForUser(companyId, selectedUserId, { limit: 40 }),
     enabled: moduleEnabled,
   });
 
   const { data: myFeedbacks = [] } = useQuery({
     queryKey: ["pdi", "feedbacks", companyId, selectedUserId],
-    queryFn: () => listFeedback(companyId, selectedUserId, { limit: 40 }),
+    queryFn: () => listFeedbackForUser(companyId, selectedUserId, { limit: 40 }),
     enabled: moduleEnabled,
   });
 
   const { data: myOneOnOnes = [] } = useQuery({
     queryKey: ["pdi", "1on1", companyId, selectedUserId],
-    queryFn: () => listOneOnOnes(companyId, selectedUserId, { limit: 40 }),
+    queryFn: () => listOneOnOnesForUser(companyId, selectedUserId, { limit: 40 }),
     enabled: moduleEnabled,
   });
 
