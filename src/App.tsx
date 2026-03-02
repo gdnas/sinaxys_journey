@@ -67,6 +67,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import UserEventLedger from "./pages/UserEventLedger";
 import PerformanceScores from "./pages/PerformanceScores";
+import TestRunner from "./pages/TestRunner";
 
 const queryClient = new QueryClient();
 
@@ -91,6 +92,7 @@ const App = () => (
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/forgot" element={<ForgotPassword />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
+                  <Route path="/test-runner" element={<TestRunner />} />
 
                   {/* Dashboard / Jornada */}
                   <Route

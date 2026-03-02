@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest/globals';
 import type { DbTask } from "@/lib/okrDb";
 
 function validateDbTaskShape(obj: any): obj is DbTask {

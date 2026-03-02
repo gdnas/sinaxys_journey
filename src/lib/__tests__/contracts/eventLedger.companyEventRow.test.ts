@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest/globals';
 import type { CompanyEventRow } from "@/lib/eventLedgerDb";
 
 function validateCompanyEventRowShape(obj: any): obj is CompanyEventRow {
