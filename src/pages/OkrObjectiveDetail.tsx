@@ -324,7 +324,21 @@ export default function OkrObjectiveDetail() {
   const [delDue, setDelDue] = useState<string>("");
   const [delSaving, setDelSaving] = useState(false);
 
-  // Alignment (Tier1 -> link Tier2 objectives to a KR)
+  // Collaborator should be able to create deliverables under Tier 2 KRs they own.
+  const canAddDeliverableForKr = (kr: DbOkrKeyResult) => {
+    if (canWrite) return true;
+    if (deliverableTierAuto !== "TIER2") return false;
+    return !!kr.owner_user_id && kr.owner_user_id === user.id;
+  };
+
+  const canCreateDeliverable = useMemo(() => {
+    if (!delKrId) return false;
+    if (canWrite) return true;
+    if (deliverableTierAuto !== "TIER2") return false;
+    const kr = krs.find((k) => k.id === delKrId);
+    return !!kr?.owner_user_id && kr.owner_user_id === user.id;
+  }, [canWrite, delKrId, deliverableTierAuto, krs, user.id]);
+
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkKrId, setLinkKrId] = useState<string | null>(null);
   const [linkObjectiveId, setLinkObjectiveId] = useState<string>(SELECT_NONE);
@@ -606,8 +620,13 @@ export default function OkrObjectiveDetail() {
               }}
               onToggleDeliverableKr={() => toggleDeliverableKr(kr)}
               onAddDeliverable={() => {
+                if (!canAddDeliverableForKr(kr)) return;
                 resetDeliverable();
                 setDelKrId(kr.id);
+                // When collaborator is creating (Tier 2), default the deliverable owner to themselves.
+                if (!canWrite && deliverableTierAuto === "TIER2" && kr.owner_user_id === user.id) {
+                  setDelOwner(user.id);
+                }
                 setDelOpen(true);
               }}
               onLinkTier2={() => {
@@ -643,6 +662,7 @@ export default function OkrObjectiveDetail() {
                 setDeleteKrId(kr.id);
                 setDeleteKrOpen(true);
               }}
+              canAddDeliverable={canAddDeliverableForKr(kr)}
             />
           ))
         ) : (
@@ -875,6 +895,9 @@ export default function OkrObjectiveDetail() {
                   ))}
                 </SelectContent>
               </Select>
+              {!canWrite && deliverableTierAuto === "TIER2" ? (
+                <div className="text-xs text-muted-foreground">Como colaborador, você só pode deixar sem responsável ou selecionar você mesmo.</div>
+              ) : null}
             </div>
 
             <div className="grid gap-2">
@@ -889,9 +912,9 @@ export default function OkrObjectiveDetail() {
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!canWrite || !delKrId || delTitle.trim().length < 4 || delSaving}
+              disabled={!canCreateDeliverable || !delKrId || delTitle.trim().length < 4 || delSaving}
               onClick={async () => {
-                if (!delKrId || !canWrite || delSaving) return;
+                if (!delKrId || !canCreateDeliverable || delSaving) return;
                 setDelSaving(true);
                 try {
                   await createDeliverable({
@@ -1192,6 +1215,7 @@ function KrCard({
   onDeleteTask,
   onToggleTask,
   onDeleteKr,
+  canAddDeliverable,
 }: {
   kr: DbOkrKeyResult;
   deliverables: DbDeliverable[];
@@ -1211,6 +1235,7 @@ function KrCard({
   onDeleteTask: (t: DbTask) => void;
   onToggleTask: (t: DbTask) => void;
   onDeleteKr: () => void;
+  canAddDeliverable: boolean;
 }) {
   const pct = krProgressPct(kr);
   const unit = kr.metric_unit?.trim() ?? "";
@@ -1369,6 +1394,11 @@ function KrCard({
                 Entregável
               </Button>
             )
+          ) : canAddDeliverable && !isTier1 ? (
+            <Button variant="outline" className="h-11 rounded-xl" onClick={onAddDeliverable} title="Criar entregável (Tier 2)">
+              <Plus className="mr-2 h-4 w-4" />
+              Entregável
+            </Button>
           ) : null}
         </div>
       </div>

@@ -37,6 +37,7 @@ import {
   listUserDocuments,
 } from "@/lib/documentsDb";
 import { getProfile, updateProfile } from "@/lib/profilesDb";
+import { roleLabel } from "@/lib/sinaxys";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -112,6 +113,7 @@ export default function AdminUserCard() {
 
   // Editable state
   const [name, setName] = useState("");
+  const [role, setRole] = useState("COLABORADOR");
   const [phone, setPhone] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [deptId, setDeptId] = useState<string>("");
@@ -135,6 +137,7 @@ export default function AdminUserCard() {
   const dirty = useMemo(() => {
     if (!profile) return false;
     const baseName = profile.name ?? "";
+    const baseRole = profile.role ?? "";
     const basePhone = profile.phone ?? "";
     const baseJob = profile.job_title ?? "";
     const baseDept = profile.department_id ?? "";
@@ -143,6 +146,7 @@ export default function AdminUserCard() {
     const baseContract = profile.contract_url ?? "";
     return (
       name.trim() !== baseName ||
+      role !== baseRole ||
       phone.trim() !== basePhone ||
       jobTitle.trim() !== baseJob ||
       deptId !== baseDept ||
@@ -150,12 +154,13 @@ export default function AdminUserCard() {
       monthlyCost.trim() !== baseMonthly ||
       contractUrl.trim() !== baseContract
     );
-  }, [profile, name, phone, jobTitle, deptId, active, monthlyCost, contractUrl]);
+  }, [profile, name, role, phone, jobTitle, deptId, active, monthlyCost, contractUrl]);
 
   // Sync state from profile
   useMemo(() => {
     if (!profile) return;
     setName(profile.name ?? "");
+    setRole(profile.role ?? "COLABORADOR");
     setPhone(profile.phone ?? "");
     setJobTitle(profile.job_title ?? "");
     setDeptId(profile.department_id ?? "");
@@ -207,6 +212,7 @@ export default function AdminUserCard() {
                   <div className="truncate text-lg font-semibold text-[color:var(--sinaxys-ink)]">{title}</div>
                   <div className="mt-1 truncate text-sm text-muted-foreground">{profile.email}</div>
                   <div className="mt-2 flex flex-wrap gap-2">
+                    <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">{roleLabel(profile.role as any)}</Badge>
                     <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{departmentName ?? "Sem departamento"}</Badge>
                     {profile.active ? (
                       <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
@@ -263,8 +269,18 @@ export default function AdminUserCard() {
 
                     <div className="grid gap-3">
                       <div className="grid gap-2">
-                        <Label>Nome</Label>
-                        <Input className="h-11 rounded-2xl" value={name} onChange={(e) => setName(e.target.value)} disabled={saving} />
+                        <Label>Papel</Label>
+                        <Select value={role} onValueChange={setRole} disabled={saving}>
+                          <SelectTrigger className="h-11 rounded-2xl bg-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-2xl">
+                            <SelectItem value="ADMIN">Admin</SelectItem>
+                            <SelectItem value="HEAD">Head</SelectItem>
+                            <SelectItem value="COLABORADOR">Colaborador</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <div className="text-xs text-muted-foreground">Admin pode promover/rebaixar o papel do usuário na empresa.</div>
                       </div>
 
                       <div className="grid gap-2">
@@ -327,6 +343,7 @@ export default function AdminUserCard() {
                               const cost = toMoney(monthlyCost);
                               await updateProfile(profile.id, {
                                 name: name.trim() || null,
+                                role,
                                 phone: phone.trim() || null,
                                 job_title: jobTitle.trim() || null,
                                 department_id: deptId || null,

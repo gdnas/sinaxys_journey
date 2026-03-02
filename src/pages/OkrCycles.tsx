@@ -651,7 +651,10 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
 
         <div className="grid gap-3">
           {objectives.length ? (
-            (scope === "quarter" ? objectives.filter((o) => o.level === "COMPANY") : objectives).map((o) => {
+            (scope === "quarter"
+              ? objectives.filter((o) => o.level === "COMPANY" || isAdminish || o.owner_user_id === user.id)
+              : objectives
+            ).map((o) => {
               const owner = byUserId.get(o.owner_user_id)?.name ?? "—";
               const st = objectiveStats.get(o.id) ?? { count: 0, pct: null };
               const canWriteObjective = user.id === o.owner_user_id || isAdminish;
