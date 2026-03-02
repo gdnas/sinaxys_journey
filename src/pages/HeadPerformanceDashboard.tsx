@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSearchParams } from "react-router-dom";
 import { listPerformanceScores } from "@/lib/performanceDb";
-import { ArrowLeft, TrendingUp, Award, Calendar, Users, Funnel } from "lucide-react";
+import { ArrowLeft, TrendingUp, Award, Calendar, Users, Filter } from "lucide-react";
 
 export default function HeadPerformanceDashboard() {
   const [searchParams] = useSearchParams();
@@ -63,7 +63,6 @@ export default function HeadPerformanceDashboard() {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
       <div className="space-y-2">
         <h1 className="text-3xl font-bold">Scores de Performance</h1>
         <p className="text-muted-foreground">
@@ -71,17 +70,15 @@ export default function HeadPerformanceDashboard() {
         </p>
       </div>
 
-      {/* Filtros */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
-            <Funnel className="h-5 w-5" />
+            <Filter className="h-5 w-5" />
             Filtros
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Ciclo */}
             <div>
               <label className="text-sm font-medium mb-2 block">Ciclo</label>
               <input
@@ -93,7 +90,6 @@ export default function HeadPerformanceDashboard() {
               />
             </div>
 
-            {/* Departamento */}
             <div>
               <label className="text-sm font-medium mb-2 block">Departamento</label>
               <select
@@ -113,10 +109,9 @@ export default function HeadPerformanceDashboard() {
         </CardContent>
       </Card>
 
-      {/* Lista de scores */}
       {loading ? (
         <div className="space-y-4">
-          {[1, 2, 3, ].map(i => (
+          {[1, 2, 3].map(i => (
             <Card key={i}>
               <CardContent className="py-12">
                 <div className="h-6 bg-muted rounded animate-pulse" />
@@ -174,7 +169,6 @@ export default function HeadPerformanceDashboard() {
         </div>
       )}
 
-      {/* Voltar */}
       <Button asChild variant="outline" className="w-full md:w-auto">
         <Link to="/head">
           <ArrowLeft className="mr-2 h-4 w-4" />

@@ -418,9 +418,10 @@ function TiersAdmin({ companyId, tiers }: { companyId: string; tiers: RewardTier
                     await createRewardTier({
                       company_id: companyId,
                       name: name.trim(),
-                      minPoints: Math.max(0, safeInt(minPoints)),
+                      min_points: Math.max(0, safeInt(minPoints)),
                       prize: prize.trim(),
                       description: description.trim() || null,
+                      active: true,
                     });
                     setOpen(false);
                     setName("");
