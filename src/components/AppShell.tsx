@@ -167,14 +167,6 @@ const nav: NavItem[] = [
       },
       {
         type: "link",
-        to: "/admin/org",
-        label: "Definir líderes",
-        icon: <Users className="h-4 w-4" />,
-        roles: ["ADMIN"],
-        moduleKey: "ORG",
-      },
-      {
-        type: "link",
         to: "/admin/users",
         label: "Usuários",
         icon: <Shield className="h-4 w-4" />,
