@@ -156,10 +156,22 @@ function tokenizePt(s: string) {
 }
 
 function semanticCoherenceHint(parent: string, child: string) {
-  const a = tokenizePt(parent);
-  const b = tokenizePt(child);
-  if (child.trim().length < 30) return { kind: "warn" as const, text: "Texto muito curto — pode ficar difícil garantir coerência." };
-  if (!a.length || !b.length) return { kind: "warn" as const, text: "Faltam palavras-chave suficientes para avaliar coerência." };
+  const parentTrim = parent.trim();
+  const childTrim = child.trim();
+
+  // Avoid showing a "warning" when the user is simply still typing.
+  if (parentTrim.length < 18 || childTrim.length < 18) {
+    return {
+      kind: "note" as const,
+      text: "Preencha os dois campos com frases completas para avaliar coerência.",
+    };
+  }
+
+  const a = tokenizePt(parentTrim);
+  const b = tokenizePt(childTrim);
+
+  if (childTrim.length < 30) return { kind: "note" as const, text: "Texto curto — pode ficar difícil avaliar coerência." };
+  if (!a.length || !b.length) return { kind: "note" as const, text: "Ainda não dá para avaliar coerência (poucas palavras-chave)." };
 
   const setA = new Set(a);
   const overlap = b.filter((w) => setA.has(w));
@@ -946,9 +958,9 @@ export default function OkrAssistant() {
                 <div
                   className={clsx(
                     "rounded-2xl border p-3 text-sm",
-                    coherence10to5.kind === "ok"
-                      ? "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]"
-                      : "border-amber-200 bg-amber-50",
+                    coherence10to5.kind === "warn"
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]",
                   )}
                 >
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Coerência 10 → 5</div>
@@ -965,7 +977,9 @@ export default function OkrAssistant() {
                 <div
                   className={clsx(
                     "rounded-2xl border p-3 text-sm",
-                    coherence5to2.kind === "ok" ? "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]" : "border-amber-200 bg-amber-50",
+                    coherence5to2.kind === "warn"
+                      ? "border-amber-200 bg-amber-50"
+                      : "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]",
                   )}
                 >
                   <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Coerência 5 → 2</div>
