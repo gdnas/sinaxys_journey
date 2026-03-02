@@ -26,6 +26,7 @@ import {
   listContractAttachments,
   listUserDocuments,
   uploadUserDocumentFile,
+  createSignedUrlForStoragePath,
 } from "@/lib/documentsDb";
 import { getProfile, updateProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
@@ -208,6 +209,7 @@ export default function Profile() {
   const [docFile, setDocFile] = useState<File | null>(null);
   const [docIsFile, setDocIsFile] = useState(false);
   const [docUploading, setDocUploading] = useState(false);
+  const [viewingDocUrl, setViewingDocUrl] = useState<string | null>(null);
 
   return (
     <div className="grid gap-6">
@@ -642,7 +644,24 @@ export default function Profile() {
                           variant="outline"
                           className="h-10 rounded-xl"
                           disabled={!d.url}
-                          onClick={() => d.url && window.open(d.url, "_blank", "noopener,noreferrer")}
+                          onClick={async () => {
+                            if (!d.url) return;
+                            try {
+                              // If stored path is storage://..., create a signed URL
+                              let openUrl = d.url;
+                              if (d.url.startsWith("storage://")) {
+                                openUrl = await createSignedUrlForStoragePath(d.url, 120);
+                              }
+                              // For PDFs/images, open modal viewer; else open in new tab
+                              if (openUrl.match(/\.pdf(\?|$)/i) || openUrl.match(/\.(jpg|jpeg|png|webp)(\?|$)/i)) {
+                                setViewingDocUrl(openUrl);
+                              } else {
+                                window.open(openUrl, "_blank", "noopener,noreferrer");
+                              }
+                            } catch (e) {
+                              toast({ title: "Não foi possível abrir o documento", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+                            }
+                          }}
                         >
                           <ExternalLink className="mr-2 h-4 w-4" />
                           Abrir
@@ -848,6 +867,7 @@ export default function Profile() {
 
                   if (docIsFile) {
                     if (!docFile) throw new Error("Selecione um arquivo para subir.");
+                    // Upload returns storage://path which we save in DB
                     finalUrl = await uploadUserDocumentFile({ companyId: user.companyId!, userId: user.id, file: docFile });
                     kind = "FILE";
                   } else {
@@ -881,6 +901,27 @@ export default function Profile() {
               {docUploading ? "Enviando…" : "Adicionar"}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Document viewer dialog */}
+      <Dialog open={!!viewingDocUrl} onOpenChange={() => setViewingDocUrl(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <div className="flex flex-col gap-3">
+            <div className="text-sm text-muted-foreground">Visualização</div>
+            {viewingDocUrl ? (
+              viewingDocUrl.match(/\.pdf(\?|$)/i) ? (
+                <iframe src={viewingDocUrl} className="h-[70vh] w-full rounded-2xl border" title="Documento PDF" />
+              ) : (
+                <img src={viewingDocUrl} alt="Documento" className="max-h-[70vh] w-full object-contain rounded-2xl" />
+              )
+            ) : null}
+            <div className="flex justify-end">
+              <Button variant="outline" className="rounded-xl" onClick={() => setViewingDocUrl(null)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

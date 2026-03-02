@@ -101,13 +101,25 @@ export async function deleteUserDocument(id: string) {
 
 // Upload a file to the 'user-documents' storage bucket.
 // For images we perform a client-side resize + JPEG compression to reduce size.
-// Returns a public URL to the uploaded file.
+// Returns a storage path encoded as `storage://<path>` which should be stored in the DB.
 export async function uploadUserDocumentFile(params: {
   companyId: string;
   userId: string;
   file: File;
 }): Promise<string> {
   const { companyId, userId, file } = params;
+
+  // Allowed types: images and PDFs
+  const allowedTypes = ["application/pdf", "image/png", "image/jpeg", "image/jpg", "image/webp"];
+  if (!allowedTypes.includes(file.type)) {
+    throw new Error("Tipo de arquivo não suportado. Envie imagens ou PDF.");
+  }
+
+  // Max size 10MB
+  const MAX_BYTES = 10 * 1024 * 1024;
+  if (file.size > MAX_BYTES) {
+    throw new Error("Arquivo muito grande. Tamanho máximo: 10MB.");
+  }
 
   // Helper: compress images via canvas
   async function compressImage(file: File, maxDim = 1600, quality = 0.8): Promise<Blob> {
@@ -179,12 +191,20 @@ export async function uploadUserDocumentFile(params: {
 
   if (uploadError) throw uploadError;
 
-  // Get public URL
-  const {
-    data: { publicUrl },
-    error: publicUrlError,
-  } = storage.getPublicUrl(path) as any;
+  // Return storage path encoded so caller can store it in DB and later request signed URL.
+  return `storage://${path}`;
+}
 
-  if (publicUrlError) throw publicUrlError;
-  return publicUrl as string;
+// Create a signed URL for a storage path previously saved in the DB (format: storage://<path>)
+export async function createSignedUrlForStoragePath(storageUrl: string, expiresInSeconds = 60): Promise<string> {
+  if (!storageUrl.startsWith("storage://")) {
+    throw new Error("Invalid storage path");
+  }
+  const path = storageUrl.replace("storage://", "");
+  const { data, error } = await supabase.storage.from("user-documents").createSignedUrl(path, expiresInSeconds);
+  if (error) throw error;
+  // v1 returns { signedURL } or data?.signedUrl depending on SDK; normalize
+  // Type as any to access probable fields
+  const anyData: any = data;
+  return anyData.signedURL || anyData.signedUrl || anyData.publicUrl || "";
 }
