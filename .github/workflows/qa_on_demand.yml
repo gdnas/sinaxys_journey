@@ -1,0 +1,63 @@
+name: QA On Demand
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger_user:
+        description: 'User who triggered the workflow'
+        required: false
+        type: string
+      trigger_source:
+        description: 'Source of the trigger (web/app)'
+        required: false
+        type: string
+
+jobs:
+  qa:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run Lint
+        run: npm run lint
+      
+      - name: Run Type Check
+        run: npm run typecheck
+      
+      - name: Run Unit Tests
+        run: npm run test
+      
+      - name: Install Playwright Browsers
+        run: npx playwright install --with-deps
+      
+      - name: Run E2E Tests
+        run: npm run e2e
+      
+      - name: Upload Playwright Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 30
+      
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            coverage/
+            vitest-coverage/
+          retention-days: 30

@@ -92,7 +92,14 @@ const App = () => (
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/forgot" element={<ForgotPassword />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
-                  <Route path="/test-runner" element={<TestRunner />} />
+                  <Route
+                    path="/test-runner"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN"]}>
+                        <TestRunner />
+                      </RequireAuth>
+                    }
+                  />
 
                   {/* Dashboard / Jornada */}
                   <Route

@@ -44,7 +44,7 @@ interface Assertion<T> {
   toContain(expected: unknown): T;
   toHaveLength(expected: number): T;
   toHaveProperty(key: string | string[], value?: unknown): T;
-  toThrow(error?: string | RegExp | Error | new (...args: unknown[]) => Error): T;
+  toThrow(error?: string | RegExp | Error | (new (...args: unknown[]) => Error)): T;
   toBeInstanceOf(expected: unknown): T;
   toMatchObject(expected: Partial<any>): T;
 }
