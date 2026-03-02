@@ -130,14 +130,6 @@ const nav: NavItem[] = [
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "POINTS",
       },
-      {
-        type: "link",
-        to: "/app/certificates",
-        label: "Certificados",
-        icon: <Award className="h-4 w-4" />,
-        roles: ["COLABORADOR", "HEAD", "ADMIN"],
-        moduleKey: "TRACKS",
-      },
     ],
   },
 
@@ -217,6 +209,14 @@ const nav: NavItem[] = [
         label: "Trilhas",
         icon: <GraduationCap className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "TRACKS",
+      },
+      {
+        type: "link",
+        to: "/app/certificates",
+        label: "Certificados",
+        icon: <Award className="h-4 w-4" />,
+        roles: ["COLABORADOR", "HEAD", "ADMIN"],
         moduleKey: "TRACKS",
       },
       {
