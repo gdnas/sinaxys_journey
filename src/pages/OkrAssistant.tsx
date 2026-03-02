@@ -500,10 +500,10 @@ export default function OkrAssistant() {
     const targets = annualObjectives.filter((o) => o.strategy_objective_id === so2.id);
     if (!targets.length) return false;
 
-    // Each annual objective should have 2-4 KRs.
+    // Each annual objective should have 1-4 KRs.
     return targets.every((o) => {
       const n = annualKrCountsByObjective.get(o.id) ?? 0;
-      return n >= 2 && n <= 4;
+      return n >= 1 && n <= 4;
     });
   }, [annualCycleId, annualKrCountsByObjective, annualObjectives, so2?.id]);
 
@@ -1047,7 +1047,7 @@ export default function OkrAssistant() {
         <div className="grid gap-6">
           <StepHeader
             title="Etapa 3 — Objetivos estratégicos do ano"
-            subtitle="Planejamento anual: até 5 objetivos estratégicos, cada um com 2 a 4 KRs."
+            subtitle="Planejamento anual: até 5 objetivos estratégicos, cada um com 1 a 4 KRs."
             badge={{ label: "Ano", icon: <Target className="h-3.5 w-3.5" /> }}
           />
 
@@ -1128,7 +1128,7 @@ export default function OkrAssistant() {
                           <Badge
                             className={clsx(
                               "rounded-full",
-                              n >= 2 && n <= 4
+                              n >= 1 && n <= 4
                                 ? "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]"
                                 : "bg-amber-100 text-amber-900",
                             )}
@@ -1151,7 +1151,7 @@ export default function OkrAssistant() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Criar objetivos do ano</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Até 5 objetivos. Cada um com 2–4 KRs.</div>
+                  <div className="mt-1 text-sm text-muted-foreground">Até 5 objetivos. Cada um com 1–4 KRs.</div>
                 </div>
                 <Button
                   variant="outline"
@@ -1220,7 +1220,7 @@ export default function OkrAssistant() {
 
                       <div className="grid gap-2">
                         <div className="flex items-center justify-between gap-2">
-                          <Label>KRs (2 a 4)</Label>
+                          <Label>KRs (1 a 4)</Label>
                           <Button
                             variant="outline"
                             className="h-9 rounded-xl bg-white"
@@ -1388,7 +1388,7 @@ export default function OkrAssistant() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-xs text-muted-foreground">Para avançar: tenha ao menos 1 objetivo anual conectado ao 2 anos, com 2–4 KRs.</div>
+                <div className="text-xs text-muted-foreground">Para avançar: tenha ao menos 1 objetivo anual conectado ao 2 anos, com 1–4 KRs.</div>
                 <Button
                   className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                   disabled={annualSaving || !annualCycleId || !so2?.id}
@@ -1406,9 +1406,9 @@ export default function OkrAssistant() {
                       }))
                       .filter((o) => o.title.length >= 6);
 
-                    const invalid = trimmed.some((o) => o.krs.length < 2 || o.krs.length > 4);
+                    const invalid = trimmed.some((o) => o.krs.length < 1 || o.krs.length > 4);
                     if (invalid) {
-                      toast({ title: "Ajuste os KRs", description: "Cada objetivo precisa de 2 a 4 KRs.", variant: "destructive" });
+                      toast({ title: "Ajuste os KRs", description: "Cada objetivo precisa de 1 a 4 KRs.", variant: "destructive" });
                       return;
                     }
 
