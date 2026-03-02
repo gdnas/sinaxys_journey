@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CalendarClock, Mail, Medal, Network, Phone, Search, Sparkles, UserRound, Users } from "lucide-react";
+import { CalendarClock, Mail, Network, Phone, Search, Sparkles, UserRound, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,6 @@ import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanva
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
 import { fetchLeaderboard, listRewardTiers } from "@/lib/pointsDb";
-import { fetchXpLeaderboard } from "@/lib/journeyDb";
 import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profilePublicDb";
 import { getProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
@@ -90,7 +89,6 @@ function PersonDialog({
   deptName,
   deptThemeIdx,
   points,
-  xp,
   tier,
   leader,
 }: {
@@ -100,7 +98,6 @@ function PersonDialog({
   deptName: string | null;
   deptThemeIdx: number | null;
   points: number;
-  xp: number;
   tier: string | null;
   leader: DbProfilePublic | null;
 }) {
@@ -159,14 +156,10 @@ function PersonDialog({
                   </div>
                 </button>
 
-                <div className="grid w-full grid-cols-3 gap-2 sm:w-auto sm:min-w-[260px]">
+                <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:min-w-[220px]">
                   <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pontos</div>
                     <div className="mt-1 text-lg font-semibold text-[color:var(--sinaxys-ink)]">{points}</div>
-                  </div>
-                  <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">XP</div>
-                    <div className="mt-1 text-lg font-semibold text-[color:var(--sinaxys-ink)]">{xp}</div>
                   </div>
                   <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
                     <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Admissão</div>
@@ -270,12 +263,7 @@ export default function OrgChart() {
     queryFn: () => listRewardTiers(companyId),
   });
 
-  const qXp = useQuery({
-    queryKey: ["xp", "leaderboard", companyId],
-    queryFn: () => fetchXpLeaderboard(companyId, 200),
-  });
-
-  const isLoading = isLoadingProfiles || qPoints.isLoading || qTiers.isLoading || qXp.isLoading;
+  const isLoading = isLoadingProfiles || qPoints.isLoading || qTiers.isLoading;
 
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d.name] as const)), [departments]);
 
@@ -291,12 +279,6 @@ export default function OrgChart() {
     for (const row of qPoints.data ?? []) m.set(row.user_id, row.total_points);
     return m;
   }, [qPoints.data]);
-
-  const xpByUserId = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const row of qXp.data ?? []) m.set(row.user_id, row.total_xp);
-    return m;
-  }, [qXp.data]);
 
   const tierByUserId = useMemo(() => {
     const active = (qTiers.data ?? []).filter((t) => t.active).sort((a, b) => a.min_points - b.min_points);
@@ -330,7 +312,6 @@ export default function OrgChart() {
   const selectedDeptName = selected?.department_id ? deptById.get(selected.department_id) ?? null : null;
   const selectedDeptIdx = selected?.department_id ? deptIndexById.get(selected.department_id) ?? null : null;
   const selectedPoints = selected ? pointsByUserId.get(selected.id) ?? 0 : 0;
-  const selectedXp = selected ? xpByUserId.get(selected.id) ?? 0 : 0;
   const selectedTier = selected ? tierByUserId.get(selected.id) ?? null : null;
   const selectedLeader = selected?.manager_id ? profileById.get(selected.manager_id) ?? null : null;
 
@@ -374,7 +355,6 @@ export default function OrgChart() {
               const inactive = !p.active;
 
               const points = pointsByUserId.get(p.id) ?? 0;
-              const xp = xpByUserId.get(p.id) ?? 0;
 
               return (
                 <button
@@ -404,9 +384,6 @@ export default function OrgChart() {
                     <div className="mt-2 flex items-center justify-center gap-2 text-[11px] text-muted-foreground">
                       <span className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-1 ring-1 ring-[color:var(--sinaxys-border)]">
                         <Sparkles className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" /> {points}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2 py-1 ring-1 ring-[color:var(--sinaxys-border)]">
-                        <Medal className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" /> {xp} XP
                       </span>
                     </div>
                   </div>
@@ -447,7 +424,6 @@ export default function OrgChart() {
         deptName={selectedDeptName}
         deptThemeIdx={selectedDeptIdx}
         points={selectedPoints}
-        xp={selectedXp}
         tier={selectedTier}
         leader={selectedLeader}
       />

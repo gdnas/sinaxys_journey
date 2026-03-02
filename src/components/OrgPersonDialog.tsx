@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BriefcaseBusiness, Building2, CalendarClock, Mail, Phone, Sparkles, Trophy, UserRound } from "lucide-react";
+import { BriefcaseBusiness, Building2, CalendarClock, Mail, Phone, Trophy, UserRound } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-import { getTotalXpForUser } from "@/lib/journeyDb";
 import type { DbProfile } from "@/lib/profilesDb";
 
 function initials(name: string) {
@@ -47,11 +46,8 @@ export function OrgPersonDialog({
 }) {
   const title = profile ? displayName(profile) : "Pessoa";
 
-  const { data: xp = 0, isLoading: isLoadingXp } = useQuery({
-    queryKey: ["user-xp", companyId, profile?.id],
-    queryFn: () => getTotalXpForUser({ companyId, userId: profile!.id }),
-    enabled: !!profile?.id,
-  });
+  // Keep query key stable (no-op); XP removed from this dialog.
+  void companyId;
 
   const safeEmail = profile?.email ?? "—";
   const safePhone = profile?.phone?.trim() ? profile.phone.trim() : "—";
@@ -111,18 +107,6 @@ export function OrgPersonDialog({
                       <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
-                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">XP</div>
-                            <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{isLoadingXp ? "…" : xp}</div>
-                          </div>
-                          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                            <Sparkles className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
                             <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pontos</div>
                             <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{typeof points === "number" ? points : "—"}</div>
                           </div>
@@ -131,16 +115,16 @@ export function OrgPersonDialog({
                           </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Admissão</div>
-                          <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{formatJoinedAt(profile.joined_at)}</div>
-                        </div>
-                        <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                          <CalendarClock className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                      <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Admissão</div>
+                            <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{formatJoinedAt(profile.joined_at)}</div>
+                          </div>
+                          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+                            <CalendarClock className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -187,7 +171,7 @@ export function OrgPersonDialog({
                   <div className="rounded-2xl bg-[color:var(--sinaxys-tint)]/50 p-4 sm:col-span-2">
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
                       <UserRound className="h-4 w-4" />
-                      XP é calculado pela soma de módulos concluídos (earned_xp) nas trilhas.
+                      Pontos são calculados por eventos de pontuação (trilhas, OKRs, bônus, etc.).
                     </div>
                   </div>
                 </div>
