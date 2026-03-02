@@ -42,6 +42,7 @@ import {
   listOkrCycles,
   listOkrObjectives,
   listOkrObjectivesByIds,
+  listTasksByDeliverableIds,
   updateKeyResult,
   updateOkrObjective,
   updateTask,

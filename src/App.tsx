@@ -65,6 +65,8 @@ import TrailVideos from "./pages/TrailVideos";
 import Integrations from "./pages/Integrations";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
+import UserEventLedger from "./pages/UserEventLedger";
+import PerformanceScores from "./pages/PerformanceScores";
 
 const queryClient = new QueryClient();
 
@@ -138,6 +140,15 @@ const App = () => (
                         <RequireCompanyModule moduleKey="ORG">
                           <Person />
                         </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/people/:userId/events"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}>
+                        <UserEventLedger />
                       </RequireAuth>
                     }
                   />
@@ -438,6 +449,16 @@ const App = () => (
                         <RequireCompanyModule moduleKey="POINTS">
                           <Rankings />
                         </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  {/* Performance */}
+                  <Route
+                    path="/performance"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD"]}>
+                        <PerformanceScores />
                       </RequireAuth>
                     }
                   />

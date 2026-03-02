@@ -972,6 +972,24 @@ export async function updateStrategyKeyResult(
   id: string,
   patch: Partial<Pick<DbStrategyKeyResult, "title" | "metric_unit" | "start_value" | "target_value" | "current_value" | "due_at" | "achieved" | "achieved_at" | "owner_user_id" | "confidence" | "kind">>,
 ) {
+  // Export listTasksByDeliverableIds - it's defined below but needs to be accessible
+  // (function is already defined in this file, just needs to be usable from other files)
+}
+
+export async function listTasksByDeliverableIds(deliverableIds: string[]) {
+  if (!deliverableIds.length) return [] as DbTask[];
+  const { data, error } = await supabase
+    .from("okr_tasks")
+    .select(taskSelect)
+    .in("deliverable_id", deliverableIds)
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as DbTask[];
+}
+
+export async function listTasksForUser(companyId: string, userId: string, opts?: { from?: string; to?: string }) {
   const update: Record<string, any> = {};
   if ("title" in patch) update.title = patch.title?.trim();
   if ("kind" in patch) update.kind = patch.kind;

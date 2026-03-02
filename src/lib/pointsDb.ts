@@ -8,6 +8,8 @@ export type PublicProfileRow = {
   avatar_url: string | null;
   role: string;
   active: boolean;
+  manager_id: string | null;
+  job_title: string | null;
   updated_at: string;
 };
 
