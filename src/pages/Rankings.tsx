@@ -53,9 +53,6 @@ function safeInt(v: string) {
 function TopBanner() {
   return (
     <Card className="relative overflow-hidden rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-      <div className="absolute inset-0 opacity-[0.22]">
-        <img src="/placeholder.svg" alt="" className="h-full w-full object-cover" />
-      </div>
       <div className="relative flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
@@ -139,42 +136,41 @@ function LeaderboardList({ leaderboard, profiles, myUserId }: { leaderboard: Lea
   const byId = useMemo(() => new Map(profiles.map((p) => [p.id, p])), [profiles]);
 
   return (
-    <div className="mt-4 grid gap-2">
-      {leaderboard.length === 0 ? (
-        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Sem pontuações ainda. Conclua módulos para começar.</div>
-      ) : null}
-
-      {leaderboard.map((row, idx) => {
-        const p = byId.get(row.user_id);
-        const mine = row.user_id === myUserId;
-        return (
-          <div
-            key={row.user_id}
-            className={cn(
-              "flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3",
-              mine ? "ring-2 ring-[color:var(--sinaxys-primary)]/20" : "hover:bg-[color:var(--sinaxys-tint)]/30",
-            )}
-          >
-            <div className="flex min-w-0 items-center gap-3">
-              <div className={cn("grid h-9 w-9 place-items-center rounded-2xl", idx === 0 ? "bg-[color:var(--sinaxys-primary)] text-white" : "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]")}>{idx + 1}</div>
-              <Avatar className="h-9 w-9 ring-1 ring-[color:var(--sinaxys-border)]">
-                <AvatarImage src={p?.avatar_url ?? undefined} alt={p?.name ?? ""} />
-                <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">{initials(p?.name ?? "?")}</AvatarFallback>
-              </Avatar>
-              <div className="min-w-0">
-                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{p?.name ?? "Pessoa"}</div>
-                <div className="text-xs text-muted-foreground">{mine ? "Você" : ""}</div>
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+      <div className="grid gap-3">
+        {leaderboard.map((r, idx) => {
+          const p = byId.get(r.user_id);
+          const label = p?.name?.trim() || p?.email || "Usuário";
+          const highlight = r.user_id === myUserId;
+          return (
+            <div
+              key={r.user_id}
+              className={cn(
+                "flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-4 py-3",
+                highlight ? "ring-2 ring-[color:var(--sinaxys-primary)]/30" : "",
+              )}
+            >
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="grid h-8 w-8 place-items-center rounded-xl bg-[color:var(--sinaxys-tint)] text-xs font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
+                  {idx + 1}
+                </div>
+                <Avatar className="h-9 w-9 rounded-2xl ring-1 ring-[color:var(--sinaxys-border)]">
+                  <AvatarImage src={p?.avatar_url ?? undefined} alt="" />
+                  <AvatarFallback className="rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]">
+                    {initials(label)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{label}</div>
+                  {p?.department_name ? <div className="truncate text-xs text-muted-foreground">{p.department_name}</div> : null}
+                </div>
               </div>
+              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{formatPts(r.total_points)}</Badge>
             </div>
-
-            <div className="text-right">
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{formatPts(row.total_points)}</div>
-              <div className="text-xs text-muted-foreground">pontos</div>
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
