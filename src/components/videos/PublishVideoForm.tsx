@@ -112,16 +112,39 @@ export function PublishVideoForm({ connected }: { connected: boolean }) {
 
       const youtubeVideoId = String(uploadRes.json?.id ?? "").trim() || undefined;
 
+      // upload succeeded — show processing state even if finalize fails later
       setResult({ trailVideoId: init.trailVideoId, status: "processing", youtubeVideoId });
 
-      const final = await finalizeUpload({ trailVideoId: init.trailVideoId, youtubeVideoId });
-
-      // invalidate list
-      await qc.invalidateQueries({ queryKey: ["trail-videos"] });
-
-      return { ...final, trailVideoId: init.trailVideoId };
+      // Try finalize; if it fails, do not treat as fatal for the upload itself — return partial info
+      try {
+        const final = await finalizeUpload({ trailVideoId: init.trailVideoId, youtubeVideoId });
+        // invalidate list
+        await qc.invalidateQueries({ queryKey: ["trail-videos"] });
+        return { ...final, trailVideoId: init.trailVideoId, partial: false } as any;
+      } catch (err: any) {
+        // log and return partial success
+        const msg = String(err?.message ?? err ?? "Erro ao finalizar.");
+        await qc.invalidateQueries({ queryKey: ["trail-videos"] });
+        return { partial: true, trailVideoId: init.trailVideoId, youtubeVideoId, error: msg } as any;
+      }
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
+      // data.partial indicates finalize failed but upload itself succeeded
+      if (data?.partial) {
+        toast({
+          title: "Upload concluído",
+          description: `O vídeo foi enviado ao YouTube, mas houve um problema ao finalizar/registrar no site: ${data.error}.`,
+        });
+
+        setResult({
+          trailVideoId: data.trailVideoId,
+          status: "processing",
+          youtubeVideoId: data.youtubeVideoId,
+          youtubeUrl: data.youtubeUrl,
+        });
+        return;
+      }
+
       if (data.status === "published") {
         toast({ title: "Publicado no YouTube" });
       } else {
@@ -136,6 +159,7 @@ export function PublishVideoForm({ connected }: { connected: boolean }) {
       });
     },
     onError: (e: any) => {
+      // This onError now represents true failures (upload failed or session create failed)
       toast({
         title: "Não foi possível publicar",
         description: String(e?.message ?? "Tente novamente."),
