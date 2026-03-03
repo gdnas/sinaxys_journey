@@ -80,6 +80,44 @@ export async function listPointsRules(companyId: string) {
   return (data ?? []) as PointsRuleRow[];
 }
 
+export async function createPointsRule(
+  payload: Omit<PointsRuleRow, "id" | "created_at">
+) {
+  // Prefer admin RPC (enforces role checks). Fallback to direct insert if RPC not available.
+  try {
+    const { data, error } = await supabase.rpc("admin_create_points_rule", {
+      p_company_id: payload.company_id,
+      p_key: payload.key,
+      p_category: payload.category,
+      p_label: payload.label,
+      p_points: payload.points,
+      p_description: payload.description,
+      p_active: payload.active ?? true,
+    });
+    if (error) throw error;
+    if (data && Array.isArray(data) && data.length) return data[0] as PointsRuleRow;
+  } catch (e) {
+    // ignore and fallback
+  }
+
+  const { data, error } = await supabase
+    .from("points_rules")
+    .insert({
+      company_id: payload.company_id,
+      key: payload.key,
+      category: payload.category,
+      label: payload.label,
+      points: payload.points,
+      description: payload.description,
+      active: payload.active ?? true,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as PointsRuleRow;
+}
+
 export async function updatePointsRule(
   ruleId: string,
   patch: Partial<Pick<PointsRuleRow, "points" | "active">>
@@ -96,6 +134,18 @@ export async function updatePointsRule(
     // ignore and fallback
   }
 
+  const { data, error } = await supabase
+    .from("points_rules")
+    .update(patch)
+    .eq("id", ruleId)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as PointsRuleRow;
+}
+
+export async function updatePointsRuleDirect(ruleId: string, patch: Partial<Pick<PointsRuleRow, "points" | "active">>) {
   const { data, error } = await supabase
     .from("points_rules")
     .update(patch)

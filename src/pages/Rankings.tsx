@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import {
   addPointsBonus,
   createRewardTier,
+  createPointsRule,
   deleteRewardTier,
   fetchLeaderboard,
   getMyPointsEvents,
@@ -29,6 +30,7 @@ import { ScrollableTabsList } from "@/components/ScrollableTabsList";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -300,7 +302,25 @@ function RulesAdmin({ companyId, rules }: { companyId: string; rules: PointsRule
   const { user } = useAuth();
   const [draft, setDraft] = useState<Record<string, { points: string; active: boolean }>>({});
 
+  // New-rule dialog state
+  const [openCreate, setOpenCreate] = useState(false);
+  const [newCategory, setNewCategory] = useState("TRILHAS");
+  const [newLabel, setNewLabel] = useState("");
+  const [newKey, setNewKey] = useState("");
+  const [newPoints, setNewPoints] = useState("5");
+  const [newDescription, setNewDescription] = useState("");
+  const [newActive, setNewActive] = useState(true);
+
   if (!user || user.role !== "ADMIN") return null;
+
+  const categories = ["TRILHAS", "OKR", "ENTREGAVEL", "TEMPO_EMPRESA", "OUTRO"];
+
+  const generateKey = (label: string) =>
+    label
+      .trim()
+      .toUpperCase()
+      .replace(/\s+/g, "_")
+      .replace(/[^A-Z0-9_]/g, "");
 
   return (
     <Card className="mt-4 rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
@@ -309,7 +329,97 @@ function RulesAdmin({ companyId, rules }: { companyId: string; rules: PointsRule
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Regras de pontos</div>
           <div className="mt-1 text-sm text-muted-foreground">Ajuste quanto cada tipo de ação vale daqui para frente.</div>
         </div>
-        <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white ring-1 ring-[color:var(--sinaxys-border)]">ADMIN</Badge>
+
+        <div className="flex items-center gap-2">
+          <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+            <DialogTrigger asChild>
+              <Button className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+                <Plus className="mr-2 h-4 w-4" />
+                Nova regra
+              </Button>
+            </DialogTrigger>
+
+            <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
+              <DialogHeader>
+                <DialogTitle className="text-[color:var(--sinaxys-ink)]">Criar regra de pontos</DialogTitle>
+              </DialogHeader>
+
+              <div className="grid gap-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Categoria</div>
+                  <Select value={newCategory} onValueChange={(v) => setNewCategory(v)}>
+                    <SelectTrigger className="h-11 rounded-xl"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {categories.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rótulo</div>
+                  <Input className="mt-2 h-11 rounded-xl" value={newLabel} onChange={(e) => { setNewLabel(e.target.value); setNewKey(generateKey(e.target.value)); }} placeholder="Ex.: Atingimento OKR" />
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Chave (identificador)</div>
+                  <Input className="mt-2 h-11 rounded-xl" value={newKey} onChange={(e) => setNewKey(generateKey(e.target.value))} placeholder="AUTO_GERADA" />
+                  <div className="text-xs text-muted-foreground mt-1">Chave única por empresa (ex.: OKR_ATINGIMENTO). Usada para identificar a regra programaticamente.</div>
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pontos</div>
+                  <Input className="mt-2 h-11 rounded-xl" value={newPoints} onChange={(e) => setNewPoints(e.target.value.replace(/[^0-9-]/g, ""))} />
+                </div>
+
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Descrição (opcional)</div>
+                  <Textarea className="mt-2 min-h-24 rounded-2xl" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} />
+                </div>
+
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ativa</div>
+                    <Switch checked={newActive} onCheckedChange={setNewActive} className="data-[state=checked]:bg-[color:var(--sinaxys-primary)]" />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" className="rounded-xl" onClick={() => setOpenCreate(false)}>Cancelar</Button>
+                    <Button className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                      onClick={async () => {
+                        if (!newLabel.trim() || !newKey.trim()) {
+                          toast({ title: "Informe rótulo e chave válidos." });
+                          return;
+                        }
+                        const pts = Number(newPoints) || 0;
+                        try {
+                          await createPointsRule({
+                            company_id: companyId,
+                            key: newKey,
+                            category: newCategory,
+                            label: newLabel.trim(),
+                            points: pts,
+                            description: newDescription.trim() || null,
+                            active: newActive,
+                          });
+                          toast({ title: "Regra criada." });
+                          setOpenCreate(false);
+                          setNewLabel(""); setNewKey(""); setNewPoints("5"); setNewDescription(""); setNewActive(true);
+                          await qc.invalidateQueries({ queryKey: ["points", "rules", companyId] });
+                        } catch (e: any) {
+                          toast({ title: "Erro ao criar regra", description: e?.message ?? String(e) });
+                        }
+                      }}
+                    >
+                      Criar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="mt-4 grid gap-2">
