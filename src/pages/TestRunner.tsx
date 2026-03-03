@@ -142,8 +142,11 @@ const TestRunner = () => {
       });
 
       if (error) {
-        setLastError(error.message || String(error));
-        toast.error('Erro ao iniciar QA: ' + (error.message ?? String(error)));
+        const parsedErr = parseInvokeResponse(data) ?? {};
+        const details = parsedErr.details || parsedErr.error || error.message || String(error);
+        setLastError(details);
+        console.error('qa-run error details', parsedErr);
+        toast.error('Erro ao iniciar QA: ' + details);
         setRunState('idle');
         return;
       }
