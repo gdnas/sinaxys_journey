@@ -7,6 +7,15 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function log(msg: string, data?: any) {
+  console.log('[qa-status] ' + msg, data ?? '');
+}
+
+function safeTrim(text: string | null | undefined, max = 2000) {
+  if (!text) return null;
+  return text.length <= max ? text : text.slice(0, max) + '... [truncated]';
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -15,7 +24,7 @@ serve(async (req) => {
 
   try {
     if (req.method !== 'GET' && req.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405, headers: corsHeaders })
+      return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // Extract runId from GET query or POST body
@@ -30,71 +39,105 @@ serve(async (req) => {
         try {
           const body = JSON.parse(text)
           runId = body?.run_id ?? body?.runId ?? null
-        } catch {
-          // ignore parse error
+        } catch (e) {
+          log('Failed to parse JSON body', String(e))
+          return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
       }
     }
 
     if (!runId) {
-      return new Response('run_id parameter is required', { status: 400, headers: corsHeaders })
+      return new Response(JSON.stringify({ error: 'run_id parameter is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // Authentication check
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      return new Response('Unauthorized: No authorization header', { status: 401, headers: corsHeaders })
+      return new Response(JSON.stringify({ error: 'Unauthorized: No authorization header' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const token = authHeader.replace('Bearer ', '')
+    const tokenMatch = authHeader.match(/^Bearer\s+(.+)$/i)
+    const token = tokenMatch ? tokenMatch[1] : authHeader
+
+    // Supabase env
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') || 'https://gohcnlyonuoeszaqjsxw.supabase.co'
+    const supabaseAnon = Deno.env.get('SUPABASE_ANON_KEY') || ''
 
     // Verify JWT with Supabase
-    const userResp = await fetch(`https://gohcnlyonuoeszaqjsxw.supabase.co/auth/v1/user`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'apikey': Deno.env.get('SUPABASE_ANON_KEY') || '',
-      }
-    })
-
-    if (!userResp.ok) {
-      return new Response('Unauthorized: Invalid token', { status: 401, headers: corsHeaders })
+    let userResp
+    try {
+      userResp = await fetch(`${supabaseUrl}/auth/v1/user`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey': supabaseAnon,
+        }
+      })
+    } catch (err) {
+      log('Supabase /auth fetch network error', String(err))
+      return new Response(JSON.stringify({ error: 'Network error contacting Supabase auth', details: String(err) }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const userData = await userResp.json()
-    const userId = userData.id
+    if (!userResp.ok) {
+      const errText = await userResp.text().catch(() => '')
+      log('Supabase auth failed', { status: userResp.status, body: safeTrim(errText) })
+      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid token', details: safeTrim(errText) }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
+    const userData = await userResp.json().catch((e) => {
+      log('Failed to parse user JSON', String(e))
+      return null
+    })
+
+    const userId = userData?.id
     if (!userId) {
-      return new Response('Unauthorized: Invalid user data', { status: 401, headers: corsHeaders })
+      log('Missing user id in user data', { userData })
+      return new Response(JSON.stringify({ error: 'Unauthorized: Invalid user data' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // Check if user is MASTERADMIN
-    const profilesResp = await fetch(`https://gohcnlyonuoeszaqjsxw.supabase.co/rest/v1/profiles?id=eq.${userId}&select=role`, {
+    const profilesResp = await fetch(`${supabaseUrl}/rest/v1/profiles?id=eq.${userId}&select=role`, {
       headers: {
         'Authorization': `Bearer ${token}`,
-        'apikey': Deno.env.get('SUPABASE_ANON_KEY') || '',
+        'apikey': supabaseAnon,
       }
     })
 
     if (!profilesResp.ok) {
-      return new Response('Error checking user role', { status: 500, headers: corsHeaders })
+      const txt = await profilesResp.text().catch(() => '')
+      log('Profiles fetch failed', { status: profilesResp.status, body: safeTrim(txt) })
+      return new Response(JSON.stringify({ error: 'Error checking user role', details: safeTrim(txt) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const profiles = await profilesResp.json()
-    const userRole = profiles[0]?.role
+    const profiles = await profilesResp.json().catch((e) => {
+      log('Failed to parse profiles JSON', String(e))
+      return null
+    })
 
+    const userRole = profiles?.[0]?.role
     if (userRole !== 'MASTERADMIN') {
-      return new Response('Forbidden: Only MASTERADMIN can check QA status', { status: 403, headers: corsHeaders })
+      log('Forbidden: user not MASTERADMIN', { userId, role: userRole })
+      return new Response(JSON.stringify({ error: 'Forbidden: Only MASTERADMIN can check QA status', role: userRole }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Get workflow run status from GitHub
+    // GitHub token and repository
     const githubToken = Deno.env.get('GITHUB_TOKEN')
+    const repoEnv = Deno.env.get('GITHUB_REPOSITORY')
+    const repo = repoEnv || 'your-repo-owner/your-repo'
+
+    const repoFormatOk = /^[^/\s]+\/[^/\s]+$/.test(repo)
     if (!githubToken) {
-      console.error('[qa-status] GITHUB_TOKEN not configured')
-      return new Response('Server configuration error', { status: 500, headers: corsHeaders })
+      log('Missing GITHUB_TOKEN')
+      return new Response(JSON.stringify({ error: 'Server configuration error: GITHUB_TOKEN not set' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    if (!repoFormatOk) {
+      log('Invalid GITHUB_REPOSITORY value', { repo })
+      return new Response(JSON.stringify({ error: 'Server configuration error: invalid GITHUB_REPOSITORY', repo }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Fetch run details with jobs
-    const runResp = await fetch(`https://api.github.com/repos/your-repo-owner/your-repo/actions/runs/${runId}`, {
+    // Fetch run details
+    const runUrl = `https://api.github.com/repos/${repo}/actions/runs/${runId}`
+    log('Fetching run details', { runUrl })
+    const runResp = await fetch(runUrl, {
       headers: {
         'Authorization': `Bearer ${githubToken}`,
         'Accept': 'application/vnd.github+json',
@@ -102,45 +145,47 @@ serve(async (req) => {
     })
 
     if (!runResp.ok) {
-      console.error('[qa-status] Failed to fetch run status')
-      return new Response('Failed to fetch run status', { status: 500, headers: corsHeaders })
+      const text = await runResp.text().catch(() => '')
+      log('Failed to fetch run status', { status: runResp.status, body: safeTrim(text) })
+      return new Response(JSON.stringify({ error: 'Failed to fetch run status', status: runResp.status, details: safeTrim(text) }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const runData = await runResp.json()
-    const { status, conclusion, created_at, updated_at, html_url } = runData
+    const runData = await runResp.json().catch((e) => {
+      log('Failed to parse run JSON', String(e))
+      return null
+    })
 
-    // Fetch logs for each job
-    const jobsResp = await fetch(`https://api.github.com/repos/your-repo-owner/your-repo/actions/runs/${runId}/jobs`, {
+    const { status, conclusion, created_at, updated_at, html_url } = runData || {}
+
+    // Fetch jobs
+    const jobsUrl = `https://api.github.com/repos/${repo}/actions/runs/${runId}/jobs`
+    log('Fetching run jobs', { jobsUrl })
+    const jobsResp = await fetch(jobsUrl, {
       headers: {
         'Authorization': `Bearer ${githubToken}`,
         'Accept': 'application/vnd.github+json',
       },
     })
 
-    let jobs = []
-    let logsUrl = null
+    let jobs: any[] = []
+    let logsUrl: string | null = null
 
     if (jobsResp.ok) {
-      const jobsData = await jobsResp.json() as { jobs: any[] }
-      jobs = jobsData.jobs || []
-      
-      // Try to get logs for first job
+      const jobsData = await jobsResp.json().catch((e) => {
+        log('Failed to parse jobs JSON', String(e))
+        return null
+      })
+      jobs = jobsData?.jobs || []
+
       if (jobs.length > 0) {
-        const logsResp = await fetch(`https://api.github.com/repos/your-repo-owner/your-repo/actions/jobs/${jobs[0].id}/logs`, {
-          headers: {
-            'Authorization': `Bearer ${githubToken}`,
-            'Accept': 'application/vnd.github+json',
-          },
-        })
-        
-        if (logsResp.ok) {
-          const logsData = await logsResp.json()
-          logsUrl = logsUrl || logsResp.url
-        }
+        // Provide the logs URL (note: this is a URL to the logs resource)
+        logsUrl = `https://api.github.com/repos/${repo}/actions/jobs/${jobs[0].id}/logs`
       }
+    } else {
+      const txt = await jobsResp.text().catch(() => '')
+      log('Jobs fetch failed', { status: jobsResp.status, body: safeTrim(txt) })
     }
 
-    // Map job statuses to step names
     const jobSteps = jobs.map((job: any) => ({
       name: job.name,
       status: job.status,
@@ -149,7 +194,7 @@ serve(async (req) => {
       completed_at: job.completed_at,
     }))
 
-    console.log('[qa-status] Run status:', status, 'Jobs:', jobSteps.length)
+    log('Returning run status', { runId, status, conclusion, jobs: jobSteps.length })
 
     return new Response(JSON.stringify({
       runId,
@@ -168,7 +213,7 @@ serve(async (req) => {
       },
     })
   } catch (err) {
-    console.error('[qa-status] Unexpected error', err)
-    return new Response('Internal server error', { status: 500, headers: corsHeaders })
+    log('Unexpected error', { error: String(err), stack: err?.stack })
+    return new Response(JSON.stringify({ error: 'Internal server error', details: String(err) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   }
 })
