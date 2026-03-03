@@ -48,13 +48,13 @@ export default function AppCertificates() {
                 </div>
                 <div className="flex w-full flex-col items-stretch gap-2 sm:flex-row sm:items-center md:w-auto">
                   <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
-                    <Link to={`/app/certificates/${c.id}`}>Ver</Link>
+                    <Link to={`/certificate/${c.id}`}>Ver</Link>
                   </Button>
                   <Button
                     variant="outline"
                     className="w-full rounded-xl sm:w-auto"
                     onClick={() => {
-                      window.open(`/app/certificates/${c.id}?print=1`, "_blank");
+                      window.open(`/certificate/${c.id}?print=1`, "_blank");
                     }}
                   >
                     <Printer className="mr-2 h-4 w-4" />
