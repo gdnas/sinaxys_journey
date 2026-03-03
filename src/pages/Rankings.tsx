@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Medal, Plus, Sparkles, Trophy } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { supabase } from "@/integrations/supabase/client";
 import {
   addPointsBonus,
   createRewardTier,
@@ -261,7 +262,23 @@ function AdminBonusCard({ companyId, people }: { companyId: string; people: Publ
             }
 
             try {
-              await addPointsBonus({ companyId, userId: targetId, points: n, note: note.trim() || null });
+              // Prefer admin RPC to add points; admin_add_points returns the created event
+              try {
+                const { data: rpcData, error: rpcErr } = await supabase.rpc('admin_add_points', {
+                  p_company_id: companyId,
+                  p_user_id: targetId,
+                  p_rule_key: 'ADMIN_BONUS',
+                  p_points: n,
+                  p_note: note.trim() || null,
+                  p_created_by_user_id: user.id,
+                });
+                if (rpcErr) throw rpcErr;
+                // successfully created via RPC
+              } catch (rpcErr) {
+                // fallback: use existing addPointsBonus RPC
+                await addPointsBonus({ companyId, userId: targetId, points: n, note: note.trim() || null });
+              }
+
               setNote("");
               toast({ title: "Bônus aplicado." });
               await qc.invalidateQueries({ queryKey: ["points", "leaderboard", companyId] });

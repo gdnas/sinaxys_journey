@@ -84,6 +84,18 @@ export async function updatePointsRule(
   ruleId: string,
   patch: Partial<Pick<PointsRuleRow, "points" | "active">>
 ) {
+  // Prefer admin RPC (enforces role checks). Fallback to direct update if RPC not available.
+  try {
+    const { data, error } = await supabase.rpc("admin_update_points_rule", {
+      p_rule_id: ruleId,
+      p_points: typeof patch.points === "number" ? patch.points : null,
+      p_active: typeof patch.active === "boolean" ? patch.active : null,
+    });
+    if (!error && data && Array.isArray(data) && data.length) return data[0] as PointsRuleRow;
+  } catch (e) {
+    // ignore and fallback
+  }
+
   const { data, error } = await supabase
     .from("points_rules")
     .update(patch)
@@ -110,6 +122,23 @@ export async function listRewardTiers(companyId: string) {
 export async function createRewardTier(
   payload: Omit<RewardTierRow, "id" | "created_at">
 ) {
+  // Prefer admin RPC (enforces role checks). Fallback to direct insert if RPC not available.
+  try {
+    const { data, error } = await supabase.rpc("admin_create_reward_tier", {
+      p_company_id: payload.company_id,
+      p_name: payload.name,
+      p_min_points: payload.min_points,
+      p_prize: payload.prize,
+      p_description: payload.description,
+      p_active: payload.active ?? true,
+    });
+    if (error) throw error;
+    // RPC returns the created row
+    if (data && Array.isArray(data) && data.length) return data[0] as RewardTierRow;
+  } catch (e) {
+    // ignore and fallback
+  }
+
   const { data, error } = await supabase
     .from("reward_tiers")
     .insert({
@@ -131,6 +160,15 @@ export async function updateRewardTier(
   tierId: string,
   patch: Partial<Pick<RewardTierRow, "active">>
 ) {
+  // Prefer admin RPC
+  try {
+    const { data, error } = await supabase.rpc("admin_update_reward_tier", { p_tier_id: tierId, p_active: patch.active ?? null });
+    if (error) throw error;
+    if (data && Array.isArray(data) && data.length) return data[0] as RewardTierRow;
+  } catch (e) {
+    // ignore and fallback
+  }
+
   const { data, error } = await supabase
     .from("reward_tiers")
     .update(patch)
@@ -143,6 +181,14 @@ export async function updateRewardTier(
 }
 
 export async function deleteRewardTier(tierId: string) {
+  // Prefer admin RPC
+  try {
+    const { error } = await supabase.rpc("admin_delete_reward_tier", { p_tier_id: tierId });
+    if (!error) return;
+  } catch (e) {
+    // ignore and fallback
+  }
+
   const { error } = await supabase
     .from("reward_tiers")
     .delete()
