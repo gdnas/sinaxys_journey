@@ -292,7 +292,17 @@ serve(async (req) => {
 
     // Dispatch workflow
     const dispatchUrl = `https://api.github.com/repos/${repo}/actions/workflows/${workflowFile}/dispatches`;
-    log("Dispatching workflow", { dispatchUrl, workflowFile, inputs: workflowInputs });
+
+    // GitHub API expects workflow_dispatch inputs to be strings. Convert booleans/numbers to strings.
+    const sanitizedInputs: Record<string, string> = {};
+    for (const key of Object.keys(workflowInputs)) {
+      const val = workflowInputs[key];
+      if (typeof val === 'boolean') sanitizedInputs[key] = val ? 'true' : 'false';
+      else if (val === null || val === undefined) sanitizedInputs[key] = '';
+      else sanitizedInputs[key] = String(val);
+    }
+
+    log("Dispatching workflow", { dispatchUrl, workflowFile, inputs: sanitizedInputs });
 
     let workflowResp;
     try {
@@ -304,7 +314,7 @@ serve(async (req) => {
           "User-Agent": "supabase-edge-function",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ref: "main", inputs: workflowInputs }),
+        body: JSON.stringify({ ref: "main", inputs: sanitizedInputs }),
       });
     } catch (err) {
       log("Dispatch network error", String(err));
