@@ -407,6 +407,14 @@ const App = () => (
                     }
                   />
                   <Route
+                    path="/app/certificates/:certificateId"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <CertificateView />
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
                     path="/certificate/:certificateId"
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
