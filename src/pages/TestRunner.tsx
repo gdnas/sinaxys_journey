@@ -575,7 +575,7 @@ const TestRunner = () => {
               onClick={fetchQAHistory}
               disabled={historyLoading}
             >
-              <Refresh className={`h-4 w-4 mr-2 ${historyLoading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 mr-2 ${historyLoading ? 'animate-spin' : ''}`} />
               Atualizar
             </Button>
           </div>
