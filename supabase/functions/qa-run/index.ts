@@ -269,6 +269,7 @@ serve(async (req) => {
 
     // Pre-check: validate repo access with a quick GET to the repo API
     const repoUrl = `https://api.github.com/repos/${repo}`;
+    let dispatchRef = 'main';
     try {
       const repoCheck = await fetch(repoUrl, {
         headers: { Authorization: `Bearer ${githubToken}`, Accept: "application/vnd.github+json" },
@@ -281,6 +282,15 @@ serve(async (req) => {
           JSON.stringify({ error: 'Repository access check failed', status: repoCheck.status, details: safeTrim(txt) }),
           { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // If repo is accessible, read default_branch so we dispatch to correct ref
+      try {
+        const repoData = await repoCheck.json();
+        dispatchRef = repoData?.default_branch || 'main';
+        log('Repository default branch', { dispatchRef });
+      } catch (e) {
+        log('Failed to parse repo JSON, falling back to main', String(e));
       }
     } catch (err) {
       log('Repo check network error', String(err));
@@ -302,7 +312,7 @@ serve(async (req) => {
       else sanitizedInputs[key] = String(val);
     }
 
-    log("Dispatching workflow", { dispatchUrl, workflowFile, inputs: sanitizedInputs });
+    log("Dispatching workflow", { dispatchUrl, workflowFile, inputs: sanitizedInputs, ref: dispatchRef });
 
     let workflowResp;
     try {
@@ -314,7 +324,7 @@ serve(async (req) => {
           "User-Agent": "supabase-edge-function",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ref: "main", inputs: sanitizedInputs }),
+        body: JSON.stringify({ ref: dispatchRef, inputs: sanitizedInputs }),
       });
     } catch (err) {
       log("Dispatch network error", String(err));
