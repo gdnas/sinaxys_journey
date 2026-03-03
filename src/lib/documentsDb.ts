@@ -183,6 +183,21 @@ export async function uploadUserDocumentFile(params: {
 
   // Upload to storage bucket 'user-documents'
   const storage = supabase.storage.from("user-documents");
+
+  // Helper to normalize SDK response error into a message
+  function errorMessageFromUpload(err: any) {
+    try {
+      if (!err) return undefined;
+      if (typeof err === "string") return err;
+      if (err.message) return String(err.message);
+      if (err.error) return String(err.error);
+      return JSON.stringify(err);
+    } catch {
+      return String(err);
+    }
+  }
+
+  // First attempt: normal upload (no upsert)
   const { error: uploadError } = await storage.upload(path, uploadBlob as Blob, {
     cacheControl: "3600",
     upsert: false,
@@ -191,13 +206,12 @@ export async function uploadUserDocumentFile(params: {
 
   // If bucket is not found, attempt to create it via an edge function and retry once.
   if (uploadError) {
-    const message = String(uploadError.message || uploadError.message || uploadError);
+    const message = errorMessageFromUpload(uploadError) ?? "";
     if (/bucket not found/i.test(message) || /no such bucket/i.test(message) || /Bucket not found/i.test(message)) {
       try {
         // Invoke Supabase Edge Function to create the bucket using service role key.
         // The function is expected at supabase/functions/create-user-documents-bucket
         const fn = await supabase.functions.invoke("create-user-documents-bucket");
-        // fn.data may be present; check for error
         // Retry upload once
         const { error: retryError } = await storage.upload(path, uploadBlob as Blob, {
           cacheControl: "3600",
@@ -206,10 +220,23 @@ export async function uploadUserDocumentFile(params: {
         } as any);
         if (retryError) throw retryError;
       } catch (e) {
-        throw uploadError;
+        // If we couldn't create the bucket or upload still fails, surface original error
+        throw new Error(errorMessageFromUpload(uploadError) || "Erro ao enviar arquivo.");
       }
     } else {
-      throw uploadError;
+      // For other errors, attempt a safe retry with upsert=true (handles rare race/duplicate issues)
+      try {
+        const { error: retry2 } = await storage.upload(path, uploadBlob as Blob, {
+          cacheControl: "3600",
+          upsert: true,
+          contentType,
+        } as any);
+        if (retry2) throw retry2;
+      } catch (e) {
+        // If retry also fails, throw a clear error including server message for easier debugging
+        const msg = errorMessageFromUpload(e) || errorMessageFromUpload(uploadError) || "Erro ao enviar arquivo.";
+        throw new Error(msg);
+      }
     }
   }
 
