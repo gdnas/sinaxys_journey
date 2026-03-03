@@ -361,111 +361,263 @@ const TestRunner = () => {
               </TabsList>
 
               <TabsContent value="quick" className="mt-4">
-                <div className="text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground mb-2">Testes essenciais (rápido)</p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>ESLint (Linting de código)</li>
-                    <li>TypeScript (Verificação de tipos)</li>
-                  </ul>
-                  <p className="mt-2 text-xs text-muted-foreground">Tempo estimado: 30-60 segundos</p>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Badge className={getTestTypeColor('quick')}>Rápido</Badge>
+                    <p className="font-medium text-foreground">Testes essenciais para verificar o código</p>
+                  </div>
+                  <div className="grid gap-3 pl-2">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
+                      <div className="h-8 w-8 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">ESLint (Linting de código)</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Verifica se o código está bem formatado e segue as boas práticas de programação. 
+                          Identifica erros comuns e inconsistências de estilo.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                      <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">TypeScript (Verificação de tipos)</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Confere se os tipos de dados estão corretos em todo o código. 
+                          Previne erros que poderiam ocorrer quando o sistema estiver em produção.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Tempo estimado: </span>
+                    <Badge variant="outline">30-60 segundos</Badge>
+                  </div>
                 </div>
               </TabsContent>
 
               <TabsContent value="full" className="mt-4">
-                <div className="text-sm text-muted-foreground">
-                  <p className="font-medium text-foreground mb-2">Pipeline completo</p>
-                  <ul className="list-disc list-inside space-y-1 ml-2">
-                    <li>ESLint (Linting de código)</li>
-                    <li>TypeScript (Verificação de tipos)</li>
-                    <li>Unit Tests (Vitest)</li>
-                    <li>E2E Tests (Playwright)</li>
-                  </ul>
-                  <p className="mt-2 text-xs text-muted-foreground">Tempo estimado: 5-10 minutos</p>
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Badge className={getTestTypeColor('full')}>Completo</Badge>
+                    <p className="font-medium text-foreground">Verificação completa da qualidade do código</p>
+                  </div>
+                  <div className="grid gap-3 pl-2">
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
+                      <div className="h-8 w-8 rounded-full bg-purple-500 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">ESLint (Linting de código)</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Verifica se o código está bem formatado e segue as boas práticas de programação. 
+                          Identifica erros comuns e inconsistências de estilo.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+                      <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">TypeScript (Verificação de tipos)</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Confere se os tipos de dados estão corretos em todo o código. 
+                          Previne erros que poderiam ocorrer quando o sistema estiver em produção.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                      <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">Unit Tests (Testes Unitários)</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Testa cada parte do código individualmente. Verifica se as funções, 
+                          componentes e lógicas funcionam como esperado de forma isolada.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3 p-3 rounded-lg bg-orange-50 dark:bg-orange-950/20 border border-orange-200 dark:border-orange-800">
+                      <div className="h-8 w-8 rounded-full bg-orange-500 flex items-center justify-center flex-shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-sm">E2E Tests (Testes Ponta a Ponta)</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Simula o uso real do sistema como um usuário faria. 
+                          Testa fluxos completos como login, cadastro, navegação entre páginas, etc.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Tempo estimado: </span>
+                    <Badge variant="outline">5-10 minutos</Badge>
+                  </div>
                 </div>
               </TabsContent>
 
               <TabsContent value="custom" className="mt-4">
-                <div className="space-y-3">
-                  <p className="font-medium text-sm">Selecione os testes específicos:</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center space-x-2">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <Badge className={getTestTypeColor('custom')}>Personalizado</Badge>
+                    <p className="font-medium text-foreground">Escolha quais testes executar</p>
+                  </div>
+                  <div className="grid gap-4 pl-2">
+                    <div className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
                       <Checkbox
                         id="lint"
                         checked={selectedTests.lint}
                         onCheckedChange={(checked) => setSelectedTests({ ...selectedTests, lint: checked as boolean })}
+                        className="mt-1"
                       />
-                      <label htmlFor="lint" className="text-sm">Lint (ESLint)</label>
+                      <div className="flex-1 space-y-1">
+                        <label htmlFor="lint" className="font-medium text-sm cursor-pointer flex items-center gap-2">
+                          Lint (ESLint)
+                          <Badge variant="outline" className="text-xs">Rápido</Badge>
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          Verifica se o código está bem formatado e segue as boas práticas. 
+                          Identifica erros comuns e inconsistências de estilo.
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+
+                    <div className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
                       <Checkbox
                         id="typecheck"
                         checked={selectedTests.typecheck}
                         onCheckedChange={(checked) => setSelectedTests({ ...selectedTests, typecheck: checked as boolean })}
+                        className="mt-1"
                       />
-                      <label htmlFor="typecheck" className="text-sm">Typecheck (TypeScript)</label>
+                      <div className="flex-1 space-y-1">
+                        <label htmlFor="typecheck" className="font-medium text-sm cursor-pointer flex items-center gap-2">
+                          Typecheck (TypeScript)
+                          <Badge variant="outline" className="text-xs">Rápido</Badge>
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          Confere se os tipos de dados estão corretos. 
+                          Previne erros que poderiam ocorrer quando o sistema estiver em produção.
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+
+                    <div className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
                       <Checkbox
                         id="unit"
                         checked={selectedTests.unit}
                         onCheckedChange={(checked) => setSelectedTests({ ...selectedTests, unit: checked as boolean })}
+                        className="mt-1"
                       />
-                      <label htmlFor="unit" className="text-sm">Unit Tests (Vitest)</label>
+                      <div className="flex-1 space-y-1">
+                        <label htmlFor="unit" className="font-medium text-sm cursor-pointer flex items-center gap-2">
+                          Unit Tests (Vitest)
+                          <Badge variant="outline" className="text-xs">Médio</Badge>
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          Testa cada parte do código individualmente. Verifica se as funções 
+                          e componentes funcionam como esperado de forma isolada.
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center space-x-2">
+
+                    <div className="flex items-start gap-3 p-4 rounded-lg border bg-card hover:bg-accent/5 transition-colors">
                       <Checkbox
                         id="e2e"
                         checked={selectedTests.e2e}
                         onCheckedChange={(checked) => setSelectedTests({ ...selectedTests, e2e: checked as boolean })}
+                        className="mt-1"
                       />
-                      <label htmlFor="e2e" className="text-sm">E2E Tests (Playwright)</label>
+                      <div className="flex-1 space-y-1">
+                        <label htmlFor="e2e" className="font-medium text-sm cursor-pointer flex items-center gap-2">
+                          E2E Tests (Playwright)
+                          <Badge variant="outline" className="text-xs">Lento</Badge>
+                        </label>
+                        <p className="text-xs text-muted-foreground">
+                          Simula o uso real do sistema como um usuário faria. 
+                          Testa fluxos completos como login, cadastro, navegação entre páginas, etc.
+                        </p>
+                      </div>
                     </div>
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Selecione pelo menos um teste para executar
-                  </p>
+                  <div className="p-3 rounded-lg bg-muted text-sm text-muted-foreground flex items-start gap-2">
+                    <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                    <p>Selecione pelo menos um teste para executar. O tempo total depende da combinação escolhida.</p>
+                  </div>
                 </div>
               </TabsContent>
             </Tabs>
           </div>
 
           {/* Ação Principal */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <Button
-              onClick={triggerQARun}
-              disabled={runState === 'triggering' || runState === 'queued' || runState === 'in_progress'}
-              size="lg"
-              className={`min-w-[200px] ${testType === 'custom' ? 'bg-orange-500 hover:bg-orange-600' : testType === 'quick' ? 'bg-purple-500 hover:bg-purple-600' : 'bg-blue-500 hover:bg-blue-600'}`}
-            >
-              {runState === 'triggering' ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Iniciando...
-                </>
-              ) : (
-                <>
-                  <Play className="mr-2 h-4 w-4" />
-                  Executar {getTestTypeLabel(testType)}
-                </>
-              )}
-            </Button>
+          <div className="space-y-3">
+            {/* Resumo do que será executado */}
+            {testType === 'quick' && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-purple-50 dark:bg-purple-950/20 p-3 rounded-lg">
+                <CheckCircle2 className="h-4 w-4 text-purple-500" />
+                <span>Vai executar: ESLint + TypeScript typecheck</span>
+              </div>
+            )}
+            {testType === 'full' && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg">
+                <CheckCircle2 className="h-4 w-4 text-blue-500" />
+                <span>Vai executar: ESLint + TypeScript + Unit Tests + E2E Tests</span>
+              </div>
+            )}
+            {testType === 'custom' && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-orange-50 dark:bg-orange-950/20 p-3 rounded-lg">
+                <CheckCircle2 className="h-4 w-4 text-orange-500" />
+                <span>
+                  Vai executar: {selectedTests.lint ? 'ESLint' : ''}{selectedTests.lint && (selectedTests.typecheck || selectedTests.unit || selectedTests.e2e) ? ' + ' : ''}{selectedTests.typecheck ? 'TypeScript' : ''}{selectedTests.typecheck && (selectedTests.unit || selectedTests.e2e) ? ' + ' : ''}{selectedTests.unit ? 'Unit Tests' : ''}{selectedTests.unit && selectedTests.e2e ? ' + ' : ''}{selectedTests.e2e ? 'E2E Tests' : ''}
+                </span>
+              </div>
+            )}
 
-            {qaStatus && (
-              <div className="flex items-center gap-3 text-sm">
-                {getStatusBadge(qaStatus.status, qaStatus.conclusion)}
-                {qaStatus.htmlUrl && (
-                  <a href={qaStatus.htmlUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline">
-                    Ver no GitHub <ExternalLink className="h-3 w-3" />
-                  </a>
+            {/* Botão de execução */}
+            <div className="flex items-center gap-4 flex-wrap">
+              <Button
+                onClick={triggerQARun}
+                disabled={runState === 'triggering' || runState === 'queued' || runState === 'in_progress'}
+                size="lg"
+                className={`min-w-[200px] ${testType === 'custom' ? 'bg-orange-500 hover:bg-orange-600' : testType === 'quick' ? 'bg-purple-500 hover:bg-purple-600' : 'bg-blue-500 hover:bg-blue-600'}`}
+              >
+                {runState === 'triggering' ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Iniciando...
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    Executar {getTestTypeLabel(testType)}
+                  </>
                 )}
+              </Button>
+
+              {qaStatus && (
+                <div className="flex items-center gap-3 text-sm">
+                  {getStatusBadge(qaStatus.status, qaStatus.conclusion)}
+                  {qaStatus.htmlUrl && (
+                    <a href={qaStatus.htmlUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-blue-600 hover:text-blue-700 hover:underline">
+                      Ver no GitHub <ExternalLink className="h-3 w-3" />
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+            {lastError && (
+              <div className="mt-4 text-sm text-red-400">
+                Erro: {lastError}
               </div>
             )}
           </div>
-          {lastError && (
-            <div className="mt-4 text-sm text-red-400">
-              Erro: {lastError}
-            </div>
-          )}
         </CardContent>
       </Card>
 
