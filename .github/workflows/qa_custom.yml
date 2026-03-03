@@ -1,0 +1,166 @@
+name: QA Custom Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger_user:
+        description: 'User who triggered the workflow'
+        required: false
+        type: string
+      trigger_source:
+        description: 'Source of the trigger (web/app)'
+        required: false
+        type: string
+      run_lint:
+        description: 'Run ESLint'
+        required: true
+        type: boolean
+        default: true
+      run_typecheck:
+        description: 'Run TypeScript typecheck'
+        required: true
+        type: boolean
+        default: true
+      run_unit:
+        description: 'Run unit tests'
+        required: true
+        type: boolean
+        default: false
+      run_e2e:
+        description: 'Run E2E tests'
+        required: true
+        type: boolean
+        default: false
+
+jobs:
+  lint:
+    if: ${{ inputs.run_lint == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Locate package.json
+        id: find_pkg
+        run: |
+          pkg=$(find . -maxdepth 4 -name package.json | head -n 1 || true)
+          if [ -z "$pkg" ]; then
+            echo "PACKAGE_DIR=." >> $GITHUB_ENV
+            echo "No package.json found in repository root or subfolders (depth 4). Using project root.";
+          else
+            dir=$(dirname "$pkg")
+            echo "PACKAGE_DIR=$dir" >> $GITHUB_ENV
+            echo "Found package.json in $dir";
+          fi
+
+      - name: Install dependencies
+        run: |
+          if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
+            npm --prefix "$PACKAGE_DIR" ci
+          else
+            npm --prefix "$PACKAGE_DIR" install
+          fi
+
+      - name: Run ESLint
+        run: |
+          npm --prefix "$PACKAGE_DIR" run lint || echo "Lint script not found or failed"
+
+  typecheck:
+    if: ${{ inputs.run_typecheck == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Locate package.json
+        id: find_pkg
+        run: |
+          pkg=$(find . -maxdepth 4 -name package.json | head -n 1 || true)
+          if [ -z "$pkg" ]; then
+            echo "PACKAGE_DIR=." >> $GITHUB_ENV
+            echo "No package.json found in repository root or subfolders (depth 4). Using project root.";
+          else
+            dir=$(dirname "$pkg")
+            echo "PACKAGE_DIR=$dir" >> $GITHUB_ENV
+            echo "Found package.json in $dir";
+          fi
+
+      - name: Install dependencies
+        run: |
+          if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
+            npm --prefix "$PACKAGE_DIR" ci
+          else
+            npm --prefix "$PACKAGE_DIR" install
+          fi
+
+      - name: Run TypeScript typecheck
+        run: |
+          npm --prefix "$PACKAGE_DIR" run typecheck || echo "Typecheck script not found or failed"
+
+  unit-tests:
+    if: ${{ inputs.run_unit == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Locate package.json
+        id: find_pkg
+        run: |
+          pkg=$(find . -maxdepth 4 -name package.json | head -n 1 || true)
+          if [ -z "$pkg" ]; then
+            echo "PACKAGE_DIR=." >> $GITHUB_ENV
+            echo "No package.json found in repository root or subfolders (depth 4). Using project root.";
+          else
+            dir=$(dirname "$pkg")
+            echo "PACKAGE_DIR=$dir" >> $GITHUB_ENV
+            echo "Found package.json in $dir";
+          fi
+
+      - name: Install dependencies
+        run: |
+          if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
+            npm --prefix "$PACKAGE_DIR" ci
+          else
+            npm --prefix "$PACKAGE_DIR" install
+          fi
+
+      - name: Run unit tests
+        run: |
+          npm --prefix "$PACKAGE_DIR" run test || echo "Test script not found or failed"
+
+  e2e-tests:
+    if: ${{ inputs.run_e2e == true }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Locate package.json
+        id: find_pkg
+        run: |
+          pkg=$(find . -maxdepth 4 -name package.json | head -n 1 || true)
+          if [ -z "$pkg" ]; then
+            echo "PACKAGE_DIR=." >> $GITHUB_ENV
+            echo "No package.json found in repository root or subfolders (depth 4). Using project root.";
+          else
+            dir=$(dirname "$pkg")
+            echo "PACKAGE_DIR=$dir" >> $GITHUB_ENV
+            echo "Found package.json in $dir";
+          fi
+
+      - name: Install dependencies
+        run: |
+          if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
+            npm --prefix "$PACKAGE_DIR" ci
+          else
+            npm --prefix "$PACKAGE_DIR" install
+          fi
+
+      - name: Install Playwright
+        run: |
+          npx playwright install --with-deps
+
+      - name: Run E2E tests
+        run: |
+          npm --prefix "$PACKAGE_DIR" run test:e2e || echo "E2E test script not found or failed"

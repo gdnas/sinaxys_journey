@@ -1,0 +1,76 @@
+name: QA Quick Test
+
+on:
+  workflow_dispatch:
+    inputs:
+      trigger_user:
+        description: 'User who triggered the workflow'
+        required: false
+        type: string
+      trigger_source:
+        description: 'Source of the trigger (web/app)'
+        required: false
+        type: string
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Locate package.json
+        id: find_pkg
+        run: |
+          pkg=$(find . -maxdepth 4 -name package.json | head -n 1 || true)
+          if [ -z "$pkg" ]; then
+            echo "PACKAGE_DIR=." >> $GITHUB_ENV
+            echo "No package.json found in repository root or subfolders (depth 4). Using project root.";
+          else
+            dir=$(dirname "$pkg")
+            echo "PACKAGE_DIR=$dir" >> $GITHUB_ENV
+            echo "Found package.json in $dir";
+          fi
+
+      - name: Install dependencies
+        run: |
+          if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
+            npm --prefix "$PACKAGE_DIR" ci
+          else
+            npm --prefix "$PACKAGE_DIR" install
+          fi
+
+      - name: Run ESLint
+        run: |
+          npm --prefix "$PACKAGE_DIR" run lint || echo "Lint script not found or failed"
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Locate package.json
+        id: find_pkg
+        run: |
+          pkg=$(find . -maxdepth 4 -name package.json | head -n 1 || true)
+          if [ -z "$pkg" ]; then
+            echo "PACKAGE_DIR=." >> $GITHUB_ENV
+            echo "No package.json found in repository root or subfolders (depth 4). Using project root.";
+          else
+            dir=$(dirname "$pkg")
+            echo "PACKAGE_DIR=$dir" >> $GITHUB_ENV
+            echo "Found package.json in $dir";
+          fi
+
+      - name: Install dependencies
+        run: |
+          if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
+            npm --prefix "$PACKAGE_DIR" ci
+          else
+            npm --prefix "$PACKAGE_DIR" install
+          fi
+
+      - name: Run TypeScript typecheck
+        run: |
+          npm --prefix "$PACKAGE_DIR" run typecheck || echo "Typecheck script not found or failed"

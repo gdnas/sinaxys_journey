@@ -35,6 +35,27 @@ serve(async (req) => {
   }
 
   try {
+    // Parse request body
+    let body: any = {};
+    try {
+      const text = await req.text();
+      if (text) {
+        body = JSON.parse(text);
+      }
+    } catch (e) {
+      log('Failed to parse request body', String(e));
+    }
+
+    const testType = body.test_type || 'full';
+    const validTestTypes = ['quick', 'full', 'custom'];
+    if (!validTestTypes.includes(testType)) {
+      log('Invalid test_type', { testType });
+      return new Response(
+        JSON.stringify({ error: 'Invalid test_type', validTestTypes }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     // Auth header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
@@ -63,8 +84,25 @@ serve(async (req) => {
     const supabaseAnon = Deno.env.get("SUPABASE_ANON_KEY");
     const githubToken = Deno.env.get("GITHUB_TOKEN");
     const repoEnv = Deno.env.get("GITHUB_REPOSITORY");
-    // Allow overriding the workflow filename via env var; default to the V2 workflow we created
-    const workflowFile = Deno.env.get("GITHUB_WORKFLOW_FILE") || "qa_on_demand_v2.yml";
+
+    // Select workflow based on test_type
+    let workflowFile: string;
+    let workflowInputs: any = { trigger_user: '', trigger_source: 'web' };
+
+    if (testType === 'quick') {
+      workflowFile = 'qa_quick.yml';
+      workflowInputs.trigger_user = body.trigger_user || '';
+    } else if (testType === 'full') {
+      workflowFile = 'qa_full.yml';
+      workflowInputs.trigger_user = body.trigger_user || '';
+    } else if (testType === 'custom') {
+      workflowFile = 'qa_custom.yml';
+      workflowInputs.trigger_user = body.trigger_user || '';
+      workflowInputs.run_lint = body.run_lint !== undefined ? body.run_lint : true;
+      workflowInputs.run_typecheck = body.run_typecheck !== undefined ? body.run_typecheck : true;
+      workflowInputs.run_unit = body.run_unit !== undefined ? body.run_unit : false;
+      workflowInputs.run_e2e = body.run_e2e !== undefined ? body.run_e2e : false;
+    }
 
     log("Environment check", {
       hasSupabaseUrl: !!supabaseUrl,
@@ -72,6 +110,7 @@ serve(async (req) => {
       hasGithubToken: !!githubToken,
       hasRepoEnv: !!repoEnv,
       repo: repoEnv || "your-repo-owner/your-repo (default)",
+      testType,
       workflowFile,
     });
 
@@ -252,8 +291,8 @@ serve(async (req) => {
     }
 
     // Dispatch workflow
-    const dispatchUrl = `https://api.github.com/repos/${repo}/actions/workflows/${workflowPath}/dispatches`;
-    log("Dispatching workflow", { dispatchUrl });
+    const dispatchUrl = `https://api.github.com/repos/${repo}/actions/workflows/${workflowFile}/dispatches`;
+    log("Dispatching workflow", { dispatchUrl, workflowFile, inputs: workflowInputs });
 
     let workflowResp;
     try {
@@ -265,7 +304,7 @@ serve(async (req) => {
           "User-Agent": "supabase-edge-function",
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ ref: "main", inputs: { trigger_user: userId, trigger_source: "web" } }),
+        body: JSON.stringify({ ref: "main", inputs: workflowInputs }),
       });
     } catch (err) {
       log("Dispatch network error", String(err));
@@ -296,14 +335,14 @@ serve(async (req) => {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Try to find the created run (race condition possible) — retry a few times
-    const runsListUrl = `https://api.github.com/repos/${repo}/actions/workflows/${workflowPath}/runs`;
+    const runsListUrl = `https://api.github.com/repos/${repo}/actions/workflows/${workflowFile}/runs`;
     const maxAttempts = 6;
     const attemptDelayMs = 2000;
     let foundRun = null;
     let lastRunsError = null;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      log(`Attempt ${attempt} to find run`, { attemptDelayMs });
+      log(`Attempt ${attempt} to find run for workflow ${workflowFile}`, { attemptDelayMs });
 
       try {
         const runsResp = await fetch(`${runsListUrl}?per_page=10`, {
@@ -355,18 +394,18 @@ serve(async (req) => {
     }
 
     if (foundRun) {
-      log("Returning run details", { runId: foundRun.id, status: foundRun.status });
+      log("Returning run details", { runId: foundRun.id, status: foundRun.status, testType });
       return new Response(
-        JSON.stringify({ runId: String(foundRun.id), status: foundRun.status, htmlUrl: foundRun.html_url, createdAt: foundRun.created_at }),
+        JSON.stringify({ runId: String(foundRun.id), status: foundRun.status, htmlUrl: foundRun.html_url, createdAt: foundRun.created_at, testType, workflowFile }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const workflowPage = `https://github.com/${repo}/actions/runs`;
-    log("Run not found, returning workflow page link", { workflowPage, lastRunsError });
+    log("Run not found, returning workflow page link", { workflowPage, lastRunsError, testType, workflowFile });
 
     return new Response(
-      JSON.stringify({ dispatched: true, note: "Workflow dispatched but run not yet found; check GitHub Actions page.", workflowUrl: workflowPage, lastRunsError }),
+      JSON.stringify({ dispatched: true, note: "Workflow dispatched but run not yet found; check GitHub Actions page.", workflowUrl: workflowPage, lastRunsError, testType, workflowFile }),
       { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err) {
