@@ -32,6 +32,7 @@ import { listProfilesByCompany } from "@/lib/profilesDb";
 import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { OkrObjectiveCard } from "@/components/okr/OkrObjectiveCard";
+import { TierBadge, DepartmentMultiSelect, UserMultiSelect } from "@/components/okr";
 
 import {
   createKeyResult,
@@ -754,7 +755,15 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{editingObjectiveId ? "Editar objetivo" : scope === "year" ? "Novo objetivo do ano" : "Novo objetivo do trimestre"}</DialogTitle>
+            <DialogDescription>
+              {editingObjectiveId ? "Edite os campos abaixo." : "Preencha os campos para criar um novo objetivo."}
+            </DialogDescription>
           </DialogHeader>
+
+          {/* Tier Badge no topo do formulário */}
+          <div className="mb-4">
+            <TierBadge tier={objLevel === "COMPANY" ? "TIER1" : "TIER2"} size="md" />
+          </div>
 
           <div className="grid gap-4">
             <div className="grid gap-2">
@@ -764,7 +773,6 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                 onValueChange={(v) => {
                   const next = v as ObjectiveLevel;
                   setObjLevel(next);
-
                   // Tier 1 (Estratégico) não possui objetivo pai nem alinhamento por KR.
                   if (next === "COMPANY") {
                     setObjParent(null);
@@ -797,7 +805,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
             </div>
 
             <div className="grid gap-2">
-              <Label>Atingimento esperado (%)</Label>
+              <Label>Atendimento esperado (%)</Label>
               <Input className="h-11 rounded-xl" value={objExpected} onChange={(e) => setObjExpected(e.target.value)} placeholder="80" />
               <div className="text-xs text-muted-foreground">Ex.: 70–85% costuma ser meta realista para objetivos aspiracionais.</div>
             </div>
@@ -808,115 +816,86 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
             </div>
 
             <div className="grid gap-2">
-              <Label>Motivo estratégico (opcional)</Label>
-              <Textarea className="min-h-[92px] rounded-2xl" value={objReason} onChange={(e) => setObjReason(e.target.value)} />
+              <Label>Objetivo de longo prazo (alinhamento)</Label>
+              <Select
+                value={objStrategy ?? ""}
+                onValueChange={(v) => {
+                  setObjStrategy(v === SELECT_NONE ? null : v);
+                }}
+              >
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder="Sem vínculo" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={SELECT_NONE}>Sem vínculo</SelectItem>
+                  {strategyOptions.map((so) => (
+                    <SelectItem key={so.id} value={so.id}>
+                      {so.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              </div>
+              <div className="text-xs text-muted-foreground">Vincule o objetivo do ano ao objetivo de longo prazo (ex.: 2 anos) para aparecer no mapa.</div>
             </div>
 
             <div className="grid gap-2 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label>Dono responsável</Label>
-                <Select value={objOwner} onValueChange={(v) => setObjOwner(v)}>
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {profiles.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {(p.name ?? p.email) + (p.role ? ` (${p.role})` : "")}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Responsáveis (múltiplos)</Label>
+                <UserMultiSelect
+                  users={profiles}
+                  value={objOwner ? [objOwner] : []}
+                  onChange={(ids) => setObjOwner(ids[0] || "")}
+                  placeholder="Selecione responsáveis..."
+                  disabled={false}
+                />
               </div>
 
               <div className="grid gap-2">
-                <Label>Departamento (opcional)</Label>
-                <Select
-                  value={objDept ?? ""}
-                  onValueChange={(v) => {
-                    setObjDept(v === SELECT_NONE ? null : v);
-                  }}
-                >
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue placeholder="Sem departamento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={SELECT_NONE}>Sem departamento</SelectItem>
-                    {departments.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label className="text-sm font-medium">Departamentos (múltiplos)</label>
+                <DepartmentMultiSelect
+                  departments={departments}
+                  value={objDept ? [objDept] : []}
+                  onChange={(ids) => setObjDept(ids[0] || null)}
+                  placeholder="Selecione departamentos..."
+                  disabled={false}
+                />
               </div>
             </div>
 
-            {scope === "year" ? (
-              <div className="grid gap-2">
-                <Label>Objetivo de longo prazo (alinhamento)</Label>
-                <Select value={objStrategy ?? ""} onValueChange={(v) => setObjStrategy(v === SELECT_NONE ? null : v)}>
-                  <SelectTrigger className="h-11 rounded-xl">
-                    <SelectValue placeholder="Sem vínculo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={SELECT_NONE}>Sem vínculo</SelectItem>
-                    {strategyOptions.map((so) => (
-                      <SelectItem key={so.id} value={so.id}>
-                        {so.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="text-xs text-muted-foreground">Vincule o objetivo do ano ao objetivo de longo prazo (ex.: 2 anos) para aparecer no mapa.</div>
+            <div className="grid gap-2">
+              <Label>Impacto estimado (R$)</Label>
+              <Input className="h-11 rounded-xl" value={objValue} onChange={(e) => setObjValue(e.target.value)} placeholder="50000" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Esforço estimado (horas)</Label>
+              <Input
+                className="h-11 rounded-xl"
+                value={objEffortHours}
+                onChange={(e) => setObjEffortHours(e.target.value)}
+                placeholder="40"
+              />
+            </div>
+
+            <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
+              <div className="text-xs text-muted-foreground">
+                {objLevel === "COMPANY"
+                  ? `Custo/h do time: ${deptAvgHourly ? `${brl(deptAvgHourly)}/h` : "—"}`
+                  : `Custo/h do responsável: ${brlPerHourFromMonthly(ownerMonthly ?? 0)}`}
               </div>
-            ) : null}
-
-            {requiresBusinessCase && okrRoiEnabled ? (
-              <div className="mt-4 rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Impacto financeiro + ROI</div>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {objLevel === "COMPANY"
-                    ? "Para objetivos de Empresa, o custo é estimado pela média de custo/h dos colaboradores do time participante."
-                    : "Para objetivos de departamento, o ROI usa seu custo/h (cadastre em Custos)."}
-                </p>
-
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  <div className="grid gap-2">
-                    <Label>Impacto estimado (R$)</Label>
-                    <Input className="h-11 rounded-xl" value={objValue} onChange={(e) => setObjValue(e.target.value)} placeholder="50000" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Esforço estimado (horas)</Label>
-                    <Input
-                      className="h-11 rounded-xl"
-                      value={objEffortHours}
-                      onChange={(e) => setObjEffortHours(e.target.value)}
-                      placeholder="40"
-                    />
-                  </div>
+              {objLevel === "COMPANY" ? (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Base: {deptMembers.length} colaboradores ativos no time • {deptMembers.filter((p) => typeof p.monthly_cost_brl === "number" && p.monthly_cost_brl > 0).length} com custo cadastrado.
                 </div>
-
-                <div className="mt-3 rounded-2xl bg-white p-3 ring-1 ring-[color:var(--sinaxys-border)]">
-                  <div className="text-xs text-muted-foreground">
-                    {objLevel === "COMPANY"
-                      ? `Custo/h do time: ${deptAvgHourly ? `${brl(deptAvgHourly)}/h` : "—"}`
-                      : `Custo/h do responsável: ${brlPerHourFromMonthly(ownerMonthly ?? 0)}`}
-                  </div>
-                  {objLevel === "COMPANY" ? (
-                    <div className="mt-1 text-xs text-muted-foreground">
-                      Base: {deptMembers.length} colaboradores ativos no time • {deptMembers.filter((p) => typeof p.monthly_cost_brl === "number" && p.monthly_cost_brl > 0).length} com custo cadastrado.
-                    </div>
-                  ) : null}
-                  <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                    <span className="text-muted-foreground">Custo estimado:</span>
-                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{costBRL !== null ? brl(costBRL) : "—"}</span>
-                    <span className="text-muted-foreground">• ROI:</span>
-                    <span className="font-semibold text-[color:var(--sinaxys-ink)]">{roi !== null ? `${roi.toFixed(1)}%` : "—"}</span>
-                  </div>
-                </div>
+              ) : null}
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                <span className="text-muted-foreground">Custo estimado:</span>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">{costBRL !== null ? brl(costBRL) : "—"}</span>
+                <span className="text-muted-foreground">• ROI:</span>
+                <span className="font-semibold text-[color:var(--sinaxys-ink)]">{roi !== null ? `${roi.toFixed(1)}%` : "—"}</span>
               </div>
-            ) : null}
+            </div>
 
             {scope === "quarter" && objLevel !== "COMPANY" ? (
               <div className="grid gap-2">

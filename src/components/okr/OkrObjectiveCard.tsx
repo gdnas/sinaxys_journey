@@ -1,3 +1,4 @@
+import { TierBadge } from "@/components/okr";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -170,15 +171,8 @@ export function OkrObjectiveCard(props: {
           <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
+                <TierBadge tier={objective.level === "COMPANY" ? "TIER1" : "TIER2"} size="sm" />
                 {levelBadge}
-                <Link to={openHref} className="min-w-0 flex-1 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:underline">
-                  {objective.title}
-                </Link>
-                {objective.status === "ACHIEVED" ? (
-                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
-                    Atingido
-                  </Badge>
-                ) : null}
               </div>
 
               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
