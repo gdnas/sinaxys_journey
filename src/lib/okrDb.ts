@@ -663,6 +663,68 @@ export async function updateDeliverable(
   return (data ?? null) as DbDeliverable | null;
 }
 
+export async function updateDeliverableWithDates(
+  deliverableId: string,
+  patch: Partial<Pick<DbDeliverable, "title" | "description" | "owner_user_id" | "status" | "due_at" | "tier">> & {
+    start_date?: string | null;
+    performance_indicator_id?: string | null;
+  }
+): Promise<DbDeliverable | null> {
+  // Verificar mudança de data para log
+  let logDateChange = false;
+  let previousDate: string | null = null;
+  let newDate: string | null = null;
+
+  if (patch.start_date !== undefined) {
+    const current = await supabase
+      .from("okr_deliverables")
+      .select("start_date")
+      .eq("id", deliverableId)
+      .single();
+    
+    previousDate = (current.data as any)?.start_date || null;
+    newDate = patch.start_date;
+    
+    if (previousDate !== newDate) {
+      logDateChange = true;
+    }
+  }
+
+  // Atualizar entregável
+  const updateData: any = {};
+  if (patch.title !== undefined) updateData.title = patch.title?.trim();
+  if (patch.description !== undefined) updateData.description = patch.description ?? null;
+  if (patch.owner_user_id !== undefined) updateData.owner_user_id = patch.owner_user_id ?? null;
+  if (patch.status !== undefined) updateData.status = patch.status;
+  if (patch.due_at !== undefined) updateData.due_at = patch.due_at ?? null;
+  if (patch.tier !== undefined) updateData.tier = patch.tier;
+  if (patch.start_date !== undefined) updateData.start_date = patch.start_date;
+  if (patch.performance_indicator_id !== undefined) updateData.performance_indicator_id = patch.performance_indicator_id;
+
+  const { data, error } = await supabase
+    .from("okr_deliverables")
+    .update(updateData)
+    .eq("id", deliverableId)
+    .select("id,key_result_id,tier,title,description,owner_user_id,status,due_at,created_at,updated_at,start_date,performance_indicator_id")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  // Registrar mudança de data
+  if (logDateChange && previousDate && newDate) {
+    await addDeliverableDateChangeLog(
+      deliverableId,
+      previousDate,
+      newDate,
+      patch.owner_user_id || "", // TODO: obter userId do contexto
+      "Data de entrega atualizada"
+    );
+  }
+
+  return data as DbDeliverable;
+}
+
 export type DeliverableTier = "TIER1" | "TIER2";
 export type WorkStatus = "TODO" | "IN_PROGRESS" | "DONE";
 
@@ -675,8 +737,10 @@ export type DbDeliverable = {
   owner_user_id: string | null;
   status: WorkStatus;
   due_at: string | null;
+  start_date: string | null;
   created_at: string | null;
   updated_at: string | null;
+  performance_indicator_id: string | null;
 };
 
 export async function listDeliverables(keyResultId: string) {
@@ -998,4 +1062,311 @@ export async function updateStrategyKeyResult(
 export async function deleteStrategyKeyResult(id: string) {
   const { error } = await supabase.from("strategy_key_results").delete().eq("id", id);
   if (error) throw error;
+}
+
+// ============================================================================
+// NOVOS: Objective Departments (Multi-departamentos)
+// ============================================================================
+
+export type DbObjectiveDepartment = {
+  id: string;
+  objective_id: string;
+  department_id: string;
+  created_at: string;
+};
+
+export async function listObjectiveDepartments(objectiveId: string): Promise<DbObjectiveDepartment[]> {
+  const { data, error } = await supabase
+    .from("objective_departments")
+    .select("id,objective_id,department_id,created_at")
+    .eq("objective_id", objectiveId)
+    .order("department_id");
+  if (error) throw error;
+  return (data ?? []) as DbObjectiveDepartment[];
+}
+
+export async function syncObjectiveDepartments(
+  objectiveId: string,
+  departmentIds: string[]
+): Promise<boolean> {
+  // Remove departamentos não selecionados
+  if (departmentIds.length > 0) {
+    const { error: deleteError } = await supabase
+      .from("objective_departments")
+      .delete()
+      .eq("objective_id", objectiveId)
+      .not("department_id", "in", `(${departmentIds.map(() => '?').join(',')})`);
+    if (deleteError) throw deleteError;
+  } else {
+    // Se não há departamentos, remove todos
+    const { error: deleteAllError } = await supabase
+      .from("objective_departments")
+      .delete()
+      .eq("objective_id", objectiveId);
+    if (deleteAllError) throw deleteAllError;
+  }
+
+  // Insere novos departamentos
+  if (departmentIds.length > 0) {
+    const insertData = departmentIds.map((deptId) => ({
+      objective_id: objectiveId,
+      department_id: deptId,
+    }));
+    const { error: insertError } = await supabase
+      .from("objective_departments")
+      .insert(insertData);
+    if (insertError) throw insertError;
+  }
+
+  return true;
+}
+
+export async function createObjectiveDepartments(
+  objectiveId: string,
+  departmentIds: string[]
+): Promise<boolean> {
+  if (!departmentIds.length) return true;
+  
+  const { error } = await supabase
+    .from("objective_departments")
+    .insert(
+      departmentIds.map(deptId => ({
+        objective_id: objectiveId,
+        department_id: deptId,
+      }))
+    );
+  
+  if (error) throw error;
+  return true;
+}
+
+// ============================================================================
+// NOVOS: Performance Indicators (Similar a KRs)
+// ============================================================================
+
+export type PiKind = "METRIC" | "DELIVERABLE";
+export type PiConfidence = "ON_TRACK" | "AT_RISK" | "OFF_TRACK";
+
+export type DbPerformanceIndicator = {
+  id: string;
+  objective_id: string;
+  title: string;
+  kind: PiKind;
+  metric_unit: string | null;
+  start_value: number | null;
+  target_value: number | null;
+  current_value: number | null;
+  due_at: string | null;
+  achieved: boolean;
+  achieved_at: string | null;
+  confidence: PiConfidence;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listPerformanceIndicators(objectiveId: string): Promise<DbPerformanceIndicator[]> {
+  const { data, error } = await supabase
+    .from("okr_performance_indicators")
+    .select("*")
+    .eq("objective_id", objectiveId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as DbPerformanceIndicator[];
+}
+
+export async function createPerformanceIndicator(
+  payload: Omit<DbPerformanceIndicator, "id" | "created_at" | "updated_at" | "achieved_at">
+): Promise<DbPerformanceIndicator> {
+  const { data, error } = await supabase
+    .from("okr_performance_indicators")
+    .insert({
+      ...payload,
+      achieved: false,
+      achieved_at: null,
+    })
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbPerformanceIndicator;
+}
+
+export async function updatePerformanceIndicator(
+  id: string,
+  patch: Partial<Omit<DbPerformanceIndicator, "id" | "created_at" | "updated_at" | "objective_id">>
+): Promise<DbPerformanceIndicator> {
+  const { data, error } = await supabase
+    .from("okr_performance_indicators")
+    .update(patch)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return data as DbPerformanceIndicator;
+}
+
+export async function togglePerformanceIndicatorAchieved(
+  id: string,
+  achieved: boolean
+): Promise<void> {
+  const achievedAt = achieved ? new Date().toISOString() : null;
+  const { data } = await updatePerformanceIndicator(id, { achieved, achieved_at });
+  if (!data) throw new Error("Erro ao atualizar indicador");
+}
+
+export async function deletePerformanceIndicator(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("okr_performance_indicators")
+    .delete()
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export function piProgressPct(indicator: DbPerformanceIndicator): number | null {
+  if (indicator.kind === "DELIVERABLE") {
+    return indicator.achieved ? 100 : 0;
+  }
+
+  const { start_value, target_value, current_value } = indicator;
+  if (typeof start_value !== "number" || typeof target_value !== "number" || typeof current_value !== "number") {
+    return null;
+  }
+
+  if (start_value === target_value) return 100;
+  const pct = ((current_value - start_value) / (target_value - start_value)) * 100;
+  return Math.max(0, Math.min(100, Math.round(pct)));
+}
+
+// ============================================================================
+// NOVOS: Deliverable Date Logs (Histórico de datas)
+// ============================================================================
+
+export type DbDeliverableDateLog = {
+  id: string;
+  deliverable_id: string;
+  previous_date: string | null;
+  new_date: string | null;
+  changed_by_user_id: string;
+  reason: string | null;
+  created_at: string;
+};
+
+export async function listDeliverableDateHistory(deliverableId: string): Promise<DbDeliverableDateLog[]> {
+  const { data, error } = await supabase
+    .from("okr_deliverable_date_logs")
+    .select("*")
+    .eq("deliverable_id", deliverableId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as DbDeliverableDateLog[];
+}
+
+export async function addDeliverableDateChangeLog(
+  deliverableId: string,
+  previousDate: string | null,
+  newDate: string | null,
+  changedByUserId: string,
+  reason?: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("okr_deliverable_date_logs")
+    .insert({
+      deliverable_id: deliverableId,
+      previous_date: previousDate,
+      new_date: newDate,
+      changed_by_user_id: changedByUserId,
+      reason: reason || null,
+    });
+  if (error) throw error;
+}
+
+// ============================================================================
+// NOVOS: Task Hierarchy (4 níveis: TASK, LIST, CHECKLIST, CHECKLIST_ITEM)
+// ============================================================================
+
+export type TaskLevelType = "TASK" | "LIST" | "CHECKLIST" | "CHECKLIST_ITEM";
+
+export type DbTaskHierarchy = {
+  id: string;
+  deliverable_id: string;
+  parent_task_id: string | null;
+  depth: number;
+  level_type: TaskLevelType;
+  task_hierarchy: any;
+  start_date: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function createTaskWithParent(
+  parentId: string | null,
+  levelType: TaskLevelType,
+  taskData: Omit<DbTask, "id" | "created_at" | "updated_at" | "parent_task_id" | "depth" | "level_type">
+): Promise<DbTask> {
+  // Calcular depth baseado no nível do pai
+  let depth = 0;
+  if (parentId) {
+    const parent = await supabase
+      .from("okr_tasks")
+      .select("depth")
+      .eq("id", parentId)
+      .single();
+    if (parent.data) {
+      depth = (parent.data as any).depth + 1;
+    }
+  }
+
+  // Validar profundidade máxima (4)
+  if (depth > 4) {
+    throw new Error("Profundidade máxima de 4 níveis atingida");
+  }
+
+  // Validar nível do tipo
+  const levelDepths: Record<TaskLevelType, number> = {
+    TASK: 0,
+    LIST: 1,
+    CHECKLIST: 2,
+    CHECKLIST_ITEM: 3,
+  };
+
+  if (levelType !== Object.keys(levelDepths)[depth]) {
+    throw new Error(`Tipo ${levelType} inválido para depth ${depth}`);
+  }
+
+  const { data, error } = await supabase
+    .from("okr_tasks")
+    .insert({
+      ...taskData,
+      parent_task_id: parentId,
+      depth,
+      level_type: levelType,
+      task_hierarchy: {},
+      start_date: taskData.due_date ? taskData.due_date : new Date().toISOString(),
+    })
+    .select(taskSelect)
+    .single();
+
+  if (error) throw error;
+  return data as DbTask;
+}
+
+export async function updateTaskHierarchy(
+  taskId: string,
+  hierarchy: any
+): Promise<void> {
+  const { error } = await supabase
+    .from("okr_tasks")
+    .update({ task_hierarchy: hierarchy })
+    .eq("id", taskId);
+  if (error) throw error;
+}
+
+export async function listTasksByHierarchy(deliverableId: string): Promise<DbTaskHierarchy[]> {
+  const { data, error } = await supabase
+    .from("okr_tasks")
+    .select("id,deliverable_id,parent_task_id,depth,level_type,task_hierarchy,created_at,updated_at")
+    .eq("deliverable_id", deliverableId)
+    .order("depth, created_at", { ascending: true });
+  
+  if (error) throw error;
+  return (data ?? []) as DbTaskHierarchy[];
 }
