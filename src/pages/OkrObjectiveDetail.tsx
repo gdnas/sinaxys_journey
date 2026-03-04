@@ -1,3 +1,4 @@
+import { PerformanceIndicatorEditor } from "@/components/okr/PerformanceIndicatorEditor";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp, ChevronRight, ListChecks, KeyRound, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";

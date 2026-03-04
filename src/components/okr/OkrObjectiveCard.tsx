@@ -262,15 +262,9 @@ export function OkrObjectiveCard(props: {
 
                 {krs.map((kr) => {
                   const pct = krProgressPct(kr);
-                  const meta =
-                    kr.kind === "METRIC"
-                      ? `${kr.current_value ?? "—"} / ${kr.target_value ?? "—"}${kr.metric_unit ? ` ${kr.metric_unit}` : ""}`
-                      : kr.achieved
-                        ? "Concluído"
-                        : "Em andamento";
-
-                  const aligned = linkedObjectiveData?.linksByKrId.get(kr.id) ?? [];
-                  const isKrOpen = openKrIds.has(kr.id);
+                  const meta = kr.kind === "METRIC"
+                    ? `${kr.current_value ?? "—"} / ${kr.target_value}` : kr.metric_unit;
+                  const isDone = kr.achieved;
 
                   return (
                     <div key={kr.id} className="grid gap-2">
@@ -285,73 +279,37 @@ export function OkrObjectiveCard(props: {
                         }}
                       >
                         <div className="flex items-start gap-3">
-                          <button
-                            type="button"
-                            className="min-w-0 flex-1 text-left"
-                            onClick={() => {
-                              if (!companyId || !currentUserId) return;
-                              setEditingKr(kr);
-                            }}
-                            aria-label={`Editar KR: ${kr.title}`}
-                          >
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                                <KeyRound className="mr-1.5 h-3.5 w-3.5" />
-                                KR
-                              </Badge>
-                              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
-                                {kindLabel(kr.kind)}
-                              </Badge>
-                              <span className={"rounded-full px-2.5 py-1 text-[11px] font-semibold " + confidenceClass(kr.confidence)}>
-                                {confidenceLabel(kr.confidence)}
+                          <span className="text-xs text-muted-foreground">
+                            {meta}
+                          </span>
+                          <span className="font-semibold text-[color:var(--sinaxys-ink)]">
+                            {kr.title}
+                          </span>
+                          {isDone ? (
+                            <span className="text-green-600 dark:text-green-400 font-medium text-sm">✓</span>
+                          ) : null}
+                          <TierBadge tier={objective.level === "COMPANY" ? "TIER1" : "TIER2"} size="sm" />
+                        </div>
+                        <div>
+                          <span className="text-xs text-muted-foreground">
+                            {meta}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-[color:var(--sinaxys-ink)]">
+                              {kr.title}
+                            </span>
+                            <TierBadge tier={objective.level === "COMPANY" ? "TIER1" : "TIER2"} size="sm" />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {pct !== null ? (
+                              <span className="font-semibold text-[color:var(--sinaxys-ink)]">
+                                {pct}%
                               </span>
-                              {objective.level === "COMPANY" && aligned.length ? (
-                                <span className="rounded-full bg-[color:var(--sinaxys-primary)]/10 px-2.5 py-1 text-[11px] font-semibold text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-primary)]/15">
-                                  {aligned.length} OKR(s) alinhado(s)
-                                </span>
-                              ) : null}
-                              <span className="text-xs text-muted-foreground opacity-0 transition group-hover:opacity-100">Clique para editar</span>
-                            </div>
-
-                            <div className="mt-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{kr.title}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">{meta}</div>
-
-                            {typeof pct === "number" ? (
-                              <Progress
-                                value={pct}
-                                className={
-                                  "mt-3 h-2 rounded-full bg-[color:var(--sinaxys-tint)]/70 ring-1 ring-[color:var(--sinaxys-border)]/70 " +
-                                  "dark:bg-[hsl(var(--secondary))] dark:ring-border"
-                                }
-                                style={{ ["--progress-accent" as any]: accent.accent }}
-                              />
                             ) : null}
-                          </button>
-
-                          {objective.level === "COMPANY" && aligned.length ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon"
-                              className="h-10 w-10 rounded-xl bg-white"
-                              aria-label={isKrOpen ? "Recolher alinhamentos" : "Expandir alinhamentos"}
-                              title={isKrOpen ? "Recolher alinhamentos" : "Expandir alinhamentos"}
-                              onClick={() => {
-                                setOpenKrIds((prev) => {
-                                  const next = new Set(prev);
-                                  if (next.has(kr.id)) next.delete(kr.id);
-                                  else next.add(kr.id);
-                                  return next;
-                                });
-                              }}
-                            >
-                              {isKrOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            </Button>
-                          ) : null}
-
-                          {typeof pct === "number" ? (
-                            <div className="shrink-0 pt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{Math.round(pct)}%</div>
-                          ) : null}
+                            {isDone ? (
+                              <span className="text-green-600 dark:text-green-400 font-medium text-sm">✓</span>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
 
