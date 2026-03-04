@@ -1,4 +1,4 @@
-import { TaskHierarchyView } from "@/components/okr";
+import { TaskHierarchyView } from "@/components/okr/TaskHierarchyView";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";

@@ -762,7 +762,8 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
 
           {/* Tier Badge no topo do formulário */}
           <div className="mb-4">
-            <TierBadge tier={objLevel === "COMPANY" ? "TIER1" : "TIER2"} size="md" />
+            <TierBadge tier={objLevel === "COMPANY" ? "TIER1" : "TIER2"} size="sm" />
+            {levelBadge}
           </div>
 
           <div className="grid gap-4">
