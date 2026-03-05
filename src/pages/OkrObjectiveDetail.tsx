@@ -1,8 +1,11 @@
 import { PerformanceIndicatorEditor } from "@/components/okr/PerformanceIndicatorEditor";
+import { TierBadge } from "@/components/okr/TierBadge";
+import { DepartmentMultiSelect } from "@/components/okr/DepartmentMultiSelect";
+import { UserMultiSelect } from "@/components/okr/UserMultiSelect";
+import { TaskHierarchyView } from "@/components/okr/TaskHierarchyView";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp, ChevronRight, ListChecks, KeyRound, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";
-
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,6 +28,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
 import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
@@ -56,7 +60,6 @@ import {
   deleteOkrObjectiveCascade,
 } from "@/lib/okrDb";
 import { linkObjectiveToKr, listLinkedObjectivesByKrIds, listKrLinksByObjectiveId, unlinkObjectiveFromKr } from "@/lib/okrAlignmentDb";
-
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { OkrObjectiveBusinessCase } from "@/components/okr/OkrObjectiveBusinessCase";

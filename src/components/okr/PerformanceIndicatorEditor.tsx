@@ -4,13 +4,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import type { DbPerformanceIndicator, PiKind, PiConfidence } from "@/lib/okrDb";
+import { useToast } from "@/hooks/use-toast";
+import type {
+  DbPerformanceIndicator,
+  PiKind,
+  PiConfidence,
+  piProgressPct
+} from "@/lib/okrDb";
 
 type PerformanceIndicatorEditorProps = {
   objectiveId: string;
   indicators: DbPerformanceIndicator[];
   onCreate: (data: Omit<DbPerformanceIndicator, "id" | "created_at" | "updated_at" | "achieved_at">) => Promise<void>;
-  onUpdate: (id: string, patch: Partial<Omit<DbPerformanceIndicator, "id" | "created_at" | "updated_at" | "objective_id">>) => Promise<void>;
+  onUpdate: (id: string, patch: Partial<Omit<DbPerformanceIndicator, "id" | "created_at" | "updated_at" | "achieved_at">>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onToggleAchieved: (id: string, achieved: boolean) => Promise<void>;
   readOnly?: boolean;
@@ -25,6 +31,8 @@ export function PerformanceIndicatorEditor({
   onToggleAchieved,
   readOnly = false,
 }: PerformanceIndicatorEditorProps) {
+  const { toast } = useToast();
+  
   const [newIndicator, setNewIndicator] = useState({
     title: "",
     kind: "METRIC" as PiKind,
@@ -45,7 +53,8 @@ export function PerformanceIndicatorEditor({
       start_value: newIndicator.start_value || null,
       target_value: newIndicator.target_value || null,
       due_at: newIndicator.due_at || null,
-      current_value: newIndicator.kind === "METRIC" ? newIndicator.start_value : null,
+      achieved: false,
+      achieved_at: null,
       confidence: "ON_TRACK",
     };
 
@@ -61,9 +70,9 @@ export function PerformanceIndicatorEditor({
   };
 
   const handleUpdate = async (id: string, field: string, value: any) => {
-    const patch: Partial<Omit<DbPerformanceIndicator, "id" | "created_at" | "updated_at" | "objective_id">> = {
+    const patch: Partial<Omit<DbPerformanceIndicator, "id" | "created_at" | "updated_at" | "achieved_at"> = {
       [field]: value,
-    };
+    } as const;
     await onUpdate(id, patch);
   };
 
@@ -170,7 +179,7 @@ export function PerformanceIndicatorEditor({
             type="number"
             placeholder="100"
             value={newIndicator.target_value}
-            onChange={(e) => setNewIndicator({ ...newIndicator, target_value: Number(e.target.value) })}
+            onChange={(e) => setNewIndicator({ ...newIndicator, target_value: Number(e.target_value) })}
             disabled={readOnly}
           />
         </div>
@@ -205,12 +214,11 @@ export function PerformanceIndicatorEditor({
                   </Button>
                 </div>
               </div>
-
               <div className="flex items-center gap-4 text-sm">
                 <span className="text-muted-foreground">
                   {indicator.kind === "METRIC" ? `${indicator.current_value ?? 0} / ${indicator.target_value}` : indicator.metric_unit}
                 </span>
-                
+
                 {indicator.kind === "METRIC" && (
                   <div className="flex items-center gap-2">
                     <span className="text-muted-foreground">{indicator.metric_unit}</span>
@@ -231,7 +239,7 @@ export function PerformanceIndicatorEditor({
                     Marcar como atingido
                   </Button>
                 )}
-                
+
                 <Select
                   value={indicator.confidence}
                   onValueChange={(value) => handleUpdate(indicator.id, "confidence", value)}
@@ -265,8 +273,8 @@ export function PerformanceIndicatorEditor({
         {indicators.length === 0 && (
           <div className="text-center py-8 text-muted-foreground border rounded-lg border-dashed">
             <Target className="h-12 w-12 mx-auto mb-2 text-muted-foreground opacity-50" />
-            <p>Nenhum indicador de performance criado ainda</p>
-            <p className="text-sm mt-1">Adicione PIs para acompanhar o progresso deste objetivo</p>
+            <p className="text-muted-foreground">Nenhum indicador de performance criado ainda</p>
+            <p className="text-sm text-muted-foreground mt-1">Adicione PIs para acompanhar o progresso deste objetivo</p>
           </div>
         )}
       </div>
