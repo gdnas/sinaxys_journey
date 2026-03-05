@@ -134,7 +134,7 @@ serve(async (req) => {
       client_id: TEAMS_CLIENT_ID,
       redirect_uri: redirectUri,
       response_type: "code",
-      scope: "OnlineMeetings.Read.All ChannelMessage.Read.All",
+      scope: "https://graph.microsoft.com/OnlineMeetings.Read https://graph.microsoft.com/ChannelMessage.Read.All https://graph.microsoft.com/User.Read",
       response_mode: "query",
       state,
       prompt: "consent",
