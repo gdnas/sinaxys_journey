@@ -53,6 +53,7 @@ export function PerformanceIndicatorEditor({
       metric_unit: newIndicator.metric_unit || null,
       start_value: newIndicator.start_value || null,
       target_value: newIndicator.target_value || null,
+      current_value: newIndicator.current_value || null,
       due_at: newIndicator.due_at || null,
       achieved: false,
       confidence: "ON_TRACK",
