@@ -33,6 +33,7 @@ import { laborCostFromMonthly, parsePtNumber, roiPct } from "@/lib/roi";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { OkrObjectiveCard } from "@/components/okr/OkrObjectiveCard";
 import { TierBadge, DepartmentMultiSelect, UserMultiSelect } from "@/components/okr";
+import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
 
 import {
   createKeyResult,

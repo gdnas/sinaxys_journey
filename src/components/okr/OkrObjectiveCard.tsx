@@ -171,8 +171,8 @@ export function OkrObjectiveCard(props: {
           <div className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2">
-                  <TierBadge tier="TIER1" size="sm" />
+                <div className="flex flex-wrap items-center gap-2">
+                  <TierBadge tier={objective.level === "COMPANY" ? "TIER1" : "TIER2"} size="sm" />
                   {levelBadge}
                 </div>
                 <Link to={openHref} className="min-w-0 flex-1 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:underline">
