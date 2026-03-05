@@ -836,7 +836,6 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                   ))}
                 </SelectContent>
               </Select>
-              </div>
               <div className="text-xs text-muted-foreground">Vincule o objetivo do ano ao objetivo de longo prazo (ex.: 2 anos) para aparecer no mapa.</div>
             </div>
 
