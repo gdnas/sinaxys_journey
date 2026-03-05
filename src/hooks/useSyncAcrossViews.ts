@@ -2,37 +2,50 @@ import { useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 /**
- * Hook simples para invalidar queries relacionadas ao OKR quando ocorrerem mudanças
- * Garante que o Mapa e o Assistente sempre mostrem dados atualizados
+ * Hook para sincronizar dados entre diferentes views (Mapa Estratégico, Assistente, Detalhes)
+ * Invalida queries automaticamente quando há mudanças em objetivos, entregáveis ou tarefas
  */
-export function useSyncAcrossViews(objectiveIds: string[] = [], deliverableIds: string[] = [], taskIds: string[] = []) {
+export function useSyncAcrossViews(
+  objectiveIds: string[],
+  deliverableIds: string[],
+  taskIds: string[]
+) {
   const qc = useQueryClient();
-  const previousIds = useRef(new Set<string>());
+  const previousIds = useRef({ objectives: [] as string[], deliverables: [] as string[], tasks: [] as string[] });
 
   useEffect(() => {
-    const allIds = [...objectiveIds, ...deliverableIds, ...taskIds];
-    
-    // Comparar com os IDs anteriores
-    const newIds = new Set(allIds);
-    const addedIds = allIds.filter(id => !previousIds.current.has(id));
-    
-    if (addedIds.size > 0) {
+    const newIds = { objectives: objectiveIds, deliverables: deliverableIds, tasks: taskIds };
+    const prev = previousIds.current;
+
+    // Detectar mudanças
+    const addedObjectives = objectiveIds.filter(id => !prev.objectives.includes(id));
+    const addedDeliverables = deliverableIds.filter(id => !prev.deliverables.includes(id));
+    const addedTasks = taskIds.filter(id => !prev.tasks.includes(id));
+
+    const addedIds = [...addedObjectives, ...addedDeliverables, ...addedTasks];
+
+    if (addedIds.length > 0) {
       // Algo foi adicionado - invalidar queries relevantes
       const toInvalidate: string[] = [];
-      
-      if (objectiveIds.length > 0) toInvalidate.push(...objectiveIds);
-      if (deliverableIds.length > 0) toInvalidate.push(...deliverableIds);
-      if (taskIds.length > 0) toInvalidate.push(...taskIds);
-      
+
+      if (addedObjectives.length > 0) {
+        toInvalidate.push(["objectives"]);
+      }
+      if (addedDeliverables.length > 0) {
+        toInvalidate.push(["deliverables"]);
+      }
+      if (addedTasks.length > 0) {
+        toInvalidate.push(["tasks"]);
+      }
+
       // Invalidar queries
-      qc.invalidateQueries({ queries: toInvalidate });
-      
-      console.log(`[Sync] Invalidando queries por mudanças:`, addedIds.size, \"objetivos\", "entregáveis", "tarefas"]);
+      toInvalidate.forEach(queryKey => {
+        qc.invalidateQueries({ queryKey });
+      });
+
+      console.log(`[Sync] Invalidando queries por mudanças:`, addedIds.length, "objetivos, entregáveis, tarefas");
     }
-    
-    // Atualizar referência
+
     previousIds.current = newIds;
-  }, [objectiveIds.join(","), deliverableIds.join(","), taskIds.join(",")]]);
-  }, [objectiveIds.join(","), deliverableIds.join(","), taskIds.join(",")]]);
-}, [objectiveIds.join(","), deliverableIds.join(","), taskIds.join(",")]]);
+  }, [objectiveIds.join(","), deliverableIds.join(","), taskIds.join(",")]);
 }

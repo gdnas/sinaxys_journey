@@ -1498,6 +1498,8 @@ export function OkrStrategyMapCanvas(props: {
                       description: createDelDesc.trim() || null,
                       owner_user_id: createDelOwner,
                       status: "TODO",
+                      start_date: null,
+                      performance_indicator_id: null,
                       due_at: createDelDue.trim() || null,
                     });
 

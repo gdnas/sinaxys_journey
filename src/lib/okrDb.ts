@@ -1209,8 +1209,7 @@ export async function togglePerformanceIndicatorAchieved(
   achieved: boolean
 ): Promise<void> {
   const achievedAt = achieved ? new Date().toISOString() : null;
-  const { data } = await updatePerformanceIndicator(id, { achieved, achieved_at });
-  if (!data) throw new Error("Erro ao atualizar indicador");
+  await updatePerformanceIndicator(id, { achieved, achieved_at: achievedAt });
 }
 
 export async function deletePerformanceIndicator(id: string): Promise<void> {

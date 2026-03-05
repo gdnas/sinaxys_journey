@@ -1,6 +1,6 @@
 // src/components/DocumentUpload.tsx
 import React, { useState } from 'react';
-import { uploadUserDocument } from '../services/uploadUserDocument';
+import { uploadUserDocument } from '../uploadUserDocument';
 
 export default function DocumentUpload({ onDone }: { onDone?: () => void }) {
   const [file, setFile] = useState<File | null>(null);

@@ -1007,6 +1007,8 @@ export default function OkrObjectiveDetail() {
                     description: delDesc,
                     owner_user_id: delOwner,
                     status: "TODO",
+                    start_date: null,
+                    performance_indicator_id: null,
                     due_at: delDue.trim() || null,
                   });
                   await qc.invalidateQueries({ queryKey: ["okr-deliverables", objectiveId] });

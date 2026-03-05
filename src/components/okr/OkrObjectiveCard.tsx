@@ -275,6 +275,8 @@ export function OkrObjectiveCard(props: {
                   const meta = kr.kind === "METRIC"
                     ? `${kr.current_value ?? "—"} / ${kr.target_value}` : kr.metric_unit;
                   const isDone = kr.achieved;
+                  const aligned = linksByKrId.get(kr.id) ?? [];
+                  const isKrOpen = openKrIds.has(kr.id);
 
                   return (
                     <div key={kr.id} className="grid gap-2">

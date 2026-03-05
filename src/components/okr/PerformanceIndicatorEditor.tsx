@@ -33,13 +33,15 @@ export function PerformanceIndicatorEditor({
 }: PerformanceIndicatorEditorProps) {
   const { toast } = useToast();
   
-  const [newIndicator, setNewIndicator] = useState({
+  const [newIndicator, setNewIndicator] = useState<Partial<DbPerformanceIndicator>>({
+    kind: "METRIC",
     title: "",
-    kind: "METRIC" as PiKind,
-    metric_unit: "",
-    start_value: 0,
-    target_value: 0,
-    due_at: "",
+    description: "",
+    target_value: 100,
+    current_value: 0,
+    unit: "%",
+    achieved: false,
+    confidence: "ON_TRACK",
   });
 
   const handleCreate = async () => {
@@ -70,9 +72,9 @@ export function PerformanceIndicatorEditor({
   };
 
   const handleUpdate = async (id: string, field: string, value: any) => {
-    const patch: Partial<Omit<DbPerformanceIndicator, "id" | "created_at" | "updated_at" | "achieved_at"> = {
+    const patch: Partial<DbPerformanceIndicator> = {
       [field]: value,
-    } as const;
+    };
     await onUpdate(id, patch);
   };
 
@@ -179,7 +181,7 @@ export function PerformanceIndicatorEditor({
             type="number"
             placeholder="100"
             value={newIndicator.target_value}
-            onChange={(e) => setNewIndicator({ ...newIndicator, target_value: Number(e.target_value) })}
+            onChange={(e) => setNewIndicator({ ...newIndicator, target_value: Number(e.target.value) })}
             disabled={readOnly}
           />
         </div>

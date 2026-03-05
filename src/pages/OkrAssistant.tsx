@@ -2325,6 +2325,8 @@ export default function OkrAssistant() {
                           description: d.description || null,
                           owner_user_id: d.ownerUserId,
                           status: d.status,
+                          start_date: null,
+                          performance_indicator_id: null,
                           due_at: d.dueAt || null,
                         });
                       }

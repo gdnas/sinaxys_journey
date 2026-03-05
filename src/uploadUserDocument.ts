@@ -1,5 +1,5 @@
 // src/services/uploadUserDocument.ts
-import { supabase } from '../lib/supabase'; // ajuste se seu client estiver em outro lugar
+import { supabase } from './integrations/supabase/client';
 
 export async function uploadUserDocument({
   file,

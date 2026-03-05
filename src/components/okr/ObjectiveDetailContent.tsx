@@ -1,5 +1,6 @@
 import { PerformanceIndicatorEditor } from "@/components/okr/PerformanceIndicatorEditor";
 import { TierBadge } from "@/components/okr/TierBadge";
+import { useToast } from "@/hooks/use-toast";
 
 interface ObjectiveDetailContentProps {
   objectiveId: string;
@@ -7,6 +8,8 @@ interface ObjectiveDetailContentProps {
 }
 
 export function ObjectiveDetailContent({ objectiveId, tier = "TIER1" }: ObjectiveDetailContentProps) {
+  const { toast } = useToast();
+
   return (
     <div className="space-y-6">
       {/* Performance Indicators */}
