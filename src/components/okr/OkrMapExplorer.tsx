@@ -693,46 +693,6 @@ function StrategyLinker(
                 </div>
             ) : (
                 <div className="grid gap-4">
-                    <div className="grid gap-2">
-                        <Label>Estratégia (objetivo de longo prazo)</Label>
-                        <Select
-                            disabled={!canEdit || saving}
-                            value={objective.strategy_objective_id ?? "__none__"}
-                            onValueChange={async v => {
-                                setSaving(true);
-
-                                try {
-                                    await updateOkrObjective(objective.id, {
-                                        strategy_objective_id: v === "__none__" ? null : v
-                                    });
-
-                                    toast({
-                                        title: "Vínculo com estratégia atualizado"
-                                    });
-
-                                    await onSaved();
-                                } catch (e) {
-                                    toast({
-                                        title: "Não foi possível salvar",
-                                        description: e instanceof Error ? e.message : "Erro inesperado.",
-                                        variant: "destructive"
-                                    });
-                                } finally {
-                                    setSaving(false);
-                                }
-                            }}>
-                            <SelectTrigger className="h-11 rounded-2xl bg-white">
-                                <SelectValue placeholder="Selecione…" />
-                            </SelectTrigger>
-                            <SelectContent className="rounded-2xl">
-                                <SelectItem value="__none__">Sem vínculo</SelectItem>
-                                {strategy.map(so => (<SelectItem key={so.id} value={so.id}>
-                                    {so.title}
-                                </SelectItem>))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
                     {showParentAndFundamentals ? (
                       <>
                         <div className="grid gap-2">
