@@ -26,22 +26,15 @@ export function useSyncAcrossViews(
 
     if (addedIds.length > 0) {
       // Algo foi adicionado - invalidar queries relevantes
-      const toInvalidate: string[] = [];
-
       if (addedObjectives.length > 0) {
-        toInvalidate.push(["objectives"]);
+        qc.invalidateQueries({ queryKey: ["objectives"] });
       }
       if (addedDeliverables.length > 0) {
-        toInvalidate.push(["deliverables"]);
+        qc.invalidateQueries({ queryKey: ["deliverables"] });
       }
       if (addedTasks.length > 0) {
-        toInvalidate.push(["tasks"]);
+        qc.invalidateQueries({ queryKey: ["tasks"] });
       }
-
-      // Invalidar queries
-      toInvalidate.forEach(queryKey => {
-        qc.invalidateQueries({ queryKey });
-      });
 
       console.log(`[Sync] Invalidando queries por mudanças:`, addedIds.length, "objetivos, entregáveis, tarefas");
     }

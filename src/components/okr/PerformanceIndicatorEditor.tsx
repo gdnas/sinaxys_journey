@@ -36,10 +36,9 @@ export function PerformanceIndicatorEditor({
   const [newIndicator, setNewIndicator] = useState<Partial<DbPerformanceIndicator>>({
     kind: "METRIC",
     title: "",
-    description: "",
     target_value: 100,
     current_value: 0,
-    unit: "%",
+    metric_unit: "%",
     achieved: false,
     confidence: "ON_TRACK",
   });
@@ -56,7 +55,6 @@ export function PerformanceIndicatorEditor({
       target_value: newIndicator.target_value || null,
       due_at: newIndicator.due_at || null,
       achieved: false,
-      achieved_at: null,
       confidence: "ON_TRACK",
     };
 

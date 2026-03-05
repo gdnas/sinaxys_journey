@@ -157,6 +157,8 @@ export function OkrObjectiveCard(props: {
     return new Map((departments ?? []).map((d) => [d.id, d.name] as const));
   }, [departments]);
 
+  const linksByKrId = linkedObjectiveData?.linksByKrId ?? new Map<string, DbOkrObjective[]>();
+
   return (
     <>
       <Collapsible

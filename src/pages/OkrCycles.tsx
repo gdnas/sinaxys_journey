@@ -5,7 +5,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -764,7 +764,6 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
           {/* Tier Badge no topo do formulário */}
           <div className="mb-4">
             <TierBadge tier={objLevel === "COMPANY" ? "TIER1" : "TIER2"} size="sm" />
-            {levelBadge}
           </div>
 
           <div className="grid gap-4">
