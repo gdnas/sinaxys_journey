@@ -45,15 +45,21 @@ import {
   updateOkrObjective,
   updateStrategyObjective,
   upsertCompanyFundamentals,
+  listTasksByDeliverableIds,
+  createTaskWithParent,
+  updateTask,
+  deleteTask,
   type DbCompanyFundamentals,
   type DbDeliverable,
   type DbOkrCycle,
   type DbOkrKeyResult,
   type DbOkrObjective,
   type DbStrategyObjective,
+  type DbTask,
   type KrKind,
   type ObjectiveLevel,
   type WorkStatus,
+  type TaskLevelType,
 } from "@/lib/okrDb";
 import { linkObjectiveToKr } from "@/lib/okrAlignmentDb";
 import { parseDescribedItems, serializeDescribedItems, type DescribedItem } from "@/lib/fundamentalsFormat";
@@ -78,6 +84,7 @@ import { UserMultiSelect } from "@/components/okr/UserMultiSelect";
 import { DepartmentMultiSelect } from "@/components/okr/DepartmentMultiSelect";
 import { PerformanceIndicatorEditor } from "@/components/okr/PerformanceIndicatorEditor";
 import { PerformanceIndicatorDraft, type DraftPerformanceIndicator } from "@/components/okr/PerformanceIndicatorDraft";
+import { TaskHierarchyView } from "@/components/okr/TaskHierarchyView";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany, type DbProfile } from "@/lib/profilesDb";
 
@@ -531,6 +538,83 @@ export default function OkrAssistant() {
   });
 
   const existingDeliverables = qExistingDeliverables.data ?? [];
+
+  // Load tasks for deliverables
+  const qDeliverableTasks = useQuery({
+    queryKey: ["okr-deliverable-tasks", existingDeliverables.map((d) => d.id).join(",")],
+    enabled: existingDeliverables.length > 0,
+    queryFn: () => listTasksByDeliverableIds(existingDeliverables.map((d) => d.id)),
+  });
+
+  const deliverableTasks = qDeliverableTasks.data ?? [];
+
+  // Group tasks by deliverable
+  const tasksByDeliverable = useMemo(() => {
+    const map = new Map<string, DbTask[]>();
+    deliverableTasks.forEach((task) => {
+      const tasks = map.get(task.deliverable_id) || [];
+      tasks.push(task);
+      map.set(task.deliverable_id, tasks);
+    });
+    return map;
+  }, [deliverableTasks]);
+
+  // Task creation handler
+    const handleCreateTask = async (deliverableId: string, parentId: string | null, levelType: TaskLevelType) => {
+      try {
+        await createTaskWithParent(parentId, levelType, {
+          deliverable_id: deliverableId,
+          title: "Nova tarefa",
+          description: null,
+          owner_user_id: user.id,
+          status: "TODO",
+          due_date: null,
+          estimate_minutes: null,
+          checklist: null,
+          completed_at: null,
+          estimated_value_brl: null,
+          estimated_cost_brl: null,
+          estimated_roi_pct: null,
+        });
+        await qc.invalidateQueries({ queryKey: ["okr-deliverable-tasks", existingDeliverables.map((d) => d.id).join(",")] });
+        toast({ title: "Tarefa criada" });
+      } catch (e) {
+        toast({
+          title: "Não foi possível criar tarefa",
+          description: getErrorMessage(e),
+          variant: "destructive",
+        });
+      }
+    };
+
+  // Task update handler
+  const handleUpdateTask = async (taskId: string, updates: Partial<DbTask>) => {
+    try {
+      await updateTask(taskId, updates);
+      await qc.invalidateQueries({ queryKey: ["okr-deliverable-tasks", existingDeliverables.map((d) => d.id).join(",")] });
+    } catch (e) {
+      toast({
+        title: "Não foi possível atualizar tarefa",
+        description: getErrorMessage(e),
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Task delete handler
+  const handleDeleteTask = async (taskId: string) => {
+    try {
+      await deleteTask(taskId);
+      await qc.invalidateQueries({ queryKey: ["okr-deliverable-tasks", existingDeliverables.map((d) => d.id).join(",")] });
+      toast({ title: "Tarefa removida" });
+    } catch (e) {
+      toast({
+        title: "Não foi possível remover tarefa",
+        description: getErrorMessage(e),
+        variant: "destructive",
+      });
+    }
+  };
 
   // --- gating ---
   const canGoStep2 = fundSaved;
@@ -2229,6 +2313,7 @@ export default function OkrAssistant() {
                                                   + KR
                                                 </Button>
                                               </div>
+
                         <div className="grid gap-3">
                           {d.krs.map((kr, kIdx) => (
                             <div key={kIdx} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
@@ -2660,19 +2745,64 @@ export default function OkrAssistant() {
 
               <div className="grid gap-3">
                 {existingDeliverables.length ? (
-                  existingDeliverables.map((d) => (
-                    <div key={d.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
-                          <div className="mt-1 text-xs text-muted-foreground">KR: {tacticalKrs.find((k) => k.id === d.key_result_id)?.title ?? "—"}</div>
+                  existingDeliverables.map((d) => {
+                    const tasks = tasksByDeliverable.get(d.id) || [];
+                    const krTitle = tacticalKrs.find((k) => k.id === d.key_result_id)?.title ?? "—";
+                    
+                    return (
+                      <div key={d.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">KR: {krTitle}</div>
+                          </div>
+                          <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">
+                            {d.status}
+                          </Badge>
                         </div>
-                        <Badge className="rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-bg)]">{d.status}</Badge>
+
+                        {/* Task Hierarchy View */}
+                        {tasks.length > 0 && (
+                          <div className="mt-4 pt-4 border-t border-[color:var(--sinaxys-border)]">
+                            <TaskHierarchyView
+                              tasks={tasks}
+                              onCreateTask={(parentId, levelType) => handleCreateTask(d.id, parentId, levelType)}
+                              onUpdateTask={handleUpdateTask}
+                              onDeleteTask={handleDeleteTask}
+                              readOnly={false}
+                            />
+                          </div>
+                        )}
+
+                        {/* Empty state for tasks */}
+                        {tasks.length === 0 && (
+                          <div className="mt-4 pt-4 border-t border-[color:var(--sinaxys-border)]">
+                            <div className="text-center py-6 border-2 border-dashed rounded-lg bg-[color:var(--sinaxys-bg)]">
+                              <ListChecks className="h-8 w-8 mx-auto mb-2 text-muted-foreground opacity-50" />
+                              <p className="text-sm text-muted-foreground">Nenhuma subtarefa criada</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Crie tarefas para detalhar a execução deste entregável
+                              </p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="mt-3 rounded-xl bg-white"
+                                onClick={() => handleCreateTask(d.id, null, "TASK")}
+                              >
+                                <Plus className="h-4 w-4 mr-1" />
+                                Criar primeira tarefa
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
-                  <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum entregável ainda.</div>
+                  <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                    Nenhum entregável ainda.
+                  </div>
                 )}
               </div>
 
@@ -2823,9 +2953,10 @@ export default function OkrAssistant() {
                     >
                       Avançar
                       <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                </Card>
-              </div>
-            );
-          }
+                                          </Button>
+                                        </div>
+                                      </Card>
+                                    </div>
+                                  );
+                                }
+                      }
