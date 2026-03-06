@@ -70,7 +70,7 @@ import {
   type ValidateQuarterlyTier2ObjectiveParams,
   type ValidateDeliverableParams,
 } from "@/lib/okrValidation";
-import { syncObjectiveDepartments } from "@/lib/okrDb";
+import { syncObjectiveDepartments, createPerformanceIndicator } from "@/lib/okrDb";
 import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
