@@ -28,12 +28,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import { listDepartments } from "@/lib/departmentsDb";
-import { listProfilesByCompany, type DbProfile } from "@/lib/profilesDb";
 import {
   createDeliverable,
   createKeyResult,
   createOkrObjective,
+  createPerformanceIndicator,
   createStrategyObjective,
   ensureOkrCycle,
   getCompanyFundamentals,
@@ -64,20 +63,23 @@ import {
   validateAnnualObjective,
   validateQuarterlyTier1Objective,
   validateQuarterlyTier2Objective,
+  validateDeliverable,
   type ValidateStrategyObjectiveParams,
   type ValidateAnnualObjectiveParams,
   type ValidateQuarterlyTier1ObjectiveParams,
   type ValidateQuarterlyTier2ObjectiveParams,
+  type ValidateDeliverableParams,
 } from "@/lib/okrValidation";
 import { syncObjectiveDepartments } from "@/lib/okrDb";
 import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
-
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { UserMultiSelect } from "@/components/okr/UserMultiSelect";
 import { DepartmentMultiSelect } from "@/components/okr/DepartmentMultiSelect";
 import { PerformanceIndicatorEditor } from "@/components/okr/PerformanceIndicatorEditor";
 import { PerformanceIndicatorDraft, type DraftPerformanceIndicator } from "@/components/okr/PerformanceIndicatorDraft";
+import { listDepartments } from "@/lib/departmentsDb";
+import { listProfilesByCompany, type DbProfile } from "@/lib/profilesDb";
 
 type StepId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -1270,6 +1272,7 @@ export default function OkrAssistant() {
                           { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
                           { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
                         ],
+                        performanceIndicators: [],
                       },
                     ])
                   }
@@ -1760,6 +1763,7 @@ export default function OkrAssistant() {
                           { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
                           { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
                         ],
+                        performanceIndicators: [],
                       },
                     ])
                   }
@@ -1769,9 +1773,7 @@ export default function OkrAssistant() {
               </div>
 
               {!annualKrs.length ? (
-                <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">
-                  Você ainda não tem KRs anuais para conectar. Conclua a etapa 3.
-                </div>
+                <div className="rounded-2xl bg-amber-50 p-4 text-sm text-amber-900">Você ainda não tem KRs anuais para conectar. Conclua a etapa 3.</div>
               ) : null}
 
               <div className="grid gap-4">
@@ -1956,7 +1958,7 @@ export default function OkrAssistant() {
                       .filter((o) => o.title.length >= 6);
 
                     if (!trimmed.length) {
-                      toast({ title: "Crie ao menos 1 objetivo", variant: "destructive" });
+                      toast({ title: "Ajuste os entregáveis", description: "Escolha KR, título (>=6) e responsável.", variant: "destructive" });
                       return;
                     }
 
@@ -1976,7 +1978,7 @@ export default function OkrAssistant() {
                       
                       // Check KR count (minimum 1, maximum 5)
                                             if (o.krs.length < 1) {
-                                              validationErrors.push("Objetivo trimestral estratégico deve ter no mínimo 1 KR");
+                                              validationErrors.push("Objetivo trimestral estratégico deve ter pelo menos 1 KR");
                                             }
                                             if (o.krs.length > 5) {
                                               validationErrors.push("Objetivo trimestral estratégico pode ter no máximo 5 KRs");
