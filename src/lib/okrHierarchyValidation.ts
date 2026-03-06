@@ -227,16 +227,6 @@ export function validateAnnualObjective(params: ValidateAnnualObjectiveParams): 
     });
   }
 
-  // Validação: máximo de 4 KRs
-  if (krs.length > 4) {
-    errors.push({
-      field: 'key_results',
-      message: 'Objetivo anual pode ter no máximo 4 resultados-chave',
-      code: 'MAX_KRS_EXCEEDED',
-      severity: 'error',
-    });
-  }
-
   return {
     valid: errors.length === 0,
     errors,
@@ -337,21 +327,11 @@ export function validateQuarterlyTier1Objective(params: ValidateQuarterlyTier1Ob
     });
   }
 
-  // Validação: mínimo de 2 KRs (conforme especificação)
-  if (krs.length < 2) {
+  // Validação: máximo de 5 KRs (alterado de 4 para 5)
+  if (krs.length > 5) {
     errors.push({
       field: 'key_results',
-      message: 'Objetivo trimestral estratégico deve ter no mínimo 2 resultados-chave',
-      code: 'MIN_KRS_REQUIRED',
-      severity: 'error',
-    });
-  }
-
-  // Validação: máximo de 4 KRs
-  if (krs.length > 4) {
-    errors.push({
-      field: 'key_results',
-      message: 'Objetivo trimestral estratégico pode ter no máximo 4 resultados-chave',
+      message: 'Objetivo trimestral estratégico pode ter no máximo 5 resultados-chave',
       code: 'MAX_KRS_EXCEEDED',
       severity: 'error',
     });
@@ -488,11 +468,11 @@ export function validateQuarterlyTier2Objective(params: ValidateQuarterlyTier2Ob
     });
   }
 
-  // Validação: máximo de 4 KRs
-  if (krs.length > 4) {
+  // Validação: máximo de 5 KRs (alterado de 4 para 5)
+  if (krs.length > 5) {
     errors.push({
       field: 'key_results',
-      message: 'Objetivo tático pode ter no máximo 4 resultados-chave',
+      message: 'Objetivo tático pode ter no máximo 5 resultados-chave',
       code: 'MAX_KRS_EXCEEDED',
       severity: 'error',
     });
@@ -621,6 +601,29 @@ export function canUserEditDeliverable(
   }
 
   // Admin ou dono do objetivo pode editar
+  if (isOwnerOrAdmin) {
+    return true;
+  }
+
+  return false;
+}
+
+// ============================================================================
+// HELPER: VERIFICAR SE USUÁRIO PODE APAGAR ENTREGÁVEL
+// ============================================================================
+
+export function canUserDeleteDeliverable(
+  deliverable: DbDeliverable,
+  userId: string,
+  userRole: string,
+  isOwnerOrAdmin: boolean
+): boolean {
+  // Dono do entregável pode apagar
+  if (deliverable.owner_user_id === userId) {
+    return true;
+  }
+
+  // Admin pode apagar qualquer entregável
   if (isOwnerOrAdmin) {
     return true;
   }
