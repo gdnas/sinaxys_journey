@@ -12,6 +12,8 @@ type UserMultiSelectProps = {
   onChange: (ids: string[]) => void;
   placeholder?: string;
   disabled?: boolean;
+  // optional: how many badges to show before collapsing into +N
+  visibleBadgeCount?: number;
 };
 
 export function UserMultiSelect({ 
@@ -20,6 +22,7 @@ export function UserMultiSelect({
   onChange, 
   placeholder = "Selecione responsáveis...",
   disabled = false,
+  visibleBadgeCount = 3,
 }: UserMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -40,6 +43,9 @@ export function UserMultiSelect({
     return users.filter(u => (u.name || "").toLowerCase().includes(term));
   }, [users, q]);
 
+  const visibleSelected = selectedUsers.slice(0, visibleBadgeCount);
+  const hiddenCount = Math.max(0, selectedUsers.length - visibleBadgeCount);
+
   return (
     <div className="w-full">
       <Popover open={open} onOpenChange={setOpen}>
@@ -53,30 +59,38 @@ export function UserMultiSelect({
               {selectedUsers.length === 0 ? (
                 <span className="text-sm text-muted-foreground">{placeholder}</span>
               ) : (
-                selectedUsers.map(user => (
-                  <Badge
-                    key={user.id}
-                    variant="secondary"
-                    className="inline-flex items-center gap-1 pr-1 group rounded-full"
-                  >
-                    <User className="h-3 w-3" />
-                    <span className="max-w-[12rem] truncate">{user.name}</span>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); toggleUser(user.id); }}
-                      disabled={disabled}
-                      className="opacity-0 group-hover:opacity-100 hover:bg-accent rounded-full p-0.5 transition-all"
+                <>
+                  {visibleSelected.map(user => (
+                    <Badge
+                      key={user.id}
+                      variant="secondary"
+                      className="inline-flex items-center gap-1 pr-1 group rounded-full"
                     >
-                      <X className="h-3 w-3" />
-                    </button>
-                  </Badge>
-                ))
+                      <User className="h-3 w-3" />
+                      <span className="max-w-[10rem] truncate">{user.name}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); toggleUser(user.id); }}
+                        disabled={disabled}
+                        className="opacity-0 group-hover:opacity-100 hover:bg-accent rounded-full p-0.5 transition-all"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+
+                  {hiddenCount > 0 && (
+                    <Badge variant="secondary" className="inline-flex items-center gap-1 pr-1 rounded-full">
+                      +{hiddenCount}
+                    </Badge>
+                  )}
+                </>
               )}
             </div>
           </button>
         </PopoverTrigger>
 
-        <PopoverContent className="w-[20rem] p-2">
+        <PopoverContent className="w-[24rem] p-2">
           <div className="px-2 pb-2">
             <Input
               value={q}
@@ -100,7 +114,7 @@ export function UserMultiSelect({
                     <User className="h-4 w-4 text-muted-foreground" />
                     <div className="min-w-0">
                       <div className="truncate">{user.name}</div>
-                      {user.title && <div className="text-xs text-muted-foreground truncate">{user.title}</div>}
+                      {user.job_title && <div className="text-xs text-muted-foreground truncate">{user.job_title}</div>}
                     </div>
                   </div>
 

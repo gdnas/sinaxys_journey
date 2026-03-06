@@ -1,20 +1,26 @@
 import { TierBadge } from "@/components/okr";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, ChevronDown, ChevronUp, KeyRound, Link2, Pencil, Plus, Trash2 } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { ArrowRight, ChevronDown, ChevronUp, KeyRound, Link2, Pencil, Plus, Trash2, Check, User as UserIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
-import { krProgressPct, listKeyResults, listOkrObjectivesByIds, type DbOkrKeyResult, type DbOkrObjective, type ObjectiveLevel } from "@/lib/okrDb";
+import { krProgressPct, listKeyResults, listOkrObjectivesByIds, type DbOkrKeyResult, type DbOkrObjective, type ObjectiveLevel,
+  listPerformanceIndicators, createPerformanceIndicator, updatePerformanceIndicator, deletePerformanceIndicator, piProgressPct, type DbPerformanceIndicator,
+} from "@/lib/okrDb";
 import { listLinkedObjectivesByKrIds } from "@/lib/okrAlignmentDb";
 import type { DbDepartment } from "@/lib/departmentsDb";
 import { objectiveAccent, objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 import { KrEditDialog } from "@/components/okr/KrEditDialog";
+import { useToast } from "@/hooks/use-toast";
 
 function kindLabel(kind: DbOkrKeyResult["kind"]) {
   return kind === "METRIC" ? "Métrica" : "Entregável";
@@ -54,6 +60,8 @@ export function OkrObjectiveCard(props: {
   onEdit?: () => void;
   onDelete?: () => void;
   onAddKr?: () => void;
+  onRequestAddKr?: (objectiveId: string) => void;
+  onRequestAddPi?: (objectiveId: string) => void;
   companyId?: string;
   currentUserId?: string;
   isAdminish?: boolean;
@@ -61,7 +69,6 @@ export function OkrObjectiveCard(props: {
   byUserId?: Map<string, { name: string; monthlyCostBRL?: number | null; departmentId?: string | null }>;
   onRequestEditObjective?: (objective: DbOkrObjective) => void;
   onRequestDeleteObjective?: (objectiveId: string) => void;
-  onRequestAddKr?: (objectiveId: string) => void;
 }) {
   const {
     objective,
@@ -74,6 +81,8 @@ export function OkrObjectiveCard(props: {
     onEdit,
     onDelete,
     onAddKr,
+    onRequestAddKr,
+    onRequestAddPi,
     companyId,
     currentUserId,
     isAdminish,
@@ -81,12 +90,15 @@ export function OkrObjectiveCard(props: {
     byUserId,
     onRequestEditObjective,
     onRequestDeleteObjective,
-    onRequestAddKr,
+    onRequestAddKr: onRequestAddKrProp,
   } = props;
 
   const [open, setOpen] = useState(false);
   const [editingKr, setEditingKr] = useState<DbOkrKeyResult | null>(null);
   const [openKrIds, setOpenKrIds] = useState<Set<string>>(() => new Set());
+
+  const qc = useQueryClient();
+  const { toast } = useToast();
 
   const accent = objectiveAccent(objective.level);
 
@@ -94,6 +106,12 @@ export function OkrObjectiveCard(props: {
     queryKey: ["okr-krs", objective.id],
     enabled: open,
     queryFn: () => listKeyResults(objective.id),
+  });
+
+  const { data: pis = [] } = useQuery({
+    queryKey: ["okr-pis", objective.id],
+    enabled: open,
+    queryFn: () => listPerformanceIndicators(objective.id),
   });
 
   const krIds = useMemo(() => krs.map((k) => k.id), [krs]);
@@ -158,6 +176,69 @@ export function OkrObjectiveCard(props: {
   }, [departments]);
 
   const linksByKrId = linkedObjectiveData?.linksByKrId ?? new Map<string, DbOkrObjective[]>();
+
+  async function handleDeleteKr(krId: string) {
+    if (!companyId) return;
+    if (!confirm("Excluir KR? Essa ação não pode ser desfeita.")) return;
+    try {
+      await (await import("@/lib/okrDb")).deleteKeyResultCascade(krId);
+      await qc.invalidateQueries({ queryKey: ["okr-krs", objective.id] });
+      await qc.invalidateQueries({ queryKey: ["okr-kr-stats", companyId] });
+      toast({ title: "KR excluído" });
+    } catch (e) {
+      toast({ title: "Falha ao excluir", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+    }
+  }
+
+  async function handleDeletePi(piId: string) {
+    if (!companyId) return;
+    if (!confirm("Excluir KPI?")) return;
+    try {
+      await deletePerformanceIndicator(piId);
+      await qc.invalidateQueries({ queryKey: ["okr-pis", objective.id] });
+      toast({ title: "KPI excluído" });
+    } catch (e) {
+      toast({ title: "Falha ao excluir", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+    }
+  }
+
+  const [editingPi, setEditingPi] = useState<DbPerformanceIndicator | null>(null);
+  const [piOpen, setPiOpen] = useState(false);
+  const [piSaving, setPiSaving] = useState(false);
+  const [piTitle, setPiTitle] = useState("");
+  const [piKind, setPiKind] = useState<DbPerformanceIndicator["kind"]>("METRIC");
+  const [piUnit, setPiUnit] = useState("");
+  const [piStart, setPiStart] = useState<string>("");
+  const [piCurrent, setPiCurrent] = useState<string>("");
+  const [piTarget, setPiTarget] = useState<string>("");
+  const [piDue, setPiDue] = useState<string>("");
+  const [piConfidence, setPiConfidence] = useState<DbPerformanceIndicator["confidence"]>("ON_TRACK");
+
+  function openNewPi(objectiveId?: string) {
+    setEditingPi(null);
+    setPiTitle("");
+    setPiKind("METRIC");
+    setPiUnit("");
+    setPiStart("");
+    setPiCurrent("");
+    setPiTarget("");
+    setPiDue("");
+    setPiConfidence("ON_TRACK");
+    setPiOpen(true);
+  }
+
+  function openEditPi(pi: DbPerformanceIndicator) {
+    setEditingPi(pi);
+    setPiTitle(pi.title);
+    setPiKind(pi.kind);
+    setPiUnit(pi.metric_unit ?? "");
+    setPiStart(pi.start_value !== null ? String(pi.start_value) : "");
+    setPiCurrent(pi.current_value !== null ? String(pi.current_value) : "");
+    setPiTarget(pi.target_value !== null ? String(pi.target_value) : "");
+    setPiDue(pi.due_at ?? "");
+    setPiConfidence(pi.confidence);
+    setPiOpen(true);
+  }
 
   return (
     <>
@@ -246,10 +327,38 @@ export function OkrObjectiveCard(props: {
                 </Button>
               ) : null}
 
-              {canWriteObjective && onAddKr ? (
-                <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl bg-white" onClick={onAddKr} aria-label="Adicionar KR">
-                  <Plus className="h-4 w-4" />
-                </Button>
+              {canWriteObjective ? (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-11 w-11 rounded-xl bg-white" aria-label="Adicionar">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-40 p-2">
+                    <div className="grid gap-2">
+                      <button
+                        type="button"
+                        className="rounded-md px-3 py-2 text-sm text-left hover:bg-accent/5"
+                        onClick={() => {
+                          setOpen(true);
+                          setTimeout(() => onRequestAddKr && onRequestAddKr(objective.id), 50);
+                        }}
+                      >
+                        Adicionar KR
+                      </button>
+                      <button
+                        type="button"
+                        className="rounded-md px-3 py-2 text-sm text-left hover:bg-accent/5"
+                        onClick={() => {
+                          setOpen(true);
+                          setTimeout(() => onRequestAddPi && onRequestAddPi(objective.id), 50);
+                        }}
+                      >
+                        Adicionar KPI
+                      </button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               ) : null}
 
               <Button asChild size="icon" className="h-11 w-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
@@ -266,25 +375,28 @@ export function OkrObjectiveCard(props: {
               <div className="grid gap-3">
                 {isFetching ? <div className="text-sm text-muted-foreground">Carregando KRs…</div> : null}
 
-                {!isFetching && !krs.length ? (
+                {!isFetching && !krs.length && !pis.length ? (
                   <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-sm text-muted-foreground">
-                    Nenhum KR neste objetivo ainda.
+                    Nenhum KR ou KPI neste objetivo ainda.
                   </div>
                 ) : null}
 
                 {krs.map((kr) => {
                   const pct = krProgressPct(kr);
                   const meta = kr.kind === "METRIC"
-                    ? `${kr.current_value ?? "—"} / ${kr.target_value}` : kr.metric_unit;
+                    ? `${kr.current_value ?? "—"} / ${kr.target_value ?? "—"}` : kr.metric_unit;
                   const isDone = kr.achieved;
                   const aligned = linksByKrId.get(kr.id) ?? [];
                   const isKrOpen = openKrIds.has(kr.id);
 
+                  const ownerName = kr.owner_user_id ? (byUserId?.get(kr.owner_user_id)?.name ?? "—") : "—";
+
                   return (
                     <div key={kr.id} className="grid gap-2">
                       <div
-                        className="group rounded-2xl border bg-white p-4 transition"
+                        className="group rounded-2xl border bg-white p-4 transition cursor-pointer"
                         style={{ borderColor: accent.border as any }}
+                        onClick={() => setEditingKr(kr)}
                         onMouseEnter={(e) => {
                           (e.currentTarget as HTMLDivElement).style.borderColor = String(accent.accent);
                         }}
@@ -293,36 +405,54 @@ export function OkrObjectiveCard(props: {
                         }}
                       >
                         <div className="flex items-start gap-3">
-                          <span className="text-xs text-muted-foreground">
-                            {meta}
-                          </span>
-                          <span className="font-semibold text-[color:var(--sinaxys-ink)]">
-                            {kr.title}
-                          </span>
-                          {isDone ? (
-                            <span className="text-green-600 dark:text-green-400 font-medium text-sm">✓</span>
-                          ) : null}
-                          <TierBadge tier={objective.level === "COMPANY" ? "TIER1" : "TIER2"} size="sm" />
-                        </div>
-                        <div>
-                          <span className="text-xs text-muted-foreground">
-                            {meta}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="font-semibold text-[color:var(--sinaxys-ink)]">
-                              {kr.title}
-                            </span>
-                            <TierBadge tier={objective.level === "COMPANY" ? "TIER1" : "TIER2"} size="sm" />
-                          </div>
-                          <div className="flex items-center gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">{meta}</span>
+                              <span className="font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{kr.title}</span>
+                            </div>
+
+                            <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <UserIcon className="h-3.5 w-3.5" />
+                                <span>{ownerName}</span>
+                              </div>
+                              <div>•</div>
+                              {pct !== null ? <div>{pct}%</div> : <div>—</div>}
+                            </div>
+
                             {pct !== null ? (
-                              <span className="font-semibold text-[color:var(--sinaxys-ink)]">
-                                {pct}%
-                              </span>
+                              <div className="mt-2">
+                                <Progress value={pct} className="h-2 rounded-full" style={{ ["--progress-accent" as any]: accent.accent }} />
+                              </div>
                             ) : null}
-                            {isDone ? (
-                              <span className="text-green-600 dark:text-green-400 font-medium text-sm">✓</span>
-                            ) : null}
+                          </div>
+
+                          <div className="ml-auto flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 rounded-xl bg-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setEditingKr(kr);
+                              }}
+                              title="Editar KR"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 rounded-xl bg-destructive/5 text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDeleteKr(kr.id);
+                              }}
+                              title="Excluir KR"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </div>
                       </div>
@@ -356,10 +486,10 @@ export function OkrObjectiveCard(props: {
                                   byUserId={byUserId}
                                   onEdit={canWrite && onRequestEditObjective ? () => onRequestEditObjective(o) : undefined}
                                   onDelete={canWrite && onRequestDeleteObjective ? () => onRequestDeleteObjective(o.id) : undefined}
-                                  onAddKr={canWrite && onRequestAddKr ? () => onRequestAddKr(o.id) : undefined}
+                                  onAddKr={canWrite && onRequestAddKrProp ? () => onRequestAddKrProp(o.id) : undefined}
                                   onRequestEditObjective={onRequestEditObjective}
                                   onRequestDeleteObjective={onRequestDeleteObjective}
-                                  onRequestAddKr={onRequestAddKr}
+                                  onRequestAddKr={onRequestAddKrProp}
                                 />
                               );
                             })}
@@ -369,6 +499,80 @@ export function OkrObjectiveCard(props: {
                     </div>
                   );
                 })}
+
+                {pis.map((pi) => {
+                  const pct = piProgressPct(pi);
+                  const ownerName = pi ? "—" : "—"; // can extend if owner present on PI
+
+                  return (
+                    <div key={pi.id} className="grid gap-2">
+                      <div
+                        className="group rounded-2xl border bg-white p-4 transition cursor-pointer"
+                        style={{ borderColor: accent.border as any }}
+                        onClick={() => openEditPi(pi)}
+                        onMouseEnter={(e) => {
+                          (e.currentTarget as HTMLDivElement).style.borderColor = String(accent.accent);
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.currentTarget as HTMLDivElement).style.borderColor = String(accent.border);
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">KPI</span>
+                              <span className="font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{pi.title}</span>
+                            </div>
+
+                            <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+                              <div className="flex items-center gap-1">
+                                <UserIcon className="h-3.5 w-3.5" />
+                                <span>{ownerName}</span>
+                              </div>
+                              <div>•</div>
+                              {pct !== null ? <div>{pct}%</div> : <div>—</div>}
+                            </div>
+
+                            {pct !== null ? (
+                              <div className="mt-2">
+                                <Progress value={pct} className="h-2 rounded-full" style={{ ["--progress-accent" as any]: accent.accent }} />
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="ml-auto flex items-center gap-2">
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 rounded-xl bg-white"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openEditPi(pi);
+                              }}
+                              title="Editar KPI"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              className="h-9 w-9 rounded-xl bg-destructive/5 text-destructive"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void handleDeletePi(pi.id);
+                              }}
+                              title="Excluir KPI"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
               </div>
             </div>
           </CollapsibleContent>
@@ -386,6 +590,86 @@ export function OkrObjectiveCard(props: {
           kr={editingKr}
         />
       ) : null}
+
+      <Dialog open={piOpen} onOpenChange={(v) => { setPiOpen(v); if (!v) setEditingPi(null); }}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{editingPi ? "Editar KPI" : "Novo KPI"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-2">
+            <div className="grid gap-2">
+              <Input value={piTitle} onChange={(e) => setPiTitle(e.target.value)} placeholder="Título do KPI" />
+            </div>
+
+            <div className="grid gap-2">
+              <Input value={piUnit} onChange={(e) => setPiUnit(e.target.value)} placeholder="Unidade (%, pts, R$)" />
+            </div>
+
+            <div className="grid gap-2 md:grid-cols-3">
+              <Input value={piStart} onChange={(e) => setPiStart(e.target.value)} placeholder="Início" />
+              <Input value={piCurrent} onChange={(e) => setPiCurrent(e.target.value)} placeholder="Atual" />
+              <Input value={piTarget} onChange={(e) => setPiTarget(e.target.value)} placeholder="Meta" />
+            </div>
+
+            <div className="grid gap-2">
+              <Input type="date" value={piDue} onChange={(e) => setPiDue(e.target.value)} />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setPiOpen(false)} disabled={piSaving}>Cancelar</Button>
+            <Button className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white" disabled={piSaving || piTitle.trim().length < 6} onClick={async () => {
+              if (piSaving) return;
+              setPiSaving(true);
+              try {
+                const parseOrNull = (v: string) => {
+                  const n = Number(String(v).replace(",", "."));
+                  return Number.isFinite(n) ? n : null;
+                };
+
+                if (editingPi) {
+                  await updatePerformanceIndicator(editingPi.id, {
+                    title: piTitle,
+                    kind: piKind,
+                    metric_unit: piUnit || null,
+                    start_value: parseOrNull(piStart),
+                    current_value: parseOrNull(piCurrent),
+                    target_value: parseOrNull(piTarget),
+                    due_at: piDue || null,
+                    confidence: piConfidence,
+                  });
+
+                  toast({ title: "KPI atualizado" });
+                } else {
+                  if (!companyId) throw new Error("CompanyId ausente");
+                  await createPerformanceIndicator({
+                    objective_id: objective.id,
+                    title: piTitle,
+                    kind: piKind,
+                    metric_unit: piUnit || null,
+                    start_value: parseOrNull(piStart),
+                    current_value: parseOrNull(piCurrent),
+                    target_value: parseOrNull(piTarget),
+                    due_at: piDue || null,
+                    confidence: piConfidence,
+                    achieved: false,
+                  });
+                  toast({ title: "KPI criado" });
+                }
+
+                await qc.invalidateQueries({ queryKey: ["okr-pis", objective.id] });
+                await qc.invalidateQueries({ queryKey: ["okr-kr-stats", companyId] });
+                setPiOpen(false);
+              } catch (e) {
+                toast({ title: "Falha ao salvar KPI", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+              } finally {
+                setPiSaving(false);
+              }
+            }}>Salvar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
