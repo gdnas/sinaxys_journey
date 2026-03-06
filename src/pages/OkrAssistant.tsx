@@ -413,11 +413,8 @@ export default function OkrAssistant() {
 
   const annualCycles = useMemo(() => cycles.filter((c) => c.type === "ANNUAL"), [cycles]);
   
-  // Filter only admins for moderator selection
-  const admins = useMemo(() => profiles.filter(p => p.role === "ADMIN" || p.role === "MASTERADMIN"), [profiles]);
-
-  useEffect(() => {
-    const y = Number(annualYear);
+    useEffect(() => {
+      const y = Number(annualYear);
     const found = annualCycles.find((c) => c.year === y)?.id ?? "";
     setAnnualCycleId(found);
   }, [annualCycles, annualYear]);
@@ -497,9 +494,6 @@ export default function OkrAssistant() {
   });
 
   const profiles = qProfiles.data ?? [];
-  
-    // Filter only admins for moderator selection
-    const admins = useMemo(() => profiles.filter(p => p.role === "ADMIN" || p.role === "MASTERADMIN"), [profiles]);
   
     const [tacticalDrafts, setTacticalDrafts] = useState<DraftTacticalObjective[]>([]);
     const [tacticalSaving, setTacticalSaving] = useState(false);

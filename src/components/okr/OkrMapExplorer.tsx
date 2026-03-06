@@ -86,11 +86,10 @@ import {
     type DbPerformanceIndicator,
 } from "@/lib/okrDb";
     import {
-        clearKrLinksForObjective,
-        linkObjectiveToKr,
-        listKrLinksByObjectiveId,
-        listKrLinksByKrId,
-    } from "@/lib/okrAlignmentDb";
+            clearKrLinksForObjective,
+            linkObjectiveToKr,
+            listKrLinksByObjectiveId,
+        } from "@/lib/okrAlignmentDb";
 
 import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profilePublicDb";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
