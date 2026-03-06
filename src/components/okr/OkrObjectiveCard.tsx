@@ -1,4 +1,5 @@
 import { TierBadge } from "@/components/okr";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
