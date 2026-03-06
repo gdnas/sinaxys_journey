@@ -4,6 +4,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
+type DeliverableTask = {
+  id: string;
+  title: string;
+  ownerName?: string | null;
+  status?: string | null;
+};
+
 type Deliverable = {
   id: string;
   title: string;
@@ -11,6 +18,7 @@ type Deliverable = {
   due_at: string | null;
   ownerName?: string;
   ownerAvatar?: string | null;
+  tasks?: DeliverableTask[];
 };
 
 export default function DeliverableTimeline({
@@ -83,7 +91,7 @@ export default function DeliverableTimeline({
   // Handlers de mouse/touch
   const handleMouseDown = (e: React.MouseEvent | React.TouchEvent, deliverable: Deliverable, isResize = false, isResizeLeft = false) => {
     e.preventDefault();
-    const startX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const startX = "touches" in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
     setDragState({
       id: deliverable.id,
       isDragging: !isResize,
@@ -97,10 +105,9 @@ export default function DeliverableTimeline({
     });
   };
 
-  const handleMouseMove = (e: React.MouseEvent | React.TouchEvent) => {
+  const handleMouseMove = (e: MouseEvent | TouchEvent) => {
     if (!dragState.id || dragState.originalDue === null) return;
-    
-    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientX = (e as TouchEvent).touches ? (e as TouchEvent).touches[0].clientX : (e as MouseEvent).clientX;
     const deltaX = clientX - dragState.startX;
     const deltaDays = Math.round(deltaX / dayWidth);
 
@@ -163,15 +170,15 @@ export default function DeliverableTimeline({
   // Adicionar e remover event listeners
   useMemo(() => {
     if (dragState.isDragging || dragState.isResizing) {
-      const handleMove = (e: MouseEvent | TouchEvent) => handleMouseMove(e as any);
+      const handleMove = (e: MouseEvent | TouchEvent) => handleMouseMove(e);
       const handleUp = () => handleMouseUp();
-      window.addEventListener("mousemove", handleMove);
-      window.addEventListener("touchmove", handleMove, { passive: false });
+      window.addEventListener("mousemove", handleMove as any);
+      window.addEventListener("touchmove", handleMove as any, { passive: false } as any);
       window.addEventListener("mouseup", handleUp);
       window.addEventListener("touchend", handleUp);
       return () => {
-        window.removeEventListener("mousemove", handleMove);
-        window.removeEventListener("touchmove", handleMove);
+        window.removeEventListener("mousemove", handleMove as any);
+        window.removeEventListener("touchmove", handleMove as any);
         window.removeEventListener("mouseup", handleUp);
         window.removeEventListener("touchend", handleUp);
       };
@@ -204,7 +211,7 @@ export default function DeliverableTimeline({
           return (
             <div
               key={d.id}
-              className={`group flex items-center gap-3 rounded-2xl border bg-white p-4 transition cursor-pointer hover:border-[color:var(--sinaxys-primary)] ${
+              className={`group flex items-start gap-3 rounded-2xl border bg-white p-4 transition cursor-pointer hover:border-[color:var(--sinaxys-primary)] ${
                 isDragging ? "ring-2 ring-[color:var(--sinaxys-primary)]" : ""
               }`}
               style={{ borderColor: isDragging ? "var(--sinaxys-primary)" : "var(--sinaxys-border)" }}
@@ -218,7 +225,10 @@ export default function DeliverableTimeline({
               </Avatar>
               
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                <div className="flex items-center justify-between">
+                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                  <div className="text-xs text-muted-foreground">{d.due_at ? formatDate(d.due_at) : "Sem prazo"}</div>
+                </div>
                 <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                   <span className="flex items-center gap-1">
                     <UserIcon className="h-3 w-3" />
@@ -227,6 +237,17 @@ export default function DeliverableTimeline({
                   {d.start_date ? <span>Início: {formatDate(d.start_date)}</span> : null}
                   {d.due_at ? <span>Prazo: {formatDate(d.due_at)}</span> : null}
                 </div>
+
+                {d.tasks && d.tasks.length ? (
+                  <div className="mt-3 space-y-2">
+                    {d.tasks.map(t => (
+                      <div key={t.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-3 text-sm flex items-center justify-between">
+                        <div className="min-w-0 truncate">{t.title}</div>
+                        <div className="text-xs text-muted-foreground">{t.ownerName ?? "—"}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
               
               <GripVertical className="h-5 w-5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -273,7 +294,7 @@ export default function DeliverableTimeline({
 
           {/* Linha do dia atual */}
           <div className="relative h-10 border-b border-[color:var(--sinaxys-border)]">
-            <div className="absolute left-48 top-0 bottom-0 w-px bg-red-500 z-5" style={{ left: `calc(192px + ${todayOffset}px)` }}>
+            <div className="absolute top-0 bottom-0 w-px bg-red-500 z-5" style={{ left: `calc(12rem + ${todayOffset}px)` }}>
               <div className="absolute -top-1 -left-1 w-2 h-2 bg-red-500 rounded-full" />
             </div>
           </div>
@@ -298,8 +319,6 @@ export default function DeliverableTimeline({
                 barLeft = startDays * dayWidth;
                 barWidth = Math.max(30, (dueDays - startDays) * dayWidth);
               }
-              
-              const barLeftPx = 192 + barLeft;
               
               // Usar datas atualizadas durante o arrasto
               const displayStart = isDragging && dragState.newStart ? new Date(dragState.newStart) : startDate;
@@ -348,8 +367,8 @@ export default function DeliverableTimeline({
                           }`}
                           style={{ left: displayBarLeft, width: displayBarWidth }}
                           onClick={(e) => { e.stopPropagation(); onBarClick(d.id); }}
-                          onMouseDown={(e) => handleMouseDown(e, d, false, false)}
-                          onTouchStart={(e) => handleMouseDown(e, d, false, false)}
+                          onMouseDown={(e) => handleMouseDown(e as any, d, false, false)}
+                          onTouchStart={(e) => handleMouseDown(e as any, d, false, false)}
                         >
                           <span className="truncate px-2 text-xs font-medium text-white">{formatDate(d.due_at)}</span>
                         </div>
@@ -361,8 +380,8 @@ export default function DeliverableTimeline({
                               isDragging && dragState.isResizingLeft ? "bg-[color:var(--sinaxys-primary)]/20" : ""
                             }`}
                             style={{ left: displayBarLeft, width: 8 }}
-                            onMouseDown={(e) => handleMouseDown(e, d, true, true)}
-                            onTouchStart={(e) => handleMouseDown(e, d, true, true)}
+                            onMouseDown={(e) => handleMouseDown(e as any, d, true, true)}
+                            onTouchStart={(e) => handleMouseDown(e as any, d, true, true)}
                           />
                         ) : null}
                         
@@ -372,8 +391,8 @@ export default function DeliverableTimeline({
                             isDragging && dragState.isResizing && !dragState.isResizingLeft ? "bg-[color:var(--sinaxys-primary)]/20" : ""
                           }`}
                           style={{ left: displayBarLeft + displayBarWidth - 8, width: 8 }}
-                          onMouseDown={(e) => handleMouseDown(e, d, true, false)}
-                          onTouchStart={(e) => handleMouseDown(e, d, true, false)}
+                          onMouseDown={(e) => handleMouseDown(e as any, d, true, false)}
+                          onTouchStart={(e) => handleMouseDown(e as any, d, true, false)}
                         />
                       </>
                     ) : (

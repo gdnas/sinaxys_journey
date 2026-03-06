@@ -1523,45 +1523,7 @@ function KrCard({
           <Separator className="my-5" />
 
           {/* Timeline de Gantt para os entregáveis */}
-          {deliverables.length > 0 && (
-            <div className="mb-6">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Timeline de Entregáveis</div>
-              </div>
-              <DeliverableTimeline
-                deliverables={deliverables.map((d) => {
-                  const owner = d.owner_user_id ? profileById.get(d.owner_user_id) : null;
-                  return {
-                    id: d.id,
-                    title: d.title,
-                    start_date: d.start_date,
-                    due_at: d.due_at,
-                    ownerName: owner?.name,
-                    ownerAvatar: owner?.avatarUrl,
-                  };
-                })}
-                onBarClick={(id) => {
-                  window.location.href = `/okr/entregaveis/${id}`;
-                }}
-                onReschedule={handleReschedule}
-              />
-              <div className="mt-2 text-xs text-muted-foreground">
-                Arraste as barras para reagendar. Use as bordas esquerda/direita para ajustar datas de início/término.
-              </div>
-            </div>
-          )}
-
-          {isTier1 ? (
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entregáveis</div>
-              {canWrite ? (
-                <Button variant="outline" className="h-10 rounded-xl" onClick={onAddDeliverable} title="Criar entregável">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Entregável
-                </Button>
-              ) : null}
-            </div>
-          ) : null}
+          {/* Timeline is rendered at the objective level (not per-KR) to avoid duplication */}
 
           <div className="grid gap-3">
             {deliverables.length ? (
