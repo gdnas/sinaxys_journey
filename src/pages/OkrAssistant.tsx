@@ -11,6 +11,7 @@ import {
   Target,
   Users,
   Waypoints,
+  Plus,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -18,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
@@ -57,6 +57,16 @@ import {
 import { linkObjectiveToKr } from "@/lib/okrAlignmentDb";
 import { parseDescribedItems, serializeDescribedItems, type DescribedItem } from "@/lib/fundamentalsFormat";
 import { getErrorMessage } from "@/lib/errorMessage";
+import { 
+  validateStrategyObjective,
+  validateAnnualObjective,
+  validateQuarterlyTier1Objective,
+  validateQuarterlyTier2Objective,
+  type ValidateStrategyObjectiveParams,
+  type ValidateAnnualObjectiveParams,
+  type ValidateQuarterlyTier1ObjectiveParams,
+  type ValidateQuarterlyTier2ObjectiveParams,
+} from "@/lib/okrValidation";
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
@@ -380,6 +390,8 @@ export default function OkrAssistant() {
   const [annualCycleId, setAnnualCycleId] = useState<string>("");
   const [annualDrafts, setAnnualDrafts] = useState<DraftObjective[]>([]);
   const [annualSaving, setAnnualSaving] = useState(false);
+  const [annualModeratorId, setAnnualModeratorId] = useState<string>("");
+  const [annualValidationErrors, setAnnualValidationErrors] = useState<string[]>([]);
 
   const annualCycles = useMemo(() => cycles.filter((c) => c.type === "ANNUAL"), [cycles]);
 
@@ -1416,14 +1428,48 @@ export default function OkrAssistant() {
                       }))
                       .filter((o) => o.title.length >= 6);
 
-                    const invalid = trimmed.some((o) => o.krs.length < 1 || o.krs.length > 4);
-                    if (invalid) {
-                      toast({ title: "Ajuste os KRs", description: "Cada objetivo precisa de 1 a 4 KRs.", variant: "destructive" });
+                    // Validações
+                    const validationErrors: string[] = [];
+                    
+                    for (const o of trimmed) {
+                      const result: ValidateAnnualObjectiveParams = validateAnnualObjective({
+                        objective: {
+                          ...annualDrafts[0],
+                          title: o.title,
+                          description: o.description,
+                        },
+                        krs: o.krs,
+                        objectives2Year: strategyObjectives,
+                        admins: profiles.filter(p => p.role === "ADMIN" || p.role === "MASTERADMIN"),
+                        cycleType: "ANNUAL",
+                      });
+
+                      if (!result.valid) {
+                        validationErrors.push(...result.errors.map(e => e.message));
+                      }
+
+                      // Validar contagem de KRs
+                      if (o.krs.length < 1) {
+                        validationErrors.push("Cada objetivo anual deve ter pelo menos 1 KR");
+                      }
+                      if (o.krs.length > 4) {
+                        validationErrors.push("Cada objetivo anual pode ter no máximo 4 KRs");
+                      }
+                    }
+
+                    if (validationErrors.length > 0) {
+                      setAnnualValidationErrors(validationErrors);
+                      toast({
+                        title: "Erros de validação",
+                        description: validationErrors.join(". "),
+                        variant: "destructive",
+                      });
                       return;
                     }
 
+                    setAnnualValidationErrors([]);
+                    setAnnualSaving(true);
                     try {
-                      setAnnualSaving(true);
                       for (const o of trimmed) {
                         const created = await createOkrObjective({
                           company_id: cid,
@@ -1447,6 +1493,7 @@ export default function OkrAssistant() {
                           expected_profit_brl: null,
                           profit_thesis: null,
                           expected_revenue_at: null,
+                          moderator_user_id: annualModeratorId || null,
                         });
 
                         for (const kr of o.krs) {
@@ -1471,6 +1518,7 @@ export default function OkrAssistant() {
                       }
 
                       setAnnualDrafts([]);
+                      setAnnualModeratorId("");
                       await qc.invalidateQueries({ queryKey: ["okr-annual-objectives", cid, annualCycleId] });
                       await qc.invalidateQueries({ queryKey: ["okr-annual-krs", annualObjectives.map((o) => o.id).join(",")] });
 

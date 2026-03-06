@@ -33,7 +33,7 @@ export function validateKrTitlePt(title: string) {
   for (const v of TASKISH_VERBS) {
     const re = new RegExp(`(^|\\s)${v}(\\s|$)`, "i");
     if (re.test(lower)) {
-      return `KR parece tarefa ("${v}"). Reescreva como resultado mensurável (ex.: \"Reduzir churn de X para Y\").`;
+      return `KR parece tarefa ("${v}"). Reescreva como resultado mensurável (ex.: "Reduzir churn de X para Y").`;
     }
   }
 
@@ -43,3 +43,31 @@ export function validateKrTitlePt(title: string) {
 export function clampInt(n: number, min: number, max: number) {
   return Math.max(min, Math.min(max, Math.trunc(n)));
 }
+
+// ============================================================================
+// VALIDAÇÕES DE HIERARQUIA OKR - IMPORTADAS DE okrHierarchyValidation.ts
+// ============================================================================
+
+export type { 
+  ValidateStrategyObjectiveParams,
+  ValidateAnnualObjectiveParams,
+  ValidateQuarterlyTier1ObjectiveParams,
+  ValidateQuarterlyTier2ObjectiveParams,
+  ValidateDeliverableParams,
+  ValidationError,
+  ValidationResult,
+} from './okrHierarchyValidation';
+
+export {
+  validateStrategyObjective,
+  validateAnnualObjective,
+  validateQuarterlyTier1Objective,
+  validateQuarterlyTier2Objective,
+  validateDeliverable,
+  validateAllObjectivesInCycle,
+  canUserEditDeliverable,
+  canUserCreateDeliverable,
+  isObjectiveTier1,
+  isObjectiveTier2,
+  determineObjectiveTier,
+} from './okrHierarchyValidation';
