@@ -299,8 +299,8 @@ export default function OkrObjectiveDetail() {
   });
 
   const profileById = useMemo(() => {
-    const m = new Map<string, { name: string; monthlyCostBRL: number | null }>();
-    for (const p of profiles) m.set(p.id, { name: p.name ?? p.email, monthlyCostBRL: p.monthly_cost_brl });
+    const m = new Map<string, { name: string; monthlyCostBRL: number | null; avatarUrl?: string | null }>();
+    for (const p of profiles) m.set(p.id, { name: p.name ?? p.email, monthlyCostBRL: p.monthly_cost_brl, avatarUrl: p.avatar_url });
     return m;
   }, [profiles]);
 
@@ -677,6 +677,7 @@ export default function OkrObjectiveDetail() {
               deliverables={deliverablesByKrId.get(kr.id) ?? []}
               tasksByDeliverableId={tasksByDeliverableId}
               byUserId={byUserId}
+              profileById={profileById}
               canWrite={canWrite}
               canEditTask={canEditTask}
               isTier1={isTier1}
@@ -1289,6 +1290,7 @@ function KrCard({
   deliverables,
   tasksByDeliverableId,
   byUserId,
+  profileById,
   canWrite,
   canEditTask,
   onToggleDeliverableKr,
@@ -1310,6 +1312,7 @@ function KrCard({
   deliverables: DbDeliverable[];
   tasksByDeliverableId: Map<string, DbTask[]>;
   byUserId: Map<string, string>;
+  profileById: Map<string, { name: string; monthlyCostBRL: number | null; avatarUrl?: string | null }>;
   canWrite: boolean;
   canEditTask: (t: DbTask) => boolean;
   onToggleDeliverableKr: () => void;
@@ -1526,12 +1529,17 @@ function KrCard({
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Timeline de Entregáveis</div>
               </div>
               <DeliverableTimeline
-                deliverables={deliverables.map((d) => ({
-                  id: d.id,
-                  title: d.title,
-                  start_date: d.start_date,
-                  due_at: d.due_at,
-                }))}
+                deliverables={deliverables.map((d) => {
+                  const owner = d.owner_user_id ? profileById.get(d.owner_user_id) : null;
+                  return {
+                    id: d.id,
+                    title: d.title,
+                    start_date: d.start_date,
+                    due_at: d.due_at,
+                    ownerName: owner?.name,
+                    ownerAvatar: owner?.avatarUrl,
+                  };
+                })}
                 onBarClick={(id) => {
                   window.location.href = `/okr/entregaveis/${id}`;
                 }}
