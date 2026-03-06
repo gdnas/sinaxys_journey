@@ -497,10 +497,13 @@ export default function OkrAssistant() {
   });
 
   const profiles = qProfiles.data ?? [];
-
-  const [tacticalDrafts, setTacticalDrafts] = useState<DraftTacticalObjective[]>([]);
-  const [tacticalSaving, setTacticalSaving] = useState(false);
-  const [tacticalValidationErrors, setTacticalValidationErrors] = useState<string[]>([]);
+  
+    // Filter only admins for moderator selection
+    const admins = useMemo(() => profiles.filter(p => p.role === "ADMIN" || p.role === "MASTERADMIN"), [profiles]);
+  
+    const [tacticalDrafts, setTacticalDrafts] = useState<DraftTacticalObjective[]>([]);
+    const [tacticalSaving, setTacticalSaving] = useState(false);
+    const [tacticalValidationErrors, setTacticalValidationErrors] = useState<string[]>([]);
 
   const tacticalObjectives = useMemo(() => {
     const all = qQuarterObjectives.data ?? [];
@@ -1574,24 +1577,32 @@ export default function OkrAssistant() {
                         });
 
                         for (const kr of o.krs) {
-                          const kind = kr.kind as KrKind;
-                          const start = kind === "METRIC" ? Number(String(kr.start_value).replace(",", ".")) : null;
-                          const target = kind === "METRIC" ? Number(String(kr.target_value).replace(",", ".")) : null;
-
-                          await createKeyResult({
-                            objective_id: created.id,
-                            title: kr.title,
-                            kind,
-                            due_at: null,
-                            achieved: false,
-                            metric_unit: kind === "METRIC" ? kr.metric_unit : null,
-                            start_value: kind === "METRIC" && Number.isFinite(start) ? start : null,
-                            current_value: kind === "METRIC" && Number.isFinite(start) ? start : null,
-                            target_value: kind === "METRIC" && Number.isFinite(target) ? target : null,
-                            owner_user_id: user.id,
-                            confidence: "ON_TRACK",
-                          });
-                        }
+                                                  const kind = kr.kind as KrKind;
+                                                  let start: number | null = null;
+                                                  let target: number | null = null;
+                                                  let metricUnit: string | null = null;
+                        
+                                                  if (kind === "METRIC") {
+                                                    const metricKr = kr as Extract<DraftKr, { kind: "METRIC" }>;
+                                                    start = Number(String(metricKr.start_value).replace(",", "."));
+                                                    target = Number(String(metricKr.target_value).replace(",", "."));
+                                                    metricUnit = metricKr.metric_unit;
+                                                  }
+                        
+                                                  await createKeyResult({
+                                                    objective_id: created.id,
+                                                    title: kr.title,
+                                                    kind,
+                                                    due_at: null,
+                                                    achieved: false,
+                                                    metric_unit: metricUnit,
+                                                    start_value: kind === "METRIC" && Number.isFinite(start) ? start : null,
+                                                    current_value: kind === "METRIC" && Number.isFinite(start) ? start : null,
+                                                    target_value: kind === "METRIC" && Number.isFinite(target) ? target : null,
+                                                    owner_user_id: user.id,
+                                                    confidence: "ON_TRACK",
+                                                  });
+                                                }
                       }
 
                       setAnnualDrafts([]);
@@ -1629,13 +1640,13 @@ export default function OkrAssistant() {
           />
 
           <CoachCard
-            title="Estratégico (neste trimestre)"
-            lines={[
-              "Estratégico = mudança que move o negócio (não apenas 'manter a operação').",
-              "Aqui, cada objetivo trimestral se conecta aos <span className="font-medium text-[color:var(--sinaxys-ink)]">KRs anuais</span>.",
-              "Governança: revisão mensal e acompanhamento semanal dos KRs.",
-            ]}
-          />
+                      title="Estratégico (neste trimestre)"
+                      lines={[
+                        "Estratégico = mudança que move o negócio (não apenas 'manter a operação').",
+                        "Aqui, cada objetivo trimestral se conecta aos KRs anuais.",
+                        "Governança: revisão mensal e acompanhamento semanal dos KRs.",
+                      ]}
+                    />
 
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
             <div className="grid gap-4">

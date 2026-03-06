@@ -3,7 +3,7 @@ import { TierBadge } from "@/components/okr/TierBadge";
 import { DepartmentMultiSelect } from "@/components/okr/DepartmentMultiSelect";
 import { UserMultiSelect } from "@/components/okr/UserMultiSelect";
 import { TaskHierarchyView } from "@/components/okr/TaskHierarchyView";
-import DeliverableTimeline from "@/components/okr/DeliverableTimeline";
+import { DeliverableTimeline } from "@/components/okr/DeliverableTimeline";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp, ChevronRight, ListChecks, KeyRound, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";
@@ -1522,22 +1522,12 @@ function KrCard({
       </div>
 
       {open ? (
-        <>
-          <Separator className="my-5" />
-
-          {/* Timeline de Gantt para os entregáveis */}
-          <DeliverableTimeline
-            deliverables={deliverables.map(d => ({
-              id: d.id,
-              title: d.title,
-              start_date: d.start_date,
-              due_at: d.due_at,
-              ownerName: d.owner_user_id ? profileById.get(d.owner_user_id)?.name ?? "—" : null,
-              ownerAvatar: d.owner_user_id ? profileById.get(d.owner_user_id)?.avatarUrl ?? null : null,
-            }))}
-            onBarClick={(id) => window.location.href = `/okr/entregaveis/${id}`}
-            onReschedule={handleReschedule}
-            showHeader={true}
+              <>
+                <Separator className="my-5" />
+      
+                {/* Timeline de Gantt para os entregáveis */}
+                <DeliverableTimeline
+                  dateLogs={[]}
           />
 
           <div className="grid gap-3">

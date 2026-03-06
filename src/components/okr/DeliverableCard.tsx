@@ -28,7 +28,8 @@ import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
-import type { DbDeliverable, WorkStatus, DbProfile } from "@/lib/okrDb";
+import type { DbDeliverable, WorkStatus } from "@/lib/okrDb";
+import type { DbProfile } from "@/lib/profilesDb";
 import { listDeliverableDateHistory } from "@/lib/okrDb";
 
 import { DeliverableTimeline } from "./DeliverableTimeline";

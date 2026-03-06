@@ -72,8 +72,12 @@ import {
     updatePerformanceIndicator,
     deletePerformanceIndicator,
     togglePerformanceIndicatorAchieved,
-    listKrLinksByObjectiveId,
-    listKrLinksByKrId,
+    listOkrObjectives,
+    getOkrObjective,
+    createStrategyObjective,
+    getCompanyFundamentals,
+    listStrategyObjectives,
+    listOkrCycles,
     type DbCompanyFundamentals,
     type DbOkrCycle,
     type DbOkrKeyResult,
@@ -81,11 +85,12 @@ import {
     type DbStrategyObjective,
     type DbPerformanceIndicator,
 } from "@/lib/okrDb";
-import {
-    clearKrLinksForObjective,
-    linkObjectiveToKr,
-    listKrLinksByObjectiveId,
-} from "@/lib/okrAlignmentDb";
+    import {
+        clearKrLinksForObjective,
+        linkObjectiveToKr,
+        listKrLinksByObjectiveId,
+        listKrLinksByKrId,
+    } from "@/lib/okrAlignmentDb";
 
 import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profilePublicDb";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
@@ -503,10 +508,28 @@ function StrategyLinker(
     // Quarter alignment: pick annual Tier 1 objective first, then pick its KR.
     const [annualTier1ObjectiveId, setAnnualTier1ObjectiveId] = useState<string>("__none__");
 
+    const qAnnualParents = useQuery({
+        queryKey: ["okr-cycle-objectives", cid, annualCycleId],
+        enabled: isQuarter && !!annualCycleId,
+        queryFn: () => listOkrObjectives(cid, annualCycleId),
+        staleTime: 20_000
+    });
+
+    const annualObjectives = useMemo(() => {
+        const all = qAnnualParents.data ?? [];
+        return all.filter((o) => o.level === "COMPANY");
+    }, [qAnnualParents.data]);
+
+    const objectiveLinkedKrId = useMemo(() => {
+            const link = krLinks.find(l => l.objective_id === objective.id);
+            return link?.key_result_id ?? null;
+        }, [krLinks, objective.id]);
+
     useEffect(() => {
         if (!isQuarter) return;
         const pid = objective.parent_objective_id;
-        setAnnualTier1ObjectiveId(pid && annualTier1ObjectiveId.has(pid) ? pid : "__none__");
+        const annualObjectiveIds = new Set(annualObjectives.map(o => o.id));
+        setAnnualTier1ObjectiveId(pid && annualObjectiveIds.has(pid) ? pid : "__none__");
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isQuarter, objective.id, objective.parent_objective_id, annualObjectives.length]);
 

@@ -22,7 +22,7 @@ import type { DbDepartment } from "@/lib/departmentsDb";
 import { objectiveAccent, objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 import { KrEditDialog } from "@/components/okr/KrEditDialog";
 import { useToast } from "@/hooks/use-toast";
-import DeliverableTimeline from "@/components/okr/DeliverableTimeline";
+import { DeliverableTimeline } from "@/components/okr/DeliverableTimeline";
 
 function kindLabel(kind: DbOkrKeyResult["kind"]) {
   return kind === "METRIC" ? "Métrica" : "Entregável";
