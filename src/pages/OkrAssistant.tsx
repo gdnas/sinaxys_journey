@@ -961,10 +961,10 @@ export default function OkrAssistant() {
       {step === 2 ? (
         <div className="grid gap-6">
           <StepHeader
-            title="Etapa 2 — Visão e objetivos de longo prazo"
-            subtitle="Agora vamos transformar fundamentos em direção: 10 anos → 5 anos → 2 anos."
-            badge={{ label: "Direção", icon: <Waypoints className="h-3.5 w-3.5" /> }}
-          />
+                      title="Etapa 2 — Visão e objetivos de longo prazo"
+                      subtitle="Agora vamos transformar fundamentos em direção: 10 anos (opcional) → 5 anos (opcional) → 2 anos (obrigatório)."
+                      badge={{ label: "Direção", icon: <Waypoints className="h-3.5 w-3.5" /> }}
+                    />
 
           <CoachCard
             title="Visão vs objetivo (em 10s)"
@@ -1140,10 +1140,10 @@ export default function OkrAssistant() {
       {step === 3 ? (
         <div className="grid gap-6">
           <StepHeader
-            title="Etapa 3 — Objetivos estratégicos do ano"
-            subtitle="Planejamento anual: até 5 objetivos estratégicos, cada um com 1 a 4 KRs."
-            badge={{ label: "Ano", icon: <Target className="h-3.5 w-3.5" /> }}
-          />
+                      title="Etapa 3 — Objetivos estratégicos do ano"
+                      subtitle="Planejamento anual: até 5 objetivos estratégicos, cada um com 1+ KRs."
+                      badge={{ label: "Ano", icon: <Target className="h-3.5 w-3.5" /> }}
+                    />
 
           <CoachCard
             title="Objetivo vs KR (em 10s)"
@@ -1253,10 +1253,10 @@ export default function OkrAssistant() {
               <Separator />
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div>
-                                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Criar objetivos do ano</div>
-                                <div className="mt-1 text-sm text-muted-foreground">Até 5 objetivos. Cada um com 1+ KRs.</div>
-                              </div>
+                                            <div>
+                                              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Criar objetivos do ano</div>
+                                              <div className="mt-1 text-sm text-muted-foreground">Até 5 objetivos. Cada um com 1+ KRs (sem limite máximo).</div>
+                                            </div>
                 <Button
                   variant="outline"
                   className="h-11 rounded-2xl bg-white"
@@ -1496,7 +1496,7 @@ export default function OkrAssistant() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="text-xs text-muted-foreground">Para avançar: tenha ao menos 1 objetivo anual conectado ao 2 anos, com 1+ KRs.</div>
+                                            <div className="text-xs text-muted-foreground">Para avançar: tenha ao menos 1 objetivo anual conectado ao 2 anos, com 1+ KRs (sem limite máximo).</div>
                 <Button
                   className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                   disabled={annualSaving || !annualCycleId || !has2YearObjective}
@@ -1745,10 +1745,10 @@ export default function OkrAssistant() {
               <Separator />
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div>
-                                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Criar objetivos estratégicos do trimestre</div>
-                                <div className="mt-1 text-sm text-muted-foreground">Cada um com 1–5 KRs e alinhamento a um KR anual.</div>
-                              </div>
+                                            <div>
+                                              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Criar objetivos estratégicos do trimestre</div>
+                                              <div className="mt-1 text-sm text-muted-foreground">Cada um com 1-5 KRs e alinhamento a um KR anual.</div>
+                                            </div>
                 <Button
                   variant="outline"
                   className="h-11 rounded-2xl bg-white"
@@ -1820,21 +1820,21 @@ export default function OkrAssistant() {
                       </div>
 
                       <div className="grid gap-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <Label>KRs estratégicos (1 a 5)</Label>
-                                                    <Button
-                                                      variant="outline"
-                                                      className="h-9 rounded-xl bg-white"
-                                                      disabled={d.krs.length >= 5}
-                                                      onClick={() =>
-                                                        setQuarterDrafts((arr) =>
-                                                          arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
-                                                        )
-                                                      }
-                          >
-                            + KR
-                          </Button>
-                        </div>
+                                              <div className="flex items-center justify-between gap-2">
+                                                <Label>KRs estratégicos (1-5)</Label>
+                                                                          <Button
+                                                                            variant="outline"
+                                                                            className="h-9 rounded-xl bg-white"
+                                                                            disabled={d.krs.length >= 5}
+                                                                            onClick={() =>
+                                                                              setQuarterDrafts((arr) =>
+                                                                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
+                                                                              )
+                                                                            }
+                                                >
+                                                  + KR
+                                                </Button>
+                                              </div>
 
                         <div className="grid gap-3">
                           {d.krs.map((kr, kIdx) => (
@@ -1941,7 +1941,7 @@ export default function OkrAssistant() {
               )}
 
               <div className="flex flex-wrap items-center justify-between gap-2">
-                              <div className="text-xs text-muted-foreground">Para avançar: ao menos 1 objetivo trimestral com 1–5 KRs e alinhamento a KR anual.</div>
+                                            <div className="text-xs text-muted-foreground">Para avançar: ao menos 1 objetivo trimestral com 1-5 KRs e alinhamento a KR anual.</div>
                 <Button
                   className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
                   disabled={quarterSaving || !quarterCycleId || !annualKrs.length}
@@ -2214,21 +2214,21 @@ export default function OkrAssistant() {
                       </div>
 
                       <div className="grid gap-2">
-                        <div className="flex items-center justify-between gap-2">
-                          <Label>KRs táticos (1 a 5)</Label>
-                                                    <Button
-                                                      variant="outline"
-                                                      className="h-9 rounded-xl bg-white"
-                                                      disabled={d.krs.length >= 5}
-                                                      onClick={() =>
-                                                        setTacticalDrafts((arr) =>
-                                                          arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
-                                                        )
-                                                      }
-                          >
-                            + KR
-                          </Button>
-                        </div>
+                                              <div className="flex items-center justify-between gap-2">
+                                                <Label>KRs táticos (1-5)</Label>
+                                                                          <Button
+                                                                            variant="outline"
+                                                                            className="h-9 rounded-xl bg-white"
+                                                                            disabled={d.krs.length >= 5}
+                                                                            onClick={() =>
+                                                                              setTacticalDrafts((arr) =>
+                                                                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
+                                                                              )
+                                                                            }
+                                                >
+                                                  + KR
+                                                </Button>
+                                              </div>
                         <div className="grid gap-3">
                           {d.krs.map((kr, kIdx) => (
                             <div key={kIdx} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
