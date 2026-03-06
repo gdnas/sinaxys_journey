@@ -33,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { DbDeliverable, WorkStatus, DbDeliverableAttachment, DbDeliverableComment } from "@/lib/okrDb";
 import type { DbProfile } from "@/lib/profilesDb";
 import { listDeliverableDateHistory } from "@/lib/okrDb";
+import { canUserEditDeliverable, canUserDeleteDeliverable } from "@/lib/okrHierarchyValidation";
 
 import { DeliverableTimeline } from "./DeliverableTimeline";
 import { TaskHierarchyView } from "./TaskHierarchyView";
@@ -47,6 +48,7 @@ interface DeliverableCardProps {
   attachments?: DbDeliverableAttachment[];
   comments?: DbDeliverableComment[];
   currentUserId?: string;
+  currentUserRole?: string;
   currentUserAvatar?: string;
   currentUserEmail?: string;
   canEdit?: boolean;
@@ -97,6 +99,7 @@ export function DeliverableCard({
   attachments = [],
   comments = [],
   currentUserId = "",
+  currentUserRole = "",
   currentUserAvatar,
   currentUserEmail,
   canEdit = true,
@@ -113,6 +116,11 @@ export function DeliverableCard({
   const statusConfigItem = statusConfig[deliverable.status];
   const StatusIcon = statusConfigItem.icon;
 
+  // Verificar permissões usando os helpers
+  const isAdmin = currentUserRole === "ADMIN" || currentUserRole === "MASTERADMIN" || currentUserRole === "HEAD";
+  const userCanEdit = canEdit && canUserEditDeliverable(deliverable, currentUserId, currentUserRole, isAdmin);
+  const userCanDelete = canDelete && canUserDeleteDeliverable(deliverable, currentUserId, currentUserRole, isAdmin);
+
   const handleShowHistory = async () => {
     try {
       const logs = await listDeliverableDateHistory(deliverable.id);
@@ -127,9 +135,6 @@ export function DeliverableCard({
     if (!dateStr) return "—";
     return format(new Date(dateStr), "dd MMM yyyy", { locale: ptBR });
   };
-
-  const userCanEdit = canEdit && (deliverable.owner_user_id === currentUserId || !deliverable.owner_user_id);
-  const userCanDelete = canDelete && (deliverable.owner_user_id === currentUserId || !deliverable.owner_user_id);
 
   return (
     <Card className="overflow-hidden rounded-2xl border-[color:var(--sinaxys-border)] bg-white transition hover:shadow-md">

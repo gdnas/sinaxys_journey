@@ -48,6 +48,7 @@ import {
   type DbTask,
   updateTask,
 } from "@/lib/okrDb";
+import { canUserEditDeliverable, canUserDeleteDeliverable } from "@/lib/okrHierarchyValidation";
 import { supabase } from "@/integrations/supabase/client";
 
 type ExecStep = {
@@ -216,11 +217,17 @@ export default function OkrDeliverableDetail() {
 
   const deliverable = qDeliverable.data;
 
+  // Verificar permissões usando os helpers
+  const isAdmin = user.role === "MASTERADMIN" || user.role === "ADMIN" || user.role === "HEAD";
   const canWrite = useMemo(() => {
     if (!deliverable) return false;
-    if (user.role === "MASTERADMIN" || user.role === "ADMIN" || user.role === "HEAD") return true;
-    return deliverable.owner_user_id ? deliverable.owner_user_id === user.id : false;
-  }, [deliverable, user.id, user.role]);
+    return canUserEditDeliverable(deliverable, user.id, user.role, isAdmin);
+  }, [deliverable, user.id, user.role, isAdmin]);
+
+  const canDelete = useMemo(() => {
+    if (!deliverable) return false;
+    return canUserDeleteDeliverable(deliverable, user.id, user.role, isAdmin);
+  }, [deliverable, user.id, user.role, isAdmin]);
 
   const { data: tasks = [] } = useQuery({
     queryKey: ["okr-tasks-for-deliverable", deliverableId],

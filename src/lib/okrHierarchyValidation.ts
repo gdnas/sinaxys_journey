@@ -595,13 +595,13 @@ export function canUserEditDeliverable(
   userRole: string,
   isOwnerOrAdmin: boolean
 ): boolean {
-  // Dono do entregável pode editar
-  if (deliverable.owner_user_id === userId) {
+  // Admin pode editar qualquer entregável
+  if (isOwnerOrAdmin) {
     return true;
   }
 
-  // Admin ou dono do objetivo pode editar
-  if (isOwnerOrAdmin) {
+  // Colaborador pode editar apenas entregáveis criados por ele
+  if (deliverable.owner_user_id === userId) {
     return true;
   }
 
@@ -618,13 +618,13 @@ export function canUserDeleteDeliverable(
   userRole: string,
   isOwnerOrAdmin: boolean
 ): boolean {
-  // Dono do entregável pode apagar
-  if (deliverable.owner_user_id === userId) {
+  // Admin pode apagar qualquer entregável
+  if (isOwnerOrAdmin) {
     return true;
   }
 
-  // Admin pode apagar qualquer entregável
-  if (isOwnerOrAdmin) {
+  // Colaborador pode apagar apenas entregáveis criados por ele
+  if (deliverable.owner_user_id === userId) {
     return true;
   }
 
@@ -640,17 +640,14 @@ export function canUserCreateDeliverable(
   userId: string,
   isOwnerOrAdmin: boolean
 ): boolean {
-  // Dono do KR pode criar entregável
-  if (krOwnerId === userId) {
-    return true;
-  }
-
   // Admin pode criar entregável em qualquer KR tático
   if (isOwnerOrAdmin) {
     return true;
   }
 
-  return false;
+  // Colaborador pode criar entregável em qualquer KR tático
+  // (regra de negócio: colaborador pode criar entregáveis onde for permitido pelo fluxo)
+  return true;
 }
 
 // ============================================================================
