@@ -70,7 +70,7 @@ import {
   type ValidateQuarterlyTier2ObjectiveParams,
   type ValidateDeliverableParams,
 } from "@/lib/okrValidation";
-import { syncObjectiveDepartments, createPerformanceIndicator } from "@/lib/okrDb";
+import { syncObjectiveDepartments } from "@/lib/okrDb";
 import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
@@ -2047,7 +2047,7 @@ export default function OkrAssistant() {
                                                     confidence: "ON_TRACK",
                                                   });
                                                 }
-                        
+                                                
                                                 // Create performance indicators
                                                 for (const pi of o.performanceIndicators) {
                                                   if (!pi.title.trim()) continue;
@@ -2056,13 +2056,12 @@ export default function OkrAssistant() {
                                                     title: pi.title.trim(),
                                                     kind: pi.kind,
                                                     metric_unit: pi.kind === "METRIC" ? pi.metric_unit.trim() : null,
-                                                    start_value: pi.kind === "METRIC" ? pi.start_value.trim() : null,
-                                                    target_value: pi.kind === "METRIC" ? pi.target_value.trim() : null,
-                                                    current_value: pi.kind === "METRIC" ? pi.current_value.trim() : null,
+                                                    start_value: pi.kind === "METRIC" ? Number(pi.start_value.trim()) : null,
+                                                    target_value: pi.kind === "METRIC" ? Number(pi.target_value.trim()) : null,
+                                                    current_value: pi.kind === "METRIC" ? Number(pi.current_value.trim()) : null,
                                                     due_at: pi.due_at.trim() || null,
                                                     confidence: pi.confidence,
                                                     achieved: false,
-                                                    achieved_at: null,
                                                   });
                                                 }
                                               }
@@ -2450,7 +2449,7 @@ export default function OkrAssistant() {
                                                     confidence: "ON_TRACK",
                                                   });
                                                 }
-                        
+                                                
                                                 // Create performance indicators
                                                 for (const pi of o.performanceIndicators) {
                                                   if (!pi.title.trim()) continue;
@@ -2459,13 +2458,12 @@ export default function OkrAssistant() {
                                                     title: pi.title.trim(),
                                                     kind: pi.kind,
                                                     metric_unit: pi.kind === "METRIC" ? pi.metric_unit.trim() : null,
-                                                    start_value: pi.kind === "METRIC" ? pi.start_value.trim() : null,
-                                                    target_value: pi.kind === "METRIC" ? pi.target_value.trim() : null,
-                                                    current_value: pi.kind === "METRIC" ? pi.current_value.trim() : null,
+                                                    start_value: pi.kind === "METRIC" ? Number(pi.start_value.trim()) : null,
+                                                    target_value: pi.kind === "METRIC" ? Number(pi.target_value.trim()) : null,
+                                                    current_value: pi.kind === "METRIC" ? Number(pi.current_value.trim()) : null,
                                                     due_at: pi.due_at.trim() || null,
                                                     confidence: pi.confidence,
                                                     achieved: false,
-                                                    achieved_at: null,
                                                   });
                                                 }
                                               }
@@ -2825,11 +2823,10 @@ export default function OkrAssistant() {
                     >
                       Avançar
                       <ArrowRight className="ml-2 h-4 w-4" />
-                    </Button>
-                  </div>
-                </Card>
-              </div>
-            );
-          }
-
-}
+                                          </Button>
+                                        </div>
+                                      </Card>
+                                    </div>
+                                  );
+                                }
+                      }
