@@ -754,7 +754,7 @@ export type DbDeliverable = {
 export async function listDeliverables(keyResultId: string) {
   const { data, error } = await supabase
     .from("okr_deliverables")
-    .select("id,key_result_id,tier,title,description,owner_user_id,status,due_at,created_at,updated_at")
+    .select("id,key_result_id,tier,title,description,owner_user_id,status,due_at,created_at,updated_at,start_date,performance_indicator_id")
     .eq("key_result_id", keyResultId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -765,7 +765,7 @@ export async function listDeliverablesByKeyResultIds(keyResultIds: string[]) {
   if (!keyResultIds.length) return [] as DbDeliverable[];
   const { data, error } = await supabase
     .from("okr_deliverables")
-    .select("id,key_result_id,tier,title,description,owner_user_id,status,due_at,created_at,updated_at")
+    .select("id,key_result_id,tier,title,description,owner_user_id,status,due_at,created_at,updated_at,start_date,performance_indicator_id")
     .in("key_result_id", keyResultIds)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -783,8 +783,10 @@ export async function createDeliverable(payload: Omit<DbDeliverable, "id" | "cre
       owner_user_id: payload.owner_user_id ?? null,
       status: payload.status,
       due_at: payload.due_at ?? null,
+      start_date: payload.start_date ?? null,
+      performance_indicator_id: payload.performance_indicator_id ?? null,
     })
-    .select("id,key_result_id,tier,title,description,owner_user_id,status,due_at,created_at,updated_at")
+    .select("id,key_result_id,tier,title,description,owner_user_id,status,due_at,created_at,updated_at,start_date,performance_indicator_id")
     .single();
   if (error) throw error;
   return data as DbDeliverable;
@@ -1379,4 +1381,148 @@ export async function listTasksByHierarchy(deliverableId: string): Promise<DbTas
   
   if (error) throw error;
   return (data ?? []) as DbTaskHierarchy[];
+}
+
+// ============================================================================
+// NOVOS: Deliverable Attachments (Links, Documentos, Arquivos)
+// ============================================================================
+
+export type AttachmentType = "LINK" | "DOCUMENT" | "FILE";
+
+export type DbDeliverableAttachment = {
+  id: string;
+  deliverable_id: string;
+  type: AttachmentType;
+  url: string | null;
+  description: string | null;
+  file_name: string | null;
+  file_size: number | null;
+  file_type: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listDeliverableAttachments(deliverableId: string): Promise<DbDeliverableAttachment[]> {
+  const { data, error } = await supabase
+    .from("okr_deliverable_attachments")
+    .select("*")
+    .eq("deliverable_id", deliverableId)
+    .order("created_at", { ascending: false });
+  
+  if (error) throw error;
+  return (data ?? []) as DbDeliverableAttachment[];
+}
+
+export async function createDeliverableAttachment(
+  payload: Omit<DbDeliverableAttachment, "id" | "created_at" | "updated_at">
+): Promise<DbDeliverableAttachment> {
+  const { data, error } = await supabase
+    .from("okr_deliverable_attachments")
+    .insert({
+      deliverable_id: payload.deliverable_id,
+      type: payload.type,
+      url: payload.url ?? null,
+      description: payload.description ?? null,
+      file_name: payload.file_name ?? null,
+      file_size: payload.file_size ?? null,
+      file_type: payload.file_type ?? null,
+      created_by: payload.created_by,
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as DbDeliverableAttachment;
+}
+
+export async function updateDeliverableAttachment(
+  attachmentId: string,
+  patch: Partial<Pick<DbDeliverableAttachment, "url" | "description" | "file_name">>
+): Promise<DbDeliverableAttachment> {
+  const { data, error } = await supabase
+    .from("okr_deliverable_attachments")
+    .update(patch)
+    .eq("id", attachmentId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as DbDeliverableAttachment;
+}
+
+export async function deleteDeliverableAttachment(attachmentId: string): Promise<void> {
+  const { error } = await supabase
+    .from("okr_deliverable_attachments")
+    .delete()
+    .eq("id", attachmentId);
+  
+  if (error) throw error;
+}
+
+// ============================================================================
+// NOVOS: Deliverable Comments
+// ============================================================================
+
+export type DbDeliverableComment = {
+  id: string;
+  deliverable_id: string;
+  text: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function listDeliverableComments(deliverableId: string): Promise<DbDeliverableComment[]> {
+  const { data, error } = await supabase
+    .from("okr_deliverable_comments")
+    .select("*")
+    .eq("deliverable_id", deliverableId)
+    .order("created_at", { ascending: true });
+  
+  if (error) throw error;
+  return (data ?? []) as DbDeliverableComment[];
+}
+
+export async function createDeliverableComment(
+  payload: Omit<DbDeliverableComment, "id" | "created_at" | "updated_at">
+): Promise<DbDeliverableComment> {
+  const { data, error } = await supabase
+    .from("okr_deliverable_comments")
+    .insert({
+      deliverable_id: payload.deliverable_id,
+      text: payload.text.trim(),
+      created_by: payload.created_by,
+    })
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as DbDeliverableComment;
+}
+
+export async function updateDeliverableComment(
+  commentId: string,
+  patch: Pick<DbDeliverableComment, "text">
+): Promise<DbDeliverableComment> {
+  const { data, error } = await supabase
+    .from("okr_deliverable_comments")
+    .update({
+      text: patch.text.trim(),
+    })
+    .eq("id", commentId)
+    .select()
+    .single();
+  
+  if (error) throw error;
+  return data as DbDeliverableComment;
+}
+
+export async function deleteDeliverableComment(commentId: string): Promise<void> {
+  const { error } = await supabase
+    .from("okr_deliverable_comments")
+    .delete()
+    .eq("id", commentId);
+  
+  if (error) throw error;
 }

@@ -12,6 +12,7 @@ import {
   MoreVertical,
   PlayCircle,
   User,
+  Lock,
 } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
@@ -27,22 +28,34 @@ import {
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import type { DbDeliverable, WorkStatus } from "@/lib/okrDb";
+import type { DbDeliverable, WorkStatus, DbDeliverableAttachment, DbDeliverableComment } from "@/lib/okrDb";
 import type { DbProfile } from "@/lib/profilesDb";
 import { listDeliverableDateHistory } from "@/lib/okrDb";
 
 import { DeliverableTimeline } from "./DeliverableTimeline";
 import { TaskHierarchyView } from "./TaskHierarchyView";
+import { DeliverableAttachments } from "./DeliverableAttachments";
+import { DeliverableComments } from "./DeliverableComments";
 
 interface DeliverableCardProps {
   deliverable: DbDeliverable;
   krTitle: string;
   objectiveTitle: string;
   owner?: DbProfile;
+  attachments?: DbDeliverableAttachment[];
+  comments?: DbDeliverableComment[];
+  currentUserId?: string;
+  currentUserAvatar?: string;
+  currentUserEmail?: string;
+  canEdit?: boolean;
+  canDelete?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
   onStatusChange?: (status: WorkStatus) => void;
+  onAttachmentsChange?: () => void;
+  onCommentsChange?: () => void;
 }
 
 const statusConfig = {
@@ -81,9 +94,18 @@ export function DeliverableCard({
   krTitle,
   objectiveTitle,
   owner,
+  attachments = [],
+  comments = [],
+  currentUserId = "",
+  currentUserAvatar,
+  currentUserEmail,
+  canEdit = true,
+  canDelete = true,
   onEdit,
   onDelete,
   onStatusChange,
+  onAttachmentsChange,
+  onCommentsChange,
 }: DeliverableCardProps) {
   const [showHistory, setShowHistory] = useState(false);
   const [dateLogs, setDateLogs] = useState<any[]>([]);
@@ -105,6 +127,9 @@ export function DeliverableCard({
     if (!dateStr) return "—";
     return format(new Date(dateStr), "dd MMM yyyy", { locale: ptBR });
   };
+
+  const userCanEdit = canEdit && (deliverable.owner_user_id === currentUserId || !deliverable.owner_user_id);
+  const userCanDelete = canDelete && (deliverable.owner_user_id === currentUserId || !deliverable.owner_user_id);
 
   return (
     <Card className="overflow-hidden rounded-2xl border-[color:var(--sinaxys-border)] bg-white transition hover:shadow-md">
@@ -190,23 +215,68 @@ export function DeliverableCard({
           )}
         </div>
 
+        {/* Attachments and Comments Tabs */}
+        {(attachments.length > 0 || comments.length > 0 || userCanEdit) && (
+          <div className="mb-4">
+            <Tabs defaultValue="attachments" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 h-9 rounded-xl">
+                <TabsTrigger value="attachments" className="text-xs">
+                  <FileText className="mr-1 h-3.5 w-3.5" />
+                  Anexos ({attachments.length})
+                </TabsTrigger>
+                <TabsTrigger value="comments" className="text-xs">
+                  <MessageSquare className="mr-1 h-3.5 w-3.5" />
+                  Comentários ({comments.length})
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="attachments" className="mt-3">
+                <DeliverableAttachments
+                  deliverableId={deliverable.id}
+                  attachments={attachments}
+                  onAttachmentsChange={onAttachmentsChange || (() => {})}
+                  currentUserId={currentUserId}
+                  canEdit={userCanEdit}
+                />
+              </TabsContent>
+              <TabsContent value="comments" className="mt-3">
+                <DeliverableComments
+                  deliverableId={deliverable.id}
+                  comments={comments}
+                  onCommentsChange={onCommentsChange || (() => {})}
+                  currentUserId={currentUserId}
+                  currentUserAvatar={currentUserAvatar}
+                  currentUserEmail={currentUserEmail}
+                  canEdit={userCanEdit}
+                />
+              </TabsContent>
+            </Tabs>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            {!userCanEdit && (
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Lock className="h-3 w-3" />
+                <span>Somente leitura</span>
+              </div>
+            )}
+            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8">
+                <Button variant="ghost" size="sm" className="h-8" disabled={!userCanEdit && !userCanDelete}>
                   <MoreVertical className="h-4 w-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
-                {onEdit && (
+                {userCanEdit && onEdit && (
                   <DropdownMenuItem onClick={onEdit}>
                     <FileText className="mr-2 h-4 w-4" />
                     Editar
                   </DropdownMenuItem>
                 )}
-                {onStatusChange && (
+                {userCanEdit && onStatusChange && (
                   <>
                     <DropdownMenuItem onClick={() => onStatusChange("TODO")}>
                       <Clock className="mr-2 h-4 w-4" />
@@ -223,7 +293,7 @@ export function DeliverableCard({
                   </>
                 )}
                 <Separator />
-                {onDelete && (
+                {userCanDelete && onDelete && (
                   <DropdownMenuItem onClick={onDelete} className="text-red-600">
                     Deletar
                   </DropdownMenuItem>
