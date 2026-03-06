@@ -925,15 +925,20 @@ function KrInlineEditor(
                                 const next = !kr.achieved;
 
                                 await updateKeyResult(kr.id, {
-                                    achieved: next,
-                                    achieved_at: next ? new Date().toISOString() : null
-                                });
-
-                                toast({
-                                    title: "KR atualizado"
-                                });
-
-                                onSaved();
+                                                                    achieved: next,
+                                                                    achieved_at: next ? new Date().toISOString() : null
+                                                                });
+                                
+                                                                toast({
+                                                                    title: "KR atualizado"
+                                                                });
+                                
+                                                                // Sincronizar com o Assistant
+                                                                await qc.invalidateQueries({ queryKey: ["okr-annual-krs"] });
+                                                                await qc.invalidateQueries({ queryKey: ["okr-quarter-krs"] });
+                                                                await qc.invalidateQueries({ queryKey: ["okr-tactical-krs"] });
+                                
+                                                                onSaved();
                             } catch (e) {
                                 toast({
                                     title: "Não foi possível atualizar",
@@ -966,13 +971,18 @@ function KrInlineEditor(
                                 }
 
                                 await updateKeyResult(kr.id, patch);
-
-                                toast({
-                                    title: "KR atualizado"
-                                });
-
-                                onSaved();
-                                setEditing(false);
+                                
+                                                                toast({
+                                                                    title: "KR atualizado"
+                                                                });
+                                
+                                                                // Sincronizar com o Assistant
+                                                                await qc.invalidateQueries({ queryKey: ["okr-annual-krs"] });
+                                                                await qc.invalidateQueries({ queryKey: ["okr-quarter-krs"] });
+                                                                await qc.invalidateQueries({ queryKey: ["okr-tactical-krs"] });
+                                
+                                                                onSaved();
+                                                                setEditing(false);
                             } catch (e) {
                                 toast({
                                     title: "Não foi possível salvar",
@@ -1207,16 +1217,26 @@ function ObjectiveEditor(
                                     });
 
                                     await Promise.all([qc.invalidateQueries({
-                                        queryKey: ["okr-objective", objective.id]
-                                    }), qc.invalidateQueries({
-                                        queryKey: ["okr-objectives", companyId]
-                                    }), qc.invalidateQueries({
-                                        queryKey: ["okr-map-cycle-objectives", companyId]
-                                    }), qc.invalidateQueries({
-                                        queryKey: ["okr-cycle-objectives", companyId, objective.cycle_id]
-                                    })]);
-
-                                    await onSaved();
+                                                                            queryKey: ["okr-objective", objective.id]
+                                                                        }), qc.invalidateQueries({
+                                                                            queryKey: ["okr-objectives", companyId]
+                                                                        }), qc.invalidateQueries({
+                                                                            queryKey: ["okr-map-cycle-objectives", companyId]
+                                                                        }), qc.invalidateQueries({
+                                                                            queryKey: ["okr-cycle-objectives", companyId, objective.cycle_id]
+                                                                        })]);
+                                    
+                                                                        // Sincronizar com o Assistant
+                                                                        if (objective.cycle_id) {
+                                                                          const cycle = cycles.find(c => c.id === objective.cycle_id);
+                                                                          if (cycle?.type === "ANNUAL") {
+                                                                            await qc.invalidateQueries({ queryKey: ["okr-annual-objectives", companyId, objective.cycle_id] });
+                                                                          } else if (cycle?.type === "QUARTERLY") {
+                                                                            await qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", companyId, objective.cycle_id] });
+                                                                          }
+                                                                        }
+                                    
+                                                                        await onSaved();
                                 } catch (e) {
                                     toast({
                                         title: "Não foi possível salvar",
@@ -1729,10 +1749,14 @@ function KrQuickEditor(
                         try {
                             const parsed = cur.trim() ? Number(cur.replace(",", ".")) : null;
                             await updateKeyResult(kr.id, {
-                                current_value: parsed,
-                            });
-                            toast({ title: "KR atualizado" });
-                            await onSaved();
+                                                            current_value: parsed,
+                                                        });
+                                                        toast({ title: "KR atualizado" });
+                                                        // Sincronizar com o Assistant
+                                                        await qc.invalidateQueries({ queryKey: ["okr-annual-krs"] });
+                                                        await qc.invalidateQueries({ queryKey: ["okr-quarter-krs"] });
+                                                        await qc.invalidateQueries({ queryKey: ["okr-tactical-krs"] });
+                                                        await onSaved();
                         } catch (e) {
                             toast({
                                 title: "Não foi possível salvar",

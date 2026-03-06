@@ -1019,9 +1019,9 @@ export default function OkrAssistant() {
                         culture: serializeDescribedItems(fundCultureItems) || null,
                       };
                       await upsertCompanyFundamentals(cid, patch);
-                      await qc.invalidateQueries({ queryKey: ["okr-fundamentals", cid] });
-                      setFundSaved(true);
-                      toast({ title: "Fundamentos salvos" });
+                                            await qc.invalidateQueries({ queryKey: ["okr-fundamentals", cid] });
+                                            setFundSaved(true);
+                                            toast({ title: "Fundamentos salvos" });
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
@@ -1197,10 +1197,12 @@ export default function OkrAssistant() {
                       const id10 = await upsertOne(so10, 10, so10Text, null);
                       const id5 = await upsertOne(so5, 5, so5Text, id10);
                       await upsertOne(so2, 2, so2Text, id5);
-
-                      await qc.invalidateQueries({ queryKey: ["okr-strategy-objectives", cid] });
-                      setSoSaved(true);
-                      toast({ title: "Direção de longo prazo salva" });
+                      
+                                            await qc.invalidateQueries({ queryKey: ["okr-strategy-objectives", cid] });
+                                            // Sincronizar com o Mapa (usa okr-strategy)
+                                            await qc.invalidateQueries({ queryKey: ["okr-strategy", cid] });
+                                            setSoSaved(true);
+                                            toast({ title: "Direção de longo prazo salva" });
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
@@ -1730,11 +1732,15 @@ export default function OkrAssistant() {
                       }
 
                       setAnnualDrafts([]);
-                      setAnnualModeratorId("");
-                      await qc.invalidateQueries({ queryKey: ["okr-annual-objectives", cid, annualCycleId] });
-                      await qc.invalidateQueries({ queryKey: ["okr-annual-krs", annualObjectives.map((o) => o.id).join(",")] });
-
-                      toast({ title: "Planejamento anual salvo" });
+                                            setAnnualModeratorId("");
+                                            await qc.invalidateQueries({ queryKey: ["okr-annual-objectives", cid, annualCycleId] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-annual-krs", annualObjectives.map((o) => o.id).join(",")] });
+                                            // Sincronizar com o Mapa
+                                            await qc.invalidateQueries({ queryKey: ["okr-objectives", cid] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-cycle-objectives", cid, annualCycleId] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-map-cycle-objectives", cid, annualCycleId] });
+                      
+                                            toast({ title: "Planejamento anual salvo" });
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
@@ -2151,8 +2157,14 @@ export default function OkrAssistant() {
                                               }
 
                       setQuarterDrafts([]);
-                      await qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid, quarterCycleId] });
-                      toast({ title: "OKRs estratégicos do trimestre salvos" });
+                                            await qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid, quarterCycleId] });
+                                            // Sincronizar com o Mapa
+                                            await qc.invalidateQueries({ queryKey: ["okr-objectives", cid] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-cycle-objectives", cid, quarterCycleId] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-map-cycle-objectives", cid, quarterCycleId] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-quarter-krs", quarterObjectives.map((o) => o.id).join(",")] });
+                      
+                                            toast({ title: "OKRs estratégicos do trimestre salvos" });
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
@@ -2554,8 +2566,14 @@ export default function OkrAssistant() {
                                               }
 
                       setTacticalDrafts([]);
-                      await qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid, quarterCycleId] });
-                      toast({ title: "OKRs táticos salvos" });
+                                            await qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid, quarterCycleId] });
+                                            // Sincronizar com o Mapa
+                                            await qc.invalidateQueries({ queryKey: ["okr-objectives", cid] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-cycle-objectives", cid, quarterCycleId] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-map-cycle-objectives", cid, quarterCycleId] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-tactical-krs", tacticalObjectives.map((o) => o.id).join(",")] });
+                      
+                                            toast({ title: "OKRs táticos salvos" });
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
@@ -2845,8 +2863,12 @@ export default function OkrAssistant() {
                       }
 
                       setDeliverableDrafts([]);
-                      await qc.invalidateQueries({ queryKey: ["okr-tactical-deliverables", tacticalKrs.map((k) => k.id).join(",")] });
-                      toast({ title: "Entregáveis salvos" });
+                                            await qc.invalidateQueries({ queryKey: ["okr-tactical-deliverables", tacticalKrs.map((k) => k.id).join(",")] });
+                                            // Sincronizar com o Mapa
+                                            await qc.invalidateQueries({ queryKey: ["okr-deliverables"] });
+                                            await qc.invalidateQueries({ queryKey: ["okr-krs"] });
+                      
+                                            toast({ title: "Entregáveis salvos" });
                     } catch (e) {
                       toast({
                         title: "Não foi possível salvar",
@@ -2939,24 +2961,23 @@ export default function OkrAssistant() {
                     </div>
           
                     <Button
-                      className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                      onClick={onNext}
-                      disabled={
-                        (step === 1 && !canGoStep2) ||
-                        (step === 2 && !canGoStep3) ||
-                        (step === 3 && !annualReady) ||
-                        (step === 4 && !quarterReady) ||
-                        (step === 5 && !tacticalReady) ||
-                        (step === 6 && !deliverablesReady) ||
-                        step === 7
-                      }
-                    >
-                      Avançar
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      </Card>
-                                    </div>
-                                  );
+                                className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                                onClick={onNext}
+                                disabled={
+                                  (step === 1 && !canGoStep2) ||
+                                  (step === 2 && !canGoStep3) ||
+                                  (step === 3 && !annualReady) ||
+                                  (step === 4 && !quarterReady) ||
+                                  (step === 5 && !tacticalReady) ||
+                                  (step === 6 && !deliverablesReady) ||
+                                  step === 7
                                 }
-                      }
+                              >
+                                Avançar
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                              </Button>
+                            </div>
+                          </Card>
+                        </div>
+                      );
+                    }
