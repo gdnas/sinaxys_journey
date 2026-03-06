@@ -166,6 +166,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
           name: p.name ?? p.email,
           monthlyCostBRL: p.monthly_cost_brl,
           departmentId: p.department_id,
+          avatarUrl: p.avatar_url ?? null,
         },
       ] as const),
     );

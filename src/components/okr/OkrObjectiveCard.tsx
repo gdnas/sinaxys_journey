@@ -1,7 +1,7 @@
 import { TierBadge } from "@/components/okr";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, ChevronDown, ChevronUp, KeyRound, Link2, Pencil, Plus, Trash2, Check, User as UserIcon, Building2 } from "lucide-react";
 
@@ -67,7 +67,7 @@ export function OkrObjectiveCard(props: {
   currentUserId?: string;
   isAdminish?: boolean;
   departments?: DbDepartment[];
-  byUserId?: Map<string, { name: string; monthlyCostBRL?: number | null; departmentId?: string | null }>;
+  byUserId?: Map<string, { name: string; monthlyCostBRL?: number | null; departmentId?: string | null; avatarUrl?: string | null }>;
   onRequestEditObjective?: (objective: DbOkrObjective) => void;
   onRequestDeleteObjective?: (objectiveId: string) => void;
 }) {
@@ -93,6 +93,8 @@ export function OkrObjectiveCard(props: {
     onRequestDeleteObjective,
     onRequestAddKr: onRequestAddKrProp,
   } = props;
+
+  const navigate = useNavigate();
 
   const [open, setOpen] = useState(false);
   const [editingKr, setEditingKr] = useState<DbOkrKeyResult | null>(null);
@@ -399,6 +401,8 @@ export function OkrObjectiveCard(props: {
                   const ownerName = kr.owner_user_id ? (byUserId?.get(kr.owner_user_id)?.name ?? "—") : "—";
                   const ownerDeptId = kr.owner_user_id ? byUserId?.get(kr.owner_user_id)?.departmentId ?? null : null;
                   const ownerDeptName = ownerDeptId ? deptNameById.get(ownerDeptId) ?? null : null;
+                  const ownerAvatar = kr.owner_user_id ? byUserId?.get(kr.owner_user_id)?.avatarUrl ?? null : null;
+                  const initials = ownerName.split(' ').map(s => s[0]).slice(0,2).join('').toUpperCase();
 
                   return (
                     <div key={kr.id} className="grid gap-2">
@@ -406,15 +410,13 @@ export function OkrObjectiveCard(props: {
                         className="group rounded-2xl border bg-white p-4 transition cursor-pointer"
                         style={{ borderColor: accent.border as any }}
                         onClick={() => {
-                          // If this is a strategic KR with linked team objectives, toggle the linked objectives view;
-                          // otherwise open the KR editor.
+                          // If this is a strategic KR with linked team objectives, navigate to the objective detail and focus the KR.
                           if (objective.level === "COMPANY" && aligned.length > 0) {
-                            const next = new Set(openKrIds);
-                            if (next.has(kr.id)) next.delete(kr.id); else next.add(kr.id);
-                            setOpenKrIds(next);
-                          } else {
-                            setEditingKr(kr);
+                            navigate(`${openHref}?focusKr=${kr.id}`);
+                            return;
                           }
+                          // otherwise open inline editor
+                          setEditingKr(kr);
                         }}
                         onMouseEnter={(e) => {
                           (e.currentTarget as HTMLDivElement).style.borderColor = String(accent.accent);
@@ -431,11 +433,28 @@ export function OkrObjectiveCard(props: {
                             </div>
 
                             <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
-                              <div className="flex items-center gap-1">
-                                <UserIcon className="h-3.5 w-3.5" />
+                              <div className="flex items-center gap-2">
+                                {ownerAvatar ? (
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarImage src={ownerAvatar} alt={ownerName} />
+                                    <AvatarFallback>{initials}</AvatarFallback>
+                                  </Avatar>
+                                ) : (
+                                  <Avatar className="h-6 w-6">
+                                    <AvatarFallback>{initials}</AvatarFallback>
+                                  </Avatar>
+                                )}
                                 <span>{ownerName}</span>
                                 {ownerDeptName ? (
-                                  <span className="flex items-center gap-1 text-xs text-muted-foreground">• <Building2 className="h-3 w-3" /> {ownerDeptName}</span>
+                                  <button
+                                    type="button"
+                                    className="ml-2 inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/okr?department=${ownerDeptId}`); }}
+                                    title={`Filtrar por departamento ${ownerDeptName}`}
+                                  >
+                                    <Building2 className="h-3 w-3" />
+                                    <span className="truncate">{ownerDeptName}</span>
+                                  </button>
                                 ) : null}
                               </div>
                               <div>•</div>
