@@ -1307,9 +1307,11 @@ function ObjectiveEditor(
                     onCreate={async (indicator) => {
                         try {
                             await createPerformanceIndicator(indicator);
-                            toast({ title: "Indicador criado" });
-                            await qc.invalidateQueries({ queryKey: ["okr-performance-indicators", objective.id] });
-                            await onSaved();
+                                                        toast({ title: "Indicador criado" });
+                                                        await qc.invalidateQueries({ queryKey: ["okr-performance-indicators", objective.id] });
+                                                        // Sincronizar com o Assistant
+                                                        await qc.invalidateQueries({ queryKey: ["okr-performance-indicators"] });
+                                                        await onSaved();
                         } catch (e) {
                             toast({
                                 title: "Não foi possível criar",
@@ -2504,7 +2506,9 @@ function FundamentalEditor(
                             } as any);
 
                             await upsertCompanyFundamentals(cid, patch);
-                            await onSaved();
+                                                        // Sincronizar com o Assistant
+                                                        await qc.invalidateQueries({ queryKey: ["okr-fundamentals", cid] });
+                                                        await onSaved();
                         } catch (e) {
                             toast({
                                 title: "Não foi possível salvar",
@@ -2723,19 +2727,22 @@ function StrategyObjectiveInlineCard(
                                             const nYear = targetYear.trim() ? Number(targetYear.trim()) : null;
 
                                             await updateStrategyObjective(so.id, {
-                                                title,
-                                                target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
-                                                description: description.trim() || null,
-                                                owner_user_id: ownerId,
-                                                parent_strategy_objective_id: parentSoId,
-                                                linked_fundamental: linkedFundamental,
-                                            });
-
-                                            toast({
-                                                title: "Objetivo atualizado"
-                                            });
-
-                                            await onSaved();
+                                                                                            title,
+                                                                                            target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
+                                                                                            description: description.trim() || null,
+                                                                                            owner_user_id: ownerId,
+                                                                                            parent_strategy_objective_id: parentSoId,
+                                                                                            linked_fundamental: linkedFundamental,
+                                                                                        });
+                                            
+                                                                                        toast({
+                                                                                            title: "Objetivo atualizado"
+                                                                                        });
+                                            
+                                                                                        // Sincronizar com o Assistant
+                                                                                        await qc.invalidateQueries({ queryKey: ["okr-strategy-objectives", cid] });
+                                            
+                                                                                        await onSaved();
                                         } catch (e) {
                                             toast({
                                                 title: "Não foi possível salvar",
@@ -3022,22 +3029,25 @@ function StrategyPicker(
                                         const nYear = newTargetYear.trim() ? Number(newTargetYear.trim()) : null;
 
                                         const created = await createStrategyObjective({
-                                            company_id: cid,
-                                            horizon_years: newYears,
-                                            target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
-                                            title: newTitle,
-                                            description: newDesc.trim() || null,
-                                            created_by_user_id: user.id,
-                                            owner_user_id: newOwner,
-                                            parent_strategy_objective_id: newParentSoId,
-                                            linked_fundamental: newLinkedFundamental,
-                                        });
-
-                                        toast({
-                                            title: "Objetivo criado"
-                                        });
-
-                                        await onSaved();
+                                                                                    company_id: cid,
+                                                                                    horizon_years: newYears,
+                                                                                    target_year: Number.isFinite(nYear as any) ? (nYear as any) : null,
+                                                                                    title: newTitle,
+                                                                                    description: newDesc.trim() || null,
+                                                                                    created_by_user_id: user.id,
+                                                                                    owner_user_id: newOwner,
+                                                                                    parent_strategy_objective_id: newParentSoId,
+                                                                                    linked_fundamental: newLinkedFundamental,
+                                                                                });
+                                        
+                                                                                toast({
+                                                                                    title: "Objetivo criado"
+                                                                                });
+                                        
+                                                                                // Sincronizar com o Assistant
+                                                                                await qc.invalidateQueries({ queryKey: ["okr-strategy-objectives", cid] });
+                                        
+                                                                                await onSaved();
                                         setOpenSoId(created.id);
                                         setCreateOpen(false);
                                     } catch (e) {
