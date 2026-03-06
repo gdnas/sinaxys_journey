@@ -2788,25 +2788,25 @@ export default function OkrAssistant() {
           </Button>
 
           <div className="flex flex-wrap items-center gap-2">
-            {step === 1 ? (
-              <Badge className={clsx("rounded-full", fundSaved ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{fundSaved ? "Salvo" : "Pendente"}</Badge>
-            ) : null}
-            {step === 2 ? (
-              <Badge className={clsx("rounded-full", soSaved ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{soSaved ? "Salvo" : "Pendente"}</Badge>
-            ) : null}
-            {step === 3 ? (
-              <Badge className={clsx("rounded-full", annualReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{annualReady ? "OK" : "Ajustar"}</Badge>
-            ) : null}
-            {step === 4 ? (
-              <Badge className={clsx("rounded-full", quarterReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{quarterReady ? "OK" : "Ajustar"}</Badge>
-            ) : null}
-            {step === 5 ? (
-              <Badge className={clsx("rounded-full", tacticalReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{tacticalReady ? "OK" : "Ajustar"}</Badge>
-            ) : null}
-            {step === 6 ? (
-              <Badge className={clsx("rounded-full", deliverablesReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{deliverablesReady ? "OK" : "Ajustar"}</Badge>
-            ) : null}
-          </div>
+                      {step === 1 ? (
+                        <Badge className={clsx("rounded-full", fundSaved ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{fundSaved ? "Salvo" : "Pendente"}</Badge>
+                      ) : null}
+                      {step === 2 ? (
+                        <Badge className={clsx("rounded-full", soSaved ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{soSaved ? "Salvo" : "Pendente"}</Badge>
+                      ) : null}
+                      {step === 3 ? (
+                        <Badge className={clsx("rounded-full", annualReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{annualReady ? "OK" : "Ajustar"}</Badge>
+                      ) : null}
+                      {step === 4 ? (
+                        <Badge className={clsx("rounded-full", quarterReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{quarterReady ? "OK" : "Ajustar"}</Badge>
+                      ) : null}
+                      {step === 5 ? (
+                        <Badge className={clsx("rounded-full", tacticalReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{tacticalReady ? "OK" : "Ajustar"}</Badge>
+                      ) : null}
+                      {step === 6 ? (
+                        <Badge className={clsx("rounded-full", deliverablesReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{deliverablesReady ? "OK" : "Ajustar"}</Badge>
+                      ) : null}
+                    </div>
           
                     <Button
                       className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -2823,10 +2823,9 @@ export default function OkrAssistant() {
                     >
                       Avançar
                       <ArrowRight className="ml-2 h-4 w-4" />
-                                          </Button>
-                                        </div>
-                                      </Card>
-                                    </div>
-                                  );
-                                }
-                      }
+                    </Button>
+                  </div>
+                </Card>
+              </div>
+            );
+          }
