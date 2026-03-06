@@ -857,6 +857,7 @@ function KrInlineEditor(
     const {
         toast
     } = useToast();
+    const qc = useQueryClient();
 
     const [editing, setEditing] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -1535,23 +1536,24 @@ function DetailsBody(
                     });
                 }} />) : null}
             {node.kind === "strategyObjective" ? (strategy.find(s => s.id === node.soId) ? (<StrategyObjectiveInlineCard
-                so={strategy.find(s => s.id === node.soId)!}
-                strategy={strategy}
-                people={people}
-                canEdit={canEdit}
-                open={true}
-                onToggle={() => {}}
-                onSaved={async () => {
-                    await qc.invalidateQueries({
-                        queryKey: ["okr-strategy", cid]
-                    });
-
-                    toast({
-                        title: "Objetivo atualizado"
-                    });
-                }} />) : (<Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-                <div className="text-sm text-muted-foreground">Objetivo de longo prazo não encontrado.</div>
-            </Card>)) : null}
+                            so={strategy.find(s => s.id === node.soId)!}
+                            strategy={strategy}
+                            people={people}
+                            canEdit={canEdit}
+                            open={true}
+                            onToggle={() => {}}
+                            cid={cid}
+                            onSaved={async () => {
+                                await qc.invalidateQueries({
+                                    queryKey: ["okr-strategy", cid]
+                                });
+            
+                                toast({
+                                    title: "Objetivo atualizado"
+                                });
+                            }} />) : (<Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+                            <div className="text-sm text-muted-foreground">Objetivo de longo prazo não encontrado.</div>
+                        </Card>)) : null}
             {node.kind === "cycle" ? (<Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
                 <div className="flex items-start justify-between gap-4">
                     <div>
@@ -1697,6 +1699,7 @@ function KrQuickEditor(
     }
 ) {
     const { toast } = useToast();
+    const qc = useQueryClient();
     const [saving, setSaving] = useState(false);
 
     const [cur, setCur] = useState(typeof kr.current_value === "number" ? String(kr.current_value) : "");
@@ -2434,6 +2437,7 @@ function FundamentalEditor(
     const {
         toast
     } = useToast();
+    const qc = useQueryClient();
 
     const [items, setItems] = useState<string[]>([]);
     const [draft, setDraft] = useState("");
@@ -2534,7 +2538,8 @@ function StrategyObjectiveInlineCard(
         canEdit,
         open,
         onToggle,
-        onSaved
+        onSaved,
+        cid
     }: {
         so: DbStrategyObjective;
         strategy: DbStrategyObjective[];
@@ -2543,11 +2548,13 @@ function StrategyObjectiveInlineCard(
         open: boolean;
         onToggle: () => void;
         onSaved: () => Promise<void>;
+        cid: string;
     }
 ) {
     const {
         toast
     } = useToast();
+    const qc = useQueryClient();
 
     const peopleById = useMemo(() => new Map(people.map(p => [p.id, p] as const)), [people]);
     const owner = so.owner_user_id ? peopleById.get(so.owner_user_id) ?? null : null;
@@ -2788,6 +2795,7 @@ function StrategyPicker(
     const {
         toast
     } = useToast();
+    const qc = useQueryClient();
 
     const [openSoId, setOpenSoId] = useState<string | null>(null);
 
@@ -2867,28 +2875,29 @@ function StrategyPicker(
                     </div>
                 </Card>
                 {ordered.length ? (<div className="grid gap-3">
-                    {ordered.map(so => (<StrategyObjectiveInlineCard
-                        key={so.id}
-                        so={so}
-                        strategy={ordered}
-                        people={people}
-                        canEdit={canEdit}
-                        open={openSoId === so.id}
-                        onToggle={() => setOpenSoId(prev => (prev === so.id ? null : so.id))}
-                        onSaved={async () => {
-                            await onSaved();
-                        }} />))}
-                </div>) : (<Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-                    <div className="text-sm text-muted-foreground">Nenhum objetivo de longo prazo ainda.</div>
-                    {canCreate ? (<div className="mt-3">
-                        <Button
-                            type="button"
-                            className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                            onClick={() => setCreateOpen(true)}>
-                            <Plus className="mr-2 h-4 w-4" />Criar primeiro objetivo
-                                            </Button>
-                    </div>) : null}
-                </Card>)}
+                                    {ordered.map(so => (<StrategyObjectiveInlineCard
+                                        key={so.id}
+                                        so={so}
+                                        strategy={ordered}
+                                        people={people}
+                                        canEdit={canEdit}
+                                        open={openSoId === so.id}
+                                        onToggle={() => setOpenSoId(prev => (prev === so.id ? null : so.id))}
+                                        cid={cid}
+                                        onSaved={async () => {
+                                            await onSaved();
+                                        }} />))}
+                                </div>) : (<Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+                                    <div className="text-sm text-muted-foreground">Nenhum objetivo de longo prazo ainda.</div>
+                                    {canCreate ? (<div className="mt-3">
+                                        <Button
+                                            type="button"
+                                            className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                                            onClick={() => setCreateOpen(true)}>
+                                            <Plus className="mr-2 h-4 w-4" />Criar primeiro objetivo
+                                                            </Button>
+                                    </div>) : null}
+                                </Card>)}
             </div>
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
                 <DialogContent
