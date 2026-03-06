@@ -1135,6 +1135,9 @@ export default function OkrObjectiveDetail() {
 
                   await createTask({
                     deliverable_id: taskDeliverableId,
+                    parent_task_id: null,
+                    depth: 0,
+                    level_type: "TASK",
                     title: taskTitle,
                     description: taskDesc,
                     owner_user_id: taskOwner,

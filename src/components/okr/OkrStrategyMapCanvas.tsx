@@ -1396,6 +1396,8 @@ export function OkrStrategyMapCanvas(props: {
                       parent_objective_id: createOkrMode === "quarterUnderAnnual" ? createOkrParentId : null,
                       strategy_objective_id: createOkrMode === "annualUnderStrategy" ? createOkrParentId : null,
                       level: createOkrMode === "annualUnderStrategy" ? "COMPANY" : "DEPARTMENT",
+                      tier: createOkrMode === "annualUnderStrategy" ? null : ("TIER2" as const),
+                      moderator_user_id: null,
                       department_id: null,
                       owner_user_id: createOkrOwner,
                       title: createOkrTitle,
