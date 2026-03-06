@@ -409,6 +409,7 @@ export default function OkrAssistant() {
   const [annualSaving, setAnnualSaving] = useState(false);
   const [annualModeratorId, setAnnualModeratorId] = useState<string>("");
   const [annualValidationErrors, setAnnualValidationErrors] = useState<string[]>([]);
+  const [annualValidationWarnings, setAnnualValidationWarnings] = useState<string[]>([]);
 
   const annualCycles = useMemo(() => cycles.filter((c) => c.type === "ANNUAL"), [cycles]);
   
@@ -454,6 +455,7 @@ export default function OkrAssistant() {
   const [quarterSaving, setQuarterSaving] = useState(false);
   const [quarterModeratorId, setQuarterModeratorId] = useState<string>("");
   const [quarterValidationErrors, setQuarterValidationErrors] = useState<string[]>([]);
+  const [quarterValidationWarnings, setQuarterValidationWarnings] = useState<string[]>([]);
 
   const quarterlyCycles = useMemo(() => cycles.filter((c) => c.type === "QUARTERLY"), [cycles]);
 
@@ -1854,6 +1856,23 @@ export default function OkrAssistant() {
                       <ul className="mt-2 space-y-1 text-sm">
                         {quarterValidationErrors.map((error, idx) => (
                           <li key={idx}>• {error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Validation Warnings */}
+              {quarterValidationWarnings.length > 0 && (
+                <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4">
+                  <div className="flex items-start gap-2 text-amber-900">
+                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                    <div>
+                      <div className="font-semibold">Avisos</div>
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {quarterValidationWarnings.map((warning, idx) => (
+                          <li key={idx}>• {warning}</li>
                         ))}
                       </ul>
                     </div>
