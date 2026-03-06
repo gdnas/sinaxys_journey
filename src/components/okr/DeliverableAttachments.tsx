@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -12,19 +11,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Link2, FileText, File, X, Plus, ExternalLink } from "lucide-react";
+import { Link2, X, Plus, ExternalLink } from "lucide-react";
 import {
   createDeliverableAttachment,
   deleteDeliverableAttachment,
   type DbDeliverableAttachment,
-  type AttachmentType,
 } from "@/lib/okrDb";
 import { toast } from "@/components/ui/use-toast";
 
@@ -36,6 +27,34 @@ interface DeliverableAttachmentsProps {
   canEdit: boolean;
 }
 
+/**
+ * Validação básica de URL
+ * Verifica se a string parece uma URL válida (http:// ou https://)
+ */
+function isValidUrl(url: string): boolean {
+  try {
+    const urlObj = new URL(url);
+    return urlObj.protocol === "http:" || urlObj.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Sanitiza URL para evitar XSS
+ * Remove caracteres perigosos e garante que é uma URL válida
+ */
+function sanitizeUrl(url: string): string {
+  const trimmed = url.trim();
+  
+  // Adiciona https:// se não tiver protocolo
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return `https://${trimmed}`;
+  }
+  
+  return trimmed;
+}
+
 export function DeliverableAttachments({
   deliverableId,
   attachments,
@@ -44,17 +63,28 @@ export function DeliverableAttachments({
   canEdit,
 }: DeliverableAttachmentsProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [attachmentType, setAttachmentType] = useState<AttachmentType>("LINK");
   const [url, setUrl] = useState("");
   const [description, setDescription] = useState("");
-  const [fileName, setFileName] = useState("");
   const [isAdding, setIsAdding] = useState(false);
 
   const handleAddAttachment = async () => {
-    if (!url.trim()) {
+    const trimmedUrl = url.trim();
+    
+    if (!trimmedUrl) {
       toast({
         title: "URL obrigatória",
         description: "Por favor, insira uma URL para o anexo.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validar formato da URL
+    const sanitizedUrl = sanitizeUrl(trimmedUrl);
+    if (!isValidUrl(sanitizedUrl)) {
+      toast({
+        title: "URL inválida",
+        description: "Por favor, insira uma URL válida (ex: https://exemplo.com).",
         variant: "destructive",
       });
       return;
@@ -64,10 +94,10 @@ export function DeliverableAttachments({
       setIsAdding(true);
       await createDeliverableAttachment({
         deliverable_id: deliverableId,
-        type: attachmentType,
-        url: url.trim(),
+        type: "LINK", // Apenas links por enquanto
+        url: sanitizedUrl,
         description: description.trim() || null,
-        file_name: fileName.trim() || null,
+        file_name: null,
         file_size: null,
         file_type: null,
         created_by: currentUserId,
@@ -76,16 +106,14 @@ export function DeliverableAttachments({
       // Reset form
       setUrl("");
       setDescription("");
-      setFileName("");
-      setAttachmentType("LINK");
       setIsAddDialogOpen(false);
 
       onAttachmentsChange();
-      toast({ title: "Anexo adicionado com sucesso" });
+      toast({ title: "Link adicionado com sucesso" });
     } catch (error) {
       console.error("Error adding attachment:", error);
       toast({
-        title: "Erro ao adicionar anexo",
+        title: "Erro ao adicionar link",
         description: error instanceof Error ? error.message : "Tente novamente.",
         variant: "destructive",
       });
@@ -98,99 +126,59 @@ export function DeliverableAttachments({
     try {
       await deleteDeliverableAttachment(attachmentId);
       onAttachmentsChange();
-      toast({ title: "Anexo removido" });
+      toast({ title: "Link removido" });
     } catch (error) {
       console.error("Error deleting attachment:", error);
       toast({
-        title: "Erro ao remover anexo",
+        title: "Erro ao remover link",
         description: error instanceof Error ? error.message : "Tente novamente.",
         variant: "destructive",
       });
     }
   };
 
-  const getAttachmentIcon = (type: AttachmentType) => {
-    switch (type) {
-      case "LINK":
-        return <Link2 className="h-4 w-4" />;
-      case "DOCUMENT":
-        return <FileText className="h-4 w-4" />;
-      case "FILE":
-        return <File className="h-4 w-4" />;
-    }
-  };
-
-  const getAttachmentTypeLabel = (type: AttachmentType) => {
-    switch (type) {
-      case "LINK":
-        return "Link";
-      case "DOCUMENT":
-        return "Documento";
-      case "FILE":
-        return "Arquivo";
-    }
-  };
+  // Filtra apenas anexos do tipo LINK
+  const linkAttachments = attachments.filter((a) => a.type === "LINK");
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <Label className="text-sm font-semibold">Anexos</Label>
+        <Label className="text-sm font-semibold">Links</Label>
         {canEdit && (
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm" className="h-8 rounded-xl">
                 <Plus className="h-3.5 w-3.5 mr-1" />
-                Adicionar
+                Adicionar Link
               </Button>
             </DialogTrigger>
             <DialogContent className="rounded-2xl">
               <DialogHeader>
-                <DialogTitle>Adicionar Anexo</DialogTitle>
+                <DialogTitle>Adicionar Link</DialogTitle>
                 <DialogDescription>
-                  Adicione links, documentos ou arquivos ao entregável.
+                  Adicione um link útil ao entregável.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label>Tipo de Anexo</Label>
-                  <Select value={attachmentType} onValueChange={(v) => setAttachmentType(v as AttachmentType)}>
-                    <SelectTrigger className="rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl">
-                      <SelectItem value="LINK">Link</SelectItem>
-                      <SelectItem value="DOCUMENT">Documento</SelectItem>
-                      <SelectItem value="FILE">Arquivo</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid gap-2">
-                  <Label>URL *</Label>
+                  <Label htmlFor="url">URL *</Label>
                   <Input
-                    placeholder="https://..."
+                    id="url"
+                    placeholder="https://exemplo.com"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
                     className="rounded-xl"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Insira uma URL válida começando com http:// ou https://
+                  </p>
                 </div>
 
-                {attachmentType === "FILE" && (
-                  <div className="grid gap-2">
-                    <Label>Nome do Arquivo</Label>
-                    <Input
-                      placeholder="documento.pdf"
-                      value={fileName}
-                      onChange={(e) => setFileName(e.target.value)}
-                      className="rounded-xl"
-                    />
-                  </div>
-                )}
-
                 <div className="grid gap-2">
-                  <Label>Descrição (opcional)</Label>
+                  <Label htmlFor="description">Descrição (opcional)</Label>
                   <Textarea
-                    placeholder="Breve descrição do anexo..."
+                    id="description"
+                    placeholder="Breve descrição do link..."
                     value={description}
                     onChange={(e) => setDescription(e.target.value)}
                     className="rounded-xl min-h-[80px]"
@@ -218,31 +206,23 @@ export function DeliverableAttachments({
         )}
       </div>
 
-      {attachments.length === 0 ? (
+      {linkAttachments.length === 0 ? (
         <div className="rounded-xl border border-dashed p-4 text-center text-sm text-muted-foreground">
-          Nenhum anexo ainda
+          Nenhum link anexado ainda
         </div>
       ) : (
         <div className="space-y-2">
-          {attachments.map((attachment) => (
+          {linkAttachments.map((attachment) => (
             <div
               key={attachment.id}
               className="flex items-start gap-3 rounded-xl border p-3 hover:bg-muted/50 transition-colors"
             >
-              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted">
-                {getAttachmentIcon(attachment.type)}
+              <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600">
+                <Link2 className="h-4 w-4" />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline" className="text-xs">
-                    {getAttachmentTypeLabel(attachment.type)}
-                  </Badge>
-                  {attachment.file_name && (
-                    <span className="text-sm font-medium truncate">{attachment.file_name}</span>
-                  )}
-                </div>
                 {attachment.description && (
-                  <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
+                  <p className="text-sm font-medium text-foreground">
                     {attachment.description}
                   </p>
                 )}
@@ -251,10 +231,10 @@ export function DeliverableAttachments({
                     href={attachment.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                    className="mt-1 inline-flex items-center gap-1 text-xs text-blue-600 hover:underline break-all"
                   >
-                    <ExternalLink className="h-3 w-3" />
-                    Abrir link
+                    <ExternalLink className="h-3 w-3 shrink-0" />
+                    <span className="truncate">{attachment.url}</span>
                   </a>
                 )}
               </div>
@@ -264,6 +244,7 @@ export function DeliverableAttachments({
                   size="sm"
                   onClick={() => handleDeleteAttachment(attachment.id)}
                   className="h-8 w-8 shrink-0 rounded-lg p-0 text-muted-foreground hover:text-destructive"
+                  title="Remover link"
                 >
                   <X className="h-4 w-4" />
                 </Button>
