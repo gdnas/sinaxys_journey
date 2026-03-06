@@ -250,7 +250,9 @@ export type DbOkrObjective = {
   strategy_objective_id: string | null;
   level: ObjectiveLevel;
   department_id: string | null;
+  tier: "TIER1" | "TIER2" | null;
   owner_user_id: string;
+  moderator_user_id: string | null;
   title: string;
   description: string | null;
   strategic_reason: string | null;
@@ -279,7 +281,7 @@ export type DbOkrObjective = {
 };
 
 const objectiveSelect =
-  "id,company_id,cycle_id,parent_objective_id,strategy_objective_id,level,department_id,owner_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,expected_profit_brl,profit_thesis,expected_revenue_at,expected_attainment_pct,status,achieved_pct,achieved_at,head_performance_score,head_performance_notes,head_performance_reviewed_at,created_at,updated_at";
+  "id,company_id,cycle_id,parent_objective_id,strategy_objective_id,level,department_id,tier,owner_user_id,moderator_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,expected_profit_brl,profit_thesis,expected_revenue_at,expected_attainment_pct,status,achieved_pct,achieved_at,head_performance_score,head_performance_notes,head_performance_reviewed_at,created_at,updated_at";
 
 export async function listOkrObjectives(companyId: string, cycleId: string) {
   const { data, error } = await supabase
@@ -348,7 +350,9 @@ export async function createOkrObjective(
       strategy_objective_id: payload.strategy_objective_id ?? null,
       level: payload.level,
       department_id: payload.department_id ?? null,
+      tier: payload.tier ?? null,
       owner_user_id: payload.owner_user_id,
+      moderator_user_id: payload.moderator_user_id ?? null,
       title: payload.title.trim(),
       description: payload.description ?? null,
       strategic_reason: payload.strategic_reason ?? null,
@@ -382,7 +386,9 @@ export async function updateOkrObjective(
       | "linked_fundamental"
       | "linked_fundamental_text"
       | "owner_user_id"
+      | "moderator_user_id"
       | "department_id"
+      | "tier"
       | "parent_objective_id"
       | "strategy_objective_id"
       | "expected_attainment_pct"
@@ -414,9 +420,11 @@ export async function updateOkrObjective(
   if ("linked_fundamental_text" in patch) update.linked_fundamental_text = patch.linked_fundamental_text ?? null;
 
   if ("owner_user_id" in patch) update.owner_user_id = patch.owner_user_id;
+  if ("moderator_user_id" in patch) update.moderator_user_id = patch.moderator_user_id ?? null;
   if ("department_id" in patch) update.department_id = patch.department_id ?? null;
   if ("parent_objective_id" in patch) update.parent_objective_id = patch.parent_objective_id ?? null;
   if ("strategy_objective_id" in patch) update.strategy_objective_id = patch.strategy_objective_id ?? null;
+  if ("tier" in patch) update.tier = patch.tier ?? null;
   if ("level" in patch) update.level = patch.level;
 
   if ("expected_attainment_pct" in patch) update.expected_attainment_pct = patch.expected_attainment_pct ?? null;
@@ -785,6 +793,9 @@ export async function createDeliverable(payload: Omit<DbDeliverable, "id" | "cre
 export type DbTask = {
   id: string;
   deliverable_id: string;
+  parent_task_id: string | null;
+  depth: number | null;
+  level_type: "TASK" | "LIST" | "CHECKLIST" | "CHECKLIST_ITEM" | null;
   title: string;
   description: string | null;
   owner_user_id: string;
@@ -802,7 +813,7 @@ export type DbTask = {
 };
 
 const taskSelect =
-  "id,deliverable_id,title,description,owner_user_id,status,due_date,estimate_minutes,checklist,completed_at,estimated_value_brl,estimated_cost_brl,estimated_roi_pct,created_at,updated_at";
+  "id,deliverable_id,parent_task_id,depth,level_type,title,description,owner_user_id,status,due_date,estimate_minutes,checklist,completed_at,estimated_value_brl,estimated_cost_brl,estimated_roi_pct,created_at,updated_at";
 
 export async function listTasksByDeliverableIds(deliverableIds: string[]) {
   if (!deliverableIds.length) return [] as DbTask[];

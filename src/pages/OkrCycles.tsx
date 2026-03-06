@@ -1018,6 +1018,8 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                       parent_objective_id: parentForSave,
                       strategy_objective_id: strategyId,
                       level: objLevel,
+                      tier: objLevel === "COMPANY" && scope === "quarter" ? ("TIER1" as const) : null,
+                      moderator_user_id: null,
                       department_id: objDept,
                       owner_user_id: objOwner,
                       title: objTitle,

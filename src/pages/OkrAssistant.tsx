@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 
@@ -1432,13 +1433,42 @@ export default function OkrAssistant() {
                     const validationErrors: string[] = [];
                     
                     for (const o of trimmed) {
-                      const result: ValidateAnnualObjectiveParams = validateAnnualObjective({
+                      const result = validateAnnualObjective({
                         objective: {
-                          ...annualDrafts[0],
+                          id: "",
+                          company_id: cid,
+                          cycle_id: annualCycleId,
+                          parent_objective_id: null,
+                          strategy_objective_id: so2.id,
+                          level: "COMPANY" as ObjectiveLevel,
+                          department_id: null,
+                          tier: null,
+                          owner_user_id: user.id,
+                          moderator_user_id: null,
                           title: o.title,
-                          description: o.description,
+                          description: o.description || null,
+                          strategic_reason: null,
+                          linked_fundamental: null,
+                          linked_fundamental_text: null,
+                          due_at: null,
+                          expected_attainment_pct: null,
+                          estimated_value_brl: null,
+                          estimated_effort_hours: null,
+                          estimated_cost_brl: null,
+                          estimated_roi_pct: null,
+                          expected_profit_brl: null,
+                          profit_thesis: null,
+                          expected_revenue_at: null,
+                          status: "ACTIVE",
+                          achieved_pct: null,
+                          achieved_at: null,
+                          head_performance_score: null,
+                          head_performance_notes: null,
+                          head_performance_reviewed_at: null,
+                          created_at: null,
+                          updated_at: null,
                         },
-                        krs: o.krs,
+                        krs: o.krs as any,
                         objectives2Year: strategyObjectives,
                         admins: profiles.filter(p => p.role === "ADMIN" || p.role === "MASTERADMIN"),
                         cycleType: "ANNUAL",
@@ -1478,7 +1508,9 @@ export default function OkrAssistant() {
                           strategy_objective_id: so2.id,
                           level: "COMPANY" as ObjectiveLevel,
                           department_id: null,
+                          tier: null,
                           owner_user_id: user.id,
+                          moderator_user_id: annualModeratorId || null,
                           title: o.title,
                           description: o.description || null,
                           strategic_reason: null,
@@ -1493,7 +1525,6 @@ export default function OkrAssistant() {
                           expected_profit_brl: null,
                           profit_thesis: null,
                           expected_revenue_at: null,
-                          moderator_user_id: annualModeratorId || null,
                         });
 
                         for (const kr of o.krs) {
@@ -1802,6 +1833,8 @@ export default function OkrAssistant() {
                           strategy_objective_id: null,
                           level: "COMPANY" as ObjectiveLevel,
                           department_id: null,
+                          tier: "TIER1" as const,
+                          moderator_user_id: null,
                           owner_user_id: user.id,
                           title: o.title,
                           description: o.description || null,
@@ -2097,6 +2130,8 @@ export default function OkrAssistant() {
                           strategy_objective_id: null,
                           level: "DEPARTMENT" as ObjectiveLevel,
                           department_id: o.departmentId,
+                          tier: "TIER2" as const,
+                          moderator_user_id: null,
                           owner_user_id: o.ownerUserId,
                           title: o.title,
                           description: o.description || null,
