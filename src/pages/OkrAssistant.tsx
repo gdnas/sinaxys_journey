@@ -1814,40 +1814,50 @@ export default function OkrAssistant() {
                                 </Button>
                               </div>
                               <div className="mt-3 grid gap-2">
-                                <Label>Título do KR</Label>
-                                <Input
-                                  className="h-11 rounded-xl"
-                                  value={kr.title}
-                                  onChange={(e) =>
-                                    setQuarterDrafts((arr) =>
-                                      arr.map((it, i) => {
-                                        if (i !== idx) return it;
-                                        const next = [...it.krs];
-                                        next[kIdx] = { ...next[kIdx], title: e.target.value } as DraftKr;
-                                        return { ...it, krs: next };
-                                      }),
-                                    )
-                                  }
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Separator />
-
-              <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-                {!quarterModeratorId ? (
-                  <div className="flex items-start gap-2 text-amber-700">
-                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
-                    <div>
-                      <div className="font-semibold">Moderador obrigatório</div>
-                      <div className="mt-1">Selecione um moderador (usuário ADMIN) para governar os OKRs estratégicos.</div>
+                                                              <Label>Título do KR</Label>
+                                                              <Input
+                                                                className="h-11 rounded-xl"
+                                                                value={kr.title}
+                                                                onChange={(e) =>
+                                                                  setQuarterDrafts((arr) =>
+                                                                    arr.map((it, i) => {
+                                                                      if (i !== idx) return it;
+                                                                      const next = [...it.krs];
+                                                                      next[kIdx] = { ...next[kIdx], title: e.target.value } as DraftKr;
+                                                                      return { ...it, krs: next };
+                                                                    }),
+                                                                  )
+                                                                }
+                                                              />
+                                                            </div>
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                              
+                                                    <Separator />
+                              
+                                                    <PerformanceIndicatorDraft
+                                                      indicators={d.performanceIndicators}
+                                                      onChange={(indicators) =>
+                                                        setQuarterDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, performanceIndicators: indicators } : it)))
+                                                      }
+                                                      maxIndicators={5}
+                                                    />
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                              
+                                            <Separator />
+                              
+                                            <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+                                              {!quarterModeratorId ? (
+                                                <div className="flex items-start gap-2 text-amber-700">
+                                                  <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                                                  <div>
+                                                    <div className="font-semibold">Moderador obrigatório</div>
+                                                    <div className="mt-1">Selecione um moderador (usuário ADMIN) para governar os OKRs estratégicos.</div>
                     </div>
                   </div>
                 ) : (
@@ -1980,23 +1990,41 @@ export default function OkrAssistant() {
                         });
 
                         await linkObjectiveToKr(o.alignToKrId, created.id);
-
-                        for (const kr of o.krs) {
-                          await createKeyResult({
-                            objective_id: created.id,
-                            title: kr.title,
-                            kind: "METRIC",
-                            due_at: null,
-                            achieved: false,
-                            metric_unit: null,
-                            start_value: null,
-                            current_value: null,
-                            target_value: null,
-                            owner_user_id: user.id,
-                            confidence: "ON_TRACK",
-                          });
-                        }
-                      }
+                        
+                                                for (const kr of o.krs) {
+                                                  await createKeyResult({
+                                                    objective_id: created.id,
+                                                    title: kr.title,
+                                                    kind: "METRIC",
+                                                    due_at: null,
+                                                    achieved: false,
+                                                    metric_unit: null,
+                                                    start_value: null,
+                                                    current_value: null,
+                                                    target_value: null,
+                                                    owner_user_id: user.id,
+                                                    confidence: "ON_TRACK",
+                                                  });
+                                                }
+                        
+                                                // Create performance indicators
+                                                for (const pi of o.performanceIndicators) {
+                                                  if (!pi.title.trim()) continue;
+                                                  await createPerformanceIndicator({
+                                                    objective_id: created.id,
+                                                    title: pi.title.trim(),
+                                                    kind: pi.kind,
+                                                    metric_unit: pi.kind === "METRIC" ? pi.metric_unit.trim() : null,
+                                                    start_value: pi.kind === "METRIC" ? pi.start_value.trim() : null,
+                                                    target_value: pi.kind === "METRIC" ? pi.target_value.trim() : null,
+                                                    current_value: pi.kind === "METRIC" ? pi.current_value.trim() : null,
+                                                    due_at: pi.due_at.trim() || null,
+                                                    confidence: pi.confidence,
+                                                    achieved: false,
+                                                    achieved_at: null,
+                                                  });
+                                                }
+                                              }
 
                       setQuarterDrafts([]);
                       await qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid, quarterCycleId] });
@@ -2055,18 +2083,19 @@ export default function OkrAssistant() {
                   disabled={!quarterCycleId}
                   onClick={() =>
                     setTacticalDrafts((d) => [
-                      ...d,
-                      {
-                        departmentId: departments[0]?.id ?? SELECT_NONE,
-                        departmentIds: [],
-                        ownerUserId: user.id,
-                        ownerUserIds: [],
-                        title: "",
-                        description: "",
-                        alignToKrId: SELECT_NONE,
-                        krs: [{ title: "", kind: "DELIVERABLE" }],
-                      },
-                    ])
+                                          ...d,
+                                          {
+                                            departmentId: departments[0]?.id ?? SELECT_NONE,
+                                            departmentIds: [],
+                                            ownerUserId: user.id,
+                                            ownerUserIds: [],
+                                            title: "",
+                                            description: "",
+                                            alignToKrId: SELECT_NONE,
+                                            krs: [{ title: "", kind: "DELIVERABLE" }],
+                                            performanceIndicators: [],
+                                          },
+                                        ])
                   }
                 >
                   Adicionar objetivo tático
@@ -2179,33 +2208,43 @@ export default function OkrAssistant() {
                                 </Button>
                               </div>
                               <div className="mt-3 grid gap-2">
-                                <Label>Título do KR</Label>
-                                <Input
-                                  className="h-11 rounded-xl"
-                                  value={kr.title}
-                                  onChange={(e) =>
-                                    setTacticalDrafts((arr) =>
-                                      arr.map((it, i) => {
-                                        if (i !== idx) return it;
-                                        const next = [...it.krs];
-                                        next[kIdx] = { ...next[kIdx], title: e.target.value } as DraftKr;
-                                        return { ...it, krs: next };
-                                      }),
-                                    )
-                                  }
-                                  placeholder="Ex.: reduzir churn de 8% para 5%"
-                                />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Separator />
+                                                              <Label>Título do KR</Label>
+                                                              <Input
+                                                                className="h-11 rounded-xl"
+                                                                value={kr.title}
+                                                                onChange={(e) =>
+                                                                  setTacticalDrafts((arr) =>
+                                                                    arr.map((it, i) => {
+                                                                      if (i !== idx) return it;
+                                                                      const next = [...it.krs];
+                                                                      next[kIdx] = { ...next[kIdx], title: e.target.value } as DraftKr;
+                                                                      return { ...it, krs: next };
+                                                                    }),
+                                                                  )
+                                                                }
+                                                                placeholder="Ex.: reduzir churn de 8% para 5%"
+                                                              />
+                                                            </div>
+                                                          </div>
+                                                        ))}
+                                                      </div>
+                                                    </div>
+                              
+                                                    <Separator />
+                              
+                                                    <PerformanceIndicatorDraft
+                                                      indicators={d.performanceIndicators}
+                                                      onChange={(indicators) =>
+                                                        setTacticalDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, performanceIndicators: indicators } : it)))
+                                                      }
+                                                      maxIndicators={5}
+                                                    />
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                              
+                                            <Separator />
 
               <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
                 {tacticalDrafts.some(d => (d.departmentIds?.length || 0) === 0) ? (
@@ -2349,28 +2388,46 @@ export default function OkrAssistant() {
                         });
 
                         await linkObjectiveToKr(o.alignToKrId, created.id);
-
-                        // Sync multiple departments if provided
-                        if (o.departmentIds && o.departmentIds.length > 0) {
-                          await syncObjectiveDepartments(created.id, o.departmentIds);
-                        }
-
-                        for (const kr of o.krs) {
-                          await createKeyResult({
-                            objective_id: created.id,
-                            title: kr.title,
-                            kind: "DELIVERABLE",
-                            due_at: null,
-                            achieved: false,
-                            metric_unit: null,
-                            start_value: null,
-                            current_value: null,
-                            target_value: null,
-                            owner_user_id: o.ownerUserId,
-                            confidence: "ON_TRACK",
-                          });
-                        }
-                      }
+                        
+                                                // Sync multiple departments if provided
+                                                if (o.departmentIds && o.departmentIds.length > 0) {
+                                                  await syncObjectiveDepartments(created.id, o.departmentIds);
+                                                }
+                        
+                                                for (const kr of o.krs) {
+                                                  await createKeyResult({
+                                                    objective_id: created.id,
+                                                    title: kr.title,
+                                                    kind: "DELIVERABLE",
+                                                    due_at: null,
+                                                    achieved: false,
+                                                    metric_unit: null,
+                                                    start_value: null,
+                                                    current_value: null,
+                                                    target_value: null,
+                                                    owner_user_id: o.ownerUserId,
+                                                    confidence: "ON_TRACK",
+                                                  });
+                                                }
+                        
+                                                // Create performance indicators
+                                                for (const pi of o.performanceIndicators) {
+                                                  if (!pi.title.trim()) continue;
+                                                  await createPerformanceIndicator({
+                                                    objective_id: created.id,
+                                                    title: pi.title.trim(),
+                                                    kind: pi.kind,
+                                                    metric_unit: pi.kind === "METRIC" ? pi.metric_unit.trim() : null,
+                                                    start_value: pi.kind === "METRIC" ? pi.start_value.trim() : null,
+                                                    target_value: pi.kind === "METRIC" ? pi.target_value.trim() : null,
+                                                    current_value: pi.kind === "METRIC" ? pi.current_value.trim() : null,
+                                                    due_at: pi.due_at.trim() || null,
+                                                    confidence: pi.confidence,
+                                                    achieved: false,
+                                                    achieved_at: null,
+                                                  });
+                                                }
+                                              }
 
                       setTacticalDrafts([]);
                       await qc.invalidateQueries({ queryKey: ["okr-quarter-objectives", cid, quarterCycleId] });
@@ -2711,52 +2768,25 @@ export default function OkrAssistant() {
               <Badge className={clsx("rounded-full", deliverablesReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{deliverablesReady ? "OK" : "Ajustar"}</Badge>
             ) : null}
           </div>
-
-          <Button
-            className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-            onClick={onNext}
-            disabled={
-              (step === 1 && !canGoStep2) ||
-              (step === 2 && !canGoStep3) ||
-              (step === 3 && !annualReady) ||
-              (step === 4 && !quarterReady) ||
-              (step === 5 && !tacticalReady) ||
-              (step === 6 && !deliverablesReady) ||
-              step === 7
-            }
-          >
-            Avançar
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </Card>
-    </div>
-  );
-}, tacticalReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{tacticalReady ? "OK" : "Ajustar"}</Badge>
-            ) : null}
-            {step === 6 ? (
-              <Badge className={clsx("rounded-full", deliverablesReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{deliverablesReady ? "OK" : "Ajustar"}</Badge>
-            ) : null}
-          </div>
-
-          <Button
-            className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-            onClick={onNext}
-            disabled={
-              (step === 1 && !canGoStep2) ||
-              (step === 2 && !canGoStep3) ||
-              (step === 3 && !annualReady) ||
-              (step === 4 && !quarterReady) ||
-              (step === 5 && !tacticalReady) ||
-              (step === 6 && !deliverablesReady) ||
-              step === 7
-            }
-          >
-            Avançar
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
-      </Card>
-    </div>
-  );
-}
+          
+                    <Button
+                      className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                      onClick={onNext}
+                      disabled={
+                        (step === 1 && !canGoStep2) ||
+                        (step === 2 && !canGoStep3) ||
+                        (step === 3 && !annualReady) ||
+                        (step === 4 && !quarterReady) ||
+                        (step === 5 && !tacticalReady) ||
+                        (step === 6 && !deliverablesReady) ||
+                        step === 7
+                      }
+                    >
+                      Avançar
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </div>
+                </Card>
+              </div>
+            );
+          }
