@@ -6,12 +6,23 @@ import { useCompany } from "@/lib/company";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { OkrMapExplorer } from "@/components/okr/OkrMapExplorer";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
 import { Link } from "react-router-dom";
 
 export default function OkrMap() {
   const { user } = useAuth();
   const { companyId } = useCompany();
   const isMobile = useIsMobile();
+
+  // Use sync hook to keep data synchronized across views
+  useSyncAcrossViews({
+    companyId,
+    objectiveIds: [], // Will be populated dynamically
+    deliverableIds: [],
+    taskIds: [],
+    krIds: [],
+    cycleIds: [],
+  });
 
   if (!user) return null;
 

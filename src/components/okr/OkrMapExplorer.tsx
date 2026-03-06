@@ -61,23 +61,25 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 
 import {
-    createStrategyObjective,
-    getCompanyFundamentals,
-    getOkrObjective,
-    listOkrCycles,
-    listOkrObjectives,
-    listStrategyObjectives,
     listKeyResults,
     krProgressPct,
     updateKeyResult,
     updateOkrObjective,
     upsertCompanyFundamentals,
     updateStrategyObjective,
+    listPerformanceIndicators,
+    createPerformanceIndicator,
+    updatePerformanceIndicator,
+    deletePerformanceIndicator,
+    togglePerformanceIndicatorAchieved,
+    listKrLinksByObjectiveId,
+    listKrLinksByKrId,
     type DbCompanyFundamentals,
     type DbOkrCycle,
     type DbOkrKeyResult,
     type DbOkrObjective,
     type DbStrategyObjective,
+    type DbPerformanceIndicator,
 } from "@/lib/okrDb";
 import {
     clearKrLinksForObjective,
@@ -100,6 +102,8 @@ import { DescribedItemsEditor } from "@/components/fundamentals/DescribedItemsEd
 import { getErrorMessage } from "@/lib/errorMessage";
 import { brl } from "@/lib/costs";
 import { OkrStrategyMapCanvas } from "@/components/okr/OkrStrategyMapCanvas";
+import { PerformanceIndicatorEditor } from "@/components/okr/PerformanceIndicatorEditor";
+import { KrLinkViewer } from "@/components/okr/KrLinkViewer";
 
 type NodeId = string;
 
@@ -487,27 +491,14 @@ function StrategyLinker(
         return cycles.find(c => c.type === "ANNUAL" && c.year === cycle.year)?.id ?? null;
     }, [cycle, cycles]);
 
-    const qAnnualParents = useQuery({
-        queryKey: ["okr-map-parent-annual", cid, annualCycleId],
-        enabled: !!annualCycleId,
-        queryFn: () => listOkrObjectives(cid, annualCycleId as string),
-        staleTime: 20_000
-    });
-
-    const annualObjectives = useMemo(() => (qAnnualParents.data ?? []).slice().sort((a, b) => a.title.localeCompare(b.title, "pt-BR")), [qAnnualParents.data]);
-    const annualObjectiveById = useMemo(() => {
-        const m = new Map<string, DbOkrObjective>();
-        for (const o of annualObjectives) m.set(o.id, o);
-        return m;
-    }, [annualObjectives]);
-
-    const qObjectiveKrLinks = useQuery({
-        queryKey: ["okr-map-objective-kr-links", objective.id],
+    const qKrLinks = useQuery({
+        queryKey: ["okr-kr-links", objective.id],
+        enabled: !!objective.id,
         queryFn: () => listKrLinksByObjectiveId(objective.id),
         staleTime: 20_000,
     });
 
-    const objectiveLinkedKrId = qObjectiveKrLinks.data?.[0]?.key_result_id ?? null;
+    const krLinks = qKrLinks.data ?? [];
 
     // Quarter alignment: pick annual Tier 1 objective first, then pick its KR.
     const [annualTier1ObjectiveId, setAnnualTier1ObjectiveId] = useState<string>("__none__");
@@ -515,7 +506,7 @@ function StrategyLinker(
     useEffect(() => {
         if (!isQuarter) return;
         const pid = objective.parent_objective_id;
-        setAnnualTier1ObjectiveId(pid && annualObjectiveById.has(pid) ? pid : "__none__");
+        setAnnualTier1ObjectiveId(pid && annualTier1ObjectiveId.has(pid) ? pid : "__none__");
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isQuarter, objective.id, objective.parent_objective_id, annualObjectives.length]);
 
@@ -1063,6 +1054,26 @@ function ObjectiveEditor(
     const [desc, setDesc] = useState(objective.description ?? "");
     const [saving, setSaving] = useState(false);
 
+    // Query performance indicators
+    const qPerformanceIndicators = useQuery({
+        queryKey: ["okr-performance-indicators", objective.id],
+        enabled: !!objective.id,
+        queryFn: () => listPerformanceIndicators(objective.id),
+        staleTime: 20_000,
+    });
+
+    const performanceIndicators = qPerformanceIndicators.data ?? [];
+
+    // Query KR links for this objective
+    const qKrLinks = useQuery({
+        queryKey: ["okr-kr-links", objective.id],
+        enabled: !!objective.id,
+        queryFn: () => listKrLinksByObjectiveId(objective.id),
+        staleTime: 20_000,
+    });
+
+    const krLinks = qKrLinks.data ?? [];
+
     useEffect(() => {
         setTitle(objective.title);
         setDesc(objective.description ?? "");
@@ -1245,6 +1256,82 @@ function ObjectiveEditor(
                     </Button>
                 </div>
             </Card>
+
+            {/* Performance Indicators Section - Only for quarterly objectives */}
+            {objective.tier && (
+                <PerformanceIndicatorEditor
+                    objectiveId={objective.id}
+                    indicators={performanceIndicators}
+                    onCreate={async (indicator) => {
+                        try {
+                            await createPerformanceIndicator(indicator);
+                            toast({ title: "Indicador criado" });
+                            await qc.invalidateQueries({ queryKey: ["okr-performance-indicators", objective.id] });
+                            await onSaved();
+                        } catch (e) {
+                            toast({
+                                title: "Não foi possível criar",
+                                description: getErrorMessage(e),
+                                variant: "destructive",
+                            });
+                        }
+                    }}
+                    onUpdate={async (id, patch) => {
+                        try {
+                            await updatePerformanceIndicator(id, patch);
+                            toast({ title: "Indicador atualizado" });
+                            await qc.invalidateQueries({ queryKey: ["okr-performance-indicators", objective.id] });
+                            await onSaved();
+                        } catch (e) {
+                            toast({
+                                title: "Não foi possível atualizar",
+                                description: getErrorMessage(e),
+                                variant: "destructive",
+                            });
+                        }
+                    }}
+                    onDelete={async (id) => {
+                        try {
+                            await deletePerformanceIndicator(id);
+                            toast({ title: "Indicador removido" });
+                            await qc.invalidateQueries({ queryKey: ["okr-performance-indicators", objective.id] });
+                            await onSaved();
+                        } catch (e) {
+                            toast({
+                                title: "Não foi possível remover",
+                                description: getErrorMessage(e),
+                                variant: "destructive",
+                            });
+                        }
+                    }}
+                    onToggleAchieved={async (id, achieved) => {
+                        try {
+                            await togglePerformanceIndicatorAchieved(id, achieved);
+                            toast({ title: achieved ? "Indicador marcado como concluído" : "Indicador marcado como não concluído" });
+                            await qc.invalidateQueries({ queryKey: ["okr-performance-indicators", objective.id] });
+                            await onSaved();
+                        } catch (e) {
+                            toast({
+                                title: "Não foi possível atualizar",
+                                description: getErrorMessage(e),
+                                variant: "destructive",
+                            });
+                        }
+                    }}
+                    readOnly={!canEdit}
+                    maxIndicators={5}
+                />
+            )}
+
+            {/* KR Links Visualization */}
+            {krLinks.length > 0 && (
+                <KrLinkViewer
+                    parentKr={krs.find(kr => kr.id === krLinks[0].key_result_id)!}
+                    parentObjective={objective}
+                    childObjectives={[]}
+                    childKrs={[]}
+                />
+            )}
         </div>
     );
 }

@@ -181,22 +181,30 @@ export function validateAnnualObjective(params: ValidateAnnualObjectiveParams): 
     });
   }
 
+  // Validação: deve existir objetivo de 2 anos antes de criar objetivos anuais
+  const has2YearObjective = objectives2Year.some(o => o.horizon_years === 2);
+  if (!has2YearObjective) {
+    errors.push({
+      field: 'strategy_objective_id',
+      message: 'É obrigatório ter um objetivo de 2 anos antes de criar objetivos anuais',
+      code: 'MISSING_2_YEAR_OBJECTIVE',
+      severity: 'error',
+    });
+  }
+
   // Validação: responsável principal deve ser "empresa toda"
   // Na prática, owner_user_id pode ser um admin, mas conceitualmente é a empresa
   // Verificamos se está vinculado ao objetivo de 2 anos
-  if (!objective.strategy_objective_id) {
-    const has2YearObjective = objectives2Year.some(o => o.horizon_years === 2);
-    if (has2YearObjective) {
-      errors.push({
-        field: 'strategy_objective_id',
-        message: 'Objetivo anual deve estar alinhado ao objetivo de 2 anos',
-        code: 'MISSING_2_YEAR_ALIGNMENT',
-        severity: 'error',
-      });
-    }
+  if (!objective.strategy_objective_id && has2YearObjective) {
+    errors.push({
+      field: 'strategy_objective_id',
+      message: 'Objetivo anual deve estar alinhado ao objetivo de 2 anos',
+      code: 'MISSING_2_YEAR_ALIGNMENT',
+      severity: 'error',
+    });
   }
 
-  // Validação: moderador deve ser admin
+  // Validação: moderador deve ser admin (recomendado, não obrigatório)
   if (objective.moderator_user_id && admins.length > 0) {
     const isModeratorAdmin = admins.some(a => a.id === objective.moderator_user_id);
     if (!isModeratorAdmin) {
@@ -289,8 +297,25 @@ export function validateQuarterlyTier1Objective(params: ValidateQuarterlyTier1Ob
     });
   }
 
-  // Validação: moderador deve ser admin
-  if (objective.moderator_user_id && admins.length > 0) {
+  // Validação: deve ter vínculo com KR anual
+  if (!linkedAnnualKrId) {
+    errors.push({
+      field: 'parent_objective_id',
+      message: 'Objetivo trimestral estratégico deve estar alinhado a um KR anual',
+      code: 'MISSING_ANNUAL_KR_LINK',
+      severity: 'error',
+    });
+  }
+
+  // Validação: moderador deve ser admin (obrigatório para TIER 1)
+  if (!objective.moderator_user_id) {
+    errors.push({
+      field: 'moderator_user_id',
+      message: 'Objetivo trimestral estratégico deve ter um moderador (usuário ADMIN)',
+      code: 'MISSING_MODERATOR',
+      severity: 'error',
+    });
+  } else if (admins.length > 0) {
     const isModeratorAdmin = admins.some(a => a.id === objective.moderator_user_id);
     if (!isModeratorAdmin) {
       errors.push({
@@ -300,16 +325,6 @@ export function validateQuarterlyTier1Objective(params: ValidateQuarterlyTier1Ob
         severity: 'error',
       });
     }
-  }
-
-  // Validação: deve ter vínculo com KR anual
-  if (!linkedAnnualKrId) {
-    errors.push({
-      field: 'parent_objective_id',
-      message: 'Objetivo trimestral estratégico deve estar alinhado a um KR anual',
-      code: 'MISSING_ANNUAL_KR_LINK',
-      severity: 'error',
-    });
   }
 
   // Validação: deve ter pelo menos 1 KR

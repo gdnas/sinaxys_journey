@@ -69,6 +69,7 @@ import {
   type ValidateQuarterlyTier2ObjectiveParams,
 } from "@/lib/okrValidation";
 import { syncObjectiveDepartments } from "@/lib/okrDb";
+import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
@@ -297,6 +298,16 @@ export default function OkrAssistant() {
 
   const isAdminish = user?.role === "ADMIN" || user?.role === "HEAD" || user?.role === "MASTERADMIN";
 
+  // Use sync hook to keep data synchronized across views
+  useSyncAcrossViews({
+    companyId: cid,
+    objectiveIds: [],
+    deliverableIds: [],
+    taskIds: [],
+    krIds: [],
+    cycleIds: [],
+  });
+
   const [step, setStep] = useState<StepId>(1);
 
   // --- STEP 1: Fundamentals ---
@@ -442,6 +453,7 @@ export default function OkrAssistant() {
   const [quarterDrafts, setQuarterDrafts] = useState<DraftObjective[]>([]);
   const [quarterSaving, setQuarterSaving] = useState(false);
   const [quarterModeratorId, setQuarterModeratorId] = useState<string>("");
+  const [quarterValidationErrors, setQuarterValidationErrors] = useState<string[]>([]);
 
   const quarterlyCycles = useMemo(() => cycles.filter((c) => c.type === "QUARTERLY"), [cycles]);
 
@@ -486,6 +498,7 @@ export default function OkrAssistant() {
 
   const [tacticalDrafts, setTacticalDrafts] = useState<DraftTacticalObjective[]>([]);
   const [tacticalSaving, setTacticalSaving] = useState(false);
+  const [tacticalValidationErrors, setTacticalValidationErrors] = useState<string[]>([]);
 
   const tacticalObjectives = useMemo(() => {
     const all = qQuarterObjectives.data ?? [];
@@ -528,6 +541,9 @@ export default function OkrAssistant() {
       return n >= 1 && n <= 4;
     });
   }, [annualCycleId, annualKrCountsByObjective, annualObjectives, so2?.id]);
+
+  // Check if 2-year objective exists
+  const has2YearObjective = !!so2?.id;
 
   const quarterReady = useMemo(() => {
     if (!quarterCycleId) return false;
@@ -1000,7 +1016,17 @@ export default function OkrAssistant() {
               <Separator />
 
               <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-                Recomendamos revisão dos objetivos de longo prazo a cada 2 anos.
+                {!has2YearObjective ? (
+                  <div className="flex items-start gap-2 text-amber-700">
+                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                    <div>
+                      <div className="font-semibold">Objetivo de 2 anos obrigatório</div>
+                      <div className="mt-1">Complete a etapa 2 antes de criar objetivos anuais.</div>
+                    </div>
+                  </div>
+                ) : (
+                  "Revisamos os objetivos estratégicos do ano a cada trimestre."
+                )}
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1259,14 +1285,7 @@ export default function OkrAssistant() {
                             disabled={d.krs.length >= 4}
                             onClick={() =>
                               setAnnualDrafts((arr) =>
-                                arr.map((it, i) =>
-                                  i === idx
-                                    ? {
-                                        ...it,
-                                        krs: [...it.krs, { title: "", kind: "DELIVERABLE" }],
-                                      }
-                                    : it,
-                                ),
+                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
                               )
                             }
                           >
@@ -1277,7 +1296,7 @@ export default function OkrAssistant() {
                         <div className="grid gap-3">
                           {d.krs.map((kr, kIdx) => (
                             <div key={kIdx} className="rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="flex items-center justify-between gap-2">
                                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">KR #{kIdx + 1}</div>
                                 <Button
                                   variant="ghost"
@@ -1434,7 +1453,7 @@ export default function OkrAssistant() {
                 <div className="text-xs text-muted-foreground">Para avançar: tenha ao menos 1 objetivo anual conectado ao 2 anos, com 1–4 KRs.</div>
                 <Button
                   className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                  disabled={annualSaving || !annualCycleId || !so2?.id}
+                  disabled={annualSaving || !annualCycleId || !has2YearObjective}
                   onClick={async () => {
                     if (!annualCycleId || !so2?.id) return;
 
@@ -1444,19 +1463,18 @@ export default function OkrAssistant() {
                         title: o.title.trim(),
                         description: o.description.trim(),
                         krs: o.krs
-                          .map((k) => ({
-                            ...k,
-                            title: k.title.trim(),
-                            metric_unit: k.metric_unit.trim(),
-                            start_value: Number(String(k.start_value).replace(",", ".")),
-                            target_value: Number(String(k.target_value).replace(",", ".")),
-                          }))
+                          .map((k) => (k.kind === "METRIC" ? { ...k, title: k.title.trim(), metric_unit: k.metric_unit.trim() } : { ...k, title: k.title.trim() }))
                           .filter((k) => k.title.length >= 6),
                       }))
                       .filter((o) => o.title.length >= 6);
 
                     // Validações
                     const validationErrors: string[] = [];
+                    
+                    // Check if 2-year objective exists
+                    if (!so2?.id) {
+                      validationErrors.push("É obrigatório ter um objetivo de 2 anos antes de criar objetivos anuais. Complete a etapa 2.");
+                    }
                     
                     for (const o of trimmed) {
                       const result = validateAnnualObjective({
@@ -1470,7 +1488,7 @@ export default function OkrAssistant() {
                           department_id: null,
                           tier: null,
                           owner_user_id: user.id,
-                          moderator_user_id: null,
+                          moderator_user_id: annualModeratorId || null,
                           title: o.title,
                           description: o.description || null,
                           strategic_reason: null,
@@ -1496,7 +1514,7 @@ export default function OkrAssistant() {
                         },
                         krs: o.krs as any,
                         objectives2Year: strategyObjectives,
-                        admins: admins,
+                        admins: profiles.filter(p => p.role === "ADMIN" || p.role === "MASTERADMIN"),
                         cycleType: "ANNUAL",
                       });
 
@@ -1612,7 +1630,7 @@ export default function OkrAssistant() {
             title="Estratégico (neste trimestre)"
             lines={[
               "Estratégico = mudança que move o negócio (não apenas 'manter a operação').",
-              "Aqui, cada objetivo trimestral se conecta a um KR anual.",
+              "Aqui, cada objetivo trimestral se conecta aos <span className="font-medium text-[color:var(--sinaxys-ink)]">KRs anuais</span>.",
               "Governança: revisão mensal e acompanhamento semanal dos KRs.",
             ]}
           />
@@ -1813,8 +1831,35 @@ export default function OkrAssistant() {
               <Separator />
 
               <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-                Governança: revisão mensal e acompanhamento semanal dos KRs.
+                {!quarterModeratorId ? (
+                  <div className="flex items-start gap-2 text-amber-700">
+                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                    <div>
+                      <div className="font-semibold">Moderador obrigatório</div>
+                      <div className="mt-1">Selecione um moderador (usuário ADMIN) para governar os OKRs estratégicos.</div>
+                    </div>
+                  </div>
+                ) : (
+                  "Governança: revisão mensal e acompanhamento semanal dos KRs."
+                )}
               </div>
+
+              {/* Validation Errors */}
+              {quarterValidationErrors.length > 0 && (
+                <div className="rounded-2xl bg-red-50 border border-red-200 p-4">
+                  <div className="flex items-start gap-2 text-red-900">
+                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                    <div>
+                      <div className="font-semibold">Erros de validação</div>
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {quarterValidationErrors.map((error, idx) => (
+                          <li key={idx}>• {error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs text-muted-foreground">Para avançar: ao menos 1 objetivo trimestral com 2–4 KRs e alinhamento a KR anual.</div>
@@ -1838,12 +1883,40 @@ export default function OkrAssistant() {
                       return;
                     }
 
-                    const invalid = trimmed.some((o) => o.alignToKrId === SELECT_NONE || o.krs.length < 2 || o.krs.length > 4);
-                    if (invalid) {
-                      toast({ title: "Ajuste os campos", description: "Alinhe cada objetivo a um KR anual e mantenha 2–4 KRs.", variant: "destructive" });
+                    // Validations
+                    const validationErrors: string[] = [];
+                    
+                    for (const o of trimmed) {
+                      // Check moderator
+                      if (!quarterModeratorId) {
+                        validationErrors.push("Objetivo trimestral estratégico deve ter um moderador (usuário ADMIN)");
+                      }
+                      
+                      // Check KR alignment
+                      if (o.alignToKrId === SELECT_NONE) {
+                        validationErrors.push("Cada objetivo deve estar alinhado a um KR anual");
+                      }
+                      
+                      // Check KR count (minimum 2, maximum 4)
+                      if (o.krs.length < 2) {
+                        validationErrors.push("Objetivo trimestral estratégico deve ter no mínimo 2 KRs");
+                      }
+                      if (o.krs.length > 4) {
+                        validationErrors.push("Objetivo trimestral estratégico pode ter no máximo 4 KRs");
+                      }
+                    }
+                    
+                    if (validationErrors.length > 0) {
+                      setQuarterValidationErrors(validationErrors);
+                      toast({
+                        title: "Erros de validação",
+                        description: validationErrors.join(". "),
+                        variant: "destructive",
+                      });
                       return;
                     }
 
+                    setQuarterValidationErrors([]);
                     const annualKrById = new Map(annualKrs.map((k) => [k.id, k] as const));
 
                     try {
@@ -2091,6 +2164,7 @@ export default function OkrAssistant() {
                                       }),
                                     )
                                   }
+                                  placeholder="Ex.: reduzir churn de 8% para 5%"
                                 />
                               </div>
                             </div>
@@ -2105,8 +2179,43 @@ export default function OkrAssistant() {
               <Separator />
 
               <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
-                Governança: revisão mensal e acompanhamento semanal.
+                {tacticalDrafts.some(d => (d.departmentIds?.length || 0) === 0) ? (
+                  <div className="flex items-start gap-2 text-amber-700">
+                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                    <div>
+                      <div className="font-semibold">Departamentos obrigatórios</div>
+                      <div className="mt-1">Cada objetivo tático deve ter pelo menos 1 departamento.</div>
+                    </div>
+                  </div>
+                ) : tacticalDrafts.some(d => (d.ownerUserIds?.length || 0) === 0) ? (
+                  <div className="flex items-start gap-2 text-amber-700">
+                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                    <div>
+                      <div className="font-semibold">Responsáveis obrigatórios</div>
+                      <div className="mt-1">Cada objetivo tático deve ter pelo menos 1 responsável (head ou admin).</div>
+                    </div>
+                  </div>
+                ) : (
+                  "Governança: revisão mensal e acompanhamento semanal."
+                )}
               </div>
+
+              {/* Validation Errors */}
+              {tacticalValidationErrors.length > 0 && (
+                <div className="rounded-2xl bg-red-50 border border-red-200 p-4">
+                  <div className="flex items-start gap-2 text-red-900">
+                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-red-500" />
+                    <div>
+                      <div className="font-semibold">Erros de validação</div>
+                      <ul className="mt-2 space-y-1 text-sm">
+                        {tacticalValidationErrors.map((error, idx) => (
+                          <li key={idx}>• {error}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-xs text-muted-foreground">Para avançar: ao menos 1 objetivo tático alinhado, com pelo menos 1 KR.</div>
@@ -2130,12 +2239,47 @@ export default function OkrAssistant() {
                       return;
                     }
 
-                    const invalid = trimmed.some((o) => o.alignToKrId === SELECT_NONE || o.departmentId === SELECT_NONE || !o.krs.length);
-                    if (invalid) {
-                      toast({ title: "Ajuste os campos", description: "Escolha departamento, alinhamento e ao menos 1 KR.", variant: "destructive" });
+                    // Validations
+                    const validationErrors: string[] = [];
+                    
+                    for (const o of trimmed) {
+                      // Check departments
+                      const deptIds = o.departmentIds || (o.departmentId ? [o.departmentId] : []);
+                      if (deptIds.length === 0) {
+                        validationErrors.push("Objetivo tático deve ter pelo menos 1 departamento");
+                      }
+                      
+                      // Check owners
+                      const ownerIds = o.ownerUserIds || (o.ownerUserId ? [o.ownerUserId] : []);
+                      if (ownerIds.length === 0) {
+                        validationErrors.push("Objetivo tático deve ter pelo menos 1 responsável");
+                      }
+                      
+                      // Check KR alignment
+                      if (o.alignToKrId === SELECT_NONE) {
+                        validationErrors.push("Cada objetivo deve estar alinhado a um KR estratégico trimestral");
+                      }
+                      
+                      // Check KR count (minimum 1, maximum 4)
+                      if (o.krs.length < 1) {
+                        validationErrors.push("Objetivo tático deve ter pelo menos 1 KR");
+                      }
+                      if (o.krs.length > 4) {
+                        validationErrors.push("Objetivo tático pode ter no máximo 4 KRs");
+                      }
+                    }
+                    
+                    if (validationErrors.length > 0) {
+                      setTacticalValidationErrors(validationErrors);
+                      toast({
+                        title: "Erros de validação",
+                        description: validationErrors.join(". "),
+                        variant: "destructive",
+                      });
                       return;
                     }
 
+                    setTacticalValidationErrors([]);
                     const qKrById = new Map(quarterKrs.map((k) => [k.id, k] as const));
 
                     try {
