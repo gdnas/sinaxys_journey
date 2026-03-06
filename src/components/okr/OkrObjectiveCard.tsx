@@ -2,7 +2,7 @@ import { TierBadge } from "@/components/okr";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowRight, ChevronDown, ChevronUp, KeyRound, Link2, Pencil, Plus, Trash2, Check, User as UserIcon } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, KeyRound, Link2, Pencil, Plus, Trash2, Check, User as UserIcon, Building2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ function defaultLevelBadge(level: ObjectiveLevel) {
   return (
     <div className="flex items-center gap-2">
       <span className={"rounded-full px-3 py-1 text-[11px] font-semibold " + objectiveTypeBadgeClass(level)}>{objectiveTypeLabel(level)}</span>
-      <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
+      <span className={"rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]"}>
         {objectiveLevelLabel(level)}
       </span>
     </div>
@@ -350,8 +350,14 @@ export function OkrObjectiveCard(props: {
                         type="button"
                         className="rounded-md px-3 py-2 text-sm text-left hover:bg-accent/5"
                         onClick={() => {
-                          setOpen(true);
-                          setTimeout(() => onRequestAddPi && onRequestAddPi(objective.id), 50);
+                          // prefer parent handler, otherwise open our internal KPI dialog
+                          if (onRequestAddPi) {
+                            setOpen(true);
+                            setTimeout(() => onRequestAddPi(objective.id), 50);
+                          } else {
+                            // open internal PI dialog
+                            openNewPi(objective.id);
+                          }
                         }}
                       >
                         Adicionar KPI
@@ -390,13 +396,25 @@ export function OkrObjectiveCard(props: {
                   const isKrOpen = openKrIds.has(kr.id);
 
                   const ownerName = kr.owner_user_id ? (byUserId?.get(kr.owner_user_id)?.name ?? "—") : "—";
+                  const ownerDeptId = kr.owner_user_id ? byUserId?.get(kr.owner_user_id)?.departmentId ?? null : null;
+                  const ownerDeptName = ownerDeptId ? deptNameById.get(ownerDeptId) ?? null : null;
 
                   return (
                     <div key={kr.id} className="grid gap-2">
                       <div
                         className="group rounded-2xl border bg-white p-4 transition cursor-pointer"
                         style={{ borderColor: accent.border as any }}
-                        onClick={() => setEditingKr(kr)}
+                        onClick={() => {
+                          // If this is a strategic KR with linked team objectives, toggle the linked objectives view;
+                          // otherwise open the KR editor.
+                          if (objective.level === "COMPANY" && aligned.length > 0) {
+                            const next = new Set(openKrIds);
+                            if (next.has(kr.id)) next.delete(kr.id); else next.add(kr.id);
+                            setOpenKrIds(next);
+                          } else {
+                            setEditingKr(kr);
+                          }
+                        }}
                         onMouseEnter={(e) => {
                           (e.currentTarget as HTMLDivElement).style.borderColor = String(accent.accent);
                         }}
@@ -415,6 +433,9 @@ export function OkrObjectiveCard(props: {
                               <div className="flex items-center gap-1">
                                 <UserIcon className="h-3.5 w-3.5" />
                                 <span>{ownerName}</span>
+                                {ownerDeptName ? (
+                                  <span className="flex items-center gap-1 text-xs text-muted-foreground">• <Building2 className="h-3 w-3" /> {ownerDeptName}</span>
+                                ) : null}
                               </div>
                               <div>•</div>
                               {pct !== null ? <div>{pct}%</div> : <div>—</div>}
@@ -520,7 +541,7 @@ export function OkrObjectiveCard(props: {
                         <div className="flex items-start gap-3">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs text-muted-foreground">KPI</span>
+                              <KeyRound className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
                               <span className="font-semibold text-[color:var(--sinaxys-ink)] line-clamp-2">{pi.title}</span>
                             </div>
 
