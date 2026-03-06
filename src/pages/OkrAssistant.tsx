@@ -1081,13 +1081,21 @@ export default function OkrAssistant() {
                         parentId: string | null,
                       ) => {
                         const trimmed = title.trim();
+                        // Se o título estiver vazio e não existir registro, retorna null (opcional)
+                        if (!trimmed && !existing?.id) {
+                          return null;
+                        }
+                        
                         if (existing?.id) {
+                          // Se o título ficar vazio e existir registro, atualiza com título vazio
                           await updateStrategyObjective(existing.id, {
                             title: trimmed,
                             parent_strategy_objective_id: parentId,
                           });
                           return existing.id;
                         }
+                        
+                        // Cria novo registro apenas se o título não estiver vazio
                         const created = await createStrategyObjective({
                           company_id: cid,
                           horizon_years: horizon,
@@ -1099,7 +1107,7 @@ export default function OkrAssistant() {
                         return created.id;
                       };
 
-                      // Cascata: 10 anos → 5 anos → 2 anos
+                      // Cascata: 10 anos → 5 anos → 2 anos (todos opcionais exceto 2 anos)
                       const id10 = await upsertOne(so10, 10, so10Text, null);
                       const id5 = await upsertOne(so5, 5, so5Text, id10);
                       await upsertOne(so2, 2, so2Text, id5);
@@ -1348,7 +1356,7 @@ export default function OkrAssistant() {
                                       ),
                                     )
                                   }
-                                  disabled={d.krs.length <= 2}
+                                  disabled={d.krs.length <= 1}
                                 >
                                   Remover
                                 </Button>
@@ -2821,3 +2829,5 @@ export default function OkrAssistant() {
               </div>
             );
           }
+
+}
