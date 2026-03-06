@@ -68,9 +68,12 @@ import {
   type ValidateQuarterlyTier1ObjectiveParams,
   type ValidateQuarterlyTier2ObjectiveParams,
 } from "@/lib/okrValidation";
+import { syncObjectiveDepartments } from "@/lib/okrDb";
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
+import { UserMultiSelect } from "@/components/okr/UserMultiSelect";
+import { DepartmentMultiSelect } from "@/components/okr/DepartmentMultiSelect";
 
 type StepId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -97,7 +100,9 @@ type DraftObjective = {
 
 type DraftTacticalObjective = DraftObjective & {
   departmentId: string;
+  departmentIds?: string[]; // Support multiple departments
   ownerUserId: string;
+  ownerUserIds?: string[]; // Support multiple owners
 };
 
 type DraftDeliverable = {
@@ -395,6 +400,9 @@ export default function OkrAssistant() {
   const [annualValidationErrors, setAnnualValidationErrors] = useState<string[]>([]);
 
   const annualCycles = useMemo(() => cycles.filter((c) => c.type === "ANNUAL"), [cycles]);
+  
+  // Filter only admins for moderator selection
+  const admins = useMemo(() => profiles.filter(p => p.role === "ADMIN" || p.role === "MASTERADMIN"), [profiles]);
 
   useEffect(() => {
     const y = Number(annualYear);
@@ -433,6 +441,7 @@ export default function OkrAssistant() {
   const [quarterCycleId, setQuarterCycleId] = useState<string>("");
   const [quarterDrafts, setQuarterDrafts] = useState<DraftObjective[]>([]);
   const [quarterSaving, setQuarterSaving] = useState(false);
+  const [quarterModeratorId, setQuarterModeratorId] = useState<string>("");
 
   const quarterlyCycles = useMemo(() => cycles.filter((c) => c.type === "QUARTERLY"), [cycles]);
 
@@ -1276,7 +1285,12 @@ export default function OkrAssistant() {
                                   onClick={() =>
                                     setAnnualDrafts((arr) =>
                                       arr.map((it, i) =>
-                                        i === idx ? { ...it, krs: it.krs.filter((_, j) => j !== kIdx) } : it,
+                                        i === idx
+                                          ? {
+                                              ...it,
+                                              krs: it.krs.filter((_, j) => j !== kIdx),
+                                            }
+                                          : it,
                                       ),
                                     )
                                   }
@@ -1296,7 +1310,7 @@ export default function OkrAssistant() {
                                       arr.map((it, i) => {
                                         if (i !== idx) return it;
                                         const next = [...it.krs];
-                                        next[kIdx] = { ...next[kIdx], title: e.target.value } as DraftKr;
+                                        next[kIdx] = { ...next[kIdx], title: e.target.value };
                                         return { ...it, krs: next };
                                       }),
                                     )
@@ -1315,9 +1329,15 @@ export default function OkrAssistant() {
                                         if (i !== idx) return it;
                                         const next = [...it.krs];
                                         if (v === "METRIC") {
-                                          next[kIdx] = { title: kr.title, kind: "METRIC", metric_unit: "", start_value: "", target_value: "" };
+                                          next[kIdx] = {
+                                            ...next[kIdx],
+                                            kind: "METRIC",
+                                            metric_unit: "",
+                                            start_value: "",
+                                            target_value: "",
+                                          };
                                         } else {
-                                          next[kIdx] = { title: kr.title, kind: "DELIVERABLE" };
+                                          next[kIdx] = { ...next[kIdx], kind: "DELIVERABLE" };
                                         }
                                         return { ...it, krs: next };
                                       }),
@@ -1424,7 +1444,13 @@ export default function OkrAssistant() {
                         title: o.title.trim(),
                         description: o.description.trim(),
                         krs: o.krs
-                          .map((k) => (k.kind === "METRIC" ? { ...k, title: k.title.trim(), metric_unit: k.metric_unit.trim() } : { ...k, title: k.title.trim() }))
+                          .map((k) => ({
+                            ...k,
+                            title: k.title.trim(),
+                            metric_unit: k.metric_unit.trim(),
+                            start_value: Number(String(k.start_value).replace(",", ".")),
+                            target_value: Number(String(k.target_value).replace(",", ".")),
+                          }))
                           .filter((k) => k.title.length >= 6),
                       }))
                       .filter((o) => o.title.length >= 6);
@@ -1470,7 +1496,7 @@ export default function OkrAssistant() {
                         },
                         krs: o.krs as any,
                         objectives2Year: strategyObjectives,
-                        admins: profiles.filter(p => p.role === "ADMIN" || p.role === "MASTERADMIN"),
+                        admins: admins,
                         cycleType: "ANNUAL",
                       });
 
@@ -1529,8 +1555,8 @@ export default function OkrAssistant() {
 
                         for (const kr of o.krs) {
                           const kind = kr.kind as KrKind;
-                          const start = kind === "METRIC" ? Number(String((kr as Extract<DraftKr, { kind: "METRIC" }>).start_value).replace(",", ".")) : null;
-                          const target = kind === "METRIC" ? Number(String((kr as Extract<DraftKr, { kind: "METRIC" }>).target_value).replace(",", ".")) : null;
+                          const start = kind === "METRIC" ? Number(String(kr.start_value).replace(",", ".")) : null;
+                          const target = kind === "METRIC" ? Number(String(kr.target_value).replace(",", ".")) : null;
 
                           await createKeyResult({
                             objective_id: created.id,
@@ -1538,7 +1564,7 @@ export default function OkrAssistant() {
                             kind,
                             due_at: null,
                             achieved: false,
-                            metric_unit: kind === "METRIC" ? (kr as Extract<DraftKr, { kind: "METRIC" }>).metric_unit || null : null,
+                            metric_unit: kind === "METRIC" ? kr.metric_unit : null,
                             start_value: kind === "METRIC" && Number.isFinite(start) ? start : null,
                             current_value: kind === "METRIC" && Number.isFinite(start) ? start : null,
                             target_value: kind === "METRIC" && Number.isFinite(target) ? target : null,
@@ -1834,7 +1860,7 @@ export default function OkrAssistant() {
                           level: "COMPANY" as ObjectiveLevel,
                           department_id: null,
                           tier: "TIER1" as const,
-                          moderator_user_id: null,
+                          moderator_user_id: quarterModeratorId || null,
                           owner_user_id: user.id,
                           title: o.title,
                           description: o.description || null,
@@ -1931,7 +1957,9 @@ export default function OkrAssistant() {
                       ...d,
                       {
                         departmentId: departments[0]?.id ?? SELECT_NONE,
+                        departmentIds: [],
                         ownerUserId: user.id,
+                        ownerUserIds: [],
                         title: "",
                         description: "",
                         alignToKrId: SELECT_NONE,
@@ -1964,35 +1992,29 @@ export default function OkrAssistant() {
 
                     <div className="mt-4 grid gap-3">
                       <div className="grid gap-2">
-                        <Label>Departamento</Label>
-                        <Select value={d.departmentId} onValueChange={(v) => setTacticalDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, departmentId: v } : it)))}>
-                          <SelectTrigger className="h-11 rounded-xl">
-                            <SelectValue placeholder="Selecione" />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl">
-                            {departments.map((dep) => (
-                              <SelectItem key={dep.id} value={dep.id}>
-                                {dep.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label>Departamento(s)</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Objetivos táticos podem ter múltiplos departamentos envolvidos
+                        </p>
+                        <DepartmentMultiSelect
+                          departments={departments}
+                          value={d.departmentIds || []}
+                          onChange={(ids) => setTacticalDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, departmentIds: ids } : it)))}
+                          placeholder="Selecione departamentos..."
+                        />
                       </div>
 
                       <div className="grid gap-2">
-                        <Label>Responsável</Label>
-                        <Select value={d.ownerUserId} onValueChange={(v) => setTacticalDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, ownerUserId: v } : it)))}>
-                          <SelectTrigger className="h-11 rounded-xl bg-white">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="rounded-2xl">
-                            {profiles.map((p) => (
-                              <SelectItem key={p.id} value={p.id}>
-                                {(p.name ?? p.email) || p.id}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label>Responsável(is)</Label>
+                        <p className="text-xs text-muted-foreground">
+                          Objetivos táticos podem ter múltiplos responsáveis (heads ou admins)
+                        </p>
+                        <UserMultiSelect
+                          users={profiles}
+                          value={d.ownerUserIds || []}
+                          onChange={(ids) => setTacticalDrafts((arr) => arr.map((it, i) => (i === idx ? { ...it, ownerUserIds: ids } : it)))}
+                          placeholder="Selecione responsáveis..."
+                        />
                       </div>
 
                       <div className="grid gap-2">
@@ -2012,7 +2034,6 @@ export default function OkrAssistant() {
                             <SelectValue placeholder="Selecione um KR" />
                           </SelectTrigger>
                           <SelectContent className="rounded-2xl">
-                            <SelectItem value={SELECT_NONE}>Selecione…</SelectItem>
                             {quarterKrs.map((kr) => (
                               <SelectItem key={kr.id} value={kr.id}>
                                 {kr.title}
@@ -2123,16 +2144,21 @@ export default function OkrAssistant() {
                         const parentKr = qKrById.get(o.alignToKrId);
                         const parentObjectiveId = parentKr?.objective_id ?? null;
 
+                        // Use first department for the objective, but will sync all via objective_departments
+                        const primaryDepartmentId = o.departmentIds?.[0] || o.departmentId || null;
+                        // Use first owner for the objective field
+                        const primaryOwnerId = o.ownerUserIds?.[0] || o.ownerUserId || user.id;
+
                         const created = await createOkrObjective({
                           company_id: cid,
                           cycle_id: quarterCycleId,
                           parent_objective_id: parentObjectiveId,
                           strategy_objective_id: null,
                           level: "DEPARTMENT" as ObjectiveLevel,
-                          department_id: o.departmentId,
+                          department_id: primaryDepartmentId,
                           tier: "TIER2" as const,
                           moderator_user_id: null,
-                          owner_user_id: o.ownerUserId,
+                          owner_user_id: primaryOwnerId,
                           title: o.title,
                           description: o.description || null,
                           strategic_reason: null,
@@ -2150,6 +2176,11 @@ export default function OkrAssistant() {
                         });
 
                         await linkObjectiveToKr(o.alignToKrId, created.id);
+
+                        // Sync multiple departments if provided
+                        if (o.departmentIds && o.departmentIds.length > 0) {
+                          await syncObjectiveDepartments(created.id, o.departmentIds);
+                        }
 
                         for (const kr of o.krs) {
                           await createKeyResult({
