@@ -75,6 +75,8 @@ import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { UserMultiSelect } from "@/components/okr/UserMultiSelect";
 import { DepartmentMultiSelect } from "@/components/okr/DepartmentMultiSelect";
+import { PerformanceIndicatorEditor } from "@/components/okr/PerformanceIndicatorEditor";
+import { PerformanceIndicatorDraft, type DraftPerformanceIndicator } from "@/components/okr/PerformanceIndicatorDraft";
 
 type StepId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -95,6 +97,7 @@ type DraftObjective = {
   title: string;
   description: string;
   krs: DraftKr[];
+  performanceIndicators: DraftPerformanceIndicator[];
   // Alignment
   alignToKrId: string;
 };
@@ -382,11 +385,12 @@ export default function OkrAssistant() {
   const [soSaving, setSoSaving] = useState(false);
 
   useEffect(() => {
-    setSo10Text((so10?.title ?? "").trim());
-    setSo5Text((so5?.title ?? "").trim());
-    setSo2Text((so2?.title ?? "").trim());
-    setSoSaved(!!(so10?.id && so5?.id && so2?.id));
-  }, [so10?.id, so10?.title, so2?.id, so2?.title, so5?.id, so5?.title]);
+      setSo10Text((so10?.title ?? "").trim());
+      setSo5Text((so5?.title ?? "").trim());
+      setSo2Text((so2?.title ?? "").trim());
+      // Apenas 2 anos é obrigatório
+      setSoSaved(!!so2?.id);
+    }, [so10?.id, so10?.title, so2?.id, so2?.title, so5?.id, so5?.title]);
 
   const coherence10to5 = useMemo(() => semanticCoherenceHint(so10Text, so5Text), [so10Text, so5Text]);
   const coherence5to2 = useMemo(() => semanticCoherenceHint(so5Text, so2Text), [so5Text, so2Text]);
@@ -1776,16 +1780,16 @@ export default function OkrAssistant() {
 
                       <div className="grid gap-2">
                         <div className="flex items-center justify-between gap-2">
-                          <Label>KRs do trimestre (2 a 4)</Label>
-                          <Button
-                            variant="outline"
-                            className="h-9 rounded-xl bg-white"
-                            disabled={d.krs.length >= 4}
-                            onClick={() =>
-                              setQuarterDrafts((arr) =>
-                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
-                              )
-                            }
+                          <Label>KRs estratégicos (1 a 5)</Label>
+                                                    <Button
+                                                      variant="outline"
+                                                      className="h-9 rounded-xl bg-white"
+                                                      disabled={d.krs.length >= 5}
+                                                      onClick={() =>
+                                                        setQuarterDrafts((arr) =>
+                                                          arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
+                                                        )
+                                                      }
                           >
                             + KR
                           </Button>
@@ -2142,15 +2146,16 @@ export default function OkrAssistant() {
 
                       <div className="grid gap-2">
                         <div className="flex items-center justify-between gap-2">
-                          <Label>KRs táticos (mínimo 1)</Label>
-                          <Button
-                            variant="outline"
-                            className="h-9 rounded-xl bg-white"
-                            onClick={() =>
-                              setTacticalDrafts((arr) =>
-                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
-                              )
-                            }
+                          <Label>KRs táticos (1 a 5)</Label>
+                                                    <Button
+                                                      variant="outline"
+                                                      className="h-9 rounded-xl bg-white"
+                                                      disabled={d.krs.length >= 5}
+                                                      onClick={() =>
+                                                        setTacticalDrafts((arr) =>
+                                                          arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
+                                                        )
+                                                      }
                           >
                             + KR
                           </Button>
@@ -2284,13 +2289,13 @@ export default function OkrAssistant() {
                         validationErrors.push("Cada objetivo deve estar alinhado a um KR estratégico trimestral");
                       }
                       
-                      // Check KR count (minimum 1, maximum 4)
-                      if (o.krs.length < 1) {
-                        validationErrors.push("Objetivo tático deve ter pelo menos 1 KR");
-                      }
-                      if (o.krs.length > 4) {
-                        validationErrors.push("Objetivo tático pode ter no máximo 4 KRs");
-                      }
+                      // Check KR count (minimum 1, maximum 5)
+                                            if (o.krs.length < 1) {
+                                              validationErrors.push("Objetivo tático deve ter pelo menos 1 KR");
+                                            }
+                                            if (o.krs.length > 5) {
+                                              validationErrors.push("Objetivo tático pode ter no máximo 5 KRs");
+                                            }
                     }
                     
                     if (validationErrors.length > 0) {
@@ -2701,6 +2706,33 @@ export default function OkrAssistant() {
             ) : null}
             {step === 5 ? (
               <Badge className={clsx("rounded-full", tacticalReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{tacticalReady ? "OK" : "Ajustar"}</Badge>
+            ) : null}
+            {step === 6 ? (
+              <Badge className={clsx("rounded-full", deliverablesReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{deliverablesReady ? "OK" : "Ajustar"}</Badge>
+            ) : null}
+          </div>
+
+          <Button
+            className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+            onClick={onNext}
+            disabled={
+              (step === 1 && !canGoStep2) ||
+              (step === 2 && !canGoStep3) ||
+              (step === 3 && !annualReady) ||
+              (step === 4 && !quarterReady) ||
+              (step === 5 && !tacticalReady) ||
+              (step === 6 && !deliverablesReady) ||
+              step === 7
+            }
+          >
+            Avançar
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+}, tacticalReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{tacticalReady ? "OK" : "Ajustar"}</Badge>
             ) : null}
             {step === 6 ? (
               <Badge className={clsx("rounded-full", deliverablesReady ? "bg-emerald-100 text-emerald-900" : "bg-amber-100 text-amber-900")}>{deliverablesReady ? "OK" : "Ajustar"}</Badge>
