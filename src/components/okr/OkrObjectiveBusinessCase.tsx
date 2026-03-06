@@ -72,7 +72,7 @@ export function OkrObjectiveBusinessCase({
   const isTier1 = objective.level === "COMPANY";
   const linkedObjectiveIds = useMemo(() => linkedObjectives.map((o) => o.id), [linkedObjectives]);
 
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   const { data: profiles = [] } = useQuery({
     queryKey: ["profiles", companyId],

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { GripVertical, User as UserIcon } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -25,12 +25,20 @@ export default function DeliverableTimeline({
   deliverables,
   onBarClick,
   onReschedule,
+  showHeader = true,
 }: {
   deliverables: Deliverable[];
   onBarClick: (id: string) => void;
   onReschedule: (id: string, startIso: string | null, dueIso: string | null) => Promise<void>;
+  showHeader?: boolean;
 }) {
-  const [viewMode, setViewMode] = useState<"list" | "gantt">("gantt");
+  const [viewMode, setViewMode] = useState<"list" | "gantt">("list");
+  
+  // Set initial viewMode based on screen width
+  useEffect(() => {
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+    setViewMode(isDesktop ? "gantt" : "list");
+  }, []);
   
   // Estado para drag & resize
   const [dragState, setDragState] = useState<{
@@ -46,15 +54,17 @@ export default function DeliverableTimeline({
   }>({ id: null, isDragging: false, isResizing: false, isResizingLeft: false, startX: 0, originalStart: null, originalDue: null, newStart: null, newDue: null });
 
   // Calcular o intervalo de tempo
-  const { minDate, maxDate, months, dayWidth } = useMemo(() => {
+  const { minDate, maxDate, months, dayWidth, leftColWidth } = useMemo(() => {
     const dates = deliverables.flatMap(d => [d.start_date, d.due_at].filter(Boolean) as string[]);
     if (dates.length === 0) {
       const now = new Date();
+      const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
       return {
         minDate: new Date(now.getFullYear(), now.getMonth(), 1),
         maxDate: new Date(now.getFullYear(), now.getMonth() + 2, 0),
         months: [now],
         dayWidth: 30,
+        leftColWidth: isDesktop ? "12rem" : "10rem",
       };
     }
     const min = new Date(Math.min(...dates.map(d => new Date(d).getTime())));
@@ -74,7 +84,11 @@ export default function DeliverableTimeline({
     const totalDays = Math.max(30, Math.ceil((max.getTime() - min.getTime()) / (1000 * 60 * 60 * 24)));
     const dayWidth = Math.max(30, Math.min(50, 1200 / totalDays));
     
-    return { minDate: min, maxDate: max, months, dayWidth };
+    // Responsive left column width
+    const isDesktop = window.matchMedia("(min-width: 1024px)").matches;
+    const leftColWidth = isDesktop ? "12rem" : "10rem";
+    
+    return { minDate: min, maxDate: max, months, dayWidth, leftColWidth };
   }, [deliverables]);
 
   // Formatar data
@@ -221,29 +235,29 @@ export default function DeliverableTimeline({
                 {d.ownerAvatar ? (
                   <AvatarImage src={d.ownerAvatar} alt={d.ownerName} />
                 ) : null}
-                <AvatarFallback>{initials}</AvatarFallback>
+                <AvatarFallback aria-label={d.ownerName || "Sem responsável"}>{initials}</AvatarFallback>
               </Avatar>
               
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
-                  <div className="text-xs text-muted-foreground">{d.due_at ? formatDate(d.due_at) : "Sem prazo"}</div>
+                  <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]" title={d.title}>{d.title}</div>
+                  <div className="text-xs text-muted-foreground" title={d.due_at ? formatDate(d.due_at) : "Sem prazo"}>{d.due_at ? formatDate(d.due_at) : "Sem prazo"}</div>
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
+                  <span className="flex items-center gap-1" title={d.ownerName || "Sem responsável"}>
                     <UserIcon className="h-3 w-3" />
                     {d.ownerName || "Sem responsável"}
                   </span>
-                  {d.start_date ? <span>Início: {formatDate(d.start_date)}</span> : null}
-                  {d.due_at ? <span>Prazo: {formatDate(d.due_at)}</span> : null}
+                  {d.start_date ? <span title={`Início: ${formatDate(d.start_date)}`}>Início: {formatDate(d.start_date)}</span> : null}
+                  {d.due_at ? <span title={`Prazo: ${formatDate(d.due_at)}`}>Prazo: {formatDate(d.due_at)}</span> : null}
                 </div>
 
                 {d.tasks && d.tasks.length ? (
                   <div className="mt-3 space-y-2">
                     {d.tasks.map(t => (
                       <div key={t.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-3 text-sm flex items-center justify-between">
-                        <div className="min-w-0 truncate">{t.title}</div>
-                        <div className="text-xs text-muted-foreground">{t.ownerName ?? "—"}</div>
+                        <div className="min-w-0 truncate" title={t.title}>{t.title}</div>
+                        <div className="text-xs text-muted-foreground" title={t.ownerName ?? "—"}>{t.ownerName ?? "—"}</div>
                       </div>
                     ))}
                   </div>
@@ -276,7 +290,7 @@ export default function DeliverableTimeline({
         <div className="relative min-w-max">
           {/* Cabeçalho com meses */}
           <div className="flex border-b border-[color:var(--sinaxys-border)]">
-            <div className="w-48 flex-shrink-0 p-2 text-xs font-semibold text-muted-foreground sticky left-0 bg-[color:var(--sinaxys-bg)] z-10">
+            <div className="flex-shrink-0 p-2 text-xs font-semibold text-muted-foreground sticky left-0 bg-[color:var(--sinaxys-bg)] z-10" style={{ width: leftColWidth }}>
               Entregável
             </div>
             <div className="flex">
@@ -294,7 +308,7 @@ export default function DeliverableTimeline({
 
           {/* Linha do dia atual */}
           <div className="relative h-10 border-b border-[color:var(--sinaxys-border)]">
-            <div className="absolute top-0 bottom-0 w-px bg-red-500 z-5" style={{ left: `calc(12rem + ${todayOffset}px)` }}>
+            <div className="absolute top-0 bottom-0 w-px bg-red-500 z-5" style={{ left: `calc(${leftColWidth} + ${todayOffset}px)` }}>
               <div className="absolute -top-1 -left-1 w-2 h-2 bg-red-500 rounded-full" />
             </div>
           </div>
@@ -339,7 +353,7 @@ export default function DeliverableTimeline({
               return (
                 <div key={d.id} className="relative flex items-center h-14 hover:bg-[color:var(--sinaxys-tint)]/20 transition">
                   {/* Nome do entregável */}
-                  <div className="w-48 flex-shrink-0 p-3 sticky left-0 bg-white z-10 border-r border-[color:var(--sinaxys-border)]">
+                  <div className="flex-shrink-0 p-3 sticky left-0 bg-white z-10 border-r border-[color:var(--sinaxys-border)]" style={{ width: leftColWidth }}>
                     <div className="flex items-center gap-2">
                       <Avatar className="h-6 w-6 flex-shrink-0">
                         {d.ownerAvatar ? (
@@ -348,9 +362,9 @@ export default function DeliverableTimeline({
                         <AvatarFallback className="text-[10px]">{initials}</AvatarFallback>
                       </Avatar>
                       <div className="min-w-0">
-                        <div className="truncate text-xs font-medium text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                        <div className="truncate text-xs font-medium text-[color:var(--sinaxys-ink)]" title={d.title}>{d.title}</div>
                         {d.ownerName ? (
-                          <div className="truncate text-[10px] text-muted-foreground">{d.ownerName}</div>
+                          <div className="truncate text-[10px] text-muted-foreground" title={d.ownerName}>{d.ownerName}</div>
                         ) : null}
                       </div>
                     </div>
@@ -370,7 +384,7 @@ export default function DeliverableTimeline({
                           onMouseDown={(e) => handleMouseDown(e as any, d, false, false)}
                           onTouchStart={(e) => handleMouseDown(e as any, d, false, false)}
                         >
-                          <span className="truncate px-2 text-xs font-medium text-white">{formatDate(d.due_at)}</span>
+                          <span className="truncate px-2 text-xs font-medium text-white" title={d.due_at ? formatDate(d.due_at) : "Sem data"}>{formatDate(d.due_at)}</span>
                         </div>
                         
                         {/* Handle de redimensionamento à esquerda */}
@@ -411,19 +425,34 @@ export default function DeliverableTimeline({
   };
 
   return (
-    <div>
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Timeline de Entregáveis</div>
-        <Select value={viewMode} onValueChange={(v: "list" | "gantt") => setViewMode(v)}>
-          <SelectTrigger className="h-9 w-[140px] rounded-xl">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="list">Lista</SelectItem>
-            <SelectItem value="gantt">Gantt</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+    <div data-testid="timeline-container">
+      {showHeader && (
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Timeline de Entregáveis</div>
+          <Select value={viewMode} onValueChange={(v: "list" | "gantt") => setViewMode(v)} data-testid="timeline-select">
+            <SelectTrigger className="h-9 w-[140px] rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="list">Lista</SelectItem>
+              <SelectItem value="gantt">Gantt</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {!showHeader && (
+        <div className="mb-3 flex items-center justify-end gap-3">
+          <Select value={viewMode} onValueChange={(v: "list" | "gantt") => setViewMode(v)} data-testid="timeline-select">
+            <SelectTrigger className="h-9 w-[140px] rounded-xl">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="list">Lista</SelectItem>
+              <SelectItem value="gantt">Gantt</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       
       {viewMode === "list" ? renderListView() : renderGanttView()}
       

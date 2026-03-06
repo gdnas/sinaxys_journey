@@ -1523,7 +1523,19 @@ function KrCard({
           <Separator className="my-5" />
 
           {/* Timeline de Gantt para os entregáveis */}
-          {/* Timeline is rendered at the objective level (not per-KR) to avoid duplication */}
+          <DeliverableTimeline
+            deliverables={deliverables.map(d => ({
+              id: d.id,
+              title: d.title,
+              start_date: d.start_date,
+              due_at: d.due_at,
+              ownerName: d.owner_user_id ? profileById.get(d.owner_user_id)?.name ?? "—" : null,
+              ownerAvatar: d.owner_user_id ? profileById.get(d.owner_user_id)?.avatarUrl ?? null : null,
+            }))}
+            onBarClick={(id) => window.location.href = `/okr/entregaveis/${id}`}
+            onReschedule={handleReschedule}
+            showHeader={true}
+          />
 
           <div className="grid gap-3">
             {deliverables.length ? (
@@ -1540,7 +1552,7 @@ function KrCard({
                           <ListChecks className="h-3.5 w-3.5" />
                           {d.tier}
                         </span>
-                        <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
+                        <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]" title={d.title}>{d.title}</div>
                       </div>
                       <div className="mt-1 text-xs text-muted-foreground">
                         Status: {statusLabel(d.status)}
@@ -1598,7 +1610,7 @@ function KrCard({
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t.title}</div>
+                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]" title={t.title}>{t.title}</div>
                                 <div className="flex items-center gap-2">
                                   <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{statusLabel(t.status)}</Badge>
                                   {editable ? (
