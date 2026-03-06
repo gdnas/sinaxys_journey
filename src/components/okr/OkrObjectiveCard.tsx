@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 
 import { krProgressPct, listKeyResults, listOkrObjectivesByIds, type DbOkrKeyResult, type DbOkrObjective, type ObjectiveLevel,
-  listPerformanceIndicators, createPerformanceIndicator, updatePerformanceIndicator, deletePerformanceIndicator, piProgressPct, type DbPerformanceIndicator,
+  listPerformanceIndicators, createPerformanceIndicator, updatePerformanceIndicator, deletePerformanceIndicator, piProgressPct, type DbPerformanceIndicator, updateDeliverableWithDates,
 } from "@/lib/okrDb";
 import { listLinkedObjectivesByKrIds } from "@/lib/okrAlignmentDb";
 import type { DbDepartment } from "@/lib/departmentsDb";
@@ -100,6 +100,7 @@ export function OkrObjectiveCard(props: {
   const [open, setOpen] = useState(false);
   const [editingKr, setEditingKr] = useState<DbOkrKeyResult | null>(null);
   const [openKrIds, setOpenKrIds] = useState<Set<string>>(() => new Set());
+  const [rescheduling, setRescheduling] = useState<Record<string, boolean>>({});
 
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -243,6 +244,24 @@ export function OkrObjectiveCard(props: {
     setPiConfidence(pi.confidence);
     setPiOpen(true);
   }
+
+  const handleReschedule = async (deliverableId: string, startIso: string | null, dueIso: string | null) => {
+    try {
+      setRescheduling((s) => ({ ...s, [deliverableId]: true }));
+      await updateDeliverableWithDates(deliverableId, { start_date: startIso ?? null, due_at: dueIso ?? null });
+      await qc.invalidateQueries({ queryKey: ["okr-deliverables", objective.id] });
+      await qc.invalidateQueries({ queryKey: ["okr-tasks-for-objective", objective.id] });
+      toast({ title: "Entregável reagendado" });
+    } catch (e) {
+      toast({ title: "Não foi possível reagendar", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+    } finally {
+      setRescheduling((s) => {
+        const n = { ...s };
+        delete n[deliverableId];
+        return n;
+      });
+    }
+  };
 
   return (
     <>
