@@ -3,6 +3,7 @@ import { TierBadge } from "@/components/okr/TierBadge";
 import { DepartmentMultiSelect } from "@/components/okr/DepartmentMultiSelect";
 import { UserMultiSelect } from "@/components/okr/UserMultiSelect";
 import { TaskHierarchyView } from "@/components/okr/TaskHierarchyView";
+import DeliverableTimeline from "@/components/okr/DeliverableTimeline";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp, ChevronRight, ListChecks, KeyRound, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";
@@ -58,6 +59,7 @@ import {
   type WorkStatus,
   deleteKeyResultCascade,
   deleteOkrObjectiveCascade,
+  updateDeliverableWithDates,
 } from "@/lib/okrDb";
 import { linkObjectiveToKr, listLinkedObjectivesByKrIds, listKrLinksByObjectiveId, unlinkObjectiveFromKr } from "@/lib/okrAlignmentDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
@@ -746,6 +748,7 @@ export default function OkrObjectiveDetail() {
                 setDeleteKrOpen(true);
               }}
               canAddDeliverable={canAddDeliverableForKr(kr)}
+              objectiveId={objectiveId}
             />
           ))
         ) : (
@@ -1301,6 +1304,7 @@ function KrCard({
   onToggleTask,
   onDeleteKr,
   canAddDeliverable,
+  objectiveId,
 }: {
   kr: DbOkrKeyResult;
   deliverables: DbDeliverable[];
@@ -1321,7 +1325,30 @@ function KrCard({
   onToggleTask: (t: DbTask) => void;
   onDeleteKr: () => void;
   canAddDeliverable: boolean;
+  objectiveId: string;
 }) {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const [rescheduling, setRescheduling] = useState<Record<string, boolean>>({});
+
+  const handleReschedule = async (deliverableId: string, startIso: string | null, dueIso: string | null) => {
+    try {
+      setRescheduling((s) => ({ ...s, [deliverableId]: true }));
+      await updateDeliverableWithDates(deliverableId, { start_date: startIso ?? null, due_at: dueIso ?? null });
+      await qc.invalidateQueries({ queryKey: ["okr-deliverables", objectiveId] });
+      await qc.invalidateQueries({ queryKey: ["okr-tasks-for-objective", objectiveId] });
+      toast({ title: "Entregável reagendado" });
+    } catch (e) {
+      toast({ title: "Não foi possível reagendar", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+    } finally {
+      setRescheduling((s) => {
+        const n = { ...s };
+        delete n[deliverableId];
+        return n;
+      });
+    }
+  };
+
   const pct = krProgressPct(kr);
   const unit = kr.metric_unit?.trim() ?? "";
   const unitSuffix = unit ? ` ${unit}` : "";
@@ -1491,6 +1518,30 @@ function KrCard({
       {open ? (
         <>
           <Separator className="my-5" />
+
+          {/* Timeline de Gantt para os entregáveis */}
+          {deliverables.length > 0 && (
+            <div className="mb-6">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Timeline de Entregáveis</div>
+              </div>
+              <DeliverableTimeline
+                deliverables={deliverables.map((d) => ({
+                  id: d.id,
+                  title: d.title,
+                  start_date: d.start_date,
+                  due_at: d.due_at,
+                }))}
+                onBarClick={(id) => {
+                  window.location.href = `/okr/entregaveis/${id}`;
+                }}
+                onReschedule={handleReschedule}
+              />
+              <div className="mt-2 text-xs text-muted-foreground">
+                Arraste as barras para reagendar. Use as bordas esquerda/direita para ajustar datas de início/término.
+              </div>
+            </div>
+          )}
 
           {isTier1 ? (
             <div className="mb-4 flex items-center justify-between gap-3">
