@@ -36,7 +36,10 @@ const App = () => {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot" element={<ForgotPassword />} />
+
+          {/* Accept both /change-password and legacy /password (used by guards) */}
           <Route path="/change-password" element={<ChangePassword />} />
+          <Route path="/password" element={<ChangePassword />} />
 
           {/* Authenticated routes */}
           <Route path="/dashboard" element={<AppHome />} />
