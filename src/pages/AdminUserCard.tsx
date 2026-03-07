@@ -659,12 +659,13 @@ export default function AdminUserCard() {
                 setAddingDoc(true);
                 try {
                   await createUserDocument({
-                    companyId: cid,
-                    userId,
-                    category: docCategory.trim() || "EMPRESA",
-                    title: docTitle,
-                    url: docUrl,
-                  });
+                                      companyId: cid,
+                                      userId,
+                                      category: docCategory.trim() || "EMPRESA",
+                                      title: docTitle,
+                                      url: docUrl,
+                                      kind: "LINK",
+                                    });
                   toast({ title: "Documento adicionado" });
                   await qc.invalidateQueries({ queryKey: ["user-documents", cid, userId] });
                   setAddDocOpen(false);

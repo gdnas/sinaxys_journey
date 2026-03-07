@@ -26,7 +26,7 @@ export default function HeadPerformanceDashboard() {
   const fetchScores = async () => {
     setLoading(true);
     try {
-      const data = await listPerformanceScores("", cycleId);
+      const data = await listPerformanceScores({ companyId: "", userId: cycleId });
       setScores(data);
     } catch (error) {
       console.error("Erro ao buscar scores:", error);
