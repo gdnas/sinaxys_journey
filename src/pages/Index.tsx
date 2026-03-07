@@ -53,7 +53,7 @@ function Landing() {
             </h1>
 
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70 md:text-base">
-              Sistema que conecta metas, pessoas, iniciativas e resultados em um único lugar.
+              Sistema que conecta metas, projetos, responsáveis e resultados em um único lugar.
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -72,7 +72,7 @@ function Landing() {
               </Button>
             </div>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <div className="mt-8 grid gap-3">
               <Metric label="Clareza" value="o que importa agora" />
               <Metric label="Ownership" value="quem responde pelo quê" />
               <Metric label="Decisão" value="com contexto e números" />
@@ -313,13 +313,8 @@ function Landing() {
               )}
             >
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-base font-semibold tracking-tight">{c.t}</div>
-                  <div className="mt-2 text-sm text-[color:var(--sinaxys-ink)]/70">{c.d}</div>
-                </div>
-                <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/5 ring-1 ring-[color:var(--sinaxys-border)] text-[color:var(--sinaxys-primary)]">
-                  {c.icon}
-                </div>
+                <div className="text-base font-semibold tracking-tight">{c.t}</div>
+                <div className="mt-2 text-sm text-[color:var(--sinaxys-ink)]/70">{c.d}</div>
               </div>
               <Button
                 asChild
@@ -413,5 +408,6 @@ export default function Index() {
 
   if (user.role === "MASTERADMIN") return <Navigate to="/master/overview" replace />;
 
-  return <Navigate to="/app" replace />;
+  // Redirect authenticated users to dashboard (was incorrectly pointing to /app)
+  return <Navigate to="/dashboard" replace />;
 }
