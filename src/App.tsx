@@ -70,6 +70,11 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import TestRunner from "./pages/TestRunner";
 import TrackEdit from "./pages/TrackEdit";
+import KnowledgeHome from "./pages/KnowledgeHome";
+import KnowledgeSpace from "./pages/KnowledgeSpace";
+import KnowledgePage from "./pages/KnowledgePage";
+import KnowledgeNewSpace from "./pages/KnowledgeNewSpace";
+import KnowledgeNewPage from "./pages/KnowledgeNewPage";
 
 const queryClient = new QueryClient();
 
@@ -449,6 +454,58 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <Integrations />
+                      </RequireAuth>
+                    }
+                  />
+
+                  {/* Knowledge Base */}
+                  <Route
+                    path="/knowledge"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="KNOWLEDGE">
+                          <KnowledgeHome />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/knowledge/new-space"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD"]}>
+                        <RequireCompanyModule moduleKey="KNOWLEDGE">
+                          <KnowledgeNewSpace />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/knowledge/space/:spaceId"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="KNOWLEDGE">
+                          <KnowledgeSpace />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/knowledge/space/:spaceId/new-page"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="KNOWLEDGE">
+                          <KnowledgeNewPage />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/knowledge/page/:pageId"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="KNOWLEDGE">
+                          <KnowledgePage />
+                        </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />
