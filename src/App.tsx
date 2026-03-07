@@ -73,6 +73,7 @@ import PerformanceScores from "./pages/PerformanceScores";
 import TestRunner from "./pages/TestRunner";
 import KnowledgeHub from "./pages/KnowledgeHub";
 import KnowledgePage from "./pages/KnowledgePage";
+import TrackEdit from "./pages/TrackEdit";
 
 const queryClient = new QueryClient();
 
@@ -609,6 +610,14 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD"]}>
                         <HeadTrackEdit />
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/tracks/:trackId/edit"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <TrackEdit />
                       </RequireAuth>
                     }
                   />
