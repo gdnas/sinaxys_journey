@@ -166,7 +166,7 @@ export default function KnowledgePage() {
 
   if (isLoading) {
     return (
-      <div className="flex h-[calc(100vh-8rem)]">
+      <div className="flex flex-col md:flex-row h-[calc(100vh-8rem)]">
         <div className="w-72 border-r p-4 space-y-4 hidden md:block">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
@@ -206,8 +206,10 @@ export default function KnowledgePage() {
 
   return (
     <div className="flex h-[calc(100vh-8rem)]">
-      {/* Left Sidebar */}
-      <KnowledgeSidebar />
+      {/* Left Sidebar - Hidden on mobile */}
+      <div className="hidden md:block">
+        <KnowledgeSidebar />
+      </div>
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
@@ -216,24 +218,24 @@ export default function KnowledgePage() {
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
-          className="border-b px-6 py-4"
+          className="border-b px-4 sm:px-6 py-4"
         >
           {/* Breadcrumbs */}
           {pagePath.length > 1 && (
-            <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-              <Link to="/knowledge" className="hover:underline">
+            <nav className="flex items-center gap-1 sm:gap-2 text-sm text-muted-foreground mb-2 overflow-x-auto">
+              <Link to="/knowledge" className="hover:underline whitespace-nowrap">
                 Conhecimento
               </Link>
               {pagePath.slice(0, -1).map((p, i) => (
-                <span key={p.id} className="flex items-center gap-2">
+                <span key={p.id} className="flex items-center gap-1 sm:gap-2 whitespace-nowrap">
                   <span>/</span>
-                  <Link to={`/knowledge/${p.id}`} className="hover:underline truncate max-w-[200px]">
+                  <Link to={`/knowledge/${p.id}`} className="hover:underline truncate max-w-[100px] sm:max-w-[200px]">
                     {p.title}
                   </Link>
                 </span>
               ))}
               <span>/</span>
-              <span className="text-foreground truncate max-w-[200px]">{page.title}</span>
+              <span className="text-foreground truncate max-w-[100px] sm:max-w-[200px]">{page.title}</span>
             </nav>
           )}
 
@@ -244,7 +246,7 @@ export default function KnowledgePage() {
                 <select
                   value={editedIcon}
                   onChange={(e) => setEditedIcon(e.target.value)}
-                  className="text-4xl bg-transparent border-0 cursor-pointer"
+                  className="text-3xl sm:text-4xl bg-transparent border-0 cursor-pointer"
                 >
                   {["📄", "📝", "📚", "📖", "📋", "📌", "🎯", "💡", "🔧", "📊", "🗂️", "📁"].map(
                     (emoji) => (
@@ -255,23 +257,23 @@ export default function KnowledgePage() {
                   )}
                 </select>
               ) : (
-                <span className="text-4xl">{page.icon}</span>
+                <span className="text-3xl sm:text-4xl">{page.icon}</span>
               )}
 
               {isEditing ? (
                 <Input
                   value={editedTitle}
                   onChange={(e) => setEditedTitle(e.target.value)}
-                  className="text-2xl font-bold px-0 border-0 focus-visible:ring-0 h-auto"
+                  className="text-xl sm:text-2xl font-bold px-0 border-0 focus-visible:ring-0 h-auto"
                   placeholder="Título da página"
                 />
               ) : (
-                <h1 className="text-2xl font-bold">{page.title}</h1>
+                <h1 className="text-xl sm:text-2xl font-bold">{page.title}</h1>
               )}
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <Button
                 variant="ghost"
                 size="icon"
@@ -317,7 +319,7 @@ export default function KnowledgePage() {
                     <Info className="h-4 w-4" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right">
+                <SheetContent side="right" className="w-full sm:w-80">
                   <SheetHeader>
                     <SheetTitle>Informações da página</SheetTitle>
                   </SheetHeader>
@@ -368,12 +370,12 @@ export default function KnowledgePage() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
-                className="flex items-center gap-2 mt-4"
+                className="flex items-center gap-2 mt-4 flex-col sm:flex-row"
               >
-                <Button onClick={handleSave} disabled={updateMutation.isPending}>
+                <Button onClick={handleSave} disabled={updateMutation.isPending} className="w-full sm:w-auto">
                   {updateMutation.isPending ? "Salvando..." : "Salvar"}
                 </Button>
-                <Button variant="outline" onClick={handleCancel}>
+                <Button variant="outline" onClick={handleCancel} className="w-full sm:w-auto">
                   Cancelar
                 </Button>
               </motion.div>
@@ -387,7 +389,7 @@ export default function KnowledgePage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.4 }}
-            className="max-w-4xl mx-auto px-6 py-8"
+            className="max-w-4xl mx-auto px-4 md:px-6 py-4 md:py-8"
           >
             <KnowledgeEditor
               content={editedContent}

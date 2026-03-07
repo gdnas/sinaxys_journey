@@ -42,7 +42,7 @@ export function KnowledgeHubSkeleton() {
   return (
     <div className="space-y-6">
       {/* Header Skeleton */}
-      <div className="flex items-start justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="space-y-2">
           <Skeleton className="h-9 w-64" />
           <Skeleton className="h-5 w-96" />
@@ -56,7 +56,7 @@ export function KnowledgeHubSkeleton() {
       {/* Favorites Skeleton */}
       <section>
         <Skeleton className="h-7 w-32 mb-4" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <KnowledgePageSkeleton />
           <KnowledgePageSkeleton />
           <KnowledgePageSkeleton />
@@ -66,7 +66,7 @@ export function KnowledgeHubSkeleton() {
       {/* Recent Pages Skeleton */}
       <section>
         <Skeleton className="h-7 w-32 mb-4" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <KnowledgePageSkeleton />
           <KnowledgePageSkeleton />
           <KnowledgePageSkeleton />
@@ -76,7 +76,7 @@ export function KnowledgeHubSkeleton() {
       {/* Spaces Skeleton */}
       <section>
         <Skeleton className="h-7 w-24 mb-4" />
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <KnowledgeSpaceSkeleton />
           <KnowledgeSpaceSkeleton />
           <KnowledgeSpaceSkeleton />

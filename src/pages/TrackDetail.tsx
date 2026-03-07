@@ -93,6 +93,15 @@ export default function TrackDetail() {
     enabled: !!trackId,
   });
 
+  // Permission: who can edit this track?
+  const canEdit = useMemo(() => {
+    if (!track) return false;
+    if (user.role === "ADMIN") return true;
+    if (user.role === "HEAD") return user.departmentId && track.department_id === user.departmentId;
+    if (user.role === "COLABORADOR") return track.created_by_user_id === user.id;
+    return false;
+  }, [user, track]);
+
   const { data: modules = [], isLoading: loadingModules } = useQuery({
     queryKey: ["modules", trackId],
     queryFn: () => getModulesByTrack(trackId),
@@ -142,19 +151,42 @@ export default function TrackDetail() {
           </Link>
         </Button>
 
-        {canChangeDept && track ? (
-          <Button
-            variant="outline"
-            className="rounded-xl"
-            onClick={() => {
-              setDeptNextId(track.department_id);
-              setDeptOpen(true);
-            }}
-          >
-            <Settings2 className="mr-2 h-4 w-4" />
-            Equipe responsável
-          </Button>
-        ) : null}
+        <div className="flex items-center gap-2">
+          {canChangeDept && track ? (
+            <Button
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => {
+                setDeptNextId(track.department_id);
+                setDeptOpen(true);
+              }}
+            >
+              <Settings2 className="mr-2 h-4 w-4" />
+              Equipe responsável
+            </Button>
+          ) : null}
+
+          {canEdit && track ? (
+            <Button
+              asChild
+              variant="outline"
+              className="rounded-xl"
+              onClick={() => {
+                // navigate to appropriate edit route
+                if (user.role === "ADMIN") {
+                  navigate(`/admin/tracks/${track.id}/edit`);
+                } else {
+                  navigate(`/tracks/${track.id}/edit`);
+                }
+              }}
+            >
+              <span>
+                <SquarePen className="mr-2 h-4 w-4" />
+                Editar trilha
+              </span>
+            </Button>
+          ) : null}
+        </div>
       </div>
 
       <div className="rounded-3xl border bg-white p-6">

@@ -144,21 +144,22 @@ export default function KnowledgeHub() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Conhecimento</h1>
-          <p className="text-muted-foreground">Documentação e base de conhecimento da empresa</p>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Conhecimento</h1>
+          <p className="text-sm sm:text-base text-muted-foreground">Documentação e base de conhecimento da empresa</p>
         </div>
         {isAdmin && (
           <Dialog open={newSpaceDialogOpen} onOpenChange={setNewSpaceDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="gap-2">
+              <Button className="gap-2 w-full sm:w-auto">
                 <Plus className="h-4 w-4" />
-                Novo Espaço
+                <span className="hidden sm:inline">Novo Espaço</span>
+                <span className="sm:hidden">Novo</span>
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-md">
               <DialogHeader>
                 <DialogTitle>Criar Novo Espaço</DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-sm sm:text-base">
                   Crie um novo espaço para organizar suas páginas de conhecimento
                 </DialogDescription>
               </DialogHeader>
@@ -189,11 +190,11 @@ export default function KnowledgeHub() {
                   />
                 </div>
               </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setNewSpaceDialogOpen(false)}>
+              <DialogFooter className="flex-col sm:flex-row gap-2">
+                <Button variant="outline" onClick={() => setNewSpaceDialogOpen(false)} className="w-full sm:w-auto">
                   Cancelar
                 </Button>
-                <Button onClick={handleCreateSpace}>Criar Espaço</Button>
+                <Button onClick={handleCreateSpace} className="w-full sm:w-auto">Criar Espaço</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -210,7 +211,7 @@ export default function KnowledgeHub() {
             <Star className="h-5 w-5 text-yellow-500 fill-yellow-500" />
             <h2 className="text-xl font-semibold">Favoritos</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {favoritePages.map((page, index) => (
               <motion.div
                 key={page.id}
@@ -251,7 +252,7 @@ export default function KnowledgeHub() {
             <Clock className="h-5 w-5 text-muted-foreground" />
             <h2 className="text-xl font-semibold">Recentes</h2>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {recentPages.map((page, index) => (
               <motion.div
                 key={page.id}
