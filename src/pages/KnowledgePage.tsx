@@ -38,6 +38,7 @@ import { KnowledgeSidebar } from "@/components/knowledge/KnowledgeSidebar";
 import { KnowledgeEditor } from "@/components/knowledge/KnowledgeEditor";
 import {
   getKnowledgePage,
+  getKnowledgePages,
   updateKnowledgePage,
   deleteKnowledgePage,
   getPagePath,

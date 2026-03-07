@@ -44,8 +44,7 @@ import { describedItemsToLines, parseDescribedItems, textPreview } from "@/lib/f
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
-
-type Role = "MASTERADMIN" | "ADMIN" | "HEAD" | "COLABORADOR";
+import type { Role } from "@/lib/domain";
 
 type NavLinkItem = {
   type: "link";
@@ -147,7 +146,7 @@ const nav: NavItem[] = [
     to: "/okr",
     label: "OKRs",
     icon: <Target className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLLABORADOR"],
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
     moduleKey: "OKR",
   },
 
