@@ -68,11 +68,7 @@ import TrailVideos from "./pages/TrailVideos";
 import Integrations from "./pages/Integrations";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
-import UserEventLedger from "./pages/UserEventLedger";
-import PerformanceScores from "./pages/PerformanceScores";
 import TestRunner from "./pages/TestRunner";
-import KnowledgeHub from "./pages/KnowledgeHub";
-import KnowledgePage from "./pages/KnowledgePage";
 import TrackEdit from "./pages/TrackEdit";
 
 const queryClient = new QueryClient();
@@ -159,14 +155,6 @@ const App = () => (
                     }
                   />
 
-                  <Route
-                    path="/people/:userId/events"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}>
-                        <UserEventLedger />
-                      </RequireAuth>
-                    }
-                  />
 
                   <Route
                     path="/password"
@@ -476,15 +464,6 @@ const App = () => (
                     }
                   />
 
-                  {/* Performance */}
-                  <Route
-                    path="/performance"
-                    element={
-                      <RequireAuth roles={["ADMIN", "HEAD"]}>
-                        <PerformanceScores />
-                      </RequireAuth>
-                    }
-                  />
 
                   {/* Master */}
                   <Route
@@ -682,37 +661,6 @@ const App = () => (
                     }
                   />
 
-                  {/* Knowledge Base */}
-                  <Route
-                    path="/knowledge"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <RequireCompanyModule moduleKey="KNOWLEDGE">
-                          <KnowledgeHub />
-                        </RequireCompanyModule>
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/knowledge/:pageId"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <RequireCompanyModule moduleKey="KNOWLEDGE">
-                          <KnowledgePage />
-                        </RequireCompanyModule>
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/knowledge/space/:spaceId"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <RequireCompanyModule moduleKey="KNOWLEDGE">
-                          <KnowledgeHub />
-                        </RequireCompanyModule>
-                      </RequireAuth>
-                    }
-                  />
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>
