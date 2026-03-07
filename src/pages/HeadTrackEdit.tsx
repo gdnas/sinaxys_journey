@@ -12,7 +12,6 @@ import {
   Plus,
   Save,
   Trash2,
-  Youtube,
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +38,6 @@ import {
   updateTrack,
   type DbModule,
 } from "@/lib/journeyDb";
-import { TrailVideoSelector } from "@/components/videos/TrailVideoSelector";
 
 function mapDbModule(m: DbModule): TrackModule {
   return {
@@ -132,9 +130,6 @@ export default function HeadTrackEdit() {
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
   const editingModule = useMemo(() => modules.find((m) => m.id === editingModuleId) ?? null, [modules, editingModuleId]);
 
-  // Video selector
-  const [videoSelectorOpen, setVideoSelectorOpen] = useState(false);
-
   const [mType, setMType] = useState<TrackModule["type"]>("VIDEO");
   const [mTitle, setMTitle] = useState("");
   const [mDesc, setMDesc] = useState("");
@@ -143,10 +138,6 @@ export default function HeadTrackEdit() {
   const [mMaterial, setMMaterial] = useState("");
   const [mCheckpoint, setMCheckpoint] = useState("");
   const [mMinScore, setMMinScore] = useState<string>("70");
-
-  const handleVideoSelect = (video: { youtubeUrl: string; youtubeVideoId: string; title: string }) => {
-    setMYoutube(video.youtubeUrl);
-  };
 
   useEffect(() => {
     if (!moduleOpen) return;
@@ -556,23 +547,7 @@ export default function HeadTrackEdit() {
             {mType === "VIDEO" ? (
               <div className="grid gap-2">
                 <Label>URL do YouTube</Label>
-                <div className="flex gap-2">
-                  <Input
-                    className="h-11 rounded-xl flex-1"
-                    value={mYoutube}
-                    onChange={(e) => setMYoutube(e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                  />
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="h-11 rounded-xl"
-                    onClick={() => setVideoSelectorOpen(true)}
-                  >
-                    <Youtube className="mr-2 h-4 w-4" />
-                    Biblioteca
-                  </Button>
-                </div>
+                <Input className="h-11 rounded-xl" value={mYoutube} onChange={(e) => setMYoutube(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
               </div>
             ) : null}
 
@@ -848,13 +823,6 @@ export default function HeadTrackEdit() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Video selector dialog */}
-      <TrailVideoSelector
-        open={videoSelectorOpen}
-        onOpenChange={setVideoSelectorOpen}
-        onSelect={handleVideoSelect}
-      />
     </div>
   );
 }

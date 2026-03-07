@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { useLocation, useNavigate, Link, Navigate } from "react-router-dom";
+import { useLocation, useNavigate, Link } from "react-router-dom";
 import { ArrowRight, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,11 +24,6 @@ export default function Login() {
   const canSubmit = useMemo(() => {
     return email.trim().length >= 6 && password.trim().length >= 1;
   }, [email, password]);
-
-  // If user is already authenticated, immediately redirect away from login.
-  if (!loading && user) {
-    return <Navigate to={from ?? "/dashboard"} replace />;
-  }
 
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
@@ -111,10 +106,8 @@ export default function Login() {
               disabled={!canSubmit || submitting || loading}
               onClick={async () => {
                 try {
-                  console.log("[login] submitting", email);
                   setSubmitting(true);
                   const result = await login(email, password);
-                  console.log("[login] result", result);
                   if (result.ok === false) {
                     toast({
                       title: "Não foi possível entrar",
@@ -129,7 +122,7 @@ export default function Login() {
                     return;
                   }
 
-                  navigate(from ?? "/dashboard");
+                  navigate(from ?? "/");
                 } finally {
                   setSubmitting(false);
                 }

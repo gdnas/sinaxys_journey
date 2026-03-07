@@ -98,13 +98,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const hydrateFromSession = async () => {
     setLoading(true);
     try {
-      console.log("[auth] hydrateFromSession start");
       const { data } = await supabase.auth.getSession();
       const session = data.session;
 
       if (!session?.user) {
         sessionUserIdRef.current = null;
-        console.log("[auth] no session user");
         if (!mountedRef.current) return;
         setUser(null);
         setActiveCompanyIdState(null);
@@ -112,7 +110,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       sessionUserIdRef.current = session.user.id;
-      console.log("[auth] session user id", sessionUserIdRef.current);
 
       // Best-effort: normalize duplicated links (same email across companies) on the backend.
       try {
@@ -125,7 +122,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!p) {
         // IMPORTANT: never create/vinculate tenant on login.
         // If profile is missing, access must be provisioned out-of-band.
-        console.log("[auth] profile missing for user", session.user.id);
         await supabase.auth.signOut();
         sessionUserIdRef.current = null;
         if (!mountedRef.current) return;
@@ -136,7 +132,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const nextUser = mapProfileToUser(p);
       if (!nextUser.active) {
-        console.log("[auth] user inactive", nextUser.id);
         await supabase.auth.signOut();
         sessionUserIdRef.current = null;
         if (!mountedRef.current) return;
@@ -146,7 +141,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       if (!mountedRef.current) return;
-      console.log("[auth] setting user", nextUser.id, nextUser.role);
       setUser(nextUser);
       setActiveCompanyIdState(p.company_id ?? null);
 
@@ -175,7 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // ignore
             }
           } catch {
-            // ignore errors  upload will retry and attempt to create on demand
+            // ignore errors — upload will retry and attempt to create on demand
           }
         }
       } catch {
@@ -183,10 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
     } finally {
-      if (mountedRef.current) {
-        console.log("[auth] hydrateFromSession finished, loading=false");
-        setLoading(false);
-      }
+      if (mountedRef.current) setLoading(false);
     }
   };
 
@@ -223,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const e = email.trim().toLowerCase();
         const p = password;
 
-        if (!e.includes("@")) return { ok: false as const, message: "Informe um e-mail v\u00e1lido." };
+        if (!e.includes("@")) return { ok: false as const, message: "Informe um e-mail válido." };
         if (!p.trim()) return { ok: false as const, message: "Informe a senha." };
 
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -233,18 +224,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (error) {
           const msg = error.message;
-          const isNotConfirmed = /email.*not\\s+confirmed/i.test(msg) || /not\\s+confirmed/i.test(msg);
+          const isNotConfirmed = /email.*not\s+confirmed/i.test(msg) || /not\s+confirmed/i.test(msg);
           return {
             ok: false as const,
             message: isNotConfirmed
-              ? "Seu e-mail ainda n\u00e3o foi confirmado. Verifique sua caixa de entrada (e spam) e clique no link de confirma\u00e7\u00e3o."
+              ? "Seu e-mail ainda não foi confirmado. Verifique sua caixa de entrada (e spam) e clique no link de confirmação."
               : msg,
           };
         }
 
         const uid = data.user?.id ?? null;
         if (!uid) {
-          return { ok: false as const, message: "N\u00e3o foi poss\u00edvel validar seu acesso. Tente novamente." };
+          return { ok: false as const, message: "Não foi possível validar seu acesso. Tente novamente." };
         }
 
         // Enforce profile access rules *immediately* after auth.
@@ -252,12 +243,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const prof = await fetchMyProfile(uid);
         if (!prof) {
           await supabase.auth.signOut();
-          return { ok: false as const, message: "Seu acesso ainda n\u00e3o foi provisionado. Solicite ao administrador da sua empresa." };
+          return { ok: false as const, message: "Seu acesso ainda não foi provisionado. Solicite ao administrador da sua empresa." };
         }
 
         if (!prof.active) {
           await supabase.auth.signOut();
-          return { ok: false as const, message: "Usu\u00e1rio inativo. Solicite reativa\u00e7\u00e3o ao administrador." };
+          return { ok: false as const, message: "Usuário inativo. Solicite reativação ao administrador." };
         }
 
         await hydrateFromSession();
