@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { RequireAuth } from "@/components/RequireAuth";
-import { RequireCompanyModule } from "@/components/RequireCompanyModule";
 import { AppShell } from "@/components/AppShell";
 import Index from "@/pages/Index";
 import Login from "@/pages/Login";
@@ -33,11 +31,14 @@ const App = () => {
     <Router>
       <AppShell>
         <Routes>
+          {/* Public routes */}
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/forgot" element={<ForgotPassword />} />
           <Route path="/change-password" element={<ChangePassword />} />
+
+          {/* Authenticated routes */}
           <Route path="/dashboard" element={<AppHome />} />
           <Route path="/admin" element={<AdminHome />} />
           <Route path="/admin/users" element={<AdminUsers />} />
@@ -49,6 +50,8 @@ const App = () => {
           <Route path="/head/tracks" element={<HeadTracks />} />
           <Route path="/track/:trackId" element={<TrackDetail />} />
           <Route path="/integrations" element={<Integrations />} />
+
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </AppShell>
