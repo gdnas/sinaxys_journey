@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import {
@@ -44,6 +45,8 @@ import {
   createKnowledgePage,
   deleteKnowledgeSpace,
 } from "@/lib/knowledgeDb";
+import { KnowledgeSearch } from "@/components/knowledge/KnowledgeSearch";
+import { KnowledgeHubSkeleton } from "@/components/knowledge/KnowledgeSkeleton";
 
 export default function KnowledgeHub() {
   const { user } = useAuth();
@@ -132,15 +135,8 @@ export default function KnowledgeHub() {
 
   const isAdmin = user?.role === "ADMIN" || user?.role === "MASTERADMIN";
 
-  if (spacesLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando...</p>
-        </div>
-      </div>
-    );
+  if (spacesLoading && !spaces.length) {
+    return <KnowledgeHubSkeleton />;
   }
 
   return (
@@ -205,15 +201,7 @@ export default function KnowledgeHub() {
       </div>
 
       {/* Search */}
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar espaços e páginas..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-10"
-        />
-      </div>
+      <KnowledgeSearch placeholder="Buscar páginas..." />
 
       {/* Favorites */}
       {!favoritesLoading && favoritePages.length > 0 && (
@@ -223,28 +211,34 @@ export default function KnowledgeHub() {
             <h2 className="text-xl font-semibold">Favoritos</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {favoritePages.map((page) => (
-              <Link
+            {favoritePages.map((page, index) => (
+              <motion.div
                 key={page.id}
-                to={`/knowledge/${page.id}`}
-                className="block transition hover:shadow-md"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
               >
-                <Card>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">{page.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base truncate">{page.title}</CardTitle>
+                <Link
+                  to={`/knowledge/${page.id}`}
+                  className="block transition hover:shadow-md"
+                >
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl">{page.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base truncate">{page.title}</CardTitle>
+                        </div>
                       </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Atualizado {new Date(page.updated_at).toLocaleDateString("pt-BR")}
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Atualizado {new Date(page.updated_at).toLocaleDateString("pt-BR")}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </motion.div>
             ))}
           </div>
         </section>
@@ -258,31 +252,37 @@ export default function KnowledgeHub() {
             <h2 className="text-xl font-semibold">Recentes</h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {recentPages.map((page) => (
-              <Link
+            {recentPages.map((page, index) => (
+              <motion.div
                 key={page.id}
-                to={`/knowledge/${page.id}`}
-                className="block transition hover:shadow-md"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
               >
-                <Card>
-                  <CardHeader className="pb-2">
-                    <div className="flex items-start gap-3">
-                      <span className="text-2xl">{page.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-base truncate">{page.title}</CardTitle>
+                <Link
+                  to={`/knowledge/${page.id}`}
+                  className="block transition hover:shadow-md"
+                >
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start gap-3">
+                        <span className="text-2xl">{page.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-base truncate">{page.title}</CardTitle>
+                        </div>
+                        {page.is_favorite && (
+                          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                        )}
                       </div>
-                      {page.is_favorite && (
-                        <Star className="h-4 w-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Atualizado {new Date(page.updated_at).toLocaleDateString("pt-BR")}
-                    </p>
-                  </CardContent>
-                </Card>
-              </Link>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-muted-foreground">
+                        Atualizado {new Date(page.updated_at).toLocaleDateString("pt-BR")}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </Link>
+              </motion.div>
             ))}
           </div>
         </section>
@@ -321,58 +321,65 @@ export default function KnowledgeHub() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredSpaces.map((space) => (
-              <Card key={space.id} className="group hover:shadow-md transition">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-3xl">{space.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg truncate">{space.name}</CardTitle>
-                        {space.description && (
-                          <CardDescription className="line-clamp-2 mt-1">
-                            {space.description}
-                          </CardDescription>
-                        )}
+            {filteredSpaces.map((space, index) => (
+              <motion.div
+                key={space.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+              >
+                <Card className="group hover:shadow-md transition">
+                  <CardHeader>
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">{space.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <CardTitle className="text-lg truncate">{space.name}</CardTitle>
+                          {space.description && (
+                            <CardDescription className="line-clamp-2 mt-1">
+                              {space.description}
+                            </CardDescription>
+                          )}
+                        </div>
                       </div>
+                      {isAdmin && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              onClick={() => handleCreatePage(space.id)}
+                              className="gap-2"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Nova Página
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteSpace(space.id, space.name)}
+                              className="gap-2 text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Excluir Espaço
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
-                    {isAdmin && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleCreatePage(space.id)}
-                            className="gap-2"
-                          >
-                            <FileText className="h-4 w-4" />
-                            Nova Página
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleDeleteSpace(space.id, space.name)}
-                            className="gap-2 text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Excluir Espaço
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <Link
-                    to={`/knowledge/space/${space.id}`}
-                    className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
-                  >
-                    <FolderOpen className="h-4 w-4" />
-                    Ver todas as páginas
-                  </Link>
-                </CardContent>
-              </Card>
+                  </CardHeader>
+                  <CardContent>
+                    <Link
+                      to={`/knowledge/space/${space.id}`}
+                      className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                    >
+                      <FolderOpen className="h-4 w-4" />
+                      Ver todas as páginas
+                    </Link>
+                  </CardContent>
+                </Card>
+              </motion.div>
             ))}
           </div>
         )}

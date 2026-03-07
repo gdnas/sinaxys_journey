@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import {
@@ -42,6 +43,7 @@ import {
   getPagePath,
   KnowledgePage as KnowledgePageType,
 } from "@/lib/knowledgeDb";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function KnowledgePage() {
   const { pageId } = useParams<{ pageId: string }>();
@@ -164,10 +166,20 @@ export default function KnowledgePage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Carregando...</p>
+      <div className="flex h-[calc(100vh-8rem)]">
+        <div className="w-72 border-r p-4 space-y-4 hidden md:block">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-10 w-full" />
+        </div>
+        <div className="flex-1 p-6 space-y-6">
+          <Skeleton className="h-8 w-64" />
+          <Skeleton className="h-6 w-full" />
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} className="h-4 w-full" />
+            ))}
+          </div>
         </div>
       </div>
     );
@@ -200,7 +212,12 @@ export default function KnowledgePage() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Top Bar */}
-        <div className="border-b px-6 py-4">
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="border-b px-6 py-4"
+        >
           {/* Breadcrumbs */}
           {pagePath.length > 1 && (
             <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
@@ -345,28 +362,40 @@ export default function KnowledgePage() {
           </div>
 
           {/* Edit Actions */}
-          {isEditing && (
-            <div className="flex items-center gap-2 mt-4">
-              <Button onClick={handleSave} disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? "Salvando..." : "Salvar"}
-              </Button>
-              <Button variant="outline" onClick={handleCancel}>
-                Cancelar
-              </Button>
-            </div>
-          )}
-        </div>
+          <AnimatePresence>
+            {isEditing && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex items-center gap-2 mt-4"
+              >
+                <Button onClick={handleSave} disabled={updateMutation.isPending}>
+                  {updateMutation.isPending ? "Salvando..." : "Salvar"}
+                </Button>
+                <Button variant="outline" onClick={handleCancel}>
+                  Cancelar
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
 
         {/* Content Area */}
         <ScrollArea className="flex-1">
-          <div className="max-w-4xl mx-auto px-6 py-8">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.4 }}
+            className="max-w-4xl mx-auto px-6 py-8"
+          >
             <KnowledgeEditor
               content={editedContent}
               onChange={setEditedContent}
               editable={canEdit}
               placeholder={isEditing ? "Comece a escrever..." : ""}
             />
-          </div>
+          </motion.div>
         </ScrollArea>
       </div>
     </div>

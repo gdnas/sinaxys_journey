@@ -568,6 +568,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return allowOkr;
       case "ORG":
         return allowOrg;
+      case "KNOWLEDGE":
+        return allowKnowledge;
       default:
         return true;
     }
