@@ -227,7 +227,7 @@ export async function createKnowledgePage(
   spaceId: string,
   companyId: string,
   title: string,
-  createdBy: string,
+  createdBy?: string | null,
   options?: {
     parentPageId?: string;
     icon?: string;
@@ -240,7 +240,7 @@ export async function createKnowledgePage(
       space_id: spaceId,
       company_id: companyId,
       title,
-      created_by: createdBy,
+      created_by: createdBy ?? null,
       parent_page_id: options?.parentPageId || null,
       icon: options?.icon || "📄",
       cover_image: options?.coverImage || null,
