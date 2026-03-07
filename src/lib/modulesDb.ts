@@ -16,6 +16,7 @@ export type ModuleKey =
   | "PROFILE"
   | "ADMIN"
   | "MASTER"
+  | "KNOWLEDGE"
   | (string & {});
 
 const DEFAULT_ENABLED: Record<string, boolean> = {
@@ -29,6 +30,7 @@ const DEFAULT_ENABLED: Record<string, boolean> = {
   TRACKS: false,
   POINTS: false,
   PDI_PERFORMANCE: false,
+  KNOWLEDGE: false,
 
   // Core areas (not sold as modules for now)
   PROFILE: true,

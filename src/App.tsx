@@ -51,6 +51,9 @@ import PdiPerformance from "./pages/PdiPerformance";
 import VacationRequests from "./pages/VacationRequests";
 import VacationApprovals from "./pages/VacationApprovals";
 import SupabaseStatus from "./pages/SupabaseStatus";
+import CollaboratorHome from "./pages/CollaboratorHome";
+import HeadHome from "./pages/HeadHome";
+import HeadPerformanceDashboard from "./pages/HeadPerformanceDashboard";
 import { AuthProvider } from "@/lib/auth";
 import { CompanyProvider } from "@/lib/company";
 import { AppShell } from "@/components/AppShell";
@@ -68,6 +71,8 @@ import TermsOfService from "./pages/TermsOfService";
 import UserEventLedger from "./pages/UserEventLedger";
 import PerformanceScores from "./pages/PerformanceScores";
 import TestRunner from "./pages/TestRunner";
+import KnowledgeHub from "./pages/KnowledgeHub";
+import KnowledgePage from "./pages/KnowledgePage";
 
 const queryClient = new QueryClient();
 
@@ -664,6 +669,38 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <Navigate to="/pdi-performance" replace />
+                      </RequireAuth>
+                    }
+                  />
+
+                  {/* Knowledge Base */}
+                  <Route
+                    path="/knowledge"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="KNOWLEDGE">
+                          <KnowledgeHub />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/knowledge/:pageId"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="KNOWLEDGE">
+                          <KnowledgePage />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/knowledge/space/:spaceId"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="KNOWLEDGE">
+                          <KnowledgeHub />
+                        </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />

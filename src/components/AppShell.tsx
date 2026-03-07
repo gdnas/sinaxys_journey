@@ -27,6 +27,7 @@ import {
   Wallet,
   Wrench,
   Users,
+  BookOpen,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -146,8 +147,18 @@ const nav: NavItem[] = [
     to: "/okr",
     label: "OKRs",
     icon: <Target className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR"],
+    roles: ["ADMIN", "HEAD", "COLLABORADOR"],
     moduleKey: "OKR",
+  },
+
+  // Knowledge Base
+  {
+    type: "link",
+    to: "/knowledge",
+    label: "Conhecimento",
+    icon: <BookOpen className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
+    moduleKey: "KNOWLEDGE",
   },
 
   // Empresa
@@ -526,6 +537,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => isCompanyModuleEnabled(String(companyId), "ORG"),
     enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
   });
+  const { data: knowledgeEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "KNOWLEDGE"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "KNOWLEDGE"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
 
   if (!user) return <>{children}</>;
 
@@ -535,6 +551,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const allowCosts = user.role === "MASTERADMIN" ? true : !!costsEnabled;
   const allowOkr = user.role === "MASTERADMIN" ? true : !!okrEnabled;
   const allowOrg = user.role === "MASTERADMIN" ? true : !!orgEnabled;
+  const allowKnowledge = user.role === "MASTERADMIN" ? true : !!knowledgeEnabled;
 
   const moduleAllowed = (key?: string) => {
     if (!key) return true;
