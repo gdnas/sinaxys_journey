@@ -3,9 +3,6 @@ import App from "./App.tsx";
 import "./globals.css";
 import { bootstrapCompanyTheme } from "@/lib/company";
 import { initClarity } from "@/lib/clarity";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ErrorBoundary } from "@/components/ErrorBoundary";
-import { TooltipProvider } from "@/components/ui/tooltip";
 
 // Apply last selected company theme as early as possible (before first paint)
 bootstrapCompanyTheme();
@@ -13,14 +10,4 @@ bootstrapCompanyTheme();
 // Microsoft Clarity (set your project id in VITE_CLARITY_PROJECT_ID)
 initClarity(import.meta.env.VITE_CLARITY_PROJECT_ID);
 
-const queryClient = new QueryClient();
-
-createRoot(document.getElementById("root")!).render(
-  <ErrorBoundary>
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <App />
-      </TooltipProvider>
-    </QueryClientProvider>
-  </ErrorBoundary>,
-);
+createRoot(document.getElementById("root")!).render(<App />);

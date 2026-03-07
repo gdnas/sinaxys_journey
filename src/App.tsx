@@ -5,7 +5,6 @@ import { RequireAuth } from "@/components/RequireAuth";
 import { RequireCompanyModule } from "@/components/RequireCompanyModule";
 import { AppShell } from "@/components/AppShell";
 import { AuthProvider } from "@/lib/auth";
-import { CompanyProvider } from "@/lib/company";
 import Index from "@/pages/Index";
 import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
@@ -34,29 +33,27 @@ const App = () => {
   return (
     <Router>
       <AuthProvider>
-        <CompanyProvider>
-          <AppShell>
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/forgot" element={<ForgotPassword />} />
-              <Route path="/change-password" element={<ChangePassword />} />
-              <Route path="/dashboard" element={<AppHome />} />
-              <Route path="/admin" element={<AdminHome />} />
-              <Route path="/admin/users" element={<AdminUsers />} />
-              <Route path="/admin/users/:userId" element={<AdminUsers />} />
-              <Route path="/head" element={<HeadHome />} />
-              <Route path="/head/users" element={<HeadUsers />} />
-              <Route path="/master/users" element={<MasterUsers />} />
-              <Route path="/admin/tracks" element={<AdminTracks />} />
-              <Route path="/head/tracks" element={<HeadTracks />} />
-              <Route path="/track/:trackId" element={<TrackDetail />} />
-              <Route path="/integrations" element={<Integrations />} />
-              <Route path="*" element={<Navigate to="/login" replace />} />
-            </Routes>
-          </AppShell>
-        </CompanyProvider>
+        <AppShell>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/forgot" element={<ForgotPassword />} />
+            <Route path="/change-password" element={<ChangePassword />} />
+            <Route path="/dashboard" element={<AppHome />} />
+            <Route path="/admin" element={<AdminHome />} />
+            <Route path="/admin/users" element={<AdminUsers />} />
+            <Route path="/admin/users/:userId" element={<AdminUsers />} />
+            <Route path="/head" element={<HeadHome />} />
+            <Route path="/head/users" element={<HeadUsers />} />
+            <Route path="/master/users" element={<MasterUsers />} />
+            <Route path="/admin/tracks" element={<AdminTracks />} />
+            <Route path="/head/tracks" element={<HeadTracks />} />
+            <Route path="/track/:trackId" element={<TrackDetail />} />
+            <Route path="/integrations" element={<Integrations />} />
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </AppShell>
       </AuthProvider>
     </Router>
   );
