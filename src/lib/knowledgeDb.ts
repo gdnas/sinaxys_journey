@@ -47,6 +47,16 @@ export type DbKnowledgePageVersion = {
   created_at: string | null;
 };
 
+export type DbKnowledgePageAuditLog = {
+  id: string;
+  page_id: string;
+  old_snapshot: any | null;
+  new_snapshot: any | null;
+  changed_by: string | null;
+  changed_fields: string[] | null;
+  changed_at: string | null;
+};
+
 export type DbKnowledgePageComment = {
   id: string;
   page_id: string;
@@ -360,6 +370,23 @@ export async function restoreKnowledgePageVersion(
 
   if (error) throw error;
   return (data ?? null) as DbKnowledgePage | null;
+}
+
+// ============================================================================
+// AUDIT LOG
+// ============================================================================
+
+const auditSelect = "id,page_id,old_snapshot,new_snapshot,changed_by,changed_fields,changed_at";
+
+export async function listKnowledgePageAuditLogs(pageId: string) {
+  const { data, error } = await supabase
+    .from("knowledge_page_audit_log")
+    .select(auditSelect)
+    .eq("page_id", pageId)
+    .order("changed_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as DbKnowledgePageAuditLog[];
 }
 
 // ============================================================================

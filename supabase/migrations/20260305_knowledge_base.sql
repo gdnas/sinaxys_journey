@@ -65,6 +65,20 @@ CREATE TABLE IF NOT EXISTS public.knowledge_page_versions (
 );
 
 -- ============================================
+-- Knowledge Page Audit Log (stores old/new snapshots and changed fields)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS public.knowledge_page_audit_log (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  page_id UUID NOT NULL REFERENCES public.knowledge_pages(id) ON DELETE CASCADE,
+  old_snapshot JSONB,
+  new_snapshot JSONB,
+  changed_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  changed_fields JSONB,
+  changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ============================================
 -- Knowledge Page Comments
 -- ============================================
 
@@ -110,6 +124,10 @@ CREATE INDEX IF NOT EXISTS idx_knowledge_permissions_user ON public.knowledge_pe
 -- Versions indexes
 CREATE INDEX IF NOT EXISTS idx_knowledge_page_versions_page ON public.knowledge_page_versions(page_id);
 CREATE INDEX IF NOT EXISTS idx_knowledge_page_versions_created_at ON public.knowledge_page_versions(created_at DESC);
+
+-- Audit indexes
+CREATE INDEX IF NOT EXISTS idx_knowledge_page_audit_log_page ON public.knowledge_page_audit_log(page_id);
+CREATE INDEX IF NOT EXISTS idx_knowledge_page_audit_log_changed_at ON public.knowledge_page_audit_log(changed_at DESC);
 
 -- Comments indexes
 CREATE INDEX IF NOT EXISTS idx_knowledge_page_comments_page ON public.knowledge_page_comments(page_id);
@@ -339,10 +357,11 @@ CREATE POLICY "permissions_select_company" ON public.knowledge_permissions
     WHERE p.id = page_id AND p.company_id = auth.company_id()
   ));
 
-CREATE POLICY "permissions_manage_admin" ON public.knowledge_permissions
+-- Allow the page creator OR admins to manage permissions for a page within the same company
+CREATE POLICY "permissions_manage_admin_or_creator" ON public.knowledge_permissions
   FOR ALL USING (EXISTS (
     SELECT 1 FROM public.knowledge_pages p
-    WHERE p.id = page_id AND p.company_id = auth.company_id() AND is_admin_or_master()
+    WHERE p.id = page_id AND p.company_id = auth.company_id() AND (is_admin_or_master() OR p.created_by = auth.uid())
   ));
 
 -- Versions policies
@@ -414,21 +433,37 @@ END;
 $$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
 
 -- ============================================
--- Auto-Create Version on Update
+-- Auto-Create Version on Update and Audit Log
 -- ============================================
 
 CREATE OR REPLACE FUNCTION create_page_version_on_update()
 RETURNS TRIGGER AS $$
+DECLARE
+  v_changed_fields TEXT[] := ARRAY[]::TEXT[];
 BEGIN
-  -- Only create version if content changed
+  -- Only create version & audit log if content or title changed
   IF (OLD.content IS DISTINCT FROM NEW.content) OR (OLD.title IS DISTINCT FROM NEW.title) THEN
+    IF OLD.title IS DISTINCT FROM NEW.title THEN
+      v_changed_fields := array_append(v_changed_fields, 'title');
+    END IF;
+    IF OLD.content IS DISTINCT FROM NEW.content THEN
+      v_changed_fields := array_append(v_changed_fields, 'content');
+    END IF;
+
+    -- Record a snapshot (for revert / history)
     INSERT INTO public.knowledge_page_versions (page_id, content_snapshot, created_by)
-    VALUES (NEW.id, NEW.content, NEW.created_by);
+    VALUES (NEW.id, NEW.content, auth.uid());
+
+    -- Record an audit entry with old/new snapshots and changed fields
+    INSERT INTO public.knowledge_page_audit_log (page_id, old_snapshot, new_snapshot, changed_by, changed_fields)
+    VALUES (NEW.id, OLD.content, NEW.content, auth.uid(), to_jsonb(v_changed_fields));
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
+-- Trigger to run after updates
+DROP TRIGGER IF EXISTS page_version_on_update ON public.knowledge_pages;
 CREATE TRIGGER page_version_on_update
   AFTER UPDATE ON public.knowledge_pages
   FOR EACH ROW
