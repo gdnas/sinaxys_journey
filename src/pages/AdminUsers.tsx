@@ -48,7 +48,6 @@ function fmtDateTime(ts: string | null | undefined) {
 // Normalize various ISO-like strings and return dd/mm/yyyy
 function displayFromIso(iso?: string | null) {
   if (!iso) return "";
-  // Accept full ISO (2026-02-09T00:00:00+00:00) or simple date (2026-02-09)
   const core = iso.length >= 10 ? iso.slice(0, 10) : iso;
   const parts = core.split("-");
   if (parts.length !== 3) return "";
@@ -70,21 +69,17 @@ function parseDisplayToIso(s: string) {
 
 // Simple mask for dd/mm/yyyy. Accepts input and returns formatted string as the user types.
 function maskDateInput(value: string) {
-  // keep only digits
   const digits = value.replace(/\D/g, "");
   if (!digits) return "";
   const parts: string[] = [];
-  // day
   if (digits.length <= 2) {
     parts.push(digits);
   } else {
     parts.push(digits.slice(0, 2));
-    // month
     if (digits.length <= 4) {
       parts.push(digits.slice(2));
     } else {
       parts.push(digits.slice(2, 4));
-      // year
       parts.push(digits.slice(4, 8));
     }
   }
@@ -92,10 +87,7 @@ function maskDateInput(value: string) {
 }
 
 async function describeFunctionError(e: unknown): Promise<string> {
-  // Supabase Functions errors (FunctionsHttpError/FunctionsRelayError/FunctionsFetchError)
   const anyErr = e as any;
-
-  // For FunctionsHttpError, context is usually a Response.
   const ctx = anyErr?.context;
   if (ctx && typeof ctx.json === "function") {
     try {
@@ -163,7 +155,7 @@ export default function AdminUsers() {
   const [query, setQuery] = useState("");
   const [hideInactive, setHideInactive] = useState(true);
 
-  // New: department filter and sorting controls
+  // department filter and sorting
   const [deptFilter, setDeptFilter] = useState<string>("__all__");
   const [sortKey, setSortKey] = useState<"name" | "department">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -172,12 +164,10 @@ export default function AdminUsers() {
     const q = query.trim().toLowerCase();
     let base = hideInactive ? profiles.filter((p) => !!p.active) : profiles;
 
-    // department filter
     if (deptFilter && deptFilter !== "__all__") {
       base = base.filter((p) => (p.department_id ?? "") === deptFilter);
     }
 
-    // search
     if (q) {
       base = base.filter((p) => {
         const hay = `${p.name ?? ""} ${p.email}`.toLowerCase();
@@ -185,7 +175,6 @@ export default function AdminUsers() {
       });
     }
 
-    // sorting
     const by = sortKey;
     const dir = sortDir === "asc" ? 1 : -1;
     base = [...base].sort((a, b) => {
@@ -219,7 +208,6 @@ export default function AdminUsers() {
   const [editContractUrl, setEditContractUrl] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [editJoinedAtStr, setEditJoinedAtStr] = useState("");
-  // manager (líder direto)
   const [editManagerId, setEditManagerId] = useState<string>("");
 
   const openEdit = (p: DbProfile) => {
@@ -233,7 +221,6 @@ export default function AdminUsers() {
     setEditMonthlyCost(typeof p.monthly_cost_brl === "number" ? String(p.monthly_cost_brl) : "");
     setEditContractUrl(p.contract_url ?? "");
     setEditJoinedAtStr(displayFromIso(p.joined_at));
-    // initialize manager id
     setEditManagerId(p.manager_id ?? "");
     setEditOpen(true);
   };
@@ -249,7 +236,6 @@ export default function AdminUsers() {
   const [inviteTempPassword, setInviteTempPassword] = useState("");
   const [inviting, setInviting] = useState(false);
 
-  // Role used by edge function expects MASTERADMIN too; cast to string.
   const inviteRoleForFunction = inviteRole as unknown as string;
 
   const [importOpen, setImportOpen] = useState(false);
@@ -266,169 +252,177 @@ export default function AdminUsers() {
   };
 
   return (
-    <div className="grid gap-6">
-      <div className="rounded-3xl border bg-white p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Usuários — Empresa</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Gerencie usuários desta empresa. Você pode criar com senha temporária (o usuário troca no primeiro acesso) ou enviar convite por e-mail.
-            </p>
-          </div>
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-            <Shield className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Top info */}
+      <div className="mb-6">
+        <div className="rounded-2xl border bg-[color:var(--sinaxys-bg)] p-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Usuários — Empresa</div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Gerencie usuários desta empresa. Você pode criar com senha temporária (o usuário troca no primeiro acesso) ou enviar convite por e-mail.
+              </p>
+            </div>
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+              <Shield className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+            </div>
           </div>
         </div>
       </div>
 
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Base de usuários</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isLoading ? "Carregando…" : `${profiles.length} usuários nesta empresa${hideInactive ? ` • ${filtered.length} ativos visíveis` : ""}.`}
-            </p>
+      <Card className="rounded-2xl border-[color:var(--sinaxys-border)] bg-white p-4">
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Base de usuários</div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isLoading ? "Carregando…" : `${profiles.length} usuários nesta empresa${hideInactive ? ` • ${filtered.length} ativos visíveis` : ""}.`}
+              </p>
+            </div>
+
+            {/* Controls */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex gap-2">
+                <Button
+                  className="h-10 rounded-lg bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                  onClick={() => {
+                    resetInvite();
+                    setInviteOpen(true);
+                  }}
+                >
+                  <MailPlus className="mr-2 h-4 w-4" />
+                  Adicionar usuário
+                </Button>
+
+                <Button variant="outline" className="h-10 rounded-lg" onClick={() => setImportOpen(true)}>
+                  <UploadCloud className="mr-2 h-4 w-4" />
+                  Importar
+                </Button>
+              </div>
+
+              <div className="flex items-center gap-3 px-2">
+                <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Ocultar inativos</div>
+                <Switch checked={hideInactive} onCheckedChange={setHideInactive} />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v)}>
+                  <SelectTrigger className="h-10 rounded-lg md:w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__all__">Todos departamentos</SelectItem>
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Select value={sortKey} onValueChange={(v) => setSortKey(v as "name" | "department")}>
+                  <SelectTrigger className="h-10 rounded-lg md:w-44">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="name">Ordenar por nome</SelectItem>
+                    <SelectItem value="department">Ordenar por departamento</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" className="h-10 rounded-lg" onClick={() => setSortDir((s) => (s === "asc" ? "desc" : "asc"))}>
+                  {sortDir === "asc" ? "▲" : "▼"}
+                </Button>
+              </div>
+
+              <div className="relative flex-1 min-w-[180px]">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="h-10 rounded-lg pl-9" />
+              </div>
+            </div>
           </div>
 
-          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
-            <Button
-              className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 md:w-auto"
-              onClick={() => {
-                resetInvite();
-                setInviteOpen(true);
-              }}
-            >
-              <MailPlus className="mr-2 h-4 w-4" />
-              Adicionar usuário
-            </Button>
+          <Separator />
 
-            <Button variant="outline" className="h-11 w-full rounded-xl bg-white md:w-auto" onClick={() => setImportOpen(true)}>
-              <UploadCloud className="mr-2 h-4 w-4" />
-              Importar
-            </Button>
-
-            <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2 md:w-[260px]">
-              <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Ocultar inativos</div>
-              <Switch checked={hideInactive} onCheckedChange={setHideInactive} />
+          {showAuthHint ? (
+            <div className="mb-4 rounded-lg border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-3 text-sm text-[color:var(--sinaxys-ink)]">
+              <div className="font-semibold">Não encontrou este e-mail?</div>
+              <div className="mt-1 text-xs text-muted-foreground">
+                Aqui aparecem apenas usuários com registro em <span className="font-medium text-[color:var(--sinaxys-ink)]">profiles</span>. Se a pessoa existir apenas no login (Supabase Auth), use
+                <span className="font-medium text-[color:var(--sinaxys-ink)]"> Adicionar usuário</span> para vincular/criar o perfil nesta empresa.
+              </div>
             </div>
+          ) : null}
 
-            {/* Department filter */}
-            <div className="hidden w-full items-center gap-2 md:flex md:w-[260px]">
-              <Filter className="h-4 w-4 text-muted-foreground" />
-              <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v)}>
-                <SelectTrigger className="h-11 rounded-xl md:w-[220px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos departamentos</SelectItem>
-                  {departments.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="overflow-x-auto rounded-xl border border-[color:var(--sinaxys-border)] bg-white/5 p-3">
+            <ResponsiveTable className="mt-0" minWidth="900px">
+              <div className="rounded-md overflow-hidden">
+                <Table className="min-w-full">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>E-mail</TableHead>
+                      <TableHead>Papel</TableHead>
+                      <TableHead>Departamento</TableHead>
+                      <TableHead className="text-right">Acessos</TableHead>
+                      <TableHead className="text-right">Último acesso</TableHead>
+                      <TableHead className="text-right">Ativo</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((p) => {
+                      const dept = p.department_id ? deptById.get(p.department_id)?.name : "—";
+                      const stat = statsByUserId.get(p.id);
+                      return (
+                        <TableRow key={p.id} className="hover:bg-[color:var(--sinaxys-bg)]">
+                          <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
+                            <Link to={`/admin/users/${p.id}`} className="inline-flex items-center gap-3 hover:underline">
+                              <span className="grid h-8 w-8 place-items-center rounded-lg bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                                <UserRound className="h-4 w-4" />
+                              </span>
+                              <span className="min-w-0 truncate">{p.name ?? "—"}</span>
+                            </Link>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{p.email}</TableCell>
+                          <TableCell>
+                            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                              {roleLabel(p.role as any)}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{dept ?? "—"}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{stat?.access_count ?? 0}</TableCell>
+                          <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge className={p.active ? "rounded-full bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : "rounded-full bg-amber-50 text-amber-800 hover:bg-amber-50"}>
+                              {p.active ? "Ativo" : "Inativo"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="outline" className="h-8 rounded-lg" onClick={() => openEdit(p)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Editar
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
 
-            {/* Sort controls */}
-            <div className="hidden items-center gap-2 md:flex md:w-[180px]">
-              <Select value={sortKey} onValueChange={(v) => setSortKey(v as "name" | "department")}>
-                <SelectTrigger className="h-11 rounded-xl md:w-[140px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="name">Ordenar por nome</SelectItem>
-                  <SelectItem value="department">Ordenar por departamento</SelectItem>
-                </SelectContent>
-              </Select>
-              <Button variant="outline" className="h-11 rounded-xl" onClick={() => setSortDir((s) => (s === "asc" ? "desc" : "asc"))}>
-                {sortDir === "asc" ? "▲" : "▼"}
-              </Button>
-            </div>
-
-            <div className="relative w-full md:w-[360px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="h-11 rounded-xl pl-9" />
-            </div>
+                    {!filtered.length ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                          Nenhum usuário encontrado.
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                  </TableBody>
+                </Table>
+              </div>
+            </ResponsiveTable>
           </div>
         </div>
-
-        <Separator className="my-5" />
-
-        {showAuthHint ? (
-          <div className="mb-4 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-4 text-sm text-[color:var(--sinaxys-ink)]">
-            <div className="font-semibold">Não encontrou este e-mail?</div>
-            <div className="mt-1 text-xs text-muted-foreground">
-              Aqui aparecem apenas usuários com registro em <span className="font-medium text-[color:var(--sinaxys-ink)]">profiles</span>. Se a pessoa existir apenas no login (Supabase Auth), use
-              <span className="font-medium text-[color:var(--sinaxys-ink)]"> Adicionar usuário</span> para vincular/criar o perfil nesta empresa.
-            </div>
-          </div>
-        ) : null}
-
-        <ResponsiveTable className="mt-0" minWidth="1220px">
-          <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
-            <Table className="min-w-[1220px]">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>E-mail</TableHead>
-                  <TableHead>Papel</TableHead>
-                  <TableHead>Departamento</TableHead>
-                  <TableHead className="text-right">Acessos</TableHead>
-                  <TableHead className="text-right">Último acesso</TableHead>
-                  <TableHead className="text-right">Ativo</TableHead>
-                  <TableHead className="text-right">Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((p) => {
-                  const dept = p.department_id ? deptById.get(p.department_id)?.name : "—";
-                  const stat = statsByUserId.get(p.id);
-                  return (
-                    <TableRow key={p.id}>
-                      <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
-                        <Link to={`/admin/users/${p.id}`} className="inline-flex items-center gap-2 hover:underline">
-                          <span className="grid h-9 w-9 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
-                            <UserRound className="h-4 w-4" />
-                          </span>
-                          <span className="min-w-0 truncate">{p.name ?? "—"}</span>
-                        </Link>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{p.email}</TableCell>
-                      <TableCell>
-                        <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                          {roleLabel(p.role as any)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{dept ?? "—"}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{stat?.access_count ?? 0}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
-                      <TableCell className="text-right">
-                        <Badge className={p.active ? "rounded-full bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : "rounded-full bg-amber-50 text-amber-800 hover:bg-amber-50"}>
-                          {p.active ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="outline" className="h-9 rounded-xl" onClick={() => openEdit(p)}>
-                          <Pencil className="mr-2 h-4 w-4" />
-                          Editar
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-
-                {!filtered.length ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
-                      Nenhum usuário encontrado.
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-              </TableBody>
-            </Table>
-          </div>
-        </ResponsiveTable>
       </Card>
 
       <Dialog open={importOpen} onOpenChange={setImportOpen}>
@@ -688,7 +682,7 @@ export default function AdminUsers() {
                   <SelectContent>
                     <SelectItem value="__none__">Sem líder</SelectItem>
                     {profiles
-                      .filter((p) => p.id !== editing.id) // don't allow selecting self
+                      .filter((p) => p.id !== editing.id)
                       .map((p) => (
                         <SelectItem key={p.id} value={p.id}>
                           {p.name ?? p.email}
@@ -760,7 +754,6 @@ export default function AdminUsers() {
               onClick={async () => {
                 if (!editing) return;
                 try {
-                  // validate joined_at format if provided
                   const joinedIso = editJoinedAtStr.trim() ? parseDisplayToIso(editJoinedAtStr) : null;
                   if (editJoinedAtStr.trim() && !joinedIso) {
                     toast({ title: "Data inválida", description: "Use o formato dd/mm/yyyy.", variant: "destructive" });
@@ -778,7 +771,6 @@ export default function AdminUsers() {
                     monthly_cost_brl: toMonthlyCostNumber(editMonthlyCost),
                     active: editActive,
                     joined_at: joinedIso,
-                    // include manager id (líder direto)
                     manager_id: editManagerId || null,
                   });
                   await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
