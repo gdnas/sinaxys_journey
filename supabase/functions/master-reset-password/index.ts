@@ -70,7 +70,8 @@ serve(async (req) => {
     }
 
     const callerRole = normalizeRole(callerProfile?.role);
-    if (!callerProfile || callerRole !== "MASTERADMIN") {
+    // Allow both MASTERADMIN and ADMIN to reset passwords
+    if (!callerProfile || (callerRole !== "MASTERADMIN" && callerRole !== "ADMIN")) {
       return json(403, { ok: false, message: "Sem permissão." });
     }
 

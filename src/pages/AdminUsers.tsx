@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MailPlus, Pencil, Search, Shield, UploadCloud, UserRound, CalendarDays, Filter } from "lucide-react";
+import { MailPlus, Pencil, Search, Shield, UploadCloud, UserRound, CalendarDays, Filter, Key } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -45,7 +45,6 @@ function fmtDateTime(ts: string | null | undefined) {
   return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
-// Normalize various ISO-like strings and return dd/mm/yyyy
 function displayFromIso(iso?: string | null) {
   if (!iso) return "";
   const core = iso.length >= 10 ? iso.slice(0, 10) : iso;
@@ -67,7 +66,6 @@ function parseDisplayToIso(s: string) {
   return iso;
 }
 
-// Simple mask for dd/mm/yyyy. Accepts input and returns formatted string as the user types.
 function maskDateInput(value: string) {
   const digits = value.replace(/\D/g, "");
   if (!digits) return "";
@@ -155,7 +153,6 @@ export default function AdminUsers() {
   const [query, setQuery] = useState("");
   const [hideInactive, setHideInactive] = useState(true);
 
-  // department filter and sorting
   const [deptFilter, setDeptFilter] = useState<string>("__all__");
   const [sortKey, setSortKey] = useState<"name" | "department">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
@@ -163,18 +160,15 @@ export default function AdminUsers() {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let base = hideInactive ? profiles.filter((p) => !!p.active) : profiles;
-
     if (deptFilter && deptFilter !== "__all__") {
       base = base.filter((p) => (p.department_id ?? "") === deptFilter);
     }
-
     if (q) {
       base = base.filter((p) => {
         const hay = `${p.name ?? ""} ${p.email}`.toLowerCase();
         return hay.includes(q);
       });
     }
-
     const by = sortKey;
     const dir = sortDir === "asc" ? 1 : -1;
     base = [...base].sort((a, b) => {
@@ -188,7 +182,6 @@ export default function AdminUsers() {
         return cmp * dir;
       }
     });
-
     return base;
   }, [profiles, query, hideInactive, deptFilter, sortKey, sortDir, deptById]);
 
@@ -210,6 +203,11 @@ export default function AdminUsers() {
   const [editJoinedAtStr, setEditJoinedAtStr] = useState("");
   const [editManagerId, setEditManagerId] = useState<string>("");
 
+  // Reset password dialog state
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetTempPassword, setResetTempPassword] = useState("");
+  const [resetting, setResetting] = useState(false);
+
   const openEdit = (p: DbProfile) => {
     setEditing(p);
     setEditName(p.name ?? "");
@@ -222,6 +220,7 @@ export default function AdminUsers() {
     setEditContractUrl(p.contract_url ?? "");
     setEditJoinedAtStr(displayFromIso(p.joined_at));
     setEditManagerId(p.manager_id ?? "");
+    setResetTempPassword("");
     setEditOpen(true);
   };
 
@@ -249,6 +248,45 @@ export default function AdminUsers() {
     setInvitePhone("");
     setInviteSetTempPassword(false);
     setInviteTempPassword("");
+  };
+
+  // Call master-reset-password function
+  const handleResetPassword = async (userId: string) => {
+    try {
+      setResetting(true);
+      const payload = {
+        userId,
+        tempPassword: resetTempPassword.trim() || null,
+      };
+      const { data, error } = await supabase.functions.invoke("master-reset-password", {
+        body: payload,
+      });
+
+      if (error) throw error;
+
+      if (!data?.ok) {
+        throw new Error(data?.message ?? "Erro ao resetar senha.");
+      }
+
+      // Show the generated/used temp password to the admin (so they can copy it)
+      toast({
+        title: "Senha redefinida",
+        description: `Senha temporária: ${data.tempPassword}`,
+      });
+
+      // Refresh profiles
+      await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
+      setResetOpen(false);
+    } catch (e) {
+      const msg = await describeFunctionError(e);
+      toast({
+        title: "Não foi possível redefinir a senha",
+        description: msg,
+        variant: "destructive",
+      });
+    } finally {
+      setResetting(false);
+    }
   };
 
   return (
@@ -744,50 +782,107 @@ export default function AdminUsers() {
             <div className="text-sm text-muted-foreground">Usuário não encontrado.</div>
           )}
 
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+            {/* Reset password action for admins */}
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto rounded-xl flex items-center gap-2"
+                onClick={() => setResetOpen(true)}
+                disabled={!editing}
+                title="Redefinir senha temporária do usuário"
+              >
+                <Key className="h-4 w-4" />
+                Redefinir senha
+              </Button>
+            </div>
+
+            <div className="flex gap-2 w-full sm:w-auto">
+              <Button variant="outline" className="rounded-xl w-full sm:w-auto" onClick={() => setEditOpen(false)}>
+                Cancelar
+              </Button>
+              <Button
+                className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 w-full sm:w-auto"
+                disabled={!editing || saving || editName.trim().length < 2}
+                onClick={async () => {
+                  if (!editing) return;
+                  try {
+                    const joinedIso = editJoinedAtStr.trim() ? parseDisplayToIso(editJoinedAtStr) : null;
+                    if (editJoinedAtStr.trim() && !joinedIso) {
+                      toast({ title: "Data inválida", description: "Use o formato dd/mm/yyyy.", variant: "destructive" });
+                      return;
+                    }
+
+                    setSaving(true);
+                    await updateProfile(editing.id, {
+                      name: editName.trim(),
+                      role: editRole,
+                      department_id: editDeptId || null,
+                      job_title: editJobTitle.trim() || null,
+                      phone: editPhone.trim() || null,
+                      contract_url: editContractUrl.trim() || null,
+                      monthly_cost_brl: toMonthlyCostNumber(editMonthlyCost),
+                      active: editActive,
+                      joined_at: joinedIso,
+                      manager_id: editManagerId || null,
+                    });
+                    await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
+                    toast({ title: "Usuário atualizado" });
+                    setEditOpen(false);
+                  } catch (e) {
+                    toast({
+                      title: "Não foi possível salvar",
+                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      variant: "destructive",
+                    });
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+              >
+                Salvar
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset password dialog */}
+      <Dialog open={resetOpen} onOpenChange={(v) => setResetOpen(v)}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Redefinir senha</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-3">
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Gerar ou definir senha temporária</div>
+              <div className="mt-1 text-xs text-muted-foreground">Deixe em branco para gerar automaticamente uma senha forte; caso contrário, digite a senha temporária desejada (mín. 6 caracteres).</div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Senha temporária (opcional)</Label>
+              <Input className="h-11 rounded-xl" value={resetTempPassword} onChange={(e) => setResetTempPassword(e.target.value)} placeholder="Deixe em branco para gerar automaticamente" />
+            </div>
+          </div>
+
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setEditOpen(false)}>
+            <Button variant="outline" className="rounded-xl" onClick={() => setResetOpen(false)} disabled={resetting}>
               Cancelar
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!editing || saving || editName.trim().length < 2}
               onClick={async () => {
                 if (!editing) return;
-                try {
-                  const joinedIso = editJoinedAtStr.trim() ? parseDisplayToIso(editJoinedAtStr) : null;
-                  if (editJoinedAtStr.trim() && !joinedIso) {
-                    toast({ title: "Data inválida", description: "Use o formato dd/mm/yyyy.", variant: "destructive" });
-                    return;
-                  }
-
-                  setSaving(true);
-                  await updateProfile(editing.id, {
-                    name: editName.trim(),
-                    role: editRole,
-                    department_id: editDeptId || null,
-                    job_title: editJobTitle.trim() || null,
-                    phone: editPhone.trim() || null,
-                    contract_url: editContractUrl.trim() || null,
-                    monthly_cost_brl: toMonthlyCostNumber(editMonthlyCost),
-                    active: editActive,
-                    joined_at: joinedIso,
-                    manager_id: editManagerId || null,
-                  });
-                  await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
-                  toast({ title: "Usuário atualizado" });
-                  setEditOpen(false);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível salvar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setSaving(false);
+                if (resetTempPassword.trim() && resetTempPassword.trim().length < 6) {
+                  toast({ title: "Senha inválida", description: "A senha temporária deve ter ao menos 6 caracteres.", variant: "destructive" });
+                  return;
                 }
+                await handleResetPassword(editing.id);
               }}
+              disabled={resetting}
             >
-              Salvar
+              {resetting ? "Redefinindo…" : "Redefinir senha"}
             </Button>
           </DialogFooter>
         </DialogContent>
