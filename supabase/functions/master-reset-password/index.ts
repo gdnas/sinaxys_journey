@@ -1,3 +1,5 @@
+// @ts-nocheck - Suppress TS errors for Deno globals and external modules in this function
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -43,9 +45,11 @@ serve(async (req) => {
     const token = authHeader.replace("Bearer ", "").trim();
     if (!token) return json(401, { ok: false, message: "Unauthorized" });
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    // Access Deno.env - inline cast to avoid type errors
+    const getEnv = (name: string) => (Deno as any).env.get(name) as string | undefined;
+    const SUPABASE_URL = getEnv("SUPABASE_URL")!;
+    const SUPABASE_ANON_KEY = getEnv("SUPABASE_ANON_KEY")!;
+    const SUPABASE_SERVICE_ROLE_KEY = getEnv("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
     const service = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -86,7 +90,7 @@ serve(async (req) => {
     }
 
     // Also confirms email, otherwise Supabase blocks login with "Email not confirmed".
-    const { error: updErr } = await service.auth.admin.updateUserById(userId, {
+    const { error: updErr } = await (service as any).auth.admin.updateUserById(userId, {
       password: tempPassword,
       email_confirm: true,
     });
