@@ -178,6 +178,26 @@ CREATE TRIGGER knowledge_page_comments_updated_at
   EXECUTE FUNCTION update_knowledge_page_comments_updated_at();
 
 -- ============================================
+-- Ensure created_by integrity: set created_by to auth.uid() if not provided
+-- ============================================
+
+CREATE OR REPLACE FUNCTION set_knowledge_page_created_by()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.created_by IS NULL THEN
+    NEW.created_by := auth.uid();
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS knowledge_pages_set_created_by ON public.knowledge_pages;
+CREATE TRIGGER knowledge_pages_set_created_by
+  BEFORE INSERT ON public.knowledge_pages
+  FOR EACH ROW
+  EXECUTE FUNCTION set_knowledge_page_created_by();
+
+-- ============================================
 -- Helper Functions for Permission Checking
 -- ============================================
 
@@ -341,8 +361,17 @@ CREATE POLICY "spaces_delete_admin" ON public.knowledge_spaces
 CREATE POLICY "pages_select_company" ON public.knowledge_pages
   FOR SELECT USING (company_id = auth.company_id() AND has_page_access(id));
 
-CREATE POLICY "pages_insert_editor" ON public.knowledge_pages
-  FOR INSERT WITH CHECK (company_id = auth.company_id() AND is_editor_or_master());
+-- Replace previous insert policy: allow creator (created_by) or editors/admins within same company
+DROP POLICY IF EXISTS "pages_insert_editor" ON public.knowledge_pages;
+CREATE POLICY "pages_insert_creator_or_editor" ON public.knowledge_pages
+  FOR INSERT
+  WITH CHECK (
+    company_id = auth.company_id()
+    AND (
+      is_editor_or_master()
+      OR created_by = auth.uid()
+    )
+  );
 
 CREATE POLICY "pages_update_editor" ON public.knowledge_pages
   FOR UPDATE USING (company_id = auth.company_id() AND can_edit_page(id));
@@ -358,6 +387,7 @@ CREATE POLICY "permissions_select_company" ON public.knowledge_permissions
   ));
 
 -- Allow the page creator OR admins to manage permissions for a page within the same company
+DROP POLICY IF EXISTS "permissions_manage_admin" ON public.knowledge_permissions;
 CREATE POLICY "permissions_manage_admin_or_creator" ON public.knowledge_permissions
   FOR ALL USING (EXISTS (
     SELECT 1 FROM public.knowledge_pages p
@@ -477,8 +507,8 @@ CREATE OR REPLACE FUNCTION generate_page_slug()
 RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.slug IS NULL OR NEW.slug = '' THEN
-    NEW.slug := lower(regexp_replace(NEW.title, '[^a-zA-Z0-9\s-]', '', 'g'));
-    NEW.slug := lower(regexp_replace(NEW.slug, '\s+', '-', 'g'));
+    NEW.slug := lower(regexp_replace(NEW.title, '[^a-zA-Z0-9\\s-]', '', 'g'));
+    NEW.slug := lower(regexp_replace(NEW.slug, '\\s+', '-', 'g'));
     NEW.slug := lower(regexp_replace(NEW.slug, '-+', '-', 'g'));
     NEW.slug := trim(NEW.slug, '-');
     
@@ -491,6 +521,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS page_slug_on_insert ON public.knowledge_pages;
 CREATE TRIGGER page_slug_on_insert
   BEFORE INSERT ON public.knowledge_pages
   FOR EACH ROW
