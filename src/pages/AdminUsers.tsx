@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MailPlus, Pencil, Search, Shield, UploadCloud, UserRound, CalendarDays } from "lucide-react";
+import { MailPlus, Pencil, Search, Shield, UploadCloud, UserRound, CalendarDays, Filter } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -163,15 +163,45 @@ export default function AdminUsers() {
   const [query, setQuery] = useState("");
   const [hideInactive, setHideInactive] = useState(true);
 
+  // New: department filter and sorting controls
+  const [deptFilter, setDeptFilter] = useState<string>("__all__");
+  const [sortKey, setSortKey] = useState<"name" | "department">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const base = hideInactive ? profiles.filter((p) => !!p.active) : profiles;
-    if (!q) return base;
-    return base.filter((p) => {
-      const hay = `${p.name ?? ""} ${p.email}`.toLowerCase();
-      return hay.includes(q);
+    let base = hideInactive ? profiles.filter((p) => !!p.active) : profiles;
+
+    // department filter
+    if (deptFilter && deptFilter !== "__all__") {
+      base = base.filter((p) => (p.department_id ?? "") === deptFilter);
+    }
+
+    // search
+    if (q) {
+      base = base.filter((p) => {
+        const hay = `${p.name ?? ""} ${p.email}`.toLowerCase();
+        return hay.includes(q);
+      });
+    }
+
+    // sorting
+    const by = sortKey;
+    const dir = sortDir === "asc" ? 1 : -1;
+    base = [...base].sort((a, b) => {
+      if (by === "department") {
+        const da = a.department_id ? (deptById.get(a.department_id)?.name ?? "") : "";
+        const db = b.department_id ? (deptById.get(b.department_id)?.name ?? "") : "";
+        const cmp = da.localeCompare(db, "pt-BR", { sensitivity: "base" }) || (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" });
+        return cmp * dir;
+      } else {
+        const cmp = (a.name ?? "").localeCompare(b.name ?? "", "pt-BR", { sensitivity: "base" });
+        return cmp * dir;
+      }
     });
-  }, [profiles, query, hideInactive]);
+
+    return base;
+  }, [profiles, query, hideInactive, deptFilter, sortKey, sortDir, deptById]);
 
   const emailQuery = query.trim().toLowerCase();
   const showAuthHint = !isLoading && !!emailQuery && emailQuery.includes("@") && filtered.length === 0;
@@ -189,7 +219,7 @@ export default function AdminUsers() {
   const [editContractUrl, setEditContractUrl] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [editJoinedAtStr, setEditJoinedAtStr] = useState("");
-  // NEW: manager (líder direto)
+  // manager (líder direto)
   const [editManagerId, setEditManagerId] = useState<string>("");
 
   const openEdit = (p: DbProfile) => {
@@ -280,6 +310,40 @@ export default function AdminUsers() {
             <div className="flex w-full items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] px-3 py-2 md:w-[260px]">
               <div className="text-xs font-semibold text-[color:var(--sinaxys-ink)]">Ocultar inativos</div>
               <Switch checked={hideInactive} onCheckedChange={setHideInactive} />
+            </div>
+
+            {/* Department filter */}
+            <div className="hidden w-full items-center gap-2 md:flex md:w-[260px]">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={deptFilter} onValueChange={(v) => setDeptFilter(v)}>
+                <SelectTrigger className="h-11 rounded-xl md:w-[220px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__all__">Todos departamentos</SelectItem>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sort controls */}
+            <div className="hidden items-center gap-2 md:flex md:w-[180px]">
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as "name" | "department")}>
+                <SelectTrigger className="h-11 rounded-xl md:w-[140px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="name">Ordenar por nome</SelectItem>
+                  <SelectItem value="department">Ordenar por departamento</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button variant="outline" className="h-11 rounded-xl" onClick={() => setSortDir((s) => (s === "asc" ? "desc" : "asc"))}>
+                {sortDir === "asc" ? "▲" : "▼"}
+              </Button>
             </div>
 
             <div className="relative w-full md:w-[360px]">
@@ -614,7 +678,7 @@ export default function AdminUsers() {
                 </Select>
               </div>
 
-              {/* NEW: Manager selection */}
+              {/* Manager selection */}
               <div className="grid gap-2">
                 <Label>Líder direto</Label>
                 <Select value={editManagerId || "__none__"} onValueChange={(v) => setEditManagerId(v === "__none__" ? "" : v)}>
