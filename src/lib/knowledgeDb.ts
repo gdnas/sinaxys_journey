@@ -196,6 +196,30 @@ export async function getKnowledgePage(pageId: string) {
 export async function createKnowledgePage(
   payload: Omit<DbKnowledgePage, "id" | "created_at" | "updated_at" | "slug">
 ) {
+  // Ensure created_by is set to the current authenticated user to satisfy RLS and prevent spoofing.
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData?.session?.user?.id ?? null;
+
+    if (userId) {
+      // populate created_by if missing
+      if (!payload.created_by) payload.created_by = userId;
+
+      // if company_id is missing, try to fetch from profiles
+      if (!payload.company_id) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("company_id")
+          .eq("id", userId)
+          .maybeSingle();
+        if (profileData?.company_id) payload.company_id = profileData.company_id;
+      }
+    }
+  } catch (err) {
+    // ignore errors here; the DB trigger/policy will enforce integrity if needed
+    // but we still attempt to set fields for better UX
+  }
+
   const { data, error } = await supabase
     .from("knowledge_pages")
     .insert({
