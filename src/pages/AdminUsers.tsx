@@ -189,6 +189,8 @@ export default function AdminUsers() {
   const [editContractUrl, setEditContractUrl] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [editJoinedAtStr, setEditJoinedAtStr] = useState("");
+  // NEW: manager (líder direto)
+  const [editManagerId, setEditManagerId] = useState<string>("");
 
   const openEdit = (p: DbProfile) => {
     setEditing(p);
@@ -201,6 +203,8 @@ export default function AdminUsers() {
     setEditMonthlyCost(typeof p.monthly_cost_brl === "number" ? String(p.monthly_cost_brl) : "");
     setEditContractUrl(p.contract_url ?? "");
     setEditJoinedAtStr(displayFromIso(p.joined_at));
+    // initialize manager id
+    setEditManagerId(p.manager_id ?? "");
     setEditOpen(true);
   };
 
@@ -610,6 +614,27 @@ export default function AdminUsers() {
                 </Select>
               </div>
 
+              {/* NEW: Manager selection */}
+              <div className="grid gap-2">
+                <Label>Líder direto</Label>
+                <Select value={editManagerId || "__none__"} onValueChange={(v) => setEditManagerId(v === "__none__" ? "" : v)}>
+                  <SelectTrigger className="h-11 rounded-xl">
+                    <SelectValue placeholder="Selecione…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sem líder</SelectItem>
+                    {profiles
+                      .filter((p) => p.id !== editing.id) // don't allow selecting self
+                      .map((p) => (
+                        <SelectItem key={p.id} value={p.id}>
+                          {p.name ?? p.email}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">Escolha o líder direto (manager) deste usuário.</div>
+              </div>
+
               <div className="grid gap-2">
                 <Label>Cargo</Label>
                 <Input className="h-11 rounded-xl" value={editJobTitle} onChange={(e) => setEditJobTitle(e.target.value)} />
@@ -689,6 +714,8 @@ export default function AdminUsers() {
                     monthly_cost_brl: toMonthlyCostNumber(editMonthlyCost),
                     active: editActive,
                     joined_at: joinedIso,
+                    // include manager id (líder direto)
+                    manager_id: editManagerId || null,
                   });
                   await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
                   toast({ title: "Usuário atualizado" });
