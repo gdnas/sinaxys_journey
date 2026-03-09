@@ -196,7 +196,7 @@ export async function getKnowledgePage(pageId: string) {
 export async function createKnowledgePage(
   payload: Omit<DbKnowledgePage, "id" | "created_at" | "updated_at" | "slug">
 ) {
-  // Ensure created_by is set to the current authenticated user to satisfy RLS and prevent spoofing.
+  // Ensure created_by is set to current authenticated user to satisfy RLS and prevent spoofing.
   try {
     const { data: sessionData } = await supabase.auth.getSession();
     const userId = sessionData?.session?.user?.id ?? null;
@@ -216,7 +216,7 @@ export async function createKnowledgePage(
       }
     }
   } catch (err) {
-    // ignore errors here; the DB trigger/policy will enforce integrity if needed
+    // ignore errors here; DB trigger/policy will enforce integrity if needed
     // but we still attempt to set fields for better UX
   }
 
@@ -300,11 +300,11 @@ export async function toggleKnowledgePageFavorite(pageId: string, isFavorite: bo
 
 const permissionSelect = "id,page_id,role_id,user_id,permission_level,created_at";
 
-export async function listKnowledgePermissions(pageId: string) {
+export async function listPermissions() {
   const { data, error } = await supabase
     .from("knowledge_permissions")
     .select(permissionSelect)
-    .eq("page_id", pageId);
+    .order("created_at", { ascending: false });
 
   if (error) throw error;
   return (data ?? []) as DbKnowledgePermission[];
@@ -375,7 +375,7 @@ export async function restoreKnowledgePageVersion(
   pageId: string,
   versionId: string
 ) {
-  // Get the version to restore
+  // Get version to restore
   const { data: version } = await supabase
     .from("knowledge_page_versions")
     .select("content_snapshot")
@@ -384,7 +384,7 @@ export async function restoreKnowledgePageVersion(
 
   if (!version) throw new Error("Version not found");
 
-  // Update the page with the version content
+  // Update page with version content
   const { data, error } = await supabase
     .from("knowledge_pages")
     .update({ content: version.content_snapshot })
@@ -401,6 +401,17 @@ export async function restoreKnowledgePageVersion(
 // ============================================================================
 
 const auditSelect = "id,page_id,old_snapshot,new_snapshot,changed_by,changed_fields,changed_at";
+
+export async function listAuditLogs() {
+  const { data, error } = await supabase
+    .from("knowledge_page_audit_log")
+    .select(auditSelect)
+    .order("changed_at", { ascending: false })
+    .limit(100);
+
+  if (error) throw error;
+  return (data ?? []) as DbKnowledgePageAuditLog[];
+}
 
 export async function listKnowledgePageAuditLogs(pageId: string) {
   const { data, error } = await supabase

@@ -1,5 +1,6 @@
-import { useState } from "react";
-import { Minus, Plus, ChevronDown, ChevronRight, Check, AlertCircle, Clock } from "lucide-react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { Minus, Plus, ChevronDown, ChevronRight, Check, AlertCircle, Clock, ChevronUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,6 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { listAuditLogs } from "@/lib/knowledgeDb";
 
@@ -110,7 +112,7 @@ export default function AuditLogPanel() {
                     {expandedLogId === log.id ? (
                       <div className="p-4 space-y-4 bg-[color:var(--sinaxys-bg)] rounded-2xl border-[color:var(--sinaxys-border)]">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-semibold text-[color:var(--var(--sinaxys-ink)]">Histórico</div>
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Histórico</div>
                           <div className="text-xs text-muted-foreground">
                             Registrada em {new Date(log.created_at).toLocaleString("pt-BR", {
                               day: "2-digit",
@@ -131,6 +133,7 @@ export default function AuditLogPanel() {
                               <div className="mt-1 text-sm text-muted-foreground">
                                 Por {log.user_id}
                               </div>
+                            </div>
                           </div>
 
                           <div className="flex flex-col gap-3">
@@ -150,7 +153,7 @@ export default function AuditLogPanel() {
                                             <div key={key} className="grid gap-2">
                                               <Label className="text-xs font-medium text-[color:var(--sinaxys-ink)]">{key}</Label>
                                               <div className="text-sm text-muted-foreground whitespace-pre-wrap break-all">
-                                                {value}
+                                                {JSON.stringify(value, null, 2)}
                                               </div>
                                             </div>
                                           ))}
@@ -169,7 +172,7 @@ export default function AuditLogPanel() {
                                             <div key={key} className="grid gap-2">
                                               <Label className="text-xs font-medium text-[color:var(--sinaxys-ink)]">{key}</Label>
                                               <div className="text-sm text-muted-foreground whitespace-pre-wrap break-all">
-                                                {value}
+                                                {JSON.stringify(value, null, 2)}
                                               </div>
                                             </div>
                                           ))}
@@ -178,7 +181,8 @@ export default function AuditLogPanel() {
                                     )}
                                   </div>
                                 </div>
-                              )}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
