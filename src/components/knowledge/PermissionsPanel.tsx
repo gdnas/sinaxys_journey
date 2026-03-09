@@ -1,5 +1,7 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, Users, Plus, Trash2, Search } from "lucide-react";
+import { Shield, Users, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,6 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { listPermissions, createKnowledgePermission, deleteKnowledgePermission } from "@/lib/knowledgeDb";
+import { useState } from "react";
 
 export default function PermissionsPanel() {
   const { toast } = useToast();
@@ -29,19 +32,18 @@ export default function PermissionsPanel() {
 
   const filteredPermissions = permissions.filter((p) =>
     search && (
-      p.resource_name.toLowerCase().includes(search.toLowerCase()) ||
-      p.role_name.toLowerCase().includes(search.toLowerCase())
+      p.title.toLowerCase().includes(search.toLowerCase())
     )
   );
 
   const createMutation = useMutation({
-    mutationFn: ({ title, role, resourceType, resourceId, permissionLevel }: { title: string; role: string; resourceType: string; resourceId: string; permissionLevel: string }) =>
+    mutationFn: ({ resourceId, resourceType, title, role, permissionLevel }: { resourceId: string; resourceType: string; title: string; role: string; permissionLevel: string }) =>
       createKnowledgePermission({
+        page_id: resourceId,
+        resource_type: resourceType,
         title,
-        role,
-        resourceType,
-        resourceId,
-        permissionLevel,
+        role_id: role === "all" ? null : role,
+        permission_level: permissionLevel,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["permissions"] });
@@ -81,13 +83,14 @@ export default function PermissionsPanel() {
               setOpen(true);
             }}
           >
+            <span className="sr-only">Fechar</span>
             <Plus className="mr-2 h-4 w-4" />
             Nova permissão
           </Button>
         </div>
       </Card>
 
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+      <Card className="rounded-3xl border bg-white p-6">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Permissões</div>
@@ -95,11 +98,13 @@ export default function PermissionsPanel() {
           </div>
           <div className="relative w-full md:w-[300px]">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <div className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground">
+                <Search />
+              </div>
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar per nome de permissão, role ou recurso…"
+                placeholder="Buscar por nome de permissão, role ou recurso…"
                 className="h-11 w-full rounded-xl pl-9"
               />
             </div>
@@ -107,44 +112,38 @@ export default function PermissionsPanel() {
         </div>
 
         <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-          {filteredPermissions.length ? (
+          {filteredPermissions.length > 0 ? (
             <div className="space-y-2">
               {filteredPermissions.map((permission) => (
-                <div key={permission.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div>
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{permission.title}</div>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                          <span className="font-medium">{permission.resource_type}:</span> {permission.resource_name || "-"}
-                          <div className="mt-1 text-xs text-muted-foreground">
-                            {permission.role_name} • {permission.permission_level}
-                          </div>
-                        </div>
-                      </div>
-                    <div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-full text-destructive"
-                        onClick={() => deleteMutation.mutate(permission.id)}
-                        title="Remover permissão"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                <div key={permission.id} className="flex items-start justify-between gap-3 bg-white border rounded-lg p-3">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{permission.title}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {permission.resource_type}
+                      {permission.user_id ? `• ${permission.user_id}` : ""}
+                      {permission.role_id ? `• ${permission.role_id}` : ""}
+                      {permission.permission_level}
                     </div>
                   </div>
-                );
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 rounded-full text-destructive"
+                    onClick={() => deleteMutation.mutate(permission.id)}
+                    title="Remover permissão"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-              <div className="flex flex-col items-center justify-center py-12 text-sm text-muted-foreground">
-                <span>Nenhuma permissão encontrada.</span>
-              </div>
-            )}
-          </div>
-        </Card>
+            <div className="flex flex-col items-center justify-center py-12 text-sm text-muted-foreground">
+              Nenhuma permissão encontrada
+            </div>
+          )}
+        </div>
+      </Card>
 
       <Dialog open={open} onOpenChange={(v) => {
         if (!v) {
@@ -169,6 +168,7 @@ export default function PermissionsPanel() {
                 className="h-11 rounded-xl"
               />
             </div>
+
             <div className="grid gap-2">
               <Label>Role</Label>
               <Select value={permissionLevel} onValueChange={setPermissionLevel}>
@@ -217,10 +217,11 @@ export default function PermissionsPanel() {
               onClick={() => {
                 if (title && resourceId) {
                   createMutation.mutate({
-                    title,
-                    role: permissionLevel,
-                    resourceType,
                     resourceId,
+                    resourceType,
+                    title,
+                    role: permissionLevel === "admin" ? "all" : permissionLevel,
+                    permissionLevel,
                   });
                 }
               }}
