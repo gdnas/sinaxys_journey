@@ -29,7 +29,7 @@ export default function KnowledgeNewSpace() {
 
   const createSpaceMutation = useMutation({
     mutationFn: () => createKnowledgeSpace({
-      company_id: cid,
+      companyId: cid,
       name,
       description,
       icon,

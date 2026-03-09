@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, Users, Plus, Trash2 } from "lucide-react";
+import { Shield, Users, Plus, Trash2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -23,7 +23,7 @@ export default function PermissionsPanel() {
   const [title, setTitle] = useState("");
   const [permissionLevel, setPermissionLevel] = useState<"view" | "edit" | "admin">("view");
   const [resourceId, setResourceId] = useState("");
-  const [resourceType, setResourceType] = useState<"track" | "page">("track");
+  const [resourceType, setResourceType] = useState<string>("track");
 
   const { data: permissions = [], isLoading } = useQuery({
     queryKey: ["permissions"],
@@ -31,19 +31,20 @@ export default function PermissionsPanel() {
   });
 
   const filteredPermissions = permissions.filter((p) =>
-    search && (
-      p.title.toLowerCase().includes(search.toLowerCase())
-    )
+    search
+      ? ((p.title ?? "").toLowerCase().includes(search.toLowerCase()) || (p.role_id ?? "").toLowerCase().includes(search.toLowerCase()) || (p.user_id ?? "").toLowerCase().includes(search.toLowerCase()))
+      : true
   );
 
   const createMutation = useMutation({
     mutationFn: ({ resourceId, resourceType, title, role, permissionLevel }: { resourceId: string; resourceType: string; title: string; role: string; permissionLevel: string }) =>
       createKnowledgePermission({
         page_id: resourceId,
-        resource_type: resourceType,
-        title,
         role_id: role === "all" ? null : role,
-        permission_level: permissionLevel,
+        user_id: null,
+        permission_level: permissionLevel as "view" | "edit" | "admin",
+        title,
+        resource_type: resourceType,
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["permissions"] });
@@ -117,11 +118,11 @@ export default function PermissionsPanel() {
               {filteredPermissions.map((permission) => (
                 <div key={permission.id} className="flex items-start justify-between gap-3 bg-white border rounded-lg p-3">
                   <div>
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{permission.title}</div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{permission.title ?? "Permissão"}</div>
                     <div className="mt-1 text-sm text-muted-foreground">
-                      {permission.resource_type}
-                      {permission.user_id ? `• ${permission.user_id}` : ""}
-                      {permission.role_id ? `• ${permission.role_id}` : ""}
+                      {permission.resource_type ?? ""}
+                      {permission.user_id ? ` • ${permission.user_id}` : ""}
+                      {permission.role_id ? ` • ${permission.role_id}` : ""}
                       {permission.permission_level}
                     </div>
                   </div>
@@ -171,7 +172,7 @@ export default function PermissionsPanel() {
 
             <div className="grid gap-2">
               <Label>Role</Label>
-              <Select value={permissionLevel} onValueChange={setPermissionLevel}>
+              <Select value={permissionLevel} onValueChange={(v: string) => setPermissionLevel(v as "view" | "edit" | "admin")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione…" />
                 </SelectTrigger>
@@ -185,7 +186,7 @@ export default function PermissionsPanel() {
 
             <div className="grid gap-2">
               <Label>Tipo de Recurso</Label>
-              <Select value={resourceType} onValueChange={setResourceType}>
+              <Select value={resourceType} onValueChange={(v: string) => setResourceType(v)}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione…" />
                 </SelectTrigger>

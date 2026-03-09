@@ -12,6 +12,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
@@ -397,12 +399,12 @@ export default function TrackLibrary() {
             <DialogTitle>Delegar trilha</DialogTitle>
           </DialogHeader>
 
-          {delegateTrack ? (
+          {delegateTrackId ? (
             <div className="grid gap-4">
               <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilha</div>
-                <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{delegateTrackId?.title}</div>
-                <div className="mt-1 text-xs text-muted-foreground">Departamento: {deptById.get(delegateTrackId?.department_id)?.name ?? "—"}</div>
+                <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{tracks.find(t => t.id === delegateTrackId)?.title}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Departamento: {deptById.get(tracks.find(t => t.id === delegateTrackId)?.department_id)?.name ?? "—"}</div>
               </div>
 
               <div className="grid gap-2">

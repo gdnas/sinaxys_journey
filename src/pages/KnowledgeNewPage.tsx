@@ -30,15 +30,13 @@ export default function KnowledgeNewPage() {
 
   const createPageMutation = useMutation({
     mutationFn: () => createKnowledgePage({
-      space_id: spaceId,
-      parent_page_id: null,
+      spaceId: spaceId,
       title,
       content: { type: "doc", content: [{ type: "paragraph", content: [{ type: "text", text: content }] }] },
       icon,
-      cover_image: null,
-      is_favorite: false,
-      created_by: user.id,
-      company_id: cid,
+      parentPageId: null,
+      createdBy: user.id,
+      companyId: cid,
     }),
     onSuccess: (page) => {
       toast.success("Página criada com sucesso");

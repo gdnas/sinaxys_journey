@@ -1,14 +1,13 @@
-import { useState } from "react";
-import { ChevronDown, ChevronRight, AlertCircle, Clock } from "lucide-react";
+import { useState, useMemo } from "react";
+import { ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 import { useQuery } from "@tanstack/react-query";
-import { useToast } from "@/hooks/use-toast";
 import { listAuditLogs } from "@/lib/knowledgeDb";
 
 type AuditLogEntry = {
@@ -22,8 +21,6 @@ type AuditLogEntry = {
 };
 
 export default function AuditLogPanel() {
-  const { toast } = useToast();
-
   const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<AuditLogEntry | null>(null);
 
@@ -32,11 +29,13 @@ export default function AuditLogPanel() {
     queryFn: () => listAuditLogs(),
   });
 
-  const visibleLogs = logs.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  const visibleLogs = logs.slice().sort((a, b) => 
+    new Date(b.changed_at || b.created_at || "").getTime() - new Date(a.changed_at || a.created_at || "").getTime()
+  );
 
   const dateLogs = useMemo(() => {
     return visibleLogs.filter(log => {
-      const d = new Date(log.created_at);
+      const d = new Date(log.changed_at || log.created_at || "");
       return d.getDate() === new Date().getDate() && d.getMonth() === new Date().getMonth();
     });
   }, [visibleLogs]);
@@ -67,7 +66,7 @@ export default function AuditLogPanel() {
           ) : (
             <div className="space-y-4">
               {dateLogs.map((log) => {
-                const date = new Date(log.created_at).toLocaleString('pt-BR', { 
+                const date = new Date(log.changed_at || log.created_at || "").toLocaleString('pt-BR', { 
                   weekday: 'long',
                   year: 'numeric',
                   day: 'numeric',
@@ -92,10 +91,10 @@ export default function AuditLogPanel() {
                               <Badge variant="secondary" className="rounded-full text-xs">
                                 {date}
                               </Badge>
-                              <span className="text-sm font-medium text-[color:var(--var(--sinaxys-ink)]">{log.action}</span>
+                              <span className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Atualização de página</span>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-sm text-muted-foreground">Por {log.user_id}</span>
+                              <span className="text-sm text-muted-foreground">Por {log.changed_by || "Sistema"}</span>
                             </div>
                           </div>
                           {expandedLogId === log.id ? (
@@ -111,14 +110,14 @@ export default function AuditLogPanel() {
                           <div className="flex items-center justify-between gap-2">
                             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Histórico</div>
                             <div className="text-xs text-muted-foreground">
-                              Registrada em {new Date(log.created_at).toLocaleString("pt-BR", {
+                              Registrada em {new Date(log.changed_at || log.created_at || "").toLocaleString("pt-BR", {
                                 day: "2-digit",
                                 month: "long",
                                 year: "numeric",
                               })}
                             </div>
                             <Badge variant="outline" className="text-xs">
-                              {log.user_id}
+                              {log.changed_by || "Sistema"}
                             </Badge>
                           </div>
 
@@ -126,16 +125,20 @@ export default function AuditLogPanel() {
                             <div>
                               <div className="text-xs text-muted-foreground">
                                 Ação:
-                              <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">{log.action}</div>
+                              </div>
+                              <div className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Página atualizada</div>
                               <div className="mt-1 text-sm text-muted-foreground">
-                                Por {log.user_id}
+                                Por {log.changed_by || "Sistema"}
                               </div>
                             </div>
                             <div>
                               <div className="text-xs text-muted-foreground">
                                 Detalhes:
-                                <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)] whitespace-pre-wrap break-all">{JSON.stringify(log.details, null, 2)}</div>
                               </div>
+                              <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)] whitespace-pre-wrap break-all">
+                                {JSON.stringify(log.changed_fields || [], null, 2)}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -162,25 +165,25 @@ export default function AuditLogPanel() {
             <div className="space-y-4">
               <div className="grid gap-2">
                 <Label>ID</Label>
-                  <Input value={selectedEntry.id} readOnly className="h-11 rounded-xl" />
+                <Input value={selectedEntry.id} readOnly className="h-11 rounded-xl" />
               </div>
               <div className="grid gap-2">
                 <Label>Data e Hora</Label>
-                  <Input 
-                    value={new Date(selectedEntry.created_at).toLocaleString('pt-BR', {
-                      day: '2-digit',
-                      month: 'long',
-                      year: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
-                    readOnly
-                    className="h-11 rounded-xl"
-                  />
+                <Input 
+                  value={new Date(selectedEntry.created_at).toLocaleString('pt-BR', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                  readOnly
+                  className="h-11 rounded-xl"
+                />
               </div>
               <div className="grid gap-2">
                 <Label>Usuário</Label>
-                  <Input value={selectedEntry.user_id} readOnly className="h-11 rounded-xl" />
+                <Input value={selectedEntry.user_id} readOnly className="h-11 rounded-xl" />
               </div>
               <div className="grid gap-2">
                 <Label>Ação</Label>
@@ -213,6 +216,7 @@ export default function AuditLogPanel() {
                   Fechar
                 </Button>
               </DialogFooter>
+            </div>
           </DialogContent>
         </Dialog>
       )}
