@@ -1,464 +1,233 @@
-"use client";
-
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Shield, Users, Plus, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  X, 
-  Shield, 
-  ShieldCheck, 
-  Eye, 
-  Edit, 
-  Trash2 
-} from "lucide-react";
-import { toast } from "sonner";
-import { 
-  listKnowledgePermissions, 
-  createKnowledgePermission, 
-  deleteKnowledgePermission 
-} from "@/lib/knowledgeDb";
-import { useAuth } from "@/lib/auth";
-import { useCompany } from "@/lib/company";
-import { listProfilePublic } from "@/lib/profilePublicDb";
+import { useToast } from "@/hooks/use-toast";
+import { listPermissions, createKnowledgePermission, deleteKnowledgePermission } from "@/lib/knowledgeDb";
 
-type PermissionLevel = "view" | "edit" | "admin";
+export default function PermissionsPanel() {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  
+  const [search, setSearch] = useState("");
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [permissionLevel, setPermissionLevel] = useState<"view" | "edit" | "admin">("view");
+  const [resourceId, setResourceId] = useState("");
+  const [resourceType, setResourceType] = useState<"track" | "page">("track");
 
-interface PermissionsPanelProps {
-  pageId: string;
-  companyId: string;
-  pageOwnerId: string | null;
-  onOpenChange?: (open: boolean) => void;
-}
+  const { data: permissions = [], isLoading } = useQuery({
+    queryKey: ["permissions"],
+    queryFn: () => listPermissions(),
+  });
 
-const permissionLevels: { value: PermissionLevel; label: string; description: string; color: string }[] = [
-  { value: "view", label: "Visualizar", description: "Pode ver o conteúdo", color: "bg-blue-100 text-blue-700" },
-  { value: "edit", label: "Editar", description: "Pode modificar o conteúdo", color: "bg-green-100 text-green-700" },
-  { value: "admin", label: "Administrador", description: "Controle total da página", color: "bg-purple-100 text-purple-700" },
-];
+  const filteredPermissions = permissions.filter((p) => 
+    search && (
+      p.resource_name.toLowerCase().includes(search.toLowerCase()) ||
+      p.role_name.toLowerCase().includes(search.toLowerCase())
+    )
+  );
 
-export function PermissionsPanel({ pageId, companyId, pageOwnerId, onOpenChange }: PermissionsPanelProps) {
-  const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<"users" | "roles">("users");
-  const [permissions, setPermissions] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
-  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
-  const [permissionLevel, setPermissionLevel] = useState<PermissionLevel>("view");
+  const createMutation = useMutation({
+    mutationFn: ({ title, role, resourceType, resourceId, permissionLevel }: { title: string; role: string; resourceType: string; resourceId: string; permissionLevel: string }) =>
+      createKnowledgePermission({
+        title,
+        role,
+        resourceType,
+        resourceId,
+        permissionLevel,
+      }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["permissions"] });
+      setOpen(false);
+      setTitle("");
+      setPermissionLevel("view");
+      setResourceId("");
+      setResourceType("track");
+      toast({ title: "Permissão criada" });
+    },
+  });
 
-  const loadPermissions = async () => {
-    try {
-      setLoading(true);
-      const data = await listKnowledgePermissions(pageId);
-      setPermissions(data || []);
-    } catch (error: any) {
-      toast.error("Erro ao carregar permissões", { description: error.message });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadPermissions();
-  }, [pageId]);
-
-  const loadUsers = async () => {
-    try {
-      const profiles = await listProfilePublic(companyId);
-      return profiles.filter(p => p.active !== false);
-    } catch (error: any) {
-      toast.error("Erro ao carregar usuários", { description: error.message });
-      return [];
-    }
-  };
-
-  const users = await loadUsers();
-
-  const handleAddPermission = async (level: PermissionLevel) => {
-    try {
-      setSaving(true);
-
-      if (selectedUsers.length > 0) {
-        for (const userId of selectedUsers) {
-          await createKnowledgePermission({
-            page_id: pageId,
-            user_id: userId,
-            permission_level: level,
-          });
-        }
-      }
-
-      if (selectedRoles.length > 0) {
-        for (const roleId of selectedRoles) {
-          await createKnowledgePermission({
-            page_id: pageId,
-            role_id: roleId,
-            permission_level: level,
-          });
-        }
-      }
-
-      toast.success("Permissões adicionadas com sucesso");
-      setSelectedUsers([]);
-      setSelectedRoles([]);
-      await loadPermissions();
-    } catch (error: any) {
-      toast.error("Erro ao adicionar permissões", { description: error.message });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDeletePermission = async (permissionId: string) => {
-    try {
-      setSaving(true);
-      await deleteKnowledgePermission(permissionId);
-      toast.success("Permissão removida");
-      await loadPermissions();
-    } catch (error: any) {
-      toast.error("Erro ao remover permissão", { description: error.message });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const getPermissionLevel = (level: PermissionLevel) => {
-    return permissionLevels.find(p => p.value === level);
-  };
-
-  const isOwner = currentUser?.id === pageOwnerId;
+  const deleteMutation = useMutation({
+    mutationFn: (permissionId: string) =>
+      deleteKnowledgePermission(permissionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["permissions"] });
+      toast({ title: "Permissão removida" });
+    },
+  });
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col m-4">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <div className="flex items-center gap-3">
-            <Shield className="w-5 h-5 text-[#6366F1]" />
-            <h2 className="text-xl font-bold text-[#20105B]">Gerenciar Permissões</h2>
+    <div className="grid gap-6">
+      <div className="rounded-3xl border bg-white p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Gerenciar Permissões</div>
+            <p className="mt-1 text-sm text-muted-foreground">Configure quem pode ver e editar trilhas e páginas.</p>
           </div>
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => onOpenChange?.(false)}
+          <Button
+            className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+            onClick={() => {
+              setTitle("");
+              setPermissionLevel("view");
+              setResourceId("");
+              setResourceType("track");
+              setOpen(true);
+            }}
           >
-            <X className="w-4 h-4" />
+            <Plus className="mr-2 h-4 w-4" />
+            Nova permissão
           </Button>
         </div>
+      </div>
 
-        {/* Content */}
-        <div className="flex-1 flex overflow-hidden">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col h-full">
-            <TabsList className="flex flex-col h-full">
-              <TabsTrigger value="users" className="flex items-center gap-2 px-4 py-3 text-base">
-                <Users className="w-4 h-4" />
-                <span className="font-medium">Pessoas</span>
-              </TabsTrigger>
-              <TabsTrigger value="roles" className="flex items-center gap-2 px-4 py-3 text-base">
-                <ShieldCheck className="w-4 h-4" />
-                <span className="font-medium">Departamentos</span>
-              </TabsTrigger>
-            </TabsList>
-
-            {/* Users Tab */}
-            <TabsContent value="users" className="flex-1 overflow-hidden">
-              <div className="h-full flex flex-col">
-                {/* Permission Level Selector */}
-                <div className="p-4 border-b bg-gray-50">
-                  <p className="text-sm font-medium text-gray-600 mb-3">
-                    Selecione o nível de permissão para adicionar:
-                  </p>
-                  <div className="flex gap-2 flex-wrap">
-                    {permissionLevels.map((level) => (
-                      <button
-                        key={level.value}
-                        type="button"
-                        onClick={() => setPermissionLevel(level.value)}
-                        className={`
-                          px-4 py-2 rounded-lg border-2 flex items-center gap-2 transition-all
-                          ${permissionLevel === level.value 
-                            ? 'border-[#6366F1] bg-[#6366F1] text-white' 
-                            : 'border-gray-200 bg-white hover:bg-gray-50'
-                          }
-                        `}
-                      >
-                        <div className={`
-                          w-8 h-8 rounded-lg flex items-center justify-center
-                          ${level.color}
-                        `}>
-                          {level.value === "view" && <Eye className="w-4 h-4" />}
-                          {level.value === "edit" && <Edit className="w-4 h-4" />}
-                          {level.value === "admin" && <Shield className="w-4 h-4" />}
-                        </div>
-                        <span className="text-sm font-medium">{level.label}</span>
-                        {permissionLevel === level.value && <ShieldCheck className="w-4 h-4 text-white ml-1" />}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {permissionLevels.find(p => p.value === permissionLevel)?.description}
-                  </p>
-                </div>
-
-                {/* Users List with Search */}
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  <div className="p-4 border-b bg-white">
-                    <div className="relative">
-                      <Users className="absolute left-3 top-1/2 w-4 h-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Buscar usuário..."
-                        className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:border-[#6366F1] focus:ring-2 focus:ring-[#6366F1]/20"
-                      />
-                    </div>
-                  </div>
-                  
-                  <ScrollArea className="flex-1">
-                    <div className="p-2 space-y-1">
-                      {loading ? (
-                        <div className="space-y-2">
-                          {[1, 2, 3, 4, 5].map(i => (
-                            <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
-                          ))}
-                        </div>
-                      ) : users.filter(user => {
-                        // Don't show already added permissions in the list
-                        const existingUserIds = permissions.filter(p => p.user_id).map(p => p.user_id);
-                        return !existingUserIds.includes(user.id);
-                      }).map((user) => (
-                        <div 
-                          key={user.id}
-                          onClick={() => setSelectedUsers([...selectedUsers, user.id])}
-                          className={`
-                            flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all
-                            ${selectedUsers.includes(user.id) 
-                              ? 'border-[#6366F1] bg-[#EEF2FF]' 
-                              : 'border-gray-200 hover:border-gray-300'
-                            }
-                          `}
-                        >
-                          <Checkbox 
-                            checked={selectedUsers.includes(user.id)}
-                            onChange={(checked) => {
-                              if (checked) {
-                                setSelectedUsers([...selectedUsers, user.id]);
-                              } else {
-                                setSelectedUsers(selectedUsers.filter(id => id !== user.id));
-                              }
-                            }}
-                          />
-                          <Avatar className="w-10 h-10 flex-shrink-0">
-                            {user.avatar_url ? (
-                              <AvatarFallback>
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#6366F1] to-[#9333EA] text-white font-bold flex items-center justify-center">
-                                  {user.name?.charAt(0)?.toUpperCase() || user.name?.charAt(0)}
-                                </div>
-                              </AvatarFallback>
-                            ) : (
-                              <img 
-                                src={user.avatar_url} 
-                                alt={user.name || user.email}
-                                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                              />
-                            )}
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                            <p className="text-xs text-gray-500">{user.job_title || user.email}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-
-                  {/* Action Button */}
-                  <div className="p-4 border-t bg-white">
-                    <Button
-                      onClick={() => handleAddPermission(permissionLevel)}
-                      disabled={saving || selectedUsers.length === 0}
-                      className="w-full bg-[#6366F1] hover:bg-[#4F46E5] text-white"
-                    >
-                      {saving ? (
-                        <span className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-transparent rounded-full animate-spin" />
-                          Adicionando...
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <ShieldCheck className="w-4 h-4" />
-                          Conceder Permissões
-                        </span>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-
-            {/* Roles Tab */}
-            <TabsContent value="roles" className="flex-1 overflow-hidden">
-              <div className="h-full flex flex-col">
-                {/* Permission Level Selector */}
-                <div className="p-4 border-b bg-gray-50">
-                  <p className="text-sm font-medium text-gray-600 mb-3">
-                    Selecione o nível de permissão para adicionar:
-                  </p>
-                  <div className="flex gap-2 flex-wrap">
-                    {permissionLevels.map((level) => (
-                      <button
-                        key={level.value}
-                        type="button"
-                        onClick={() => setPermissionLevel(level.value)}
-                        className={`
-                          px-4 py-2 rounded-lg border-2 flex items-center gap-2 transition-all
-                          ${permissionLevel === level.value 
-                            ? 'border-[#6366F1] bg-[#6366F1] text-white' 
-                            : 'border-gray-200 bg-white hover:bg-gray-50'
-                          }
-                        `}
-                      >
-                        <div className={`
-                          w-8 h-8 rounded-lg flex items-center justify-center
-                          ${level.color}
-                        `}>
-                          {level.value === "view" && <Eye className="w-4 h-4" />}
-                          {level.value === "edit" && <Edit className="w-4 h-4" />}
-                          {level.value === "admin" && <Shield className="w-4 h-4" />}
-                        </div>
-                        <span className="text-sm font-medium">{level.label}</span>
-                        {permissionLevel === level.value && <ShieldCheck className="w-4 h-4 text-white ml-1" />}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-gray-500 mt-2">
-                    {permissionLevels.find(p => p.value === permissionLevel)?.description}
-                  </p>
-                </div>
-
-                {/* Roles List */}
-                <div className="flex-1 flex flex-col overflow-hidden">
-                  <div className="p-4 space-y-2 bg-white">
-                    {["ADMIN", "HEAD", "COLLABORADOR"].map((role) => (
-                      <button
-                        key={role}
-                        onClick={() => setSelectedRoles([...selectedRoles, role])}
-                        className={`
-                          flex items-center gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all w-full
-                          ${selectedRoles.includes(role) 
-                            ? 'border-[#6366F1] bg-[#EEF2FF]' 
-                            : 'border-gray-200 hover:border-gray-300'
-                          }
-                        `}
-                      >
-                        <Checkbox 
-                          checked={selectedRoles.includes(role)}
-                          onChange={(checked) => {
-                            if (checked) {
-                              setSelectedRoles([...selectedRoles, role]);
-                            } else {
-                              setSelectedRoles(selectedRoles.filter(r => r !== role));
-                            }
-                          }}
-                        />
-                        <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900">{role === "ADMIN" ? "Administrador" : role === "HEAD" ? "Gerente" : "Colaborador"}</p>
-                          <p className="text-xs text-gray-500">A todos os usuários com essa função</p>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Action Button */}
-                  <div className="p-4 border-t bg-white">
-                    <Button
-                      onClick={() => handleAddPermission(permissionLevel)}
-                      disabled={saving || selectedRoles.length === 0}
-                      className="w-full bg-[#6366F1] hover:bg-[#4F46E5] text-white"
-                    >
-                      {saving ? (
-                        <span className="flex items-center gap-2">
-                          <div className="w-4 h-4 border-2 border-white/30 border-t-transparent rounded-full animate-spin" />
-                          Adicionando...
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-2">
-                          <ShieldCheck className="w-4 h-4" />
-                          Conceder Permissões
-                        </span>
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              </TabsContent>
-          </Tabs>
-
-          {/* Current Permissions */}
-          <div className="p-6 border-t bg-gray-50 max-h-[30vh] overflow-hidden">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-              <Shield className="w-4 h-4" />
-              Permissões Atuais
-            </h3>
-            {permissions.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Shield className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-                <p className="text-sm">Nenhuma permissão definida</p>
-              </div>
-            ) : (
-              <ScrollArea className="h-[24vh]">
-                <div className="space-y-2">
-                  {permissions.map((permission) => (
-                    <div 
-                      key={permission.id}
-                      className="flex items-center justify-between p-3 bg-white rounded-lg border"
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        <div className={`
-                          w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0
-                          ${getPermissionLevel(permission.permission_level)?.color}
-                        `}>
-                          {permission.user_id ? (
-                            <span className="text-lg">
-                              {permission.user_id?.charAt(0)?.toUpperCase() || "U"}
-                            </span>
-                          ) : (
-                            <Users className="w-5 h-5" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900">
-                            {permission.user_id 
-                              ? users.find(u => u.id === permission.user_id)?.name || "Usuário"
-                              : roles.find(r => r === permission.role_id) || "Departamento"
-                            }
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs">
-                              {getPermissionLevel(permission.permission_level)?.label}
-                            </Badge>
-                            <span className="text-xs text-gray-400">•</span>
-                            <span className="text-xs text-gray-500">
-                              {new Date(permission.created_at || "").toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </span>
-                          </div>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeletePermission(permission.id)}
-                          className="text-red-500 hover:text-red-700 hover:bg-red-50 flex-shrink-0"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+      <Card className="rounded-3xl border-[color:var-delegation-border)] bg-white p-6">
+        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+          <div>
+            <div className="text-sm font-semibold text-[color:delegation-ink)]">Permissões</div>
+            <p className="mt-1 text-sm text-muted-foreground">{isLoading ? "Carregando…" : `${filteredPermissions.length} permissões`}</p>
+          </div>
+          <div className="relative w-full md:w-[300px]">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar per nome de permissão, role ou recurso…"
+                className="h-11 w-full rounded-xl pl-9"
+              />
             </div>
           </div>
         </div>
+
+        <div className="rounded-2xl bg-[color:color-delegation-bg)] p-4">
+          {filteredPermissions.length ? (
+            <div className="space-y-2">
+              {filteredPermissions.map((permission) => (
+                <div key={permission.id} className="rounded-2xl border border border-[color:var(--sinaxys-border)] bg-white p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1">
+                      <div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{permission.title}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">
+                          <span className="font-medium">{permission.resource_type}:</span> {permission.resource_name || "-"}
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {permission.role_name} • {permission.permission_level}
+                          </div>
+                        </div>
+                      </div>
+                    <div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 rounded-full text-destructive"
+                        onClick={() => deleteMutation.mutate(permission.id)}
+                        title="Remover permissão"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))} : (
+            <div className="rounded-2xl bg-[color:color-delegation-bg)] p-4">
+              <div className="flex flex-col items-center justify-center py-12 text-sm text-muted-foreground">
+                <span>Nenhuma permissão encontrada.</span>
+              </div>
+            )}
+          </div>
+        </Card>
+
+      {/* Create/Edit Permission Dialog */}
+      <Dialog open={open} onOpenChange={(v) => {
+        if (!v) {
+          setTitle("");
+          setPermissionLevel("view");
+          setResourceId("");
+          setResourceType("track");
+        }
+      }}>
+        <DialogContent className="max-h-[80vh] max-w-[500px] overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>{title ? "Editar permissão" : "Nova permissão"}</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Nome</Label>
+              <Input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ex.: Acesso à trilha de Marketing"
+                className="h-11 rounded-xl"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Rol</Label>
+              <Select value={permissionLevel} onValueChange={setPermissionLevel}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="view">Visualizar</SelectItem>
+                  <SelectItem value="edit">Editar</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Tipo de Recurso</Label>
+              <Select value={resourceType} onValueChange={setResourceType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="track">Trilha</SelectItem>
+                  <SelectItem value="page">Página</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Selecionar Recurso</Label>
+              <Input
+                value={resourceId}
+                onChange={(e) => setResourceId(e.target.value)}
+                placeholder="ID da trilha ou página"
+                className="h-11 rounded-xl"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={!title.trim() || !resourceId || createMutation.isPending}
+              onClick={() => {
+                if (title && resourceId) {
+                  createMutation.mutate({
+                    title,
+                    role: permissionLevel,
+                    resourceType,
+                    resourceId,
+                  });
+                }
+              }}
+            >
+              Salvar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
