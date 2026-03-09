@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Shield, Users, Plus, Trash2 } from "lucide-react";
+import { Shield, Users, Plus, Trash2, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -7,13 +7,14 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { listPermissions, createKnowledgePermission, deleteKnowledgePermission } from "@/lib/knowledgeDb";
 
 export default function PermissionsPanel() {
   const { toast } = useToast();
   const qc = useQueryClient();
-  
+
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
@@ -26,7 +27,7 @@ export default function PermissionsPanel() {
     queryFn: () => listPermissions(),
   });
 
-  const filteredPermissions = permissions.filter((p) => 
+  const filteredPermissions = permissions.filter((p) =>
     search && (
       p.resource_name.toLowerCase().includes(search.toLowerCase()) ||
       p.role_name.toLowerCase().includes(search.toLowerCase())
@@ -64,7 +65,7 @@ export default function PermissionsPanel() {
 
   return (
     <div className="grid gap-6">
-      <div className="rounded-3xl border bg-white p-6">
+      <Card className="rounded-3xl border bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Gerenciar Permissões</div>
@@ -84,12 +85,12 @@ export default function PermissionsPanel() {
             Nova permissão
           </Button>
         </div>
-      </div>
+      </Card>
 
-      <Card className="rounded-3xl border-[color:var-delegation-border)] bg-white p-6">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
-            <div className="text-sm font-semibold text-[color:delegation-ink)]">Permissões</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Permissões</div>
             <p className="mt-1 text-sm text-muted-foreground">{isLoading ? "Carregando…" : `${filteredPermissions.length} permissões`}</p>
           </div>
           <div className="relative w-full md:w-[300px]">
@@ -105,11 +106,11 @@ export default function PermissionsPanel() {
           </div>
         </div>
 
-        <div className="rounded-2xl bg-[color:color-delegation-bg)] p-4">
+        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
           {filteredPermissions.length ? (
             <div className="space-y-2">
               {filteredPermissions.map((permission) => (
-                <div key={permission.id} className="rounded-2xl border border border-[color:var(--sinaxys-border)] bg-white p-3">
+                <div key={permission.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1">
                       <div>
@@ -133,9 +134,11 @@ export default function PermissionsPanel() {
                       </Button>
                     </div>
                   </div>
-                </div>
-              ))} : (
-            <div className="rounded-2xl bg-[color:color-delegation-bg)] p-4">
+                );
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
               <div className="flex flex-col items-center justify-center py-12 text-sm text-muted-foreground">
                 <span>Nenhuma permissão encontrada.</span>
               </div>
@@ -143,7 +146,6 @@ export default function PermissionsPanel() {
           </div>
         </Card>
 
-      {/* Create/Edit Permission Dialog */}
       <Dialog open={open} onOpenChange={(v) => {
         if (!v) {
           setTitle("");
@@ -168,7 +170,7 @@ export default function PermissionsPanel() {
               />
             </div>
             <div className="grid gap-2">
-              <Label>Rol</Label>
+              <Label>Role</Label>
               <Select value={permissionLevel} onValueChange={setPermissionLevel}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione…" />
