@@ -233,7 +233,7 @@ const nav: NavItem[] = [
         to: "/app/certificates",
         label: "Certificados",
         icon: <Award className="h-4 w-4" />,
-        roles: ["COLABORADOR", "HEAD", "ADMIN"],
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "TRACKS",
       },
       {
@@ -249,7 +249,7 @@ const nav: NavItem[] = [
         to: "/admin/tracks",
         label: "Montar trilhas",
         icon: <GraduationCap className="h-4 w-4" />,
-        roles: ["ADMIN"],
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "TRACKS",
       },
       {
@@ -257,7 +257,7 @@ const nav: NavItem[] = [
         to: "/head/tracks",
         label: "Head — Trilhas",
         icon: <GraduationCap className="h-4 w-4" />,
-        roles: ["HEAD"],
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "TRACKS",
       },
     ],
