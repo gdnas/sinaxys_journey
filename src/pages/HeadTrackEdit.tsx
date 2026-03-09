@@ -56,7 +56,7 @@ function mapDbModule(m: DbModule): TrackModule {
 }
 
 function typeLabel(t: TrackModule["type"]) {
-  if (t === "VIDEO") return "Vídeo";
+  if (t === "VIDEO") return "Vídeo do YouTube";
   if (t === "MATERIAL") return "Material";
   if (t === "CHECKPOINT") return "Checkpoint";
   return "Quiz";
@@ -166,6 +166,18 @@ export default function HeadTrackEdit() {
   const saveModuleMutation = useMutation({
     mutationFn: async () => {
       const orderIndex = editingModule?.orderIndex ?? (modules[modules.length - 1]?.orderIndex ?? 0) + 1;
+
+      // helper to detect youtube links
+      function isYouTubeUrlLocal(url: string) {
+        try {
+          const parsed = new URL(url);
+          const hn = parsed.hostname.replace("www.", "");
+          return hn === "youtube.com" || hn === "m.youtube.com" || hn === "youtu.be";
+        } catch {
+          return false;
+        }
+      }
+
       const payload: TrackModule & { trackId: string } = {
         id: editingModule?.id ?? crypto.randomUUID(),
         trackId,
@@ -174,7 +186,12 @@ export default function HeadTrackEdit() {
         title: mTitle.trim(),
         description: mDesc.trim() || undefined,
         xpReward: Math.max(0, Math.floor(Number(mXp) || 0)),
-        youtubeUrl: mType === "VIDEO" ? mYoutube.trim() || undefined : undefined,
+        youtubeUrl:
+          mType === "VIDEO"
+            ? mYoutube.trim() || undefined
+            : mType === "MATERIAL" && isYouTubeUrlLocal(mMaterial.trim())
+            ? mMaterial.trim()
+            : undefined,
         materialUrl: mType === "MATERIAL" ? mMaterial.trim() || undefined : undefined,
         checkpointPrompt: mType === "CHECKPOINT" ? mCheckpoint.trim() || undefined : undefined,
         minScore: mType === "QUIZ" ? Math.max(0, Math.min(100, Math.floor(Number(mMinScore) || 70))) : undefined,
