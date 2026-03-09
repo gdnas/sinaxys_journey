@@ -111,30 +111,34 @@ export async function addComment(itemType: ItemType, itemId: string, userId: str
     const mentionRegex = /@([\w.\-]+)/g;
     const matches = Array.from(new Set(Array.from(content.matchAll(mentionRegex)).map((m) => m[1])));
     if (matches.length > 0) {
-      // Attempt to resolve mentioned usernames to profile ids
+      // Get author's company for restriction
+      const { data: authorProfile } = await supabase.from("profiles").select("id, company_id, name, email").eq("id", userId).maybeSingle();
+      const authorCompany = authorProfile?.company_id ?? null;
+
+      // Attempt to resolve mentioned usernames to profile ids (but only within same company)
       const resolved: string[] = [];
       for (const name of matches) {
-        // Try exact name match (case-insensitive) or email local-part
-        const q = await supabase
+        // Try exact name match (case-insensitive) within same company
+        let q = await supabase
           .from("profiles")
-          .select("id, name, email")
+          .select("id, name, email, company_id")
           .ilike("name", name)
           .limit(1)
           .maybeSingle();
-        if (q.data && q.data.id) {
+        if (q.data && q.data.id && q.data.company_id === authorCompany) {
           const mentionedId = q.data.id;
           if (mentionedId !== userId) resolved.push(mentionedId);
           continue;
         }
 
-        // fallback: search by email local part
-        const q2 = await supabase
+        // fallback: search by email local part within same company
+        let q2 = await supabase
           .from("profiles")
-          .select("id, name, email")
+          .select("id, name, email, company_id")
           .like("email", `${name}%`)
           .limit(1)
           .maybeSingle();
-        if (q2.data && q2.data.id) {
+        if (q2.data && q2.data.id && q2.data.company_id === authorCompany) {
           const mentionedId = q2.data.id;
           if (mentionedId !== userId) resolved.push(mentionedId);
         }

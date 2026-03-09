@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as notificationsDb from "@/lib/notificationsDb";
 import { useAuth } from "@/lib/auth";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 type NotificationRow = {
   id: string;
@@ -53,26 +54,48 @@ export default function NotificationsPanel() {
   });
 
   useEffect(() => {
-    // Realtime subscription to notifications (Supabase Realtime channel)
     if (!userId) return;
-    const channel = (notificationsDb as any).supabase?.channel?.("public:notifications");
 
-    // If channel/real-time API available, subscribe to inserts for this user
-    try {
-      // Using client realtime via from('notifications').on('INSERT') etc isn't available in older client versions in this pattern,
-      // but Supabase JS exposes `channel` for pubsub. To keep things simple and resilient, we poll unread count on interval as a fallback.
-      const interval = setInterval(() => {
-        void qc.invalidateQueries({ queryKey: ["notifications-unread", userId] });
-      }, 5000);
-      return () => clearInterval(interval);
-    } catch {
-      // ignore
-    }
+    const channel = supabase.channel(`user-notifications-${userId}`);
+
+    // Listen to INSERT and UPDATE on notifications for this user
+    channel.on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+      (payload) => {
+        qc.invalidateQueries({ queryKey: ["my-notifications", userId] });
+        qc.invalidateQueries({ queryKey: ["notifications-unread", userId] });
+      },
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },
+      (payload) => {
+        qc.invalidateQueries({ queryKey: ["my-notifications", userId] });
+        qc.invalidateQueries({ queryKey: ["notifications-unread", userId] });
+      },
+    );
+
+    channel.subscribe();
+
+    // Cleanup
+    return () => {
+      try {
+        channel.unsubscribe();
+      } catch (e) {
+        // ignore
+      }
+    };
   }, [userId, qc]);
 
   useEffect(() => {
-    // If panel opens, mark the visible notifications as read when user clicks an item (handled on click)
-  }, []);
+    // If panel opens, refetch list
+    if (open && userId) {
+      qc.invalidateQueries({ queryKey: ["my-notifications", userId] });
+      qc.invalidateQueries({ queryKey: ["notifications-unread", userId] });
+    }
+  }, [open, userId, qc]);
 
   const data = notificationsQuery.data ?? null;
 
