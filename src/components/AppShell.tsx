@@ -44,6 +44,7 @@ import { describedItemsToLines, parseDescribedItems, textPreview } from "@/lib/f
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import NotificationsPanel from "@/components/Notifications/NotificationsPanel";
 import type { Role } from "@/lib/domain";
 
 type NavLinkItem = {
@@ -632,7 +633,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
             <div className="flex items-center gap-3">
               <ThemeToggle />
-
+              <NotificationsPanel />
               <button
                 type="button"
                 className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)] dark:border-border dark:bg-background dark:hover:bg-muted"
