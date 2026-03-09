@@ -50,7 +50,7 @@ export function computeProgress(done: number, total: number) {
   return clamp(Math.round((done / total) * 100), 0, 100);
 }
 
-export function getYouTubeEmbedUrl(url: string) {
+export function getYouTubeEmbedUrl(url: string): string | null {
   try {
     const u = new URL(url);
     const host = u.hostname.replace("www.", "");
@@ -77,7 +77,7 @@ export function getYouTubeEmbedUrl(url: string) {
     // ignore
   }
 
-  return url;
+  return null;
 }
 
 export function getFigmaEmbedUrl(url: string) {
