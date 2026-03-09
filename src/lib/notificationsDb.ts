@@ -22,7 +22,27 @@ export async function getMyNotifications(userId: string, page = 0, perPage = 20)
     .range(start, end);
   if (error) throw error;
   const rows = (data ?? []) as NotificationRow[];
-  return { rows, total: typeof count === "number" ? count : rows.length };
+  const total = typeof count === "number" ? count : rows.length;
+
+  if (rows.length === 0) return { rows: [], total };
+
+  // Enrich actor info
+  const actorIds = Array.from(new Set(rows.map((r) => r.actor_user_id).filter(Boolean) as string[]));
+  let profiles: any[] = [];
+  if (actorIds.length) {
+    const { data: pData } = await supabase.from("profiles").select("id, name, avatar_url").in("id", actorIds);
+    profiles = pData ?? [];
+  }
+  const profilesById: Record<string, any> = {};
+  profiles.forEach((p) => (profilesById[p.id] = p));
+
+  const enriched = rows.map((r) => ({
+    ...r,
+    actor_name: r.actor_user_id ? profilesById[r.actor_user_id]?.name ?? null : null,
+    actor_avatar: r.actor_user_id ? profilesById[r.actor_user_id]?.avatar_url ?? null : null,
+  }));
+
+  return { rows: enriched, total };
 }
 
 export async function markAsRead(notificationId: string, userId: string) {

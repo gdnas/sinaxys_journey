@@ -5,10 +5,13 @@ import { Card } from "@/components/ui/card";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import * as notificationsDb from "@/lib/notificationsDb";
 import { useAuth } from "@/lib/auth";
+import { useNavigate } from "react-router-dom";
 
 type NotificationRow = {
   id: string;
   actor_user_id?: string | null;
+  actor_name?: string | null;
+  actor_avatar?: string | null;
   title: string;
   content?: string | null;
   href?: string | null;
@@ -24,6 +27,7 @@ export default function NotificationsPanel() {
   const [page, setPage] = useState(0);
   const perPage = 10;
   const qc = useQueryClient();
+  const navigate = useNavigate();
 
   const notificationsQuery = useQuery({
     queryKey: ["my-notifications", userId, page, perPage],
@@ -49,7 +53,25 @@ export default function NotificationsPanel() {
   });
 
   useEffect(() => {
-    // Optionally, auto open on initial unread notifications
+    // Realtime subscription to notifications (Supabase Realtime channel)
+    if (!userId) return;
+    const channel = (notificationsDb as any).supabase?.channel?.("public:notifications");
+
+    // If channel/real-time API available, subscribe to inserts for this user
+    try {
+      // Using client realtime via from('notifications').on('INSERT') etc isn't available in older client versions in this pattern,
+      // but Supabase JS exposes `channel` for pubsub. To keep things simple and resilient, we poll unread count on interval as a fallback.
+      const interval = setInterval(() => {
+        void qc.invalidateQueries({ queryKey: ["notifications-unread", userId] });
+      }, 5000);
+      return () => clearInterval(interval);
+    } catch {
+      // ignore
+    }
+  }, [userId, qc]);
+
+  useEffect(() => {
+    // If panel opens, mark the visible notifications as read when user clicks an item (handled on click)
   }, []);
 
   const data = notificationsQuery.data ?? null;
@@ -82,12 +104,35 @@ export default function NotificationsPanel() {
                 (data as any).rows.map((n: NotificationRow) => (
                   <div key={n.id} className={`rounded-xl border p-3 ${n.is_read ? "bg-white" : "bg-[color:var(--sinaxys-tint)]"}`}>
                     <div className="flex items-center justify-between">
-                      <div className="text-sm font-semibold">{n.title}</div>
+                      <div className="flex items-center gap-3">
+                        {n.actor_avatar ? <img src={n.actor_avatar} className="h-8 w-8 rounded-full" alt={n.actor_name ?? ""} /> : <div className="h-8 w-8 rounded-full bg-[color:var(--sinaxys-tint)]" />}
+                        <div>
+                          <div className="text-sm font-semibold">{n.title}</div>
+                          {n.actor_name ? <div className="text-xs text-muted-foreground">{n.actor_name}</div> : null}
+                        </div>
+                      </div>
+
                       <Button size="icon" variant="ghost" onClick={() => { void markMutation.mutate(n.id); }}>
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
                     {n.content ? <div className="mt-1 text-sm text-muted-foreground">{n.content}</div> : null}
+                    {n.href ? (
+                      <div className="mt-2 flex items-center justify-end">
+                        <Button
+                          asChild
+                          variant="outline"
+                          onClick={() => {
+                            // Mark as read and navigate
+                            void markMutation.mutate(n.id);
+                            setOpen(false);
+                            navigate(n.href!);
+                          }}
+                        >
+                          <a>Ir para</a>
+                        </Button>
+                      </div>
+                    ) : null}
                   </div>
                 ))
               ) : (
