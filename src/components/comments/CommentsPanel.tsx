@@ -4,9 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { Heart, MessageSquare, Eye, ChevronDown, ChevronUp } from "lucide-react";
 import * as commentsDb from "@/lib/commentsDb";
 import { useAuth } from "@/lib/auth";
+import { OrgPersonDialog } from "@/components/OrgPersonDialog";
+import * as profilesDb from "@/lib/profilesDb";
 
 export type ItemType = "TRACK" | "MODULE";
 
@@ -19,6 +22,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
   const qc = useQueryClient();
   const { user } = useAuth();
   const userId = user?.id ?? null;
+  const { toast } = useToast();
 
   const [open, setOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
@@ -44,8 +48,10 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
 
   const [page, setPage] = useState(0);
   const perPage = 5;
+  const [personOpen, setPersonOpen] = useState(false);
+  const [personProfile, setPersonProfile] = useState<any | null>(null);
 
-  const commentsQuery = useQuery<{ rows: (Comment & { user_name?: string; avatar_url?: string })[]; total: number } | null>({
+  const commentsQuery = useQuery<{ rows: (Comment & { user_name?: string; avatar_url?: string; mentions?: any[] })[]; total: number } | null>({
     queryKey: ["comments", itemType, itemId, page, perPage],
     queryFn: () => commentsDb.getComments(itemType, itemId, page, perPage),
     enabled: !!itemId,
@@ -76,11 +82,24 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
       if (!userId) throw new Error("Login necessário");
       return commentsDb.addComment(itemType, itemId, userId, content);
     },
-    onSuccess: () => {
+    onSuccess: (res: any) => {
+      // res is { comment, notifErrors, mentionedUserIds }
       setNewComment("");
-      // refresh comments and comment count
       qc.invalidateQueries({ queryKey: ["comments", itemType, itemId] });
       qc.invalidateQueries({ queryKey: ["comments-count", itemType, itemId] });
+      qc.invalidateQueries({ queryKey: ["notifications-unread", userId] });
+
+      const mentioned = res?.mentionedUserIds?.length ?? 0;
+      const errors = res?.notifErrors?.length ?? 0;
+      if (mentioned > 0) {
+        toast({ title: `Notificado${mentioned > 1 ? 's' : ''}`, description: `${mentioned} usuário${mentioned > 1 ? 's' : ''} notificado(s).` });
+      }
+      if (errors > 0) {
+        toast({ title: `Erro ao notificar`, description: `${errors} notificação(ões) falharam.`, variant: "destructive" });
+      }
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro", description: err?.message ?? "Não foi possível enviar o comentário.", variant: "destructive" });
     },
   });
 
@@ -187,7 +206,45 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
                           </div>
                           <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString()}</div>
                         </div>
-                        <div className="mt-2 text-sm text-muted-foreground">{c.content}</div>
+                        <div className="mt-2 text-sm text-muted-foreground">
+                          {(() => {
+                            // Render content replacing mention tokens with links that open OrgPersonDialog
+                            const mentionRegex = /@([\w.\-]+)/g;
+                            if (!c.mentions || !c.mentions.length) return <>{c.content}</>;
+                            const parts: any[] = [];
+                            let lastIndex = 0;
+                            let match: RegExpExecArray | null;
+                            const text = c.content || "";
+                            mentionRegex.lastIndex = 0;
+                            while ((match = mentionRegex.exec(text)) !== null) {
+                              const token = match[1];
+                              const start = match.index;
+                              const end = mentionRegex.lastIndex;
+                              if (start > lastIndex) parts.push(text.slice(lastIndex, start));
+                              const resolved = (c.mentions as any[]).find((m) => m.token === token)?.match ?? null;
+                              if (resolved) {
+                                parts.push(
+                                  <button key={`${c.id}-${start}`} className="text-[color:var(--sinaxys-primary)] font-semibold underline" onClick={async () => {
+                                    try {
+                                      const prof = await profilesDb.getProfile(resolved.id);
+                                      setPersonProfile(prof);
+                                      setPersonOpen(true);
+                                    } catch (e) {
+                                      // ignore
+                                    }
+                                  }}>
+                                    @{resolved.name}
+                                  </button>
+                                );
+                              } else {
+                                parts.push(text.slice(start, end));
+                              }
+                              lastIndex = end;
+                            }
+                            if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+                            return parts.map((p, i) => (typeof p === "string" ? <span key={i}>{p}</span> : p));
+                          })()}
+                        </div>
                         {c.user_id === userId ? (
                           <div className="mt-2 flex items-center gap-2">
                             <Button variant="outline" size="sm" onClick={() => {
@@ -225,6 +282,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
           </div>
         </CollapsibleContent>
       </Collapsible>
+      <OrgPersonDialog open={personOpen} onOpenChange={setPersonOpen} profile={personProfile} departmentName={null} companyId={user?.companyId ?? ""} />
     </div>
   );
 }

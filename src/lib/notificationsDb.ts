@@ -52,8 +52,23 @@ export async function markAsRead(notificationId: string, userId: string) {
 }
 
 export async function createNotification(payload: { userId: string; actorUserId?: string | null; title: string; content?: string; href?: string; notifType?: string; }) {
+  // Log attempts to create notifications to help debugging mention delivery
+  try {
+    console.log("[notificationsDb] createNotification ->", payload);
+  } catch {}
+
   const { data, error } = await supabase.from("notifications").insert({ user_id: payload.userId, actor_user_id: payload.actorUserId ?? null, title: payload.title, content: payload.content ?? null, href: payload.href ?? null, notif_type: payload.notifType ?? null }).select();
-  if (error) throw error;
+  if (error) {
+    try {
+      console.error("[notificationsDb] createNotification error ->", error);
+    } catch {}
+    throw error;
+  }
+
+  try {
+    console.log("[notificationsDb] created ->", data?.[0]);
+  } catch {}
+
   return data?.[0];
 }
 

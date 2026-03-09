@@ -3,6 +3,18 @@ import * as notificationsDb from "@/lib/notificationsDb";
 
 export type ItemType = "TRACK" | "MODULE";
 
+function normalizeText(s: string) {
+  try {
+    return s
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase()
+      .trim();
+  } catch {
+    return String(s).toLowerCase().trim();
+  }
+}
+
 export async function getStats(itemType: ItemType, itemId: string) {
   const { data, error } = await supabase
     .from("item_stats")
@@ -15,7 +27,6 @@ export async function getStats(itemType: ItemType, itemId: string) {
 }
 
 export async function incrementView(itemType: ItemType, itemId: string) {
-  // upsert increment
   const { data, error } = await supabase.rpc("increment_item_views", { p_item_type: itemType, p_item_id: itemId });
   if (error) throw error;
   return data;
@@ -32,7 +43,6 @@ export async function getLikes(itemType: ItemType, itemId: string) {
 }
 
 export async function toggleLike(itemType: ItemType, itemId: string, userId: string) {
-  // check if liked
   const { data: existing } = await supabase
     .from("item_likes")
     .select("id")
@@ -53,11 +63,9 @@ export async function toggleLike(itemType: ItemType, itemId: string, userId: str
 }
 
 export async function getComments(itemType: ItemType, itemId: string, page = 0, perPage = 5) {
-  // returns { rows: CommentWithUser[], total }
   const start = page * perPage;
   const end = start + perPage - 1;
 
-  // select comments with total count
   const { data, error, count } = await supabase
     .from("item_comments")
     .select("id, content, user_id, created_at", { count: "exact" })
@@ -79,14 +87,45 @@ export async function getComments(itemType: ItemType, itemId: string, page = 0, 
   const profilesById: Record<string, any> = {};
   (profiles ?? []).forEach((p: any) => (profilesById[p.id] = p));
 
-  const enriched = rows.map((r: any) => ({
-    id: r.id,
-    content: r.content,
-    user_id: r.user_id,
-    created_at: r.created_at,
-    user_name: profilesById[r.user_id]?.name ?? r.user_id,
-    avatar_url: profilesById[r.user_id]?.avatar_url ?? null,
-  }));
+  const mentionRegex = /@([\w.\-]+)/g;
+  const mentionTokens = Array.from(new Set(rows.flatMap((r: any) => Array.from(r.content?.matchAll(mentionRegex) ?? []).map((m: any) => m[1]))));
+
+  let mentionsByToken: Record<string, { id: string; name: string }[]> = {};
+  if (mentionTokens.length) {
+    const found: any[] = [];
+    for (const t of mentionTokens) {
+      const qname = await supabase.from("profiles").select("id,name,email,company_id").ilike("name", `%${t}%`).limit(20);
+      const qemail = await supabase.from("profiles").select("id,name,email,company_id").like("email", `${t}%`).limit(20);
+      (qname.data ?? []).forEach((p: any) => found.push(p));
+      (qemail.data ?? []).forEach((p: any) => found.push(p));
+    }
+
+    const unique = Array.from(new Map(found.map((p) => [p.id, p])).values());
+    for (const t of mentionTokens) {
+      const nt = normalizeText(t);
+      const matches = unique
+        .map((p: any) => ({ id: p.id, name: p.name ?? p.email, nameNorm: normalizeText(p.name ?? p.email) }))
+        .filter((p: any) => p.nameNorm.includes(nt) || p.nameNorm.startsWith(nt));
+      mentionsByToken[t] = matches.map((m: any) => ({ id: m.id, name: m.name }));
+    }
+  }
+
+  const enriched = rows.map((r: any) => {
+    const tokens = Array.from(new Set(Array.from(r.content?.matchAll(mentionRegex) ?? []).map((m: any) => m[1])));
+    const mentionMap = tokens
+      .map((tok: string) => ({ token: tok, match: (mentionsByToken[tok] ?? [])[0] ?? null }))
+      .filter((x) => x.match !== null);
+
+    return {
+      id: r.id,
+      content: r.content,
+      user_id: r.user_id,
+      created_at: r.created_at,
+      user_name: profilesById[r.user_id]?.name ?? r.user_id,
+      avatar_url: profilesById[r.user_id]?.avatar_url ?? null,
+      mentions: mentionMap,
+    };
+  });
 
   return { rows: enriched, total };
 }
@@ -106,83 +145,84 @@ export async function addComment(itemType: ItemType, itemId: string, userId: str
   if (error) throw error;
   const comment = data?.[0];
 
-  // Detect mentions in the content of the form @username (alphanumeric, dot, dash, underscore)
+  const notifErrors: { mentionedUserId: string; error: any }[] = [];
+  const mentionedUserIds: string[] = [];
+
   try {
     const mentionRegex = /@([\w.\-]+)/g;
     const matches = Array.from(new Set(Array.from(content.matchAll(mentionRegex)).map((m) => m[1])));
     if (matches.length > 0) {
-      // Get author's company for restriction
       const { data: authorProfile } = await supabase.from("profiles").select("id, company_id, name, email").eq("id", userId).maybeSingle();
       const authorCompany = authorProfile?.company_id ?? null;
-
-      // Attempt to resolve mentioned usernames to profile ids (but only within same company)
       const resolved: string[] = [];
       for (const name of matches) {
-        // Try exact name match (case-insensitive) within same company
-        let q = await supabase
-          .from("profiles")
-          .select("id, name, email, company_id")
-          .ilike("name", name)
-          .limit(1)
-          .maybeSingle();
-        if (q.data && q.data.id && q.data.company_id === authorCompany) {
+        let q;
+        if (authorCompany) {
+          q = await supabase
+            .from("profiles")
+            .select("id, name, email, company_id")
+            .ilike("name", `%${name}%`)
+            .eq("company_id", authorCompany)
+            .limit(1)
+            .maybeSingle();
+        } else {
+          q = await supabase
+            .from("profiles")
+            .select("id, name, email, company_id")
+            .ilike("name", `%${name}%`)
+            .limit(1)
+            .maybeSingle();
+        }
+        if (q.data && q.data.id) {
           const mentionedId = q.data.id;
           if (mentionedId !== userId) resolved.push(mentionedId);
           continue;
         }
 
-        // fallback: search by email local part within same company
-        let q2 = await supabase
-          .from("profiles")
-          .select("id, name, email, company_id")
-          .like("email", `${name}%`)
-          .limit(1)
-          .maybeSingle();
-        if (q2.data && q2.data.id && q2.data.company_id === authorCompany) {
+        let q2;
+        if (authorCompany) {
+          q2 = await supabase
+            .from("profiles")
+            .select("id, name, email, company_id")
+            .like("email", `${name}%`)
+            .eq("company_id", authorCompany)
+            .limit(1)
+            .maybeSingle();
+        } else {
+          q2 = await supabase
+            .from("profiles")
+            .select("id, name, email, company_id")
+            .like("email", `${name}%`)
+            .limit(1)
+            .maybeSingle();
+        }
+        if (q2.data && q2.data.id) {
           const mentionedId = q2.data.id;
           if (mentionedId !== userId) resolved.push(mentionedId);
         }
       }
 
-      // Create notifications for resolved mentions
       for (const mentionedUserId of resolved) {
-        // Build a simple title/content
-        const title = "Você foi mencionado em um comentário";
-        const snippet = content.length > 200 ? content.slice(0, 200) + "…" : content;
+        try {
+          const title = "Você foi mencionado em um comentário";
+          const snippet = content.length > 200 ? content.slice(0, 200) + "…" : content;
+          let href: string | null = null;
+          if (itemType === "TRACK") href = `/tracks/${itemId}`;
+          else if (itemType === "MODULE") {
+            const { data: mdata } = await supabase.from("modules").select("track_id").eq("id", itemId).maybeSingle();
+            if (mdata && mdata.track_id) href = `/tracks/${mdata.track_id}`;
+          }
 
-        // Build href: prefer track link for TRACK items; for MODULE try to find its track
-        let href: string | null = null;
-        if (itemType === "TRACK") href = `/tracks/${itemId}`;
-        else if (itemType === "MODULE") {
-          // Try to fetch module's track_id
-          const { data: mdata } = await supabase.from("modules").select("track_id").eq("id", itemId).maybeSingle();
-          if (mdata && mdata.track_id) href = `/tracks/${mdata.track_id}`;
+          await notificationsDb.createNotification({ userId: mentionedUserId, actorUserId: userId, title, content: snippet, href, notifType: "mention" });
+          mentionedUserIds.push(mentionedUserId);
+        } catch (ne) {
+          notifErrors.push({ mentionedUserId, error: ne });
         }
-
-        await notificationsDb.createNotification({ userId: mentionedUserId, actorUserId: userId, title, content: snippet, href, notifType: "mention" });
       }
     }
   } catch (e) {
-    // don't block comment creation on mention errors
-    // console.error(e);
+    // ignore
   }
 
-  return comment;
-}
-
-export async function updateComment(commentId: string, userId: string, content: string) {
-  const { data, error } = await supabase
-    .from("item_comments")
-    .update({ content })
-    .eq("id", commentId)
-    .eq("user_id", userId)
-    .select();
-  if (error) throw error;
-  return data?.[0];
-}
-
-export async function deleteComment(commentId: string, userId: string) {
-  const { error } = await supabase.from("item_comments").delete().eq("id", commentId).eq("user_id", userId);
-  if (error) throw error;
-  return { ok: true };
+  return { comment, notifErrors, mentionedUserIds };
 }
