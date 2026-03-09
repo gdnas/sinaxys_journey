@@ -51,15 +51,53 @@ export async function toggleLike(itemType: ItemType, itemId: string, userId: str
   return { liked: true };
 }
 
-export async function getComments(itemType: ItemType, itemId: string) {
-  const { data, error } = await supabase
+export async function getComments(itemType: ItemType, itemId: string, page = 0, perPage = 5) {
+  // returns { rows: CommentWithUser[], total }
+  const start = page * perPage;
+  const end = start + perPage - 1;
+
+  // select comments with total count
+  const { data, error, count } = await supabase
     .from("item_comments")
-    .select("id, content, user_id, created_at")
+    .select("id, content, user_id, created_at", { count: "exact" })
     .eq("item_type", itemType)
     .eq("item_id", itemId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false })
+    .range(start, end);
+
   if (error) throw error;
-  return data ?? [];
+
+  const rows = data ?? [];
+  const total = typeof count === "number" ? count : rows.length;
+
+  if (rows.length === 0) return { rows: [], total };
+
+  const userIds = Array.from(new Set(rows.map((r: any) => r.user_id)));
+  const { data: profiles } = await supabase.from("profiles").select("id, name, avatar_url").in("id", userIds);
+
+  const profilesById: Record<string, any> = {};
+  (profiles ?? []).forEach((p: any) => (profilesById[p.id] = p));
+
+  const enriched = rows.map((r: any) => ({
+    id: r.id,
+    content: r.content,
+    user_id: r.user_id,
+    created_at: r.created_at,
+    user_name: profilesById[r.user_id]?.name ?? r.user_id,
+    avatar_url: profilesById[r.user_id]?.avatar_url ?? null,
+  }));
+
+  return { rows: enriched, total };
+}
+
+export async function getCommentCount(itemType: ItemType, itemId: string) {
+  const { count, error } = await supabase
+    .from("item_comments")
+    .select("id", { count: "exact", head: true })
+    .eq("item_type", itemType)
+    .eq("item_id", itemId);
+  if (error) throw error;
+  return typeof count === "number" ? count : 0;
 }
 
 export async function addComment(itemType: ItemType, itemId: string, userId: string, content: string) {

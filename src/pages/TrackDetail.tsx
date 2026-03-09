@@ -403,8 +403,8 @@ export default function TrackDetail() {
                       </div>
                     ) : null}
 
-                    {/* Comments for module (retracted by default) */}
-                    <CommentsPanel itemType="MODULE" itemId={m.id} />
+                    {/* Comments for module (retracted by default) - only for VIDEO and MATERIAL */}
+                    {m.type === "VIDEO" || m.type === "MATERIAL" ? <CommentsPanel itemType="MODULE" itemId={m.id} /> : null}
 
                     {m.type === "MATERIAL" ? (
                       <div className="grid gap-3">

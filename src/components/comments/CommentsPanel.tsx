@@ -35,9 +35,19 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
     enabled: !!itemId,
   });
 
-  const commentsQuery = useQuery<Comment[]>({
-    queryKey: ["comments", itemType, itemId],
-    queryFn: () => commentsDb.getComments(itemType, itemId),
+  // comment count for display (track-level summary / badge)
+  const commentCountQuery = useQuery<number>({
+    queryKey: ["comments-count", itemType, itemId],
+    queryFn: () => commentsDb.getCommentCount(itemType, itemId),
+    enabled: !!itemId,
+  });
+
+  const [page, setPage] = useState(0);
+  const perPage = 5;
+
+  const commentsQuery = useQuery<{ rows: (Comment & { user_name?: string; avatar_url?: string })[]; total: number } | null>({
+    queryKey: ["comments", itemType, itemId, page, perPage],
+    queryFn: () => commentsDb.getComments(itemType, itemId, page, perPage),
     enabled: !!itemId,
   });
 
@@ -68,13 +78,17 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
     },
     onSuccess: () => {
       setNewComment("");
+      // refresh comments and comment count
       qc.invalidateQueries({ queryKey: ["comments", itemType, itemId] });
+      qc.invalidateQueries({ queryKey: ["comments-count", itemType, itemId] });
     },
   });
 
   const likedByUser = !!likesQuery.data?.rows?.find((r) => r.user_id === userId);
   const likesCount = likesQuery.data?.count ?? 0;
   const views = statsQuery.data?.views ?? 0;
+
+  const totalComments = commentCountQuery.data ?? commentsQuery.data?.total ?? 0;
 
   return (
     <div className="mt-6">
@@ -101,7 +115,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
             </div>
             <div className="inline-flex items-center gap-2">
               <Button variant="outline" className="h-9 rounded-full" onClick={() => setOpen((s) => !s)}>
-                <MessageSquare className="mr-2 h-4 w-4" /> Comentários ({commentsQuery.data?.length ?? 0})
+                <MessageSquare className="mr-2 h-4 w-4" /> Comentários ({totalComments})
               </Button>
             </div>
           </div>
@@ -115,7 +129,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
           </div>
         </div>
 
-        <CollapsibleContent>
+        <CollapsibleContent className="overflow-hidden transition-all duration-200 ease-in-out data-[state=open]:max-h-[800px] max-h-0 data-[state=open]:opacity-100 opacity-0">
           <div className="mt-4 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
             <div className="grid gap-3">
               {user ? (
@@ -137,16 +151,36 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
               )}
 
               <div className="grid gap-2">
-                {commentsQuery.data && commentsQuery.data.length ? (
-                  commentsQuery.data.map((c) => (
-                    <div key={c.id} className="rounded-xl border p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.user_id}</div>
-                        <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString()}</div>
+                {commentsQuery.data && commentsQuery.data.rows && commentsQuery.data.rows.length ? (
+                  <>
+                    {commentsQuery.data.rows.map((c) => (
+                      <div key={c.id} className="rounded-xl border p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            {c.avatar_url ? (
+                              <img src={c.avatar_url} alt={c.user_name} className="h-8 w-8 rounded-full" />
+                            ) : (
+                              <div className="h-8 w-8 rounded-full bg-[color:var(--sinaxys-tint)]" />
+                            )}
+                            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.user_name}</div>
+                          </div>
+                          <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString()}</div>
+                        </div>
+                        <div className="mt-2 text-sm text-muted-foreground">{c.content}</div>
                       </div>
-                      <div className="mt-2 text-sm text-muted-foreground">{c.content}</div>
-                    </div>
-                  ))
+                    ))}
+
+                    {/* Pagination controls */}
+                    {commentsQuery.data.total > perPage && (
+                      <div className="mt-2 flex items-center justify-between">
+                        <div className="text-sm text-muted-foreground">Página {page + 1} de {Math.ceil(commentsQuery.data.total / perPage)}</div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Anterior</Button>
+                          <Button variant="outline" disabled={(page + 1) * perPage >= commentsQuery.data.total} onClick={() => setPage((p) => p + 1)}>Próxima</Button>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="text-sm text-muted-foreground">Nenhum comentário ainda.</div>
                 )}
