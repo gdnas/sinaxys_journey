@@ -142,7 +142,8 @@ export default function TrackLibrary() {
   });
 
   const profiles = useMemo(() => {
-    return (profilesQuery.data as any[])
+    const data = (profilesQuery.data ?? []) as any[];
+    return data
       .filter((p) => p.active)
       .filter((p) => p.role !== "MASTERADMIN")
       .map((p) => ({
