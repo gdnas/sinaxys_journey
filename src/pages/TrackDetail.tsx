@@ -389,10 +389,13 @@ export default function TrackDetail() {
                           }
 
                           return (
-                            <div className="flex items-center justify-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-6">
+                            <div className="flex flex-col items-center justify-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-6">
                               <Button asChild className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
                                 <a href={originalUrl} target="_blank" rel="noreferrer">Ir para o vídeo</a>
                               </Button>
+                              <p className="mt-3 max-w-[56ch] text-center text-sm text-muted-foreground">
+                                Este recurso não pode ser reproduzido diretamente aqui — pode exigir autenticação ou não permitir incorporação. Abra no site do provedor para assistir.
+                              </p>
                             </div>
                           );
                         })()}
