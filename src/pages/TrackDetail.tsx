@@ -370,15 +370,32 @@ export default function TrackDetail() {
                   <AccordionContent className="pt-4">
                     {m.type === "VIDEO" ? (
                       <div className="grid gap-3">
-                        <div className="overflow-hidden rounded-2xl border">
-                          <iframe
-                            title={m.title}
-                            src={getYouTubeEmbedUrl(m.youtube_url ?? "")}
-                            className="aspect-video w-full"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                            allowFullScreen
-                          />
-                        </div>
+                        {(() => {
+                          const originalUrl = m.youtube_url ?? m.material_url ?? "";
+                          const embedUrl = getYouTubeEmbedUrl(originalUrl ?? "");
+
+                          if (embedUrl) {
+                            return (
+                              <div className="overflow-hidden rounded-2xl border">
+                                <iframe
+                                  title={m.title}
+                                  src={embedUrl}
+                                  className="aspect-video w-full"
+                                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                  allowFullScreen
+                                />
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="flex items-center justify-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-6">
+                              <Button asChild className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+                                <a href={originalUrl} target="_blank" rel="noreferrer">Ir para o vídeo</a>
+                              </Button>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ) : null}
 
