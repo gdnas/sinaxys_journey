@@ -297,22 +297,12 @@ export default function TrackPlayer() {
                   );
                 }
 
-                // Not embeddable — show explanatory panel and a button to open externally.
+                // Not embeddable — only show a clear external button to open the video in a new tab.
                 return (
-                  <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-6">
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Visualização indisponível</div>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Este vídeo não pode ser reproduzido diretamente no player do site. Provavelmente ele requer autenticação externa ou não fornece um embed público.
-                    </p>
-                    {isTeams && (
-                      <p className="mt-2 text-sm text-muted-foreground">Abra no Microsoft Teams/Stream para assistir (login necessário).</p>
-                    )}
-                    <div className="mt-4 flex items-center gap-2">
-                      <Button asChild className="rounded-xl">
-                        <a href={originalUrl} target="_blank" rel="noreferrer">Ver vídeo</a>
-                      </Button>
-                      <Button variant="outline" className="rounded-xl" onClick={() => navigator.clipboard?.writeText(originalUrl || "")}>Copiar URL</Button>
-                    </div>
+                  <div className="flex items-center justify-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-6">
+                    <Button asChild className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+                      <a href={originalUrl} target="_blank" rel="noreferrer">Ir para o vídeo</a>
+                    </Button>
                   </div>
                 );
               })()}
