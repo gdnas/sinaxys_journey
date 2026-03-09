@@ -56,7 +56,7 @@ function mapDbModule(m: DbModule): TrackModule {
 }
 
 function typeLabel(t: TrackModule["type"]) {
-  if (t === "VIDEO") return "Vídeo do YouTube";
+  if (t === "VIDEO") return ""; // hide text label for videos (keep only icon)
   if (t === "MATERIAL") return "Material";
   if (t === "CHECKPOINT") return "Checkpoint";
   return "Quiz";
@@ -432,7 +432,7 @@ export default function HeadTrackEdit() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                         {typeIcon(m.type)}
-                        <span className="ml-2">{typeLabel(m.type)}</span>
+                        {typeLabel(m.type) ? <span className="ml-2">{typeLabel(m.type)}</span> : null}
                       </Badge>
                       <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{m.title}</div>
                       <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">+{m.xpReward} Pontos</Badge>
