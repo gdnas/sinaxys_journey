@@ -10,6 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { ModuleChecklist } from "@/components/ModuleChecklist";
 import { ResourceEmbed } from "@/components/ResourceEmbed";
+import { CommentsPanel } from "@/components/comments/CommentsPanel";
 import { useToast } from "@/hooks/use-toast";
 import type { ModuleProgress, QuizOption, QuizQuestion, TrackModule } from "@/lib/domain";
 import {
@@ -309,6 +310,11 @@ export default function TrackPlayer() {
                   </div>
                 );
               })()}
+
+              {/* Comments are shown for VIDEO and MATERIAL modules only (exclude QUIZ and CHECKPOINT). */}
+              {module && (module.type === "VIDEO" || module.type === "MATERIAL") ? (
+                <CommentsPanel itemType="MODULE" itemId={module.id} />
+              ) : null}
 
               <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
                 <div className="text-sm text-muted-foreground">Ao concluir, o próximo módulo é liberado automaticamente.</div>

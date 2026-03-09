@@ -6,6 +6,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { CommentsPanel } from "@/components/comments/CommentsPanel";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -401,6 +402,9 @@ export default function TrackDetail() {
                         })()}
                       </div>
                     ) : null}
+
+                    {/* Comments for module (retracted by default) */}
+                    <CommentsPanel itemType="MODULE" itemId={m.id} />
 
                     {m.type === "MATERIAL" ? (
                       <div className="grid gap-3">
