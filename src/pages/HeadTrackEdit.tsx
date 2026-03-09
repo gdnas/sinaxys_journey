@@ -564,7 +564,7 @@ export default function HeadTrackEdit() {
             {mType === "VIDEO" ? (
               <div className="grid gap-2">
                 <Label>URL do vídeo</Label>
-                <Input className="h-11 rounded-xl" value={mYoutube} onChange={(e) => setMYoutube(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
+                <Input className="h-11 rounded-xl" value={mYoutube} onChange={(e) => setMYoutube(e.target.value)} placeholder="https://..." />
               </div>
             ) : null}
 
