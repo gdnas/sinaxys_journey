@@ -25,13 +25,13 @@ export default function NotificationsPanel() {
   const perPage = 10;
   const qc = useQueryClient();
 
-  const notificationsQuery = useQuery<{ rows: NotificationRow[]; total: number } | null>({
+  const notificationsQuery = useQuery({
     queryKey: ["my-notifications", userId, page, perPage],
     queryFn: async () => await notificationsDb.getMyNotifications(String(userId), page, perPage),
     enabled: !!userId,
   });
 
-  const unreadQuery = useQuery<number>({
+  const unreadQuery = useQuery({
     queryKey: ["notifications-unread", userId],
     queryFn: async () => await notificationsDb.getUnreadCount(String(userId)),
     enabled: !!userId,
@@ -60,9 +60,9 @@ export default function NotificationsPanel() {
         <Button size="icon" variant="outline" onClick={() => setOpen((s) => !s)} aria-label="Notificações">
           <Bell className="h-4 w-4" />
         </Button>
-        {unreadQuery.data && unreadQuery.data > 0 ? (
+        {unreadQuery.data && (unreadQuery.data as number) > 0 ? (
           <div className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-xs font-semibold text-white">
-            {unreadQuery.data}
+            {(unreadQuery.data as number)}
           </div>
         ) : null}
       </div>
@@ -78,8 +78,8 @@ export default function NotificationsPanel() {
             </div>
 
             <div className="mt-3 grid gap-2">
-              {data && data.rows && data.rows.length ? (
-                data.rows.map((n) => (
+              {data && (data as any).rows && (data as any).rows.length ? (
+                (data as any).rows.map((n: NotificationRow) => (
                   <div key={n.id} className={`rounded-xl border p-3 ${n.is_read ? "bg-white" : "bg-[color:var(--sinaxys-tint)]"}`}>
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-semibold">{n.title}</div>
@@ -94,12 +94,12 @@ export default function NotificationsPanel() {
                 <div className="text-sm text-muted-foreground">Nenhuma notificação.</div>
               )}
 
-              {data && data.total > perPage ? (
+              {data && (data as any).total > perPage ? (
                 <div className="mt-2 flex items-center justify-between">
-                  <div className="text-sm text-muted-foreground">Página {page + 1} de {Math.ceil(data.total / perPage)}</div>
+                  <div className="text-sm text-muted-foreground">Página {page + 1} de {Math.ceil((data as any).total / perPage)}</div>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" disabled={page === 0} onClick={() => setPage((p) => Math.max(0, p - 1))}>Anterior</Button>
-                    <Button variant="outline" disabled={(page + 1) * perPage >= data.total} onClick={() => setPage((p) => p + 1)}>Próxima</Button>
+                    <Button variant="outline" disabled={(page + 1) * perPage >= (data as any).total} onClick={() => setPage((p) => p + 1)}>Próxima</Button>
                   </div>
                 </div>
               ) : null}

@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import * as notificationsDb from "@/lib/notificationsDb";
 
 export type ItemType = "TRACK" | "MODULE";
 
@@ -103,7 +104,66 @@ export async function getCommentCount(itemType: ItemType, itemId: string) {
 export async function addComment(itemType: ItemType, itemId: string, userId: string, content: string) {
   const { data, error } = await supabase.from("item_comments").insert({ item_type: itemType, item_id: itemId, user_id: userId, content }).select();
   if (error) throw error;
-  return data?.[0];
+  const comment = data?.[0];
+
+  // Detect mentions in the content of the form @username (alphanumeric, dot, dash, underscore)
+  try {
+    const mentionRegex = /@([\w.\-]+)/g;
+    const matches = Array.from(new Set(Array.from(content.matchAll(mentionRegex)).map((m) => m[1])));
+    if (matches.length > 0) {
+      // Attempt to resolve mentioned usernames to profile ids
+      const resolved: string[] = [];
+      for (const name of matches) {
+        // Try exact name match (case-insensitive) or email local-part
+        const q = await supabase
+          .from("profiles")
+          .select("id, name, email")
+          .ilike("name", name)
+          .limit(1)
+          .maybeSingle();
+        if (q.data && q.data.id) {
+          const mentionedId = q.data.id;
+          if (mentionedId !== userId) resolved.push(mentionedId);
+          continue;
+        }
+
+        // fallback: search by email local part
+        const q2 = await supabase
+          .from("profiles")
+          .select("id, name, email")
+          .like("email", `${name}%`)
+          .limit(1)
+          .maybeSingle();
+        if (q2.data && q2.data.id) {
+          const mentionedId = q2.data.id;
+          if (mentionedId !== userId) resolved.push(mentionedId);
+        }
+      }
+
+      // Create notifications for resolved mentions
+      for (const mentionedUserId of resolved) {
+        // Build a simple title/content
+        const title = "Você foi mencionado em um comentário";
+        const snippet = content.length > 200 ? content.slice(0, 200) + "…" : content;
+
+        // Build href: prefer track link for TRACK items; for MODULE try to find its track
+        let href: string | null = null;
+        if (itemType === "TRACK") href = `/tracks/${itemId}`;
+        else if (itemType === "MODULE") {
+          // Try to fetch module's track_id
+          const { data: mdata } = await supabase.from("modules").select("track_id").eq("id", itemId).maybeSingle();
+          if (mdata && mdata.track_id) href = `/tracks/${mdata.track_id}`;
+        }
+
+        await notificationsDb.createNotification({ userId: mentionedUserId, actorUserId: userId, title, content: snippet, href, notifType: "mention" });
+      }
+    }
+  } catch (e) {
+    // don't block comment creation on mention errors
+    // console.error(e);
+  }
+
+  return comment;
 }
 
 export async function updateComment(commentId: string, userId: string, content: string) {

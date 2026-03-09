@@ -75,6 +75,7 @@ import KnowledgeSpace from "./pages/KnowledgeSpace";
 import KnowledgePage from "./pages/KnowledgePage";
 import KnowledgeNewSpace from "./pages/KnowledgeNewSpace";
 import KnowledgeNewPage from "./pages/KnowledgeNewPage";
+import NotificationsPage from "./pages/NotificationsPage";
 
 const queryClient = new QueryClient();
 
@@ -553,6 +554,15 @@ const App = () => (
                     element={
                       <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                         <Profile />
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/notifications"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <NotificationsPage />
                       </RequireAuth>
                     }
                   />
