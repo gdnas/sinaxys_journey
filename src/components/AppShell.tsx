@@ -249,17 +249,9 @@ const nav: NavItem[] = [
         to: "/admin/tracks",
         label: "Montar trilhas",
         icon: <GraduationCap className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        roles: ["ADMIN"],
         moduleKey: "TRACKS",
-      },
-      {
-        type: "link",
-        to: "/head/tracks",
-        label: "Head — Trilhas",
-        icon: <GraduationCap className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "TRACKS",
-      },
+      }
     ],
   },
 
