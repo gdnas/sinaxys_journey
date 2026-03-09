@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CalendarClock, CheckCircle2, FileText, PlayCircle, Rocket, Settings2, SquarePen, Trophy } from "lucide-react";
+import { ArrowLeft, CalendarClock, CheckCircle2, FileText, PlayCircle, Rocket, Settings2, SquarePen, Trophy, MessageSquare } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
@@ -91,6 +91,17 @@ export default function TrackDetail() {
   const { data: track, isLoading: loadingTrack } = useQuery({
     queryKey: ["track", trackId],
     queryFn: () => getTrack(trackId),
+    enabled: !!trackId,
+  });
+
+  // Fetch total comments for track (track-level badge)
+  const { data: trackCommentsCount } = useQuery({
+    queryKey: ["track-comments-count", trackId],
+    queryFn: async () => {
+      if (!trackId) return 0;
+      const mod = await import("@/lib/commentsDb");
+      return await mod.getCommentCount("TRACK", trackId);
+    },
     enabled: !!trackId,
   });
 
@@ -198,9 +209,15 @@ export default function TrackDetail() {
             {track?.description ? <p className="mt-2 text-sm text-muted-foreground">{track.description}</p> : null}
 
             <div className="mt-3 flex flex-wrap gap-2">
+                          {/* Show total comments badge for the whole track */}
               {deptName ? (
                 <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white ring-1 ring-[color:var(--sinaxys-border)]">
                   {deptName}
+                </Badge>
+              ) : null}
+              {typeof trackCommentsCount === "number" && trackCommentsCount > 0 ? (
+                <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)] inline-flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" /> {trackCommentsCount}
                 </Badge>
               ) : null}
               {track ? (

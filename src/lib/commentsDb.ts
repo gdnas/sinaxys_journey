@@ -105,3 +105,20 @@ export async function addComment(itemType: ItemType, itemId: string, userId: str
   if (error) throw error;
   return data?.[0];
 }
+
+export async function updateComment(commentId: string, userId: string, content: string) {
+  const { data, error } = await supabase
+    .from("item_comments")
+    .update({ content })
+    .eq("id", commentId)
+    .eq("user_id", userId)
+    .select();
+  if (error) throw error;
+  return data?.[0];
+}
+
+export async function deleteComment(commentId: string, userId: string) {
+  const { error } = await supabase.from("item_comments").delete().eq("id", commentId).eq("user_id", userId);
+  if (error) throw error;
+  return { ok: true };
+}

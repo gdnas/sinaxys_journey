@@ -84,6 +84,27 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
     },
   });
 
+  const updateCommentMutation = useMutation({
+    mutationFn: async ({ commentId, content }: { commentId: string; content: string }) => {
+      if (!userId) throw new Error("Login necessário");
+      return commentsDb.updateComment(commentId, userId, content);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["comments", itemType, itemId] });
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: async (commentId: string) => {
+      if (!userId) throw new Error("Login necessário");
+      return commentsDb.deleteComment(commentId, userId);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["comments", itemType, itemId] });
+      qc.invalidateQueries({ queryKey: ["comments-count", itemType, itemId] });
+    },
+  });
+
   const likedByUser = !!likesQuery.data?.rows?.find((r) => r.user_id === userId);
   const likesCount = likesQuery.data?.count ?? 0;
   const views = statsQuery.data?.views ?? 0;
@@ -167,6 +188,21 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
                           <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString()}</div>
                         </div>
                         <div className="mt-2 text-sm text-muted-foreground">{c.content}</div>
+                        {c.user_id === userId ? (
+                          <div className="mt-2 flex items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={() => {
+                              const newText = window.prompt("Editar comentário", c.content);
+                              if (newText !== null) updateCommentMutation.mutate({ commentId: c.id, content: newText });
+                            }}>
+                              Editar
+                            </Button>
+                            <Button variant="destructive" size="sm" onClick={() => {
+                              if (confirm("Deseja excluir este comentário?")) deleteCommentMutation.mutate(c.id);
+                            }}>
+                              Excluir
+                            </Button>
+                          </div>
+                        ) : null}
                       </div>
                     ))}
 
