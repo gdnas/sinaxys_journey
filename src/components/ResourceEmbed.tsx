@@ -19,7 +19,8 @@ export function ResourceEmbed({
     host = "";
   }
 
-  const isVideo = teamsEmbed !== null || isYouTubeUrl(url);
+  const isVideo = isYouTubeUrl(url);
+  const isTeams = isTeamsUrl(url);
 
   return (
     <div className="grid gap-3">
@@ -45,7 +46,16 @@ export function ResourceEmbed({
         </Button>
       </div>
 
-      {teamsEmbed ? (
+      {isTeams ? (
+        <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
+          Este link do Microsoft Teams/Stream não pode ser reproduzido diretamente no player embutido por questões de autenticação/permissões. Abra no Microsoft Stream/Teams para assistir.
+          <div className="mt-3 flex items-center gap-2">
+            <Button asChild className="rounded-xl">
+              <a href={url} target="_blank" rel="noreferrer">Abrir no Teams/Stream</a>
+            </Button>
+          </div>
+        </div>
+      ) : teamsEmbed ? (
         <div className="overflow-hidden rounded-2xl border bg-white">
           <iframe
             title={title}
@@ -119,43 +129,37 @@ function getYouTubeEmbedUrl(url: string): string | null {
   }
 }
 
+function isTeamsUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const hn = parsed.hostname.toLowerCase();
+    return (
+      hn.includes("teams.microsoft.com") ||
+      hn.includes("microsoftstream.com") ||
+      hn.includes("web.microsoftstream.com") ||
+      hn.includes("microsoft.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
 function getTeamsEmbedUrl(url: string): string | null {
   try {
     const parsed = new URL(url);
 
-    // Check if it's a Microsoft Teams/Stream URL
-    if (
-      parsed.hostname.includes("microsoft.com") ||
-      parsed.hostname.includes("teams.microsoft.com") ||
-      parsed.hostname.includes("web.microsoftstream.com") ||
-      parsed.hostname.includes("microsoftstream.com")
-    ) {
-      // For Microsoft Stream videos, convert to embed URL
-      if (parsed.hostname.includes("microsoftstream.com")) {
-        const videoId = parsed.pathname.split("/").pop();
-        if (videoId) {
-          return `https://web.microsoftstream.com/embed/video/${videoId}`;
-        }
-      }
-
-      // For Teams meeting recordings, the URL might already be an embed URL
-      // or we might need to convert it
-      if (parsed.searchParams.has("embed")) {
-        return url;
-      }
-
-      // Try to extract video ID and create embed URL
-      const videoId = parsed.searchParams.get("videoId") || parsed.pathname.split("/").pop();
+    // For Microsoft Stream videos, convert to embed URL where possible
+    if (parsed.hostname.includes("microsoftstream.com")) {
+      const videoId = parsed.pathname.split("/").pop();
       if (videoId) {
-        return `https://teams.microsoft.com/_#/l/video/${videoId}?embed=true`;
+        return `https://web.microsoftstream.com/embed/video/${videoId}`;
       }
-
-      // Return the original URL if we can't convert it
-      // The iframe might still work with some Teams URLs
-      return url;
     }
 
-    return null;
+    // Many Teams/Stream links require authentication and won't embed correctly.
+    // Returning the original URL may sometimes work, but often it doesn't. We prefer
+    // to show a link for the user to open externally instead of attempting an iframe.
+    return url;
   } catch {
     return null;
   }
