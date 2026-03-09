@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { BookOpenText, CalendarClock, GraduationCap, Plus, Rocket, Search, Send, Shield, Users, ArrowLeft } from "lucide-react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -401,8 +401,8 @@ export default function TrackLibrary() {
             <div className="grid gap-4">
               <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
                 <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilha</div>
-                <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{delegateTrack.title}</div>
-                <div className="mt-1 text-xs text-muted-foreground">Departamento: {deptById.get(delegateTrack.department_id)?.name ?? "—"}</div>
+                <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{delegateTrackId?.title}</div>
+                <div className="mt-1 text-xs text-muted-foreground">Departamento: {deptById.get(delegateTrackId?.department_id)?.name ?? "—"}</div>
               </div>
 
               <div className="grid gap-2">
