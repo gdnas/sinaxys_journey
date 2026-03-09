@@ -31,7 +31,7 @@ import MasterCompanies from "./pages/MasterCompanies";
 import MasterOverview from "./pages/MasterOverview";
 import MasterUsers from "./pages/MasterUsers";
 import Profile from "./pages/Profile";
-import HeadTracks from "./pages/HeadTracks";
+import HeadTracksRedirect from "./pages/HeadTracksRedirect";
 import HeadTrackEdit from "./pages/HeadTrackEdit";
 import HeadUsers from "./pages/HeadUsers";
 import HeadCosts from "./pages/HeadCosts";
@@ -671,7 +671,7 @@ const App = () => (
                     path="/head/tracks"
                     element={
                       <RequireAuth roles={["HEAD"]}>
-                        <HeadTracks />
+                        <HeadTracksRedirect />
                       </RequireAuth>
                     }
                   />

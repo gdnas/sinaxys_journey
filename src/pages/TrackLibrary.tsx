@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { BookOpenText, CalendarClock, Search, Send, Shield, Users } from "lucide-react";
+import { BookOpenText, CalendarClock, GraduationCap, Plus, Rocket, Search, Send, Shield, Users, ArrowLeft } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilePublicByCompany, listProfilesByCompany } from "@/lib/profilesDb";
-import { assignTrack, getTracksByCompany } from "@/lib/journeyDb";
+import { assignTrack, createTrack, getTracksByCompany, setTrackPublished } from "@/lib/journeyDb";
 import { formatShortDate } from "@/lib/sinaxys";
 
 function toDateInputValue(iso?: string) {
@@ -60,10 +60,15 @@ export default function TrackLibrary() {
   if (user.role === "MASTERADMIN") return null;
 
   const companyId = user.companyId;
-  // Agora qualquer pessoa da empresa pode delegar trilhas para qualquer pessoa da empresa.
   const canDelegate = true;
+  const isHead = user.role === "HEAD";
+  const canCreateTrack = isHead; // Apenas HEADs podem criar trilhas
 
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [departmentId, setDepartmentId] = useState<string>("");
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments", companyId],
@@ -73,12 +78,6 @@ export default function TrackLibrary() {
   const { data: tracks = [], isLoading: tracksLoading } = useQuery({
     queryKey: ["tracks", companyId],
     queryFn: () => getTracksByCompany(companyId),
-  });
-
-  // Admins conseguem acessar a tabela profiles (com e-mail). Para os demais, usamos profile_public.
-  const { data: profiles = [] } = useQuery({
-    queryKey: ["delegate-profiles", companyId, user.role],
-    queryFn: () => (user.role === "ADMIN" ? listProfilesByCompany(companyId) : listProfilePublicByCompany(companyId)),
   });
 
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d] as const)), [departments]);
@@ -100,6 +99,33 @@ export default function TrackLibrary() {
     return by;
   }, [visibleTracks]);
 
+  // Create mutation for HEADs
+  const createMutation = useMutation({
+    mutationFn: () =>
+      createTrack({
+        companyId,
+        departmentId: isHead && user.departmentId ? user.departmentId : departmentId,
+        title,
+        description,
+        createdByUserId: user.id,
+      }),
+    onSuccess: async (t) => {
+      await qc.invalidateQueries({ queryKey: ["tracks", companyId] });
+      setOpen(false);
+      setTitle("");
+      setDescription("");
+      setDepartmentId("");
+      navigate(`/tracks/${t.id}/edit`);
+    },
+    onError: (e) => {
+      toast({
+        title: "Não foi possível criar",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delegation state
   const [delegateOpen, setDelegateOpen] = useState(false);
   const [delegateTrackId, setDelegateTrackId] = useState<string | null>(null);
@@ -107,33 +133,14 @@ export default function TrackLibrary() {
   const [delegateUserIds, setDelegateUserIds] = useState<string[]>([]);
   const [delegateDueDate, setDelegateDueDate] = useState<string>("");
 
-  // Allow deep-link: /tracks?delegate=<trackId>
-  useEffect(() => {
-    const sp = new URLSearchParams(location.search);
-    const tid = sp.get("delegate");
-    if (!tid) return;
+  const profilesQuery = useQuery({
+    queryKey: ["profiles", companyId],
+    queryFn: () => listProfilesByCompany(companyId),
+    enabled: !!companyId,
+  });
 
-    // open dialog preselected
-    setDelegateTrackId(tid);
-    setDelegateUserQuery("");
-    setDelegateUserIds([]);
-    setDelegateDueDate("");
-    setDelegateOpen(true);
-
-    // clean URL
-    const next = new URLSearchParams(location.search);
-    next.delete("delegate");
-    navigate({ pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : "" }, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]);
-
-  const delegateTrack = useMemo(() => {
-    if (!delegateTrackId) return null;
-    return visibleTracks.find((t) => t.id === delegateTrackId) ?? null;
-  }, [delegateTrackId, visibleTracks]);
-
-  const people = useMemo(() => {
-    return (profiles as any[])
+  const profiles = useMemo(() => {
+    return (profilesQuery.data as any[])
       .filter((p) => p.active)
       .filter((p) => p.role !== "MASTERADMIN")
       .map((p) => ({
@@ -144,12 +151,12 @@ export default function TrackLibrary() {
         department_id: p.department_id as string | null,
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [profiles]);
+  }, [profilesQuery.data]);
 
   const assignees = useMemo(() => {
     const q = delegateUserQuery.trim().toLowerCase();
-    if (!q) return people;
-    return people.filter((u) => {
+    if (!q) return profiles;
+    return profiles.filter((u) => {
       const deptName = u.department_id ? deptById.get(u.department_id)?.name ?? "" : "";
       return (
         u.name.toLowerCase().includes(q) ||
@@ -158,7 +165,7 @@ export default function TrackLibrary() {
         roleLabel(u.role).toLowerCase().includes(q)
       );
     });
-  }, [people, delegateUserQuery, deptById]);
+  }, [profiles, delegateUserQuery, deptById]);
 
   return (
     <div className="grid gap-6">
@@ -166,7 +173,7 @@ export default function TrackLibrary() {
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Biblioteca de trilhas</div>
-            <p className="mt-1 text-sm text-muted-foreground">Catálogo por departamento. Delegue trilhas para pessoas da sua empresa com prazo.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Catálogo por departamento. {canCreateTrack ? "Crie novas trilhas para seu departamento." : "Visualize e delegue trilhas para pessoas da sua empresa com prazo."}</p>
           </div>
 
           <div className="flex w-full flex-col gap-2 md:w-auto">
@@ -196,6 +203,32 @@ export default function TrackLibrary() {
       </div>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+          <div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Catálogo da empresa</div>
+            <p className="mt-1 text-sm text-muted-foreground">{tracksLoading ? "Carregando…" : `${visibleTracks.length} trilhas`}</p>
+          </div>
+
+          <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
+            {canCreateTrack && (
+              <Button
+                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                onClick={() => {
+                  if (isHead && user.departmentId) {
+                    setDepartmentId(user.departmentId);
+                  }
+                  setOpen(true);
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Criar trilha
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <Separator className="my-5" />
+
         <Accordion type="multiple" className="w-full">
           {departments.map((dept) => {
             const deptTracks = (tracksByDept.get(dept.id) ?? []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at));
@@ -272,6 +305,81 @@ export default function TrackLibrary() {
         </Accordion>
       </Card>
 
+      {/* Create track dialog for HEADs */}
+      <Dialog
+        open={open}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) {
+            setTitle("");
+            setDescription("");
+            setDepartmentId("");
+          }
+        }}
+      >
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Criar trilha</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div className="grid gap-2">
+              <Label>Departamento</Label>
+              <Select value={departmentId} onValueChange={setDepartmentId} disabled={!isHead}>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder={isHead ? "Seu departamento" : "Selecione…"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isHead && (
+                <div className="text-xs text-muted-foreground">Como HEAD, a trilha será criada para o seu departamento.</div>
+              )}
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-11 rounded-xl" placeholder="Ex.: Onboarding — Comercial" />
+            </div>
+            <div className="grid gap-2">
+              <Label>Descrição</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 rounded-2xl" placeholder="(opcional)" />
+            </div>
+
+            <div className="text-xs text-muted-foreground">Depois de criar, você poderá adicionar módulos (vídeo, material, checkpoint e quiz).</div>
+          </div>
+
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" className="rounded-xl" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={!departmentId || !title.trim() || createMutation.isPending}
+              onClick={async () => {
+                try {
+                  await createMutation.mutateAsync();
+                } catch (e) {
+                  toast({
+                    title: "Não foi possível criar",
+                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    variant: "destructive",
+                  });
+                }
+              }}
+            >
+              Criar e editar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delegation dialog */}
       <Dialog
         open={delegateOpen}
         onOpenChange={(v) => {
