@@ -46,6 +46,7 @@ import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import NotificationsPanel from "@/components/Notifications/NotificationsPanel";
 import type { Role } from "@/lib/domain";
+import { useTranslation } from 'react-i18next';
 
 type NavLinkItem = {
   type: "link";
@@ -71,28 +72,28 @@ const nav: NavItem[] = [
   {
     type: "link",
     to: "/master/overview",
-    label: "Visão geral",
+    label: "nav.master.overview",
     icon: <BarChart3 className="h-4 w-4" />,
     roles: ["MASTERADMIN"],
   },
   {
     type: "link",
     to: "/master/companies",
-    label: "Empresas",
+    label: "nav.master.companies",
     icon: <Building2 className="h-4 w-4" />,
     roles: ["MASTERADMIN"],
   },
   {
     type: "link",
     to: "/master/users",
-    label: "Usuários",
+    label: "nav.master.users",
     icon: <Shield className="h-4 w-4" />,
     roles: ["MASTERADMIN"],
   },
   {
     type: "link",
     to: "/test-runner",
-    label: "QA Pipeline",
+    label: "nav.master.qapipeline",
     icon: <TestTube className="h-4 w-4" />,
     roles: ["MASTERADMIN"],
   },
@@ -101,14 +102,14 @@ const nav: NavItem[] = [
   {
     type: "link",
     to: "/app",
-    label: "Minha jornada",
+    label: "nav.journey",
     icon: <LayoutDashboard className="h-4 w-4" />,
     roles: ["COLABORADOR", "HEAD"],
   },
   {
     type: "link",
     to: "/app",
-    label: "Início",
+    label: "nav.home",
     icon: <LayoutDashboard className="h-4 w-4" />,
     roles: ["ADMIN"],
   },
@@ -117,7 +118,7 @@ const nav: NavItem[] = [
   {
     type: "link",
     to: "/pdi-performance",
-    label: "PDI & Performance",
+    label: "nav.pdi",
     icon: <Handshake className="h-4 w-4" />,
     roles: ["COLABORADOR", "HEAD", "ADMIN"],
     moduleKey: "PDI_PERFORMANCE",
@@ -126,14 +127,14 @@ const nav: NavItem[] = [
   // Points
   {
     type: "group",
-    label: "Points",
+    label: "nav.points.group",
     icon: <Trophy className="h-4 w-4" />,
     moduleKey: "POINTS",
     children: [
       {
         type: "link",
         to: "/rankings",
-        label: "Ranking",
+        label: "nav.points.ranking",
         icon: <Trophy className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "POINTS",
@@ -145,7 +146,7 @@ const nav: NavItem[] = [
   {
     type: "link",
     to: "/okr",
-    label: "OKRs",
+    label: "nav.okr",
     icon: <Target className="h-4 w-4" />,
     roles: ["ADMIN", "HEAD", "COLABORADOR"],
     moduleKey: "OKR",
@@ -155,7 +156,7 @@ const nav: NavItem[] = [
   {
     type: "link",
     to: "/knowledge",
-    label: "Conhecimento",
+    label: "nav.knowledge",
     icon: <BookOpen className="h-4 w-4" />,
     roles: ["ADMIN", "HEAD", "COLABORADOR"],
     moduleKey: "KNOWLEDGE",
@@ -164,13 +165,13 @@ const nav: NavItem[] = [
   // Empresa
   {
     type: "group",
-    label: "Empresa",
+    label: "nav.company.group",
     icon: <Building2 className="h-4 w-4" />,
     children: [
       {
         type: "link",
         to: "/org",
-        label: "Organograma",
+        label: "nav.company.orgchart",
         icon: <Network className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "ORG",
@@ -178,28 +179,28 @@ const nav: NavItem[] = [
       {
         type: "link",
         to: "/admin/users",
-        label: "Usuários",
+        label: "nav.company.users",
         icon: <Shield className="h-4 w-4" />,
         roles: ["ADMIN"],
       },
       {
         type: "link",
         to: "/admin/import-users",
-        label: "Importar usuários",
+        label: "nav.company.import",
         icon: <UploadCloud className="h-4 w-4" />,
         roles: ["ADMIN"],
       },
       {
         type: "link",
         to: "/admin/departments",
-        label: "Departamentos",
+        label: "nav.company.departments",
         icon: <Layers className="h-4 w-4" />,
         roles: ["ADMIN"],
       },
       {
         type: "link",
         to: "/admin/costs",
-        label: "Custos",
+        label: "nav.company.costs",
         icon: <Wallet className="h-4 w-4" />,
         roles: ["ADMIN"],
         moduleKey: "COSTS",
@@ -207,7 +208,7 @@ const nav: NavItem[] = [
       {
         type: "link",
         to: "/admin/brand",
-        label: "Marca & Módulos",
+        label: "nav.company.brand",
         icon: <Palette className="h-4 w-4" />,
         roles: ["ADMIN"],
       },
@@ -217,14 +218,14 @@ const nav: NavItem[] = [
   // Trilhas
   {
     type: "group",
-    label: "Trilhas",
+    label: "nav.tracks.group",
     icon: <GraduationCap className="h-4 w-4" />,
     moduleKey: "TRACKS",
     children: [
       {
         type: "link",
         to: "/tracks",
-        label: "Trilhas",
+        label: "nav.tracks.list",
         icon: <GraduationCap className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "TRACKS",
@@ -232,7 +233,7 @@ const nav: NavItem[] = [
       {
         type: "link",
         to: "/app/certificates",
-        label: "Certificados",
+        label: "nav.tracks.certificates",
         icon: <Award className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "TRACKS",
@@ -240,7 +241,7 @@ const nav: NavItem[] = [
       {
         type: "link",
         to: "/videos",
-        label: "Vídeos de Trilhas",
+        label: "nav.tracks.videos",
         icon: <Video className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "TRACKS",
@@ -248,7 +249,7 @@ const nav: NavItem[] = [
       {
         type: "link",
         to: "/admin/tracks",
-        label: "Montar trilhas",
+        label: "nav.tracks.build",
         icon: <GraduationCap className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "TRACKS",
@@ -260,14 +261,14 @@ const nav: NavItem[] = [
   {
     type: "link",
     to: "/head/users",
-    label: "Head — Usuários",
+    label: "nav.head.users",
     icon: <Shield className="h-4 w-4" />,
     roles: ["HEAD"],
   },
   {
     type: "link",
     to: "/head/costs",
-    label: "Head — Custos",
+    label: "nav.head.costs",
     icon: <Wallet className="h-4 w-4" />,
     roles: ["HEAD"],
     moduleKey: "COSTS",
@@ -276,21 +277,28 @@ const nav: NavItem[] = [
   // Minha área
   {
     type: "group",
-    label: "Minha área",
+    label: "nav.myarea",
     icon: <UserIcon className="h-4 w-4" />,
     children: [
       {
         type: "link",
         to: "/profile",
-        label: "Perfil",
+        label: "nav.profile",
         icon: <UserIcon className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
       },
       {
         type: "link",
         to: "/integrations",
-        label: "Integrações",
+        label: "nav.integrations",
         icon: <Wrench className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+      },
+      {
+        type: "link",
+        to: "/settings",
+        label: "nav.settings",
+        icon: <Palette className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
       },
     ],
@@ -304,6 +312,7 @@ function isLinkActive(pathname: string, to: string) {
 
 function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
   const { pathname } = useLocation();
+  const { t } = useTranslation();
 
   const groups = items.filter((i): i is NavGroupItem => i.type === "group");
   const defaultOpen = groups
@@ -328,7 +337,7 @@ function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
                 }
               >
                 <span className="text-[color:var(--sinaxys-primary)]">{item.icon}</span>
-                {item.label}
+                {t(item.label)}
               </NavLink>
             );
           }
@@ -345,7 +354,7 @@ function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
               >
                 <span className="inline-flex items-center gap-2">
                   <span className="text-[color:var(--sinaxys-primary)]">{item.icon}</span>
-                  {item.label}
+                  {t(item.label)}
                 </span>
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-1">
@@ -363,7 +372,7 @@ function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
                       }
                     >
                       <span className="text-[color:var(--sinaxys-primary)]">{child.icon}</span>
-                      {child.label}
+                      {t(child.label)}
                     </NavLink>
                   ))}
                 </div>
@@ -466,12 +475,12 @@ function FundamentalsSpotlightCard() {
 
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
-            {selected?.label ?? "Fundamento"}
+            {selected?.label ? t(selected.label) : t('menu.fundamentals.open')}
           </div>
           <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-[color:var(--sinaxys-ink)]">
             {selected?.text ?? (company.tagline || "Defina os fundamentos e volte aqui para ver um destaque aleatório.")}
           </p>
-          <div className="mt-2 text-[11px] font-semibold text-[color:var(--sinaxys-primary)]">Clique para abrir</div>
+          <div className="mt-2 text-[11px] font-semibold text-[color:var(--sinaxys-primary)]">{t('menu.fundamentals.open')}</div>
         </div>
       </div>
     </button>
@@ -490,6 +499,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { company, companyId } = useCompany();
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { t } = useTranslation();
 
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -600,7 +610,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 </SheetTrigger>
                 <SheetContent side="left" className="w-[86vw] max-w-sm p-4">
                   <SheetHeader className="text-left">
-                    <SheetTitle className="text-[color:var(--sinaxys-ink)]">Menu</SheetTitle>
+                    <SheetTitle className="text-[color:var(--sinaxys-ink)]">{t('menu.title')}</SheetTitle>
                   </SheetHeader>
                   <div className="mt-4 grid gap-3">
                     <SideNav items={visible} onNavigate={() => setMenuOpen(false)} />
@@ -634,9 +644,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3">
               <ThemeToggle />
               <NotificationsPanel />
-              <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} aria-label="Configurações">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V20a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 2.3 17.88l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H4a2 2 0 1 1 0-4h.09c.61 0 1.1-.36 1.51-1a1.65 1.65 0 0 0-.33-1.82L5.3 4.7A2 2 0 1 1 8.12 1.88l.06.06c.5.5 1 .78 1.82.33h.09C11.71 1.93 12 1 12 1s.29.93.91 1.39c.82.45 1.32.17 1.82-.33l.06-.06A2 2 0 1 1 18.7 4.7l-.06.06c-.5.5-.78 1-.33 1.82v.09c.45.82 1.39.91 1.39.91s-.93.29-1.39.91c-.45.82-.17 1.32.33 1.82l.06.06A2 2 0 0 1 19.4 15z"></path></svg>
-              </Button>
               <button
                 type="button"
                 className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)] dark:border-border dark:bg-background dark:hover:bg-muted"
@@ -673,7 +680,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <LogOut className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Sair</TooltipContent>
+                <TooltipContent>{t('tooltip.logout')}</TooltipContent>
               </Tooltip>
             </div>
           </div>

@@ -4,6 +4,9 @@ import "./globals.css";
 import { bootstrapCompanyTheme } from "@/lib/company";
 import { initClarity } from "@/lib/clarity";
 
+// Initialize translations
+import './i18n';
+
 // Apply last selected company theme as early as possible (before first paint)
 bootstrapCompanyTheme();
 

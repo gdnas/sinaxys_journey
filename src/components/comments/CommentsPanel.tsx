@@ -10,6 +10,7 @@ import * as commentsDb from "@/lib/commentsDb";
 import { useAuth } from "@/lib/auth";
 import { OrgPersonDialog } from "@/components/OrgPersonDialog";
 import * as profilesDb from "@/lib/profilesDb";
+import { useTranslation } from 'react-i18next';
 
 export type ItemType = "TRACK" | "MODULE";
 
@@ -35,6 +36,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
   const { user } = useAuth();
   const userId = user?.id ?? null;
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   const [open, setOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
@@ -86,7 +88,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
   // Mutation for like toggle
   const likeMutation = useMutation({
     mutationFn: async () => {
-      if (!userId) throw new Error("Login necessário");
+      if (!userId) throw new Error(t('comments.login_to_like'));
       return commentsDb.toggleLike(itemType, itemId, userId);
     },
     onSuccess: () => {
@@ -309,7 +311,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
                   </div>
                 </div>
               ) : (
-                <div className="text-sm text-muted-foreground">Faça login para comentar.</div>
+                <div className="text-sm text-muted-foreground">{t('comments.login_required')}</div>
               )}
 
               <div className="grid gap-2">
@@ -378,15 +380,15 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
                         {c.user_id === userId ? (
                           <div className="mt-2 flex items-center gap-2">
                             <Button variant="outline" size="sm" onClick={() => {
-                              const newText = window.prompt("Editar comentário", c.content);
+                              const newText = window.prompt(t('comments.edit_prompt'), c.content);
                               if (newText !== null) updateCommentMutation.mutate({ commentId: c.id, content: newText });
                             }}>
-                              Editar
+                              {t('comments.edit')}
                             </Button>
                             <Button variant="destructive" size="sm" onClick={() => {
-                              if (confirm("Deseja excluir este comentário?")) deleteCommentMutation.mutate(c.id);
+                              if (confirm(t('comments.delete_confirm'))) deleteCommentMutation.mutate(c.id);
                             }}>
-                              Excluir
+                              {t('comments.delete')}
                             </Button>
                           </div>
                         ) : null}
@@ -405,7 +407,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
                     )}
                   </>
                 ) : (
-                  <div className="text-sm text-muted-foreground">Nenhum comentário ainda.</div>
+                  <div className="text-sm text-muted-foreground">{t('comments.none')}</div>
                 )}
               </div>
             </div>
