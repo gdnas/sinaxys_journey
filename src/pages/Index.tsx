@@ -15,6 +15,7 @@ import { Card } from "@/components/ui/card";
 import { MarketingShell } from "@/components/MarketingShell";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/auth";
+import { useTranslation } from 'react-i18next';
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
@@ -35,6 +36,8 @@ function Bullet({ children }: { children: React.ReactNode }) {
 }
 
 function Landing() {
+  const { t } = useTranslation();
+
   return (
     <MarketingShell>
       {/* HERO */}
@@ -43,23 +46,21 @@ function Landing() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-white/5 px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]/85">
               <span className="h-2 w-2 rounded-full bg-[color:var(--sinaxys-primary)]" />
-              Execution Operating System
+              {t('landing.badge')}
             </div>
 
-            <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight md:text-6xl">
-              Visibilidade total da execução.
-              <br />
-              Sem complexidade.
+            <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight md:text-6xl whitespace-pre-wrap">
+              {t('landing.hero.title')}
             </h1>
 
             <p className="mt-4 max-w-xl text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70 md:text-base">
-              Sistema que conecta metas, pessoas, iniciativas e resultados em um único lugar.
+              {t('landing.hero.subtitle')}
             </p>
 
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
               <Button asChild className="h-11 rounded-full bg-[color:var(--sinaxys-primary)] px-6 text-white hover:bg-[color:var(--sinaxys-primary)]/90">
                 <Link to="/signup">
-                  Começar grátis
+                  {t('landing.cta.start')}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -68,18 +69,18 @@ function Landing() {
                 variant="outline"
                 className="h-11 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 px-6 text-[color:var(--sinaxys-ink)] hover:bg-white/5"
               >
-                <Link to="/como-funciona">Ver como funciona na prática</Link>
+                <Link to="/como-funciona">{t('landing.cta.how')}</Link>
               </Button>
             </div>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-3">
-              <Metric label="Clareza" value="o que importa agora" />
-              <Metric label="Ownership" value="quem responde pelo quê" />
-              <Metric label="Decisão" value="com contexto e números" />
+              <Metric label={t('landing.metric.clarity')} value={t('landing.metric.clarity.value')} />
+              <Metric label={t('landing.metric.ownership')} value={t('landing.metric.ownership.value')} />
+              <Metric label={t('landing.metric.decision')} value={t('landing.metric.decision.value')} />
             </div>
 
             <div className="mt-6 max-w-xl rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/40 p-4 text-sm text-[color:var(--sinaxys-ink)]/70">
-              Empresas não precisam de mais ferramentas. Precisam de clareza operacional.
+              {t('landing.features.subtitle')}
             </div>
           </div>
 
@@ -89,11 +90,11 @@ function Landing() {
             <div className="relative overflow-hidden rounded-[28px] border border-[color:var(--sinaxys-border)] bg-white/5 p-4 backdrop-blur">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold tracking-tight">Execution overview</div>
+                  <div className="text-sm font-semibold tracking-tight">{t('landing.visual.overview')}</div>
                   <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/70">metas → iniciativas → responsáveis → resultado</div>
                 </div>
                 <div className="rounded-full bg-white/5 px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
-                  live
+                  {t('landing.visual.live')}
                 </div>
               </div>
 
@@ -134,22 +135,22 @@ function Landing() {
       <section className="mt-12">
         <div className="grid gap-6 rounded-3xl border border-[color:var(--sinaxys-border)] bg-white/5 p-6 backdrop-blur md:grid-cols-[1fr_0.9fr] md:p-10">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-primary)]">Problema</div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">O caos invisível da execução</h2>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-primary)]">{t('landing.features.title')}</div>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight md:text-3xl">{t('landing.features.title')}</h2>
             <p className="mt-3 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70">
-              Quando a empresa cresce, o trabalho se multiplica. Sem um sistema, a execução vira ruído.
+              {t('landing.features.subtitle')}
             </p>
 
             <div className="mt-6 grid gap-2">
-              <Bullet>Iniciativas demais — sem priorização visível.</Bullet>
-              <Bullet>Responsáveis difusos — ninguém "fecha" o ciclo.</Bullet>
-              <Bullet>Reuniões improdutivas — sem evidência do que avançou.</Bullet>
-              <Bullet>Falta de clareza — decisões por feeling.</Bullet>
-              <Bullet>Risco operacional — trabalho importante fica invisível.</Bullet>
+              <Bullet>{t('landing.features.list.1')}</Bullet>
+              <Bullet>{t('landing.features.list.2')}</Bullet>
+              <Bullet>{t('landing.features.list.3')}</Bullet>
+              <Bullet>{t('landing.features.list.4')}</Bullet>
+              <Bullet>{t('landing.features.list.5')}</Bullet>
             </div>
 
             <div className="mt-6 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/40 p-4 text-sm text-[color:var(--sinaxys-ink)]/70">
-              Empresas perdem energia e dinheiro na execução desalinhada.
+              Empresas não precisam de mais ferramentas. Precisam de clareza operacional.
             </div>
           </div>
 
@@ -191,7 +192,7 @@ function Landing() {
 
         <div className="mt-6 grid gap-4 md:grid-cols-5">
           {[
-            { t: "Metas", d: "Direção e vínculo" },
+            { t: "Meta", d: "Direção e vínculo" },
             { t: "Projetos", d: "Trabalho real" },
             { t: "Responsáveis", d: "Ownership" },
             { t: "Cadência", d: "Ritual e evidência" },
@@ -269,7 +270,7 @@ function Landing() {
               asChild
               className="h-11 rounded-full bg-[color:var(--sinaxys-primary)] px-6 text-white hover:bg-[color:var(--sinaxys-primary)]/90"
             >
-              <Link to="/como-funciona">Ver na prática</Link>
+              <Link to="/como-funciona">{t('landing.cta.how')}</Link>
             </Button>
           </div>
         </div>
@@ -387,14 +388,14 @@ function Landing() {
           </div>
           <div className="flex flex-col gap-3 sm:items-end sm:justify-center">
             <Button asChild className="h-11 rounded-full bg-[color:var(--sinaxys-primary)] px-6 text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-              <Link to="/login">Começar grátis</Link>
+              <Link to="/login">{t('landing.cta.start')}</Link>
             </Button>
             <Button
               asChild
               variant="outline"
               className="h-11 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 px-6 text-[color:var(--sinaxys-ink)] hover:bg-white/5"
             >
-              <Link to="/demo">Agendar demonstração</Link>
+              <Link to="/demo">{t('landing.cta.how')}</Link>
             </Button>
           </div>
         </div>

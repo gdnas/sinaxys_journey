@@ -70,7 +70,29 @@ const resources = {
 
       // General
       "ok": "OK",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar",
+
+      // Landing
+      "landing.badge": "Execution Operating System",
+      "landing.hero.title": "Visibilidade total da execução.\nSem complexidade.",
+      "landing.hero.subtitle": "Sistema que conecta metas, pessoas, iniciativas e resultados em um único lugar.",
+      "landing.cta.start": "Começar grátis",
+      "landing.cta.how": "Ver como funciona na prática",
+      "landing.metric.clarity": "Clareza",
+      "landing.metric.clarity.value": "o que importa agora",
+      "landing.metric.ownership": "Ownership",
+      "landing.metric.ownership.value": "quem responde pelo quê",
+      "landing.metric.decision": "Decisão",
+      "landing.metric.decision.value": "com contexto e números",
+      "landing.visual.overview": "Execution overview",
+      "landing.visual.live": "live",
+      "landing.features.title": "O caos invisível da execução",
+      "landing.features.subtitle": "Quando a empresa cresce, o trabalho se multiplica. Sem um sistema, a execução vira ruído.",
+      "landing.features.list.1": "Iniciativas demais — sem priorização visível.",
+      "landing.features.list.2": "Responsáveis difusos — ninguém \"fecha\" o ciclo.",
+      "landing.features.list.3": "Reuniões improdutivas — sem evidência do que avançou.",
+      "landing.features.list.4": "Falta de clareza — decisões por feeling.",
+      "landing.features.list.5": "Risco operacional — trabalho importante fica invisível.",
     }
   },
   en: {
@@ -141,7 +163,29 @@ const resources = {
 
       // General
       "ok": "OK",
-      "cancel": "Cancel"
+      "cancel": "Cancel",
+
+      // Landing
+      "landing.badge": "Execution Operating System",
+      "landing.hero.title": "Total execution visibility.\nWithout complexity.",
+      "landing.hero.subtitle": "A system that connects goals, people, initiatives and results in one place.",
+      "landing.cta.start": "Get started",
+      "landing.cta.how": "See how it works",
+      "landing.metric.clarity": "Clarity",
+      "landing.metric.clarity.value": "what matters now",
+      "landing.metric.ownership": "Ownership",
+      "landing.metric.ownership.value": "who is accountable",
+      "landing.metric.decision": "Decision",
+      "landing.metric.decision.value": "with context and numbers",
+      "landing.visual.overview": "Execution overview",
+      "landing.visual.live": "live",
+      "landing.features.title": "The invisible chaos of execution",
+      "landing.features.subtitle": "As the company grows, work multiplies. Without a system, execution becomes noise.",
+      "landing.features.list.1": "Too many initiatives — no visible prioritization.",
+      "landing.features.list.2": "Diffused owners — no one closes the loop.",
+      "landing.features.list.3": "Unproductive meetings — no evidence of progress.",
+      "landing.features.list.4": "Lack of clarity — decisions by feeling.",
+      "landing.features.list.5": "Operational risk — important work remains invisible.",
     }
   },
   de: {
@@ -212,7 +256,29 @@ const resources = {
 
       // General
       "ok": "OK",
-      "cancel": "Abbrechen"
+      "cancel": "Abbrechen",
+
+      // Landing
+      "landing.badge": "Execution Operating System",
+      "landing.hero.title": "Gesamte Ausführungsübersicht.\nOhne Komplexität.",
+      "landing.hero.subtitle": "Ein System, das Ziele, Personen, Initiativen und Ergebnisse an einem Ort verbindet.",
+      "landing.cta.start": "Loslegen",
+      "landing.cta.how": "Sehen Sie, wie es funktioniert",
+      "landing.metric.clarity": "Klarheit",
+      "landing.metric.clarity.value": "was jetzt zählt",
+      "landing.metric.ownership": "Ownership",
+      "landing.metric.ownership.value": "wer verantwortlich ist",
+      "landing.metric.decision": "Entscheidung",
+      "landing.metric.decision.value": "mit Kontext und Zahlen",
+      "landing.visual.overview": "Ausführungsübersicht",
+      "landing.visual.live": "live",
+      "landing.features.title": "Das unsichtbare Chaos der Ausführung",
+      "landing.features.subtitle": "Wenn das Unternehmen wächst, vervielfacht sich die Arbeit. Ohne System wird die Ausführung zum Rauschen.",
+      "landing.features.list.1": "Zu viele Initiativen — keine sichtbare Priorisierung.",
+      "landing.features.list.2": "Verstreute Verantwortliche — niemand schließt den Kreis.",
+      "landing.features.list.3": "Unproduktive Meetings — kein Nachweis von Fortschritt.",
+      "landing.features.list.4": "Mangelnde Klarheit — Entscheidungen nach Gefühl.",
+      "landing.features.list.5": "Betriebliches Risiko — wichtige Arbeit bleibt unsichtbar.",
     }
   }
 };
