@@ -76,6 +76,7 @@ import KnowledgePage from "./pages/KnowledgePage";
 import KnowledgeNewSpace from "./pages/KnowledgeNewSpace";
 import KnowledgeNewPage from "./pages/KnowledgeNewPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
 
@@ -90,6 +91,14 @@ const App = () => (
             <BrowserRouter>
               <AppShell>
                 <Routes>
+                  <Route
+                    path="/settings"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <Settings />
+                      </RequireAuth>
+                    }
+                  />
                   <Route path="/" element={<Index />} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/como-funciona" element={<HowItWorks />} />

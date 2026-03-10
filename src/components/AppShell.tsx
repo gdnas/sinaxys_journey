@@ -634,6 +634,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3">
               <ThemeToggle />
               <NotificationsPanel />
+              <Button variant="ghost" size="icon" onClick={() => navigate('/settings')} aria-label="Configurações">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V20a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06A2 2 0 1 1 2.3 17.88l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H4a2 2 0 1 1 0-4h.09c.61 0 1.1-.36 1.51-1a1.65 1.65 0 0 0-.33-1.82L5.3 4.7A2 2 0 1 1 8.12 1.88l.06.06c.5.5 1 .78 1.82.33h.09C11.71 1.93 12 1 12 1s.29.93.91 1.39c.82.45 1.32.17 1.82-.33l.06-.06A2 2 0 1 1 18.7 4.7l-.06.06c-.5.5-.78 1-.33 1.82v.09c.45.82 1.39.91 1.39.91s-.93.29-1.39.91c-.45.82-.17 1.32.33 1.82l.06.06A2 2 0 0 1 19.4 15z"></path></svg>
+              </Button>
               <button
                 type="button"
                 className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)] dark:border-border dark:bg-background dark:hover:bg-muted"

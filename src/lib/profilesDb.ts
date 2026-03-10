@@ -27,6 +27,10 @@ export type DbProfile = {
   emergency_contact_phone: string | null;
   created_at: string | null;
   updated_at: string | null;
+  // new settings
+  preferred_language?: string | null;
+  theme_preference?: string | null;
+  notification_preferences?: any;
 };
 
 export type DbProfilePublic = {
@@ -44,7 +48,7 @@ export type DbProfilePublic = {
 };
 
 const baseSelect =
-  "id,email,name,role,company_id,department_id,active,must_change_password,avatar_url,phone,job_title,contract_url,monthly_cost_brl,joined_at,manager_id,address_zip,address_line1,address_line2,address_neighborhood,address_city,address_state,address_country,emergency_contact_name,emergency_contact_phone,created_at,updated_at";
+  "id,email,name,role,company_id,department_id,active,must_change_password,avatar_url,phone,job_title,contract_url,monthly_cost_brl,joined_at,manager_id,address_zip,address_line1,address_line2,address_neighborhood,address_city,address_state,address_country,emergency_contact_name,emergency_contact_phone,created_at,updated_at,preferred_language,theme_preference,notification_preferences";
 
 const publicSelect = "id,company_id,department_id,name,avatar_url,role,active,updated_at,manager_id,job_title,joined_at";
 
