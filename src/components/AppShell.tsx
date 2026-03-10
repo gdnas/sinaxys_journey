@@ -44,6 +44,7 @@ import { describedItemsToLines, parseDescribedItems, textPreview } from "@/lib/f
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageSwitcher } from '@/components/LanguageSwitcher';
 import NotificationsPanel from "@/components/Notifications/NotificationsPanel";
 import type { Role } from "@/lib/domain";
 import { useTranslation } from 'react-i18next';
@@ -642,6 +643,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-3">
+              <LanguageSwitcher />
               <ThemeToggle />
               <NotificationsPanel />
               <button
