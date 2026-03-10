@@ -228,3 +228,21 @@ export async function addComment(itemType: ItemType, itemId: string, userId: str
 
   return { comment, notifErrors, mentionedUserIds, mentionTokens, resolvedProfiles };
 }
+
+export async function updateComment(commentId: string, userId: string, content: string) {
+  const { data, error } = await supabase
+    .from("item_comments")
+    .update({ content })
+    .eq("id", commentId)
+    .eq("user_id", userId)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function deleteComment(commentId: string, userId: string) {
+  const { error } = await supabase.from("item_comments").delete().eq("id", commentId).eq("user_id", userId);
+  if (error) throw error;
+  return { ok: true };
+}

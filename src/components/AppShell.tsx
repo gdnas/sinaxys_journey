@@ -395,6 +395,7 @@ function FundamentalsSpotlightCard() {
   const { company, companyId } = useCompany();
   const { pathname } = useLocation();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const { data: fundamentals } = useQuery({
     queryKey: ["company-fundamentals", companyId],
@@ -463,7 +464,7 @@ function FundamentalsSpotlightCard() {
         "w-full rounded-xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-3 text-left",
         "transition hover:bg-[color:var(--sinaxys-tint)]/80 hover:shadow-sm",
       )}
-      title="Abrir fundamentos"
+      title={t('menu.fundamentals.open')}
     >
       <div className="flex items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm">
@@ -476,7 +477,7 @@ function FundamentalsSpotlightCard() {
 
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
-            {selected?.label ? t(selected.label) : t('menu.fundamentals.open')}
+            {selected?.label ?? t('menu.fundamentals.open')}
           </div>
           <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-[color:var(--sinaxys-ink)]">
             {selected?.text ?? (company.tagline || "Defina os fundamentos e volte aqui para ver um destaque aleatório.")}
