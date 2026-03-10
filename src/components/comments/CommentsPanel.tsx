@@ -83,7 +83,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
       return commentsDb.addComment(itemType, itemId, userId, content);
     },
     onSuccess: (res: any) => {
-      // res is { comment, notifErrors, mentionedUserIds }
+      // res is { comment, notifErrors, mentionedUserIds, mentionTokens, resolvedProfiles }
       setNewComment("");
       qc.invalidateQueries({ queryKey: ["comments", itemType, itemId] });
       qc.invalidateQueries({ queryKey: ["comments-count", itemType, itemId] });
@@ -91,6 +91,21 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
 
       const mentioned = res?.mentionedUserIds?.length ?? 0;
       const errors = res?.notifErrors?.length ?? 0;
+
+      // Show a clear diagnostic toast listing mention tokens and resolved profiles
+      const tokens: string[] = res?.mentionTokens ?? [];
+      const resolved: { token: string; id: string; name: string }[] = res?.resolvedProfiles ?? [];
+
+      if (tokens.length === 0) {
+        // no mentions detected
+        toast({ title: "Comentário enviado", description: "Nenhuma menção detectada." });
+      } else {
+        const resolvedList = resolved.map((r) => `@${r.token}→${r.name}`).join(", ");
+        const unresolved = tokens.filter((t) => !resolved.find((r) => r.token === t));
+        const unresolvedText = unresolved.length ? `Não resolvidos: ${unresolved.join(", ")}.` : "";
+        toast({ title: `Menções (${tokens.length})`, description: `${resolvedList || "Nenhuma menção resolvida."} ${unresolvedText}` });
+      }
+
       if (mentioned > 0) {
         toast({ title: `Notificado${mentioned > 1 ? 's' : ''}`, description: `${mentioned} usuário${mentioned > 1 ? 's' : ''} notificado(s).` });
       }
