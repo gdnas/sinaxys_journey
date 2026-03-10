@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, CalendarClock, CheckCircle2, FileText, PlayCircle, Rocket, Settings2, SquarePen, Trophy, MessageSquare } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -40,16 +41,16 @@ function toDueIso(dateInput: string) {
   return d.toISOString();
 }
 
-function moduleTypeLabel(t: DbModule["type"]) {
+function moduleTypeLabel(t: DbModule["type"], ti18n: (key: string) => string) {
   switch (t) {
     case "VIDEO":
-      return "Vídeo";
+      return ti18n("tracks.video.title");
     case "MATERIAL":
-      return "Material";
+      return ti18n("tracks.material.title");
     case "CHECKPOINT":
-      return "Checkpoint";
+      return ti18n("tracks.checkpoint.title");
     case "QUIZ":
-      return "Quiz";
+      return ti18n("tracks.quiz.title");
   }
 }
 
@@ -67,6 +68,7 @@ function moduleTypeIcon(t: DbModule["type"]) {
 }
 
 export default function TrackDetail() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -143,10 +145,10 @@ export default function TrackDetail() {
   }, [track, user.role]);
 
   const cta = useMemo(() => {
-    if (!latestAssignment) return { label: "Adicionar à minha jornada", mode: "start" as const };
-    if (latestAssignment.status === "COMPLETED") return { label: "Refazer (nova atribuição)", mode: "restart" as const };
-    return { label: "Continuar na minha jornada", mode: "continue" as const };
-  }, [latestAssignment]);
+    if (!latestAssignment) return { label: t("tracks.add_to_journey"), mode: "start" as const };
+    if (latestAssignment.status === "COMPLETED") return { label: t("tracks.redo_new_assignment"), mode: "restart" as const };
+    return { label: t("tracks.continue_in_journey"), mode: "continue" as const };
+  }, [latestAssignment, t]);
 
   const dueAtIso = useMemo(() => {
     if (!dueDate.trim()) return null;
@@ -159,7 +161,7 @@ export default function TrackDetail() {
         <Button asChild variant="outline" className="rounded-xl">
           <Link to="/tracks">
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar para biblioteca
+            {t("tracks.back_to_library")}
           </Link>
         </Button>
 
@@ -174,7 +176,7 @@ export default function TrackDetail() {
               }}
             >
               <Settings2 className="mr-2 h-4 w-4" />
-              Equipe responsável
+              {t("tracks.responsible_team")}
             </Button>
           ) : null}
 
@@ -184,7 +186,6 @@ export default function TrackDetail() {
               variant="outline"
               className="rounded-xl"
               onClick={() => {
-                // navigate to appropriate edit route
                 if (user.role === "ADMIN") {
                   navigate(`/admin/tracks/${track.id}/edit`);
                 } else {
@@ -194,7 +195,7 @@ export default function TrackDetail() {
             >
               <span>
                 <SquarePen className="mr-2 h-4 w-4" />
-                Editar trilha
+                {t("tracks.edit_track")}
               </span>
             </Button>
           ) : null}
@@ -204,12 +205,11 @@ export default function TrackDetail() {
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilha</div>
-            <div className="mt-1 truncate text-xl font-semibold text-[color:var(--sinaxys-ink)]">{track?.title ?? (loadingTrack ? "Carregando…" : "Não encontrada")}</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("tracks.track")}</div>
+            <div className="mt-1 truncate text-xl font-semibold text-[color:var(--sinaxys-ink)]">{track?.title ?? (loadingTrack ? t("tracks.loading") : t("tracks.not_found"))}</div>
             {track?.description ? <p className="mt-2 text-sm text-muted-foreground">{track.description}</p> : null}
 
             <div className="mt-3 flex flex-wrap gap-2">
-                          {/* Show total comments badge for the whole track */}
               {deptName ? (
                 <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white ring-1 ring-[color:var(--sinaxys-border)]">
                   {deptName}
@@ -222,14 +222,14 @@ export default function TrackDetail() {
               ) : null}
               {track ? (
                 track.published ? (
-                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Publicada</Badge>
+                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">{t("tracks.published")}</Badge>
                 ) : (
-                  <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Rascunho</Badge>
+                  <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">{t("tracks.draft")}</Badge>
                 )
               ) : null}
               {track?.created_at ? (
                 <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                  Criada em {formatShortDate(track.created_at)}
+                  {t("tracks.created_at")} {formatShortDate(track.created_at)}
                 </Badge>
               ) : null}
             </div>
@@ -244,9 +244,9 @@ export default function TrackDetail() {
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Sua ação</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("tracks.your_action")}</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              Você pode entrar nessa trilha mesmo que seja de outro departamento. Se já tiver uma atribuição, você continua do ponto onde parou.
+              {t("tracks.action_desc")}
             </p>
           </div>
 
@@ -258,7 +258,7 @@ export default function TrackDetail() {
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 className="h-11 w-full rounded-xl pl-9"
-                placeholder="Prazo (opcional)"
+                placeholder={t("tracks.due_optional")}
               />
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2">
@@ -301,14 +301,14 @@ export default function TrackDetail() {
                     });
 
                     toast({
-                      title: "Trilha adicionada",
-                      description: "Ela já está na sua jornada. Vamos nessa.",
+                      title: t("tracks.track_added"),
+                      description: t("tracks.track_added_desc"),
                     });
                     navigate(`/app/tracks/${a.id}`);
                   } catch (e) {
                     toast({
-                      title: "Não foi possível iniciar",
-                      description: e instanceof Error ? e.message : "Tente novamente.",
+                      title: t("tracks.could_not_start"),
+                      description: e instanceof Error ? e.message : t("tracks.try_again"),
                       variant: "destructive",
                     });
                   } finally {
@@ -321,7 +321,7 @@ export default function TrackDetail() {
             </div>
 
             {!canStart && user.role === "COLABORADOR" ? (
-              <div className="text-xs text-muted-foreground">Essa trilha ainda está em rascunho, então não aparece para colaboradores.</div>
+              <div className="text-xs text-muted-foreground">{t("tracks.draft_not_visible")}</div>
             ) : null}
           </div>
         </div>
@@ -330,11 +330,11 @@ export default function TrackDetail() {
           <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <span className="inline-flex items-center gap-2 rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 font-semibold text-[color:var(--sinaxys-ink)]">
               {latestAssignment.status === "COMPLETED" ? <Trophy className="h-4 w-4" /> : <PlayCircle className="h-4 w-4" />}
-              Status: {latestAssignment.status}
+              {t("tracks.status")}: {latestAssignment.status}
             </span>
             {latestAssignment.due_at ? (
               <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
-                Prazo: {toDateInputValue(latestAssignment.due_at)}
+                {t("tracks.deadline")}: {toDateInputValue(latestAssignment.due_at)}
               </span>
             ) : null}
           </div>
@@ -344,9 +344,9 @@ export default function TrackDetail() {
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Conteúdo da trilha</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("tracks.track_content")}</div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {loadingModules ? "Carregando módulos…" : `${modules.length} módulo(s). Abra para visualizar o formato e os recursos.`}
+              {loadingModules ? t("tracks.loading_modules") : t("tracks.modules_count", { count: modules.length })}
             </p>
           </div>
         </div>
@@ -366,7 +366,7 @@ export default function TrackDetail() {
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)]">
                             {moduleTypeIcon(m.type)}
-                            {moduleTypeLabel(m.type)}
+                            {moduleTypeLabel(m.type, t)}
                           </span>
                           <span className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">
                             {m.order_index}. {m.title}
@@ -374,13 +374,13 @@ export default function TrackDetail() {
                         </div>
                         {m.description ? <div className="mt-1 truncate text-xs text-muted-foreground">{m.description}</div> : null}
                         <div className="text-right">
-                          <div className="text-xs text-muted-foreground">Recompensa</div>
-                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">+{m.xp_reward} Pontos</div>
+                          <div className="text-xs text-muted-foreground">{t("tracks.reward")}</div>
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">+{m.xp_reward} {t("tracks.points")}</div>
                         </div>
                       </div>
 
                       <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                        +{m.xp_reward} Pontos
+                        +{m.xp_reward} {t("tracks.points")}
                       </Badge>
                     </div>
                   </AccordionTrigger>
@@ -409,10 +409,10 @@ export default function TrackDetail() {
                           return (
                             <div className="flex flex-col items-center justify-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-6">
                               <Button asChild className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-                                <a href={originalUrl} target="_blank" rel="noreferrer">Ir para o vídeo</a>
+                                <a href={originalUrl} target="_blank" rel="noreferrer">{t("tracks.go_to_video")}</a>
                               </Button>
                               <p className="mt-3 max-w-[56ch] text-center text-sm text-muted-foreground">
-                                Este recurso não pode ser reproduzido diretamente aqui — pode exigir autenticação ou não permitir incorporação. Abra no site do provedor para assistir.
+                                {t("tracks.video_not_embeddable")}
                               </p>
                             </div>
                           );
@@ -420,7 +420,6 @@ export default function TrackDetail() {
                       </div>
                     ) : null}
 
-                    {/* Comments for module (retracted by default) - only for VIDEO and MATERIAL */}
                     {m.type === "VIDEO" || m.type === "MATERIAL" ? <CommentsPanel itemType="MODULE" itemId={m.id} /> : null}
 
                     {m.type === "MATERIAL" ? (
@@ -431,15 +430,15 @@ export default function TrackDetail() {
 
                     {m.type === "CHECKPOINT" ? (
                       <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-4">
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Pergunta</div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("tracks.checkpoint.title")}</div>
                         <div className="mt-1 text-sm text-muted-foreground">{m.checkpoint_prompt || "—"}</div>
                       </div>
                     ) : null}
 
                     {m.type === "QUIZ" ? (
                       <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-4">
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Quiz</div>
-                        <div className="mt-1 text-sm text-muted-foreground">Nota mínima: {m.min_score ?? 70}%.</div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("tracks.quiz.title")}</div>
+                        <div className="mt-1 text-sm text-muted-foreground">{t("tracks.quiz.min_score_desc", { score: m.min_score ?? 70 })}</div>
                       </div>
                     ) : null}
                   </AccordionContent>
@@ -448,7 +447,7 @@ export default function TrackDetail() {
           </Accordion>
         ) : (
           <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-            {loadingTrack ? "Carregando…" : "Nenhum módulo cadastrado ainda."}
+            {loadingTrack ? t("tracks.loading") : t("tracks.no_modules_yet")}
           </div>
         )}
       </Card>
@@ -462,19 +461,19 @@ export default function TrackDetail() {
       >
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Equipe responsável pela trilha</DialogTitle>
+            <DialogTitle>{t("tracks.responsible_team_dialog_title")}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-3">
             <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-              Alterar a equipe responsável muda o <span className="font-semibold">departamento</span> da trilha na biblioteca.
+              {t("tracks.change_team_note")}
             </div>
 
             <div className="grid gap-2">
-              <Label>Departamento</Label>
+              <Label>{t("tracks.create_dialog.department")}</Label>
               <Select value={deptNextId} onValueChange={setDeptNextId}>
                 <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder="Selecione…" />
+                  <SelectValue placeholder={t("tracks.create_dialog.select")} />
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((d) => (
@@ -489,7 +488,7 @@ export default function TrackDetail() {
 
           <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button variant="outline" className="rounded-xl" onClick={() => setDeptOpen(false)}>
-              Cancelar
+              {t("cancel")}
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -503,12 +502,12 @@ export default function TrackDetail() {
                     qc.invalidateQueries({ queryKey: ["track", trackId] }),
                     qc.invalidateQueries({ queryKey: ["tracks", companyId] }),
                   ]);
-                  toast({ title: "Equipe responsável atualizada" });
+                  toast({ title: t("tracks.team_updated") });
                   setDeptOpen(false);
                 } catch (e) {
                   toast({
-                    title: "Não foi possível atualizar",
-                    description: e instanceof Error ? e.message : "Tente novamente.",
+                    title: t("tracks.update_failed"),
+                    description: e instanceof Error ? e.message : t("tracks.try_again"),
                     variant: "destructive",
                   });
                 } finally {
@@ -516,7 +515,7 @@ export default function TrackDetail() {
                 }
               }}
             >
-              Salvar
+              {t("tracks.dialog_save")}
             </Button>
           </DialogFooter>
         </DialogContent>

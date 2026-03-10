@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, CheckCircle2, Lock, Trophy } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -54,6 +55,7 @@ function mapDbProgress(p: DbModuleProgress): ModuleProgress {
 }
 
 export default function TrackPlayer() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const qc = useQueryClient();
   const params = useParams();
@@ -155,7 +157,7 @@ export default function TrackPlayer() {
   if (isLoading) {
     return (
       <div className="rounded-3xl border bg-white p-6">
-        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Carregando trilha…</div>
+        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("player.loading_track")}</div>
       </div>
     );
   }
@@ -165,13 +167,13 @@ export default function TrackPlayer() {
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilha não encontrada</div>
-            <p className="mt-1 text-sm text-muted-foreground">Verifique o link ou retorne ao seu painel.</p>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("player.track_not_found")}</div>
+            <p className="mt-1 text-sm text-muted-foreground">{t("player.check_link_or_return")}</p>
           </div>
           <Button asChild variant="outline" className="rounded-xl">
             <Link to="/app">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
+              {t("player.back")}
             </Link>
           </Button>
         </div>
@@ -209,26 +211,26 @@ export default function TrackPlayer() {
           <Button asChild variant="outline" className="rounded-xl">
             <Link to="/app">
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Minha jornada
+              {t("player.my_journey")}
             </Link>
           </Button>
           <Button asChild variant="outline" className="rounded-xl">
-            <Link to="/app/certificates">Certificados</Link>
+            <Link to="/app/certificates">{t("player.certificates")}</Link>
           </Button>
         </div>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilha</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("tracks.track")}</div>
               <h2 className="mt-1 text-xl font-semibold text-[color:var(--sinaxys-ink)]">{mapped.track.title}</h2>
               <p className="mt-2 text-sm text-muted-foreground">{mapped.track.description}</p>
             </div>
             <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] px-4 py-3">
-              <div className="text-xs text-muted-foreground">Progresso</div>
+              <div className="text-xs text-muted-foreground">{t("player.progress")}</div>
               <div className="mt-0.5 text-lg font-semibold text-[color:var(--sinaxys-ink)]">{stats.pct}%</div>
               <div className="mt-1 text-xs text-muted-foreground">
-                {stats.done} de {stats.total} módulos
+                {t("player.modules_completed", { done: stats.done, total: stats.total })}
               </div>
             </div>
           </div>
@@ -241,13 +243,13 @@ export default function TrackPlayer() {
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Módulo {module.orderIndex}</div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t("player.module", { order: module.orderIndex })}</div>
               <h3 className="mt-1 text-lg font-semibold text-[color:var(--sinaxys-ink)]">{module.title}</h3>
               {module.description ? <p className="mt-2 text-sm text-muted-foreground">{module.description}</p> : null}
             </div>
             <div className="text-right">
-              <div className="text-xs text-muted-foreground">Recompensa</div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">+{module.xpReward} Pontos</div>
+              <div className="text-xs text-muted-foreground">{t("tracks.reward")}</div>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">+{module.xpReward} {t("tracks.points")}</div>
             </div>
           </div>
 
@@ -257,15 +259,14 @@ export default function TrackPlayer() {
                 <Lock className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulo bloqueado</div>
-                <p className="mt-1 text-sm text-muted-foreground">Conclua o módulo anterior para liberar este conteúdo.</p>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("player.module_locked")}</div>
+                <p className="mt-1 text-sm text-muted-foreground">{t("player.complete_previous")}</p>
               </div>
             </div>
           ) : null}
 
           {module.type === "VIDEO" ? (
             <div className="mt-6 grid gap-4">
-              {/* Decide how to render video: only embed when we have a YouTube embed URL. */}
               {(() => {
                 const originalUrl = module.youtubeUrl ?? module.materialUrl ?? "";
                 const embedUrl = getYouTubeEmbedUrl(originalUrl ?? "");
@@ -298,41 +299,39 @@ export default function TrackPlayer() {
                   );
                 }
 
-                // Not embeddable — only show a clear external button to open the video in a new tab, with a short explanation.
                 return (
                   <div className="flex flex-col items-center justify-center rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-6">
                     <Button asChild className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-                      <a href={originalUrl} target="_blank" rel="noreferrer">Ir para o vídeo</a>
+                      <a href={originalUrl} target="_blank" rel="noreferrer">{t("tracks.go_to_video")}</a>
                     </Button>
                     <p className="mt-3 max-w-[56ch] text-center text-sm text-muted-foreground">
-                      Este recurso não pode ser reproduzido diretamente aqui — pode exigir autenticação ou não permitir incorporação. Abra no site do provedor para assistir.
+                      {t("tracks.video_not_embeddable")}
                     </p>
                   </div>
                 );
               })()}
 
-              {/* Comments are shown for VIDEO and MATERIAL modules only (exclude QUIZ and CHECKPOINT). */}
               {module && (module.type === "VIDEO" || module.type === "MATERIAL") ? (
                 <CommentsPanel itemType="MODULE" itemId={module.id} />
               ) : null}
 
               <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
-                <div className="text-sm text-muted-foreground">Ao concluir, o próximo módulo é liberado automaticamente.</div>
+                <div className="text-sm text-muted-foreground">{t("player.next_unlocked")}</div>
                 <Button
                   disabled={!available || completeMutation.isPending}
                   className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
                   onClick={async () => {
                     await completeMutation.mutateAsync({});
-                    toast({ title: "Módulo concluído", description: "Boa. O próximo conteúdo já foi liberado." });
+                    toast({ title: t("player.module_completed"), description: t("player.next_unlocked_desc") });
                     goNextIfAny();
                   }}
                 >
                   {completed ? (
                     <>
-                      <CheckCircle2 className="mr-2 h-4 w-4" /> Concluído
+                      <CheckCircle2 className="mr-2 h-4 w-4" /> {t("player.completed")}
                     </>
                   ) : (
-                    "Concluir"
+                    t("player.complete")
                   )}
                 </Button>
               </div>
@@ -344,22 +343,22 @@ export default function TrackPlayer() {
               <ResourceEmbed url={module.materialUrl ?? ""} title={module.title} />
 
               <div className="flex flex-col items-stretch justify-between gap-3 md:flex-row md:items-center">
-                <div className="text-sm text-muted-foreground">Ao concluir, o próximo módulo é liberado automaticamente.</div>
+                <div className="text-sm text-muted-foreground">{t("player.next_unlocked")}</div>
                 <Button
                   disabled={!available || completeMutation.isPending}
                   className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
                   onClick={async () => {
                     await completeMutation.mutateAsync({});
-                    toast({ title: "Material concluído", description: "Conteúdo registrado. O próximo módulo já está disponível." });
+                    toast({ title: t("player.material_completed"), description: t("player.material_completed_desc") });
                     goNextIfAny();
                   }}
                 >
                   {completed ? (
                     <>
-                      <CheckCircle2 className="mr-2 h-4 w-4" /> Concluído
+                      <CheckCircle2 className="mr-2 h-4 w-4" /> {t("player.completed")}
                     </>
                   ) : (
-                    "Concluir"
+                    t("player.complete")
                   )}
                 </Button>
               </div>
@@ -369,16 +368,16 @@ export default function TrackPlayer() {
           {module.type === "CHECKPOINT" ? (
             <div className="mt-6 grid gap-4">
               <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-4">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Pergunta</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("tracks.checkpoint.title")}</div>
                 <p className="mt-1 text-sm text-muted-foreground">{module.checkpointPrompt}</p>
               </div>
 
               <div className="grid gap-2">
-                <Label>Sua resposta</Label>
+                <Label>{t("player.your_answer")}</Label>
                 <Textarea
                   value={checkpointAnswer}
                   onChange={(e) => setCheckpointAnswer(e.target.value)}
-                  placeholder="Escreva com clareza. Seja direto e completo."
+                  placeholder={t("player.answer_placeholder")}
                   className="min-h-32 rounded-2xl"
                   disabled={!available}
                 />
@@ -390,11 +389,11 @@ export default function TrackPlayer() {
                   className="h-11 w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 disabled:opacity-60 md:w-auto"
                   onClick={async () => {
                     await completeMutation.mutateAsync({ checkpointAnswer });
-                    toast({ title: "Checkpoint concluído", description: "Ótimo. O próximo módulo já está disponível." });
+                    toast({ title: t("player.checkpoint_completed"), description: t("player.checkpoint_completed_desc") });
                     goNextIfAny();
                   }}
                 >
-                  Concluir checkpoint
+                  {t("player.complete_checkpoint")}
                 </Button>
               </div>
             </div>
@@ -403,8 +402,8 @@ export default function TrackPlayer() {
           {module.type === "QUIZ" && quiz ? (
             <div className="mt-6 grid gap-5">
               <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-4">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Critério de aprovação</div>
-                <p className="mt-1 text-sm text-muted-foreground">Nota mínima: {module.minScore ?? 70}%.</p>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("player.approval_criteria")}</div>
+                <p className="mt-1 text-sm text-muted-foreground">{t("player.min_score", { score: module.minScore ?? 70 })}</p>
               </div>
 
               <div className="grid gap-4">
@@ -434,11 +433,11 @@ export default function TrackPlayer() {
 
               {quizResult ? (
                 <div className={"rounded-2xl border p-4 " + (quizResult.passed ? "border-emerald-200 bg-emerald-50" : "border-amber-200 bg-amber-50")}>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Resultado: {quizResult.score}%</div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("player.result_score", { score: quizResult.score })}</div>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {quizResult.passed
-                      ? "Aprovado. O próximo módulo foi liberado automaticamente."
-                      : `Ainda não. Nota mínima: ${quizResult.minScore}%. Revise e tente novamente.`}
+                      ? t("player.quiz_passed_desc")
+                      : t("player.quiz_failed_desc", { minScore: quizResult.minScore })}
                   </p>
                 </div>
               ) : null}
@@ -454,14 +453,14 @@ export default function TrackPlayer() {
                     await quizMutation.mutateAsync({ score: result.score, passed: result.passed });
 
                     if (result.passed) {
-                      toast({ title: "Quiz aprovado", description: "Boa. O próximo módulo já foi liberado." });
+                      toast({ title: t("player.quiz_passed"), description: t("player.next_unlocked_desc") });
                       goNextIfAny();
                     } else {
-                      toast({ title: "Quiz não aprovado", description: "Sem problema — revise e tente novamente.", variant: "destructive" });
+                      toast({ title: t("player.quiz_failed"), description: t("player.quiz_failed_toast"), variant: "destructive" });
                     }
                   }}
                 >
-                  Enviar respostas
+                  {t("player.submit_answers")}
                 </Button>
               </div>
             </div>
@@ -473,8 +472,8 @@ export default function TrackPlayer() {
                 <Trophy className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilha concluída</div>
-                <p className="mt-1 text-sm text-muted-foreground">Seu certificado está disponível na área de certificados.</p>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("player.track_completed")}</div>
+                <p className="mt-1 text-sm text-muted-foreground">{t("player.certificate_available")}</p>
               </div>
             </div>
           ) : null}
@@ -495,9 +494,9 @@ export default function TrackPlayer() {
         />
 
         <Card className="rounded-2xl border-[color:var(--sinaxys-border)] bg-white p-4">
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Pontos acumulados</div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t("player.accumulated_points")}</div>
           <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{stats.xp}</div>
-          <div className="mt-1 text-xs text-muted-foreground">Pontos é somatório de módulos concluídos.</div>
+          <div className="mt-1 text-xs text-muted-foreground">{t("player.points_desc")}</div>
         </Card>
       </div>
     </div>
