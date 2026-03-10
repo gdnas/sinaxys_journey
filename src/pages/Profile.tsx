@@ -34,6 +34,7 @@ import { roleLabel } from "@/lib/sinaxys";
 import { FinanceiroPanel } from "@/components/FinanceiroPanel";
 import VacationRequests from "@/pages/VacationRequests";
 import VacationApprovals from "@/pages/VacationApprovals";
+import { useTranslation } from "react-i18next";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -58,6 +59,7 @@ export default function Profile() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user, refresh } = useAuth();
+  const { t } = useTranslation();
 
   const fileRef = useRef<HTMLInputElement | null>(null);
   const docFileRef = useRef<HTMLInputElement | null>(null);
@@ -217,8 +219,8 @@ export default function Profile() {
       <div className="rounded-3xl border bg-white p-5 sm:p-6">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Minha área</div>
-            <p className="mt-1 text-sm text-muted-foreground">Perfil, trabalho, documentos e financeiro.</p>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t('profile.area_title')}</div>
+            <p className="mt-1 text-sm text-muted-foreground">{t('profile.area_desc')}</p>
 
             <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap sm:gap-2">
               <Badge className="w-fit max-w-full truncate rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
@@ -270,18 +272,18 @@ export default function Profile() {
                 reader.onload = () => {
                   const dataUrl = String(reader.result ?? "");
                   setAvatarUrl(dataUrl);
-                  toast({ title: "Foto carregada", description: "Agora é só salvar." });
+                  toast({ title: t('profile.photo_loaded'), description: t('profile.now_save') });
                 };
                 reader.readAsDataURL(file);
               }}
             />
             <Button variant="outline" className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto" onClick={() => fileRef.current?.click()}>
-              Enviar foto
+              {t('profile.upload_photo')}
             </Button>
             <Button asChild variant="outline" className="h-11 w-full justify-center rounded-xl sm:h-10 sm:w-auto">
               <Link to="/password">
                 <KeyRound className="mr-2 h-4 w-4" />
-                Alterar senha
+                {t('profile.change_password')}
               </Link>
             </Button>
           </div>
@@ -294,27 +296,27 @@ export default function Profile() {
             listClassName="h-11 rounded-2xl bg-[color:var(--sinaxys-tint)] p-1"
             containerClassName="-mx-1 px-1"
           >
-            <TabsTrigger value="perfil" className="shrink-0 rounded-xl">Perfil</TabsTrigger>
-            <TabsTrigger value="trabalho" className="shrink-0 rounded-xl">Trabalho</TabsTrigger>
-            <TabsTrigger value="docs" className="shrink-0 rounded-xl">Documentos</TabsTrigger>
-            <TabsTrigger value="financeiro" className="shrink-0 rounded-xl">Financeiro</TabsTrigger>
-            <TabsTrigger value="ferias" className="shrink-0 rounded-xl">Férias</TabsTrigger>
+            <TabsTrigger value="perfil" className="shrink-0 rounded-xl">{t('profile.tab_perfil')}</TabsTrigger>
+            <TabsTrigger value="trabalho" className="shrink-0 rounded-xl">{t('profile.tab_trabalho')}</TabsTrigger>
+            <TabsTrigger value="docs" className="shrink-0 rounded-xl">{t('profile.tab_docs')}</TabsTrigger>
+            <TabsTrigger value="financeiro" className="shrink-0 rounded-xl">{t('profile.tab_financeiro')}</TabsTrigger>
+            <TabsTrigger value="ferias" className="shrink-0 rounded-xl">{t('profile.tab_ferias')}</TabsTrigger>
           </ScrollableTabsList>
 
           <TabsContent value="perfil" className="mt-5">
             <div className="grid gap-4">
               <div className="grid gap-2">
-                <Label>Nome</Label>
+                <Label>{t('profile.name')}</Label>
                 <Input className="h-11 rounded-xl" value={name} onChange={(e) => setName(e.target.value)} />
               </div>
 
               <div className="grid gap-2">
-                <Label>Celular</Label>
+                <Label>{t('profile.phone')}</Label>
                 <Input className="h-11 rounded-xl" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+55 11 9…" />
               </div>
 
               <div className="grid gap-2">
-                <Label>Avatar URL (opcional)</Label>
+                <Label>{t('profile.avatar_url')}</Label>
                 <Input className="h-11 rounded-xl" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://..." />
               </div>
 
@@ -322,7 +324,7 @@ export default function Profile() {
                 <Accordion type="single" collapsible>
                   <AccordionItem value="endereco" className="border-none">
                     <AccordionTrigger className="rounded-2xl px-4 py-3 text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:no-underline">
-                      Endereço
+                      {t('profile.address')}
                     </AccordionTrigger>
                     <AccordionContent className="px-4 pb-4">
                       <div className="grid gap-3">
@@ -412,11 +414,11 @@ export default function Profile() {
 
                       await qc.invalidateQueries({ queryKey: ["profile", user.id] });
                       await refresh();
-                      toast({ title: "Perfil atualizado" });
+                      toast({ title: t('profile.updated') });
                     } catch (e) {
                       toast({
-                        title: "Não foi possível salvar",
-                        description: e instanceof Error ? e.message : "Erro inesperado.",
+                        title: t('profile.could_not_save'),
+                        description: e instanceof Error ? e.message : t('profile.error_unexpected'),
                         variant: "destructive",
                       });
                     } finally {
@@ -425,7 +427,7 @@ export default function Profile() {
                   }}
                 >
                   <Save className="mr-2 h-4 w-4" />
-                  {saving ? "Salvando…" : "Salvar"}
+                  {saving ? t('profile.saving') : t('profile.save')}
                 </Button>
               </div>
             </div>
@@ -525,8 +527,8 @@ export default function Profile() {
 
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Aditivos e anexos</div>
-                  <div className="mt-1 text-xs text-muted-foreground">Links extras relacionados ao contrato (ex.: aditivo).</div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t('profile.attachments_title')}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{t('profile.attachments_desc')}</div>
                 </div>
                 <Button
                   type="button"
@@ -540,7 +542,7 @@ export default function Profile() {
                   disabled={!user.companyId}
                 >
                   <Plus className="mr-2 h-4 w-4" />
-                  Adicionar
+                  {t('profile.add_attachment')}
                 </Button>
               </div>
 
@@ -590,7 +592,7 @@ export default function Profile() {
                     </div>
                   ))
                 ) : (
-                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum anexo ainda.</div>
+                  <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">{t('profile.no_attachment_yet')}</div>
                 )}
               </div>
             </div>
@@ -660,12 +662,12 @@ export default function Profile() {
                                 window.open(openUrl, "_blank", "noopener,noreferrer");
                               }
                             } catch (e) {
-                              toast({ title: "Não foi possível abrir o documento", description: e instanceof Error ? e.message : String(e), variant: "destructive" });
+                              toast({ title: t('profile.could_not_open'), description: e instanceof Error ? e.message : String(e), variant: "destructive" });
                             }
                           }}
                         >
                           <ExternalLink className="mr-2 h-4 w-4" />
-                          Abrir
+                          {t('login.continue')}
                         </Button>
                         <Button
                           type="button"
@@ -675,11 +677,11 @@ export default function Profile() {
                             try {
                               await deleteUserDocument(d.id);
                               await qc.invalidateQueries({ queryKey: ["user-documents", user.companyId, user.id] });
-                              toast({ title: "Documento removido" });
+                              toast({ title: t('profile.document_removed') });
                             } catch (e) {
                               toast({
-                                title: "Não foi possível remover",
-                                description: e instanceof Error ? e.message : "Erro inesperado.",
+                                title: t('profile.could_not_remove'),
+                                description: e instanceof Error ? e.message : t('profile.error_unexpected'),
                                 variant: "destructive",
                               });
                             }
@@ -704,8 +706,8 @@ export default function Profile() {
           <TabsContent value="ferias" className="mt-5">
             <div className="grid gap-4">
               <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/60 p-5">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Férias</div>
-                <p className="mt-1 text-sm text-muted-foreground">Solicite férias e acompanhe aprovações — tudo aqui dentro da sua área.</p>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t('profile.vacations_title')}</div>
+                <p className="mt-1 text-sm text-muted-foreground">{t('profile.vacations_desc')}</p>
               </div>
 
               <Tabs defaultValue="meus" className="w-full">
@@ -713,8 +715,8 @@ export default function Profile() {
                   listClassName="h-11 rounded-2xl bg-[color:var(--sinaxys-tint)] p-1"
                   containerClassName="-mx-1 px-1"
                 >
-                  <TabsTrigger value="meus" className="shrink-0 rounded-xl">Meus pedidos</TabsTrigger>
-                  {canApproveVacation ? <TabsTrigger value="apro" className="shrink-0 rounded-xl">Aprovações</TabsTrigger> : null}
+                  <TabsTrigger value="meus" className="shrink-0 rounded-xl">{t('profile.my_requests')}</TabsTrigger>
+                  {canApproveVacation ? <TabsTrigger value="apro" className="shrink-0 rounded-xl">{t('profile.approvals')}</TabsTrigger> : null}
                 </ScrollableTabsList>
 
                 <TabsContent value="meus" className="mt-5">
@@ -736,23 +738,23 @@ export default function Profile() {
       <Dialog open={addAttachmentOpen} onOpenChange={setAddAttachmentOpen}>
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Adicionar anexo / aditivo</DialogTitle>
+            <DialogTitle>{t('profile.add_attachment')}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-3">
             <div className="grid gap-2">
-              <Label>Título</Label>
+              <Label>{t('profile.title_label')}</Label>
               <Input className="h-11 rounded-xl" value={attTitle} onChange={(e) => setAttTitle(e.target.value)} placeholder="Ex.: Aditivo 2026" />
             </div>
             <div className="grid gap-2">
-              <Label>URL</Label>
+              <Label>{t('profile.url')}</Label>
               <Input className="h-11 rounded-xl" value={attUrl} onChange={(e) => setAttUrl(e.target.value)} placeholder="https://..." inputMode="url" />
             </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => setAddAttachmentOpen(false)}>
-              Cancelar
+              {t('cancel')}
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -766,18 +768,18 @@ export default function Profile() {
                     url: attUrl,
                   });
                   await qc.invalidateQueries({ queryKey: ["contract-attachments", user.companyId, user.id] });
-                  toast({ title: "Anexo adicionado" });
+                  toast({ title: t('profile.attachment_added') });
                   setAddAttachmentOpen(false);
                 } catch (e) {
                   toast({
-                    title: "Não foi possível adicionar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    title: t('profile.could_not_save'),
+                    description: e instanceof Error ? e.message : t('profile.error_unexpected'),
                     variant: "destructive",
                   });
                 }
               }}
             >
-              Adicionar
+              {t('profile.add_attachment')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -787,43 +789,43 @@ export default function Profile() {
       <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Adicionar documento</DialogTitle>
+            <DialogTitle>{t('profile.add_document')}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-3">
             <div className="grid gap-2">
-              <Label>Categoria</Label>
+              <Label>{t('profile.category')}</Label>
               <Input className="h-11 rounded-xl" value={docCategory} onChange={(e) => setDocCategory(e.target.value)} placeholder="Ex.: IDENTIFICACAO" />
-              <div className="text-xs text-muted-foreground">Ex.: IDENTIFICACAO, EMPRESA, etc.</div>
+              <div className="text-xs text-muted-foreground">{t('profile.category_placeholder')}</div>
             </div>
             <div className="grid gap-2">
-              <Label>Título</Label>
+              <Label>{t('profile.title_label')}</Label>
               <Input className="h-11 rounded-xl" value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="Ex.: RG" />
             </div>
 
             <div className="grid gap-2">
-              <Label>Tipo</Label>
+              <Label>{t('profile.type')}</Label>
               <div className="flex gap-2">
                 <button
                   type="button"
                   className={`h-10 rounded-xl px-4 ${docIsFile ? "bg-[color:var(--sinaxys-primary)] text-white" : "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]"}`}
                   onClick={() => setDocIsFile(true)}
                 >
-                  Arquivo
+                  {t('profile.type_file')}
                 </button>
                 <button
                   type="button"
                   className={`h-10 rounded-xl px-4 ${!docIsFile ? "bg-[color:var(--sinaxys-primary)] text-white" : "bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]"}`}
                   onClick={() => setDocIsFile(false)}
                 >
-                  Link
+                  {t('profile.type_link')}
                 </button>
               </div>
             </div>
 
             {docIsFile ? (
               <div className="grid gap-2">
-                <Label>Arquivo (imagem ou PDF)</Label>
+                <Label>{t('profile.file')}</Label>
                 <input
                   ref={docFileRef}
                   type="file"
@@ -836,14 +838,14 @@ export default function Profile() {
                 />
                 <div className="flex items-center gap-2">
                   <Button variant="outline" className="h-11 rounded-xl" onClick={() => docFileRef.current?.click()}>
-                    Escolher arquivo
+                    {t('profile.choose_file')}
                   </Button>
-                  <div className="text-sm text-muted-foreground">{docFile ? docFile.name : "Nenhum arquivo selecionado"}</div>
+                  <div className="text-sm text-muted-foreground">{docFile ? docFile.name : t('profile.no_file_selected')}</div>
                 </div>
               </div>
             ) : (
               <div className="grid gap-2">
-                <Label>URL</Label>
+                <Label>{t('profile.url')}</Label>
                 <Input className="h-11 rounded-xl" value={docUrl} onChange={(e) => setDocUrl(e.target.value)} placeholder="https://..." inputMode="url" />
               </div>
             )}
@@ -851,7 +853,7 @@ export default function Profile() {
 
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => setAddDocOpen(false)}>
-              Cancelar
+              {t('cancel')}
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -867,12 +869,12 @@ export default function Profile() {
                   let kind: any = "LINK";
 
                   if (docIsFile) {
-                    if (!docFile) throw new Error("Selecione um arquivo para subir.");
+                    if (!docFile) throw new Error(t('profile.enter_file'));
                     // Upload returns storage://path which we save in DB
                     finalUrl = await uploadUserDocumentFile({ companyId: user.companyId!, userId: user.id, file: docFile });
                     kind = "FILE";
                   } else {
-                    if (!isUrl(finalUrl)) throw new Error("URL inválida.");
+                    if (!isUrl(finalUrl)) throw new Error(t('profile.invalid_url'));
                   }
 
                   // DEBUG: log auth session and payload to help diagnose RLS failures
@@ -900,15 +902,15 @@ export default function Profile() {
                     kind,
                   });
                   await qc.invalidateQueries({ queryKey: ["user-documents", user.companyId, user.id] });
-                  toast({ title: "Documento adicionado" });
+                  toast({ title: t('profile.document_added') });
                   setAddDocOpen(false);
                   setDocFile(null);
                   setDocUrl("");
                 } catch (e) {
                   console.error("[debug] createUserDocument error:", e);
                   toast({
-                    title: "Não foi possível adicionar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    title: t('profile.could_not_save'),
+                    description: e instanceof Error ? e.message : t('profile.error_unexpected'),
                     variant: "destructive",
                   });
                 } finally {
@@ -916,7 +918,7 @@ export default function Profile() {
                 }
               }}
             >
-              {docUploading ? "Enviando…" : "Adicionar"}
+              {docUploading ? t('profile.saving') : t('profile.add_document')}
             </Button>
           </DialogFooter>
         </DialogContent>

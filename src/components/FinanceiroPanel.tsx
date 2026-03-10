@@ -523,7 +523,7 @@ export function FinanceiroPanel({
 
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => setSendOpen(false)}>
-              Cancelar
+              {t('cancel')}
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -568,7 +568,7 @@ export function FinanceiroPanel({
                 } catch (e) {
                   toast({
                     title: "Não foi possível enviar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    description: e instanceof Error ? e.message : t('profile.error_unexpected'),
                     variant: "destructive",
                   });
                 } finally {

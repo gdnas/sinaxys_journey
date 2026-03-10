@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { useTranslation } from 'react-i18next';
 
 export default function Login() {
   const { toast } = useToast();
@@ -15,6 +16,7 @@ export default function Login() {
   const { company } = useCompany();
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useTranslation();
   const from = (location.state as { from?: string } | null)?.from;
 
   const [email, setEmail] = useState(user?.email ?? "");
@@ -31,13 +33,12 @@ export default function Login() {
         <section>
           <div className="inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1 text-xs font-medium text-[color:var(--sinaxys-ink)]">
             <span className="h-2 w-2 rounded-full bg-[color:var(--sinaxys-primary)]" />
-            Plataforma interna de onboarding e aprendizagem contínua
+            {t('login.badge')}
           </div>
 
           <h1 className="mt-4 text-3xl font-semibold leading-tight text-[color:var(--sinaxys-ink)] md:text-4xl">{company.name}</h1>
           <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted-foreground">
-            Uma experiência sequencial, clara e mensurável para acelerar o onboarding e sustentar evolução constante — com o mesmo padrão de
-            confiança que a organização busca entregar.
+            {t('login.welcome_text')}
           </p>
 
           <div className="mt-6 rounded-2xl border bg-white p-4">
@@ -46,17 +47,17 @@ export default function Login() {
                 <KeyRound className="h-5 w-5 text-white" />
               </div>
               <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Acesso seguro</div>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t('login.secure_access')}</div>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Entre com seu e-mail e senha. Se você não tiver acesso, solicite ao administrador da sua empresa.
+                  {t('login.secure_access_desc')}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-xs">
                   <Link className="text-[color:var(--sinaxys-primary)] hover:underline" to="/privacidade">
-                    Política de Privacidade
+                    {t('login.privacy_policy')}
                   </Link>
                   <span className="text-muted-foreground">•</span>
                   <Link className="text-[color:var(--sinaxys-primary)] hover:underline" to="/termos">
-                    Termos de Serviço
+                    {t('login.terms')}
                   </Link>
                 </div>
               </div>
@@ -65,12 +66,12 @@ export default function Login() {
         </section>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6 shadow-sm">
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Entrar</div>
-          <p className="mt-1 text-sm text-muted-foreground">Informe suas credenciais para acessar.</p>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t('login.title')}</div>
+          <p className="mt-1 text-sm text-muted-foreground">{t('login.subtitle')}</p>
 
           <div className="mt-5 grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="email">E-mail</Label>
+              <Label htmlFor="email">{t('login.email')}</Label>
               <Input
                 id="email"
                 placeholder="nome@empresa.com"
@@ -84,9 +85,9 @@ export default function Login() {
 
             <div className="grid gap-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Senha</Label>
+                <Label htmlFor="password">{t('login.password')}</Label>
                 <Link className="text-xs text-[color:var(--sinaxys-primary)] hover:underline" to="/forgot">
-                  Esqueci minha senha
+                  {t('login.forgot_password')}
                 </Link>
               </div>
               <Input
@@ -110,7 +111,7 @@ export default function Login() {
                   const result = await login(email, password);
                   if (result.ok === false) {
                     toast({
-                      title: "Não foi possível entrar",
+                      title: t('login.failed_title'),
                       description: result.message,
                       variant: "destructive",
                     });
@@ -128,14 +129,14 @@ export default function Login() {
                 }
               }}
             >
-              {submitting ? "Entrando…" : "Continuar"}
+              {submitting ? t('login.signing_in') : t('login.continue')}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
 
             <div className="text-center text-sm text-muted-foreground">
-              Ainda não tem conta?{" "}
+              {t('login.no_account')}{" "}
               <Link className="text-[color:var(--sinaxys-primary)] hover:underline" to="/signup">
-                Criar conta
+                {t('login.create_account')}
               </Link>
             </div>
           </div>
