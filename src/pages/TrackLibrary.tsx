@@ -20,6 +20,7 @@ import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilePublicByCompany, listProfilesByCompany } from "@/lib/profilesDb";
 import { assignTrack, createTrack, getTracksByCompany, setTrackPublished } from "@/lib/journeyDb";
 import { formatShortDate } from "@/lib/sinaxys";
+import { useTranslation } from 'react-i18next';
 
 function toDateInputValue(iso?: string) {
   if (!iso) return "";
@@ -51,6 +52,7 @@ function roleLabel(role?: string | null) {
 }
 
 export default function TrackLibrary() {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -121,8 +123,8 @@ export default function TrackLibrary() {
     },
     onError: (e) => {
       toast({
-        title: "Não foi possível criar",
-        description: e instanceof Error ? e.message : "Erro inesperado.",
+        title: t('tracks.create_failed_title'),
+        description: e instanceof Error ? e.message : t('tracks.create_failed_desc'),
         variant: "destructive",
       });
     },
@@ -175,8 +177,8 @@ export default function TrackLibrary() {
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex flex-col justify-between gap-4 md:flex-row md:items-start">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Biblioteca de trilhas</div>
-            <p className="mt-1 text-sm text-muted-foreground">Catálogo por departamento. {canCreateTrack ? "Crie novas trilhas para seu departamento." : "Visualize e delegue trilhas para pessoas da sua empresa com prazo."}</p>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t('tracks.library.title')}</div>
+            <p className="mt-1 text-sm text-muted-foreground">{t(canCreateTrack ? 'tracks.library.desc_head' : 'tracks.library.desc_collab')}</p>
           </div>
 
           <div className="flex w-full flex-col gap-2 md:w-auto">
@@ -185,19 +187,19 @@ export default function TrackLibrary() {
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Buscar trilhas…"
+                placeholder={t('tracks.search.placeholder') as string}
                 className="h-11 w-full rounded-xl pl-9 md:w-[340px]"
               />
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-2 rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 font-semibold text-[color:var(--sinaxys-ink)]">
                 <BookOpenText className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
-                {tracksLoading ? "…" : visibleTracks.length} trilhas
+                {tracksLoading ? "…" : `${visibleTracks.length} ${t('tracks.label')}`}
               </span>
               {canDelegate ? (
                 <span className="inline-flex items-center gap-2">
                   <Users className="h-4 w-4" />
-                  Delegação com prazo
+                  {t('tracks.delegate_with_due')}
                 </span>
               ) : null}
             </div>
@@ -208,8 +210,8 @@ export default function TrackLibrary() {
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Catálogo da empresa</div>
-            <p className="mt-1 text-sm text-muted-foreground">{tracksLoading ? "Carregando…" : `${visibleTracks.length} trilhas`}</p>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{t('tracks.catalog.title')}</div>
+            <p className="mt-1 text-sm text-muted-foreground">{tracksLoading ? t('loading') : `${visibleTracks.length} ${t('tracks.label')}`}</p>
           </div>
 
           <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row md:items-center">
@@ -224,7 +226,7 @@ export default function TrackLibrary() {
                 }}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Criar trilha
+                {t('tracks.create')}
               </Button>
             )}
           </div>
@@ -242,7 +244,7 @@ export default function TrackLibrary() {
                   <div className="flex w-full items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{dept.name}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">{deptTracks.length ? `${deptTracks.length} trilhas` : "Nenhuma trilha"}</div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">{deptTracks.length ? `${deptTracks.length} ${t('tracks.label')}` : t('tracks.none')}</div>
                     </div>
                     <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{deptTracks.length}</Badge>
                   </div>
@@ -251,38 +253,38 @@ export default function TrackLibrary() {
                 <AccordionContent className="pt-4">
                   {deptTracks.length ? (
                     <div className="grid gap-3">
-                      {deptTracks.map((t) => (
-                        <div key={t.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                      {deptTracks.map((tItem) => (
+                        <div key={tItem.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
                           <div className="flex flex-col justify-between gap-3 md:flex-row md:items-start">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 <Link
-                                  to={`/tracks/${t.id}`}
+                                  to={`/tracks/${tItem.id}`}
                                   className="min-w-0 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] underline-offset-4 hover:underline"
                                 >
-                                  {t.title}
+                                  {tItem.title}
                                 </Link>
-                                {t.published ? (
-                                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">Publicada</Badge>
+                                {tItem.published ? (
+                                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">{t('tracks.published')}</Badge>
                                 ) : (
-                                  <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Rascunho</Badge>
+                                  <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">{t('tracks.draft')}</Badge>
                                 )}
                               </div>
-                              <div className="mt-1 text-sm text-muted-foreground">{t.description}</div>
-                              <div className="mt-2 text-xs text-muted-foreground">Criada em {formatShortDate(t.created_at)}</div>
+                              <div className="mt-1 text-sm text-muted-foreground">{tItem.description}</div>
+                              <div className="mt-2 text-xs text-muted-foreground">{t('tracks.created_at')} {formatShortDate(tItem.created_at)}</div>
                             </div>
 
                             <div className="flex w-full flex-col gap-2 sm:flex-row sm:justify-end md:w-auto">
                               <Button asChild variant="outline" className="w-full rounded-xl sm:w-auto">
-                                <Link to={`/tracks/${t.id}`}>Ver trilha</Link>
+                                <Link to={`/tracks/${tItem.id}`}>{t('tracks.view')}</Link>
                               </Button>
 
                               {canDelegate ? (
                                 <Button
                                   className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
-                                  disabled={!t.published}
+                                  disabled={!tItem.published}
                                   onClick={() => {
-                                    setDelegateTrackId(t.id);
+                                    setDelegateTrackId(tItem.id);
                                     setDelegateUserQuery("");
                                     setDelegateUserIds([]);
                                     setDelegateDueDate("");
@@ -290,7 +292,7 @@ export default function TrackLibrary() {
                                   }}
                                 >
                                   <Send className="mr-2 h-4 w-4" />
-                                  Delegar
+                                  {t('tracks.delegate')}
                                 </Button>
                               ) : null}
                             </div>
@@ -299,7 +301,7 @@ export default function TrackLibrary() {
                       ))}
                     </div>
                   ) : (
-                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhuma trilha encontrada para este departamento.</div>
+                    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">{t('tracks.none_dept')}</div>
                   )}
                 </AccordionContent>
               </AccordionItem>
@@ -322,15 +324,15 @@ export default function TrackLibrary() {
       >
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle>Criar trilha</DialogTitle>
+            <DialogTitle>{t('tracks.create_dialog.title')}</DialogTitle>
           </DialogHeader>
 
           <div className="grid gap-3">
             <div className="grid gap-2">
-              <Label>Departamento</Label>
+              <Label>{t('tracks.create_dialog.department')}</Label>
               <Select value={departmentId} onValueChange={setDepartmentId} disabled={!isHead}>
                 <SelectTrigger className="h-11 rounded-xl">
-                  <SelectValue placeholder={isHead ? "Seu departamento" : "Selecione…"} />
+                  <SelectValue placeholder={isHead ? t('tracks.create_dialog.your_department') : t('tracks.create_dialog.select')} />
                 </SelectTrigger>
                 <SelectContent>
                   {departments.map((d) => (
@@ -341,25 +343,25 @@ export default function TrackLibrary() {
                 </SelectContent>
               </Select>
               {isHead && (
-                <div className="text-xs text-muted-foreground">Como HEAD, a trilha será criada para o seu departamento.</div>
+                <div className="text-xs text-muted-foreground">{t('tracks.create_dialog.head_note')}</div>
               )}
             </div>
 
             <div className="grid gap-2">
-              <Label>Título</Label>
-              <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-11 rounded-xl" placeholder="Ex.: Onboarding — Comercial" />
+              <Label>{t('tracks.create_dialog.title')}</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-11 rounded-xl" placeholder={t('tracks.create_dialog.title_placeholder') as string} />
             </div>
             <div className="grid gap-2">
-              <Label>Descrição</Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 rounded-2xl" placeholder="(opcional)" />
+              <Label>{t('tracks.create_dialog.description')}</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 rounded-2xl" placeholder={t('tracks.create_dialog.description_placeholder') as string} />
             </div>
 
-            <div className="text-xs text-muted-foreground">Depois de criar, você poderá adicionar módulos (vídeo, material, checkpoint e quiz).</div>
+            <div className="text-xs text-muted-foreground">{t('tracks.create_dialog.after_create')}</div>
           </div>
 
           <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button variant="outline" className="rounded-xl" onClick={() => setOpen(false)}>
-              Cancelar
+              {t('cancel')}
             </Button>
             <Button
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
@@ -369,14 +371,14 @@ export default function TrackLibrary() {
                   await createMutation.mutateAsync();
                 } catch (e) {
                   toast({
-                    title: "Não foi possível criar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
+                    title: t('tracks.create_failed_title'),
+                    description: e instanceof Error ? e.message : t('tracks.create_failed_desc'),
                     variant: "destructive",
                   });
                 }
               }}
             >
-              Criar e editar
+              {t('tracks.create_and_edit')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -397,19 +399,19 @@ export default function TrackLibrary() {
       >
         <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Delegar trilha</DialogTitle>
+            <DialogTitle>{t('tracks.delegate_dialog.title')}</DialogTitle>
           </DialogHeader>
 
           {delegateTrackId ? (
             <div className="grid gap-4">
               <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilha</div>
+                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{t('tracks.delegate_dialog.track_label')}</div>
                 <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{tracks.find(t => t.id === delegateTrackId)?.title}</div>
-                <div className="mt-1 text-xs text-muted-foreground">Departamento: {deptById.get(tracks.find(t => t.id === delegateTrackId)?.department_id)?.name ?? "—"}</div>
+                <div className="mt-1 text-xs text-muted-foreground">{t('tracks.delegate_dialog.department')} {deptById.get(tracks.find(t => t.id === delegateTrackId)?.department_id)?.name ?? "—"}</div>
               </div>
 
               <div className="grid gap-2">
-                <Label>Prazos</Label>
+                <Label>{t('tracks.delegate_dialog.due_label')}</Label>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <div className="relative w-full sm:w-[220px]">
                     <CalendarClock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -436,29 +438,29 @@ export default function TrackLibrary() {
                     ))}
                   </div>
                 </div>
-                <div className="text-xs text-muted-foreground">Obrigatório: define até quando a pessoa deve concluir a trilha.</div>
+                <div className="text-xs text-muted-foreground">{t('tracks.delegate_dialog.due_note')}</div>
               </div>
 
               <div className="grid gap-2">
-                <Label>Pessoas</Label>
+                <Label>{t('tracks.delegate_dialog.people')}</Label>
                 <div className="relative">
                   <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={delegateUserQuery}
                     onChange={(e) => setDelegateUserQuery(e.target.value)}
-                    placeholder="Buscar por nome, e-mail (se disponível), papel ou departamento…"
+                    placeholder={t('tracks.delegate_dialog.people_placeholder') as string}
                     className="h-11 rounded-xl pl-9"
                   />
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="outline" className="h-9 rounded-full" onClick={() => setDelegateUserIds(assignees.map((u) => u.id))} disabled={!assignees.length}>
-                    Selecionar todos (filtrados)
+                    {t('tracks.delegate_select_filtered')}
                   </Button>
                   <Button variant="outline" className="h-9 rounded-full" onClick={() => setDelegateUserIds([])} disabled={!delegateUserIds.length}>
-                    Limpar
+                    {t('tracks.delegate_clear')}
                   </Button>
-                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{delegateUserIds.length} selecionados</Badge>
+                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{delegateUserIds.length} {t('tracks.delegate.selected')}</Badge>
                 </div>
 
                 <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
@@ -501,19 +503,19 @@ export default function TrackLibrary() {
                         );
                       })}
 
-                      {!assignees.length ? <div className="p-6 text-center text-sm text-muted-foreground">Nenhuma pessoa encontrada.</div> : null}
+                      {!assignees.length ? <div className="p-6 text-center text-sm text-muted-foreground">{t('tracks.delegate.no_people')}</div> : null}
                     </div>
                   </ScrollArea>
                 </div>
 
-                <div className="text-xs text-muted-foreground">A delegação cria uma atribuição na "Minha jornada" da pessoa selecionada.</div>
+                <div className="text-xs text-muted-foreground">{t('tracks.delegate.note')}</div>
               </div>
 
               <Separator />
 
               <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
                 <Button variant="outline" className="w-full rounded-xl sm:w-auto" onClick={() => setDelegateOpen(false)}>
-                  Cancelar
+                  {t('cancel')}
                 </Button>
                 <Button
                   className="w-full rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90 sm:w-auto"
@@ -535,27 +537,27 @@ export default function TrackLibrary() {
                       );
 
                       toast({
-                        title: "Delegação enviada",
-                        description: `${delegateUserIds.length} pessoa(s) receberam a trilha com prazo em ${delegateDueDate}.`,
+                        title: t('tracks.delegate.sent_title'),
+                        description: t('tracks.delegate.sent_desc', { count: delegateUserIds.length, date: delegateDueDate }),
                       });
 
                       setDelegateOpen(false);
                       await qc.invalidateQueries({ queryKey: ["assignments", companyId] });
                     } catch (e) {
                       toast({
-                        title: "Não foi possível delegar",
-                        description: e instanceof Error ? e.message : "Tente novamente.",
+                        title: t('tracks.delegate.failed_title'),
+                        description: e instanceof Error ? e.message : t('tracks.delegate.failed_desc'),
                         variant: "destructive",
                       });
                     }
                   }}
                 >
-                  Confirmar delegação
+                  {t('tracks.delegate.confirm')}
                 </Button>
               </DialogFooter>
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground">Trilha não encontrada.</div>
+            <div className="text-sm text-muted-foreground">{t('tracks.delegate.not_found')}</div>
           )}
         </DialogContent>
       </Dialog>
