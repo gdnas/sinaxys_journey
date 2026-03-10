@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,18 @@ type LikeRow = { user_id: string };
 type LikesRes = { count: number; rows: LikeRow[] };
 type Comment = { id: string; content: string; user_id: string; created_at: string };
 
+function normalizeText(s: string) {
+  try {
+    return s
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .toLowerCase()
+      .trim();
+  } catch {
+    return String(s).toLowerCase().trim();
+  }
+}
+
 export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId: string }) {
   const qc = useQueryClient();
   const { user } = useAuth();
@@ -26,6 +38,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
 
   const [open, setOpen] = useState(false);
   const [newComment, setNewComment] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const statsQuery = useQuery<Stats>({
     queryKey: ["stats", itemType, itemId],
@@ -50,6 +63,10 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
   const perPage = 5;
   const [personOpen, setPersonOpen] = useState(false);
   const [personProfile, setPersonProfile] = useState<any | null>(null);
+
+  const [suggestions, setSuggestions] = useState<Array<{ id: string; name: string; avatar_url?: string | null }>>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionQuery, setSuggestionQuery] = useState("");
 
   const commentsQuery = useQuery<{ rows: (Comment & { user_name?: string; avatar_url?: string; mentions?: any[] })[]; total: number } | null>({
     queryKey: ["comments", itemType, itemId, page, perPage],
@@ -85,6 +102,7 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
     onSuccess: (res: any) => {
       // res is { comment, notifErrors, mentionedUserIds, mentionTokens, resolvedProfiles }
       setNewComment("");
+      setShowSuggestions(false);
       qc.invalidateQueries({ queryKey: ["comments", itemType, itemId] });
       qc.invalidateQueries({ queryKey: ["comments-count", itemType, itemId] });
       qc.invalidateQueries({ queryKey: ["notifications-unread", userId] });
@@ -145,6 +163,73 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
 
   const totalComments = commentCountQuery.data ?? commentsQuery.data?.total ?? 0;
 
+  // Fetch company suggestions when suggestionQuery changes
+  useEffect(() => {
+    let mounted = true;
+    async function loadSuggestions() {
+      if (!user?.companyId || !suggestionQuery) {
+        setSuggestions([]);
+        setShowSuggestions(false);
+        return;
+      }
+      try {
+        const list = await profilesDb.listProfilePublicByCompany(user.companyId);
+        const q = normalizeText(suggestionQuery);
+        const filtered = (list || [])
+          .filter((p) => normalizeText(p.name).includes(q) || normalizeText(p.id).includes(q))
+          .slice(0, 6)
+          .map((p) => ({ id: p.id, name: p.name, avatar_url: p.avatar_url }));
+        if (mounted) {
+          setSuggestions(filtered);
+          setShowSuggestions(filtered.length > 0);
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+    void loadSuggestions();
+    return () => {
+      mounted = false;
+    };
+  }, [suggestionQuery, user?.companyId]);
+
+  // handle input change for autocomplete detection
+  function handleCommentChange(v: string) {
+    setNewComment(v);
+    // find the last token prefixed by @ that is currently being edited
+    const caretPos = textareaRef.current?.selectionStart ?? v.length;
+    const upto = v.slice(0, caretPos);
+    const atMatch = upto.match(/@([\w.\-]{1,})$/);
+    if (atMatch) {
+      const token = atMatch[1];
+      setSuggestionQuery(token);
+    } else {
+      setSuggestionQuery("");
+      setShowSuggestions(false);
+    }
+  }
+
+  function applySuggestion(s: { id: string; name: string }) {
+    // replace the last @token with @name<space>
+    const t = newComment;
+    const caretPos = textareaRef.current?.selectionStart ?? t.length;
+    const before = t.slice(0, caretPos);
+    const after = t.slice(caretPos);
+    const newBefore = before.replace(/@([\w.\-]{1,})$/, `@${s.name} `);
+    const newText = newBefore + after;
+    setNewComment(newText);
+    setShowSuggestions(false);
+    setSuggestionQuery("");
+    // focus textarea and move caret to after inserted text
+    window.requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        const pos = newBefore.length;
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(pos, pos);
+      }
+    });
+  }
+
   return (
     <div className="mt-6">
       <Collapsible open={open} onOpenChange={(v) => setOpen(v)}>
@@ -188,9 +273,31 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
           <div className="mt-4 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
             <div className="grid gap-3">
               {user ? (
-                <div className="grid gap-2">
+                <div className="relative grid gap-2">
                   <Label>Deixe um comentário</Label>
-                  <Textarea value={newComment} onChange={(e) => setNewComment(e.target.value)} className="min-h-[80px] rounded-2xl" />
+                  <Textarea
+                    ref={textareaRef}
+                    value={newComment}
+                    onChange={(e) => handleCommentChange(e.target.value)}
+                    className="min-h-[80px] rounded-2xl"
+                    placeholder="Escreva algo e use @ para mencionar alguém da sua companhia"
+                  />
+
+                  {showSuggestions && suggestions.length > 0 && (
+                    <div className="absolute left-4 right-4 top-[calc(100%_-_8px)] z-50 mt-2 max-h-60 overflow-auto rounded-lg border bg-white shadow-lg">
+                      {suggestions.map((s) => (
+                        <button
+                          key={s.id}
+                          className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-slate-50"
+                          onClick={() => applySuggestion(s)}
+                        >
+                          <img src={s.avatar_url ?? undefined} alt={s.name} className="h-8 w-8 rounded-full" />
+                          <div className="text-sm font-medium">{s.name}</div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-end">
                     <Button
                       disabled={!newComment.trim() || addCommentMutation.status === "pending"}
@@ -217,7 +324,15 @@ export function CommentsPanel({ itemType, itemId }: { itemType: ItemType; itemId
                             ) : (
                               <div className="h-8 w-8 rounded-full bg-[color:var(--sinaxys-tint)]" />
                             )}
-                            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{c.user_name}</div>
+                            <button className="text-sm font-semibold text-[color:var(--sinaxys-ink)] hover:underline" onClick={async () => {
+                              try {
+                                const prof = await profilesDb.getProfile(c.user_id);
+                                setPersonProfile(prof);
+                                setPersonOpen(true);
+                              } catch (e) {
+                                // ignore
+                              }
+                            }}>{c.user_name}</button>
                           </div>
                           <div className="text-xs text-muted-foreground">{new Date(c.created_at).toLocaleString()}</div>
                         </div>
