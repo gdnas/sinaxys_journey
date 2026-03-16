@@ -360,24 +360,48 @@ function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
       <Accordion type="multiple" defaultValue={defaultOpen} className="grid gap-1">
         {items.map((item) => {
           if (item.type === "link") {
+            // Determine if the module for this link is allowed for the company
+            const allowed = moduleAllowed(item.moduleKey);
+            // If user doesn't have role for this link, skip
+            if (!item.roles.includes(useAuth().user?.role ?? "" as any)) return null;
+
+            if (allowed) {
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  onClick={onNavigate}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition",
+                      isActive ? "bg-[color:var(--sinaxys-tint)]" : "hover:bg-[color:var(--sinaxys-tint)]/70",
+                    )
+                  }
+                >
+                  <span className="text-[color:var(--sinaxys-primary)]">{item.icon}</span>
+                  {t(item.label)}
+                </NavLink>
+              );
+            }
+
+            // If not allowed, render a disabled-looking item with tooltip
             return (
-              <NavLink
+              <div
                 key={item.to}
-                to={item.to}
-                onClick={onNavigate}
-                className={({ isActive }) =>
-                  cn(
-                    "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition",
-                    isActive ? "bg-[color:var(--sinaxys-tint)]" : "hover:bg-[color:var(--sinaxys-tint)]/70",
-                  )
-                }
+                className={cn(
+                  "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition opacity-60",
+                  "hover:bg-[color:var(--sinaxys-tint)]/70 cursor-not-allowed",
+                )}
+                onClick={(e) => e.preventDefault()}
+                title={t('modules.disabled')}
               >
                 <span className="text-[color:var(--sinaxys-primary)]">{item.icon}</span>
                 {t(item.label)}
-              </NavLink>
+              </div>
             );
           }
 
+          // For groups: we still show the group label even if the group's module is disabled.
           return (
             <AccordionItem key={item.label} value={item.label} className="border-0">
               <AccordionTrigger
@@ -395,22 +419,41 @@ function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
               </AccordionTrigger>
               <AccordionContent className="pb-1 pt-1">
                 <div className="grid gap-1">
-                  {item.children.map((child) => (
-                    <NavLink
-                      key={child.to}
-                      to={child.to}
-                      onClick={onNavigate}
-                      className={({ isActive }) =>
-                        cn(
-                          "ml-6 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition",
-                          isActive ? "bg-[color:var(--sinaxys-tint)]" : "hover:bg-[color:var(--sinaxys-tint)]/70",
-                        )
-                      }
-                    >
-                      <span className="text-[color:var(--sinaxys-primary)]">{child.icon}</span>
-                      {t(child.label)}
-                    </NavLink>
-                  ))}
+                  {item.children.map((child) => {
+                    // Show child even if module disabled, but render disabled appearance when not allowed
+                    const childAllowed = moduleAllowed(child.moduleKey);
+                    if (!child.roles.includes(useAuth().user?.role ?? "" as any)) return null;
+
+                    if (childAllowed) {
+                      return (
+                        <NavLink
+                          key={child.to}
+                          to={child.to}
+                          onClick={onNavigate}
+                          className={({ isActive }) =>
+                            cn(
+                              "ml-6 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition",
+                              isActive ? "bg-[color:var(--sinaxys-tint)]" : "hover:bg-[color:var(--sinaxys-tint)]/70",
+                            )
+                          }
+                        >
+                          <span className="text-[color:var(--sinaxys-primary)]">{child.icon}</span>
+                          {t(child.label)}
+                        </NavLink>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={child.to}
+                        className="ml-6 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] opacity-60 cursor-not-allowed"
+                        title={t('modules.disabled')}
+                      >
+                        <span className="text-[color:var(--sinaxys-primary)]">{child.icon}</span>
+                        {t(child.label)}
+                      </div>
+                    );
+                  })}
                 </div>
               </AccordionContent>
             </AccordionItem>

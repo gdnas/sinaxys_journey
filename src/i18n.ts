@@ -54,6 +54,7 @@ const resources = {
       "nav.profile": "Perfil",
       "nav.integrations": "Integrações",
       "nav.settings": "Configurações",
+      "modules.disabled": "Módulo desabilitado",
 
       // ThemeToggle
       "theme.light": "Tema claro",
