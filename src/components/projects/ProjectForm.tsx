@@ -16,6 +16,7 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
   const [startDate, setStartDate] = useState(project?.start_date ?? '');
   const [dueDate, setDueDate] = useState(project?.due_date ?? '');
   const [status, setStatus] = useState(project?.status ?? 'not_started');
+  const [departmentId, setDepartmentId] = useState(project?.department_id ?? '');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
     setStartDate(project?.start_date ?? '');
     setDueDate(project?.due_date ?? '');
     setStatus(project?.status ?? 'not_started');
+    setDepartmentId(project?.department_id ?? '');
   }, [project]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -42,11 +44,20 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
         // update
         const { data, error } = await supabase
           .from('projects')
-          .update({ name, description, owner_user_id: ownerUserId, start_date: startDate || null, due_date: dueDate || null, status })
+          .update({ name, description, owner_user_id: ownerUserId, start_date: startDate || null, due_date: dueDate || null, status, department_id: departmentId || null })
           .eq('id', project.id)
           .select()
           .maybeSingle();
         if (error) throw error;
+        // Sync owner in project_members: add new owner as owner if not already a member
+        if (ownerUserId !== project.owner_user_id) {
+          const existingOwnerMember = await supabase.from('project_members').select('id').match({ project_id: project.id, user_id: ownerUserId }).maybeSingle();
+          if (!existingOwnerMember?.data) {
+            await supabase.from('project_members').insert([{ tenant_id: tenantId, project_id: project.id, user_id: ownerUserId, role_in_project: 'owner' }]);
+          } else {
+            await supabase.from('project_members').update({ role_in_project: 'owner' }).match({ project_id: project.id, user_id: ownerUserId });
+          }
+        }
         toast({ title: 'Projeto atualizado' });
         onSaved?.(data);
       } else {
@@ -65,6 +76,7 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
               status,
               start_date: startDate || null,
               due_date: dueDate || null,
+              department_id: departmentId || null,
             },
           ])
           .select()
@@ -100,6 +112,11 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
       <div className="grid gap-2">
         <Label>Responsável (user id)</Label>
         <Input value={ownerUserId} onChange={(e) => setOwnerUserId(e.target.value)} required placeholder="ID do usuário (ex.: perfil)" />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Departamento (opcional)</Label>
+        <Input value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} placeholder="ID do departamento" />
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">

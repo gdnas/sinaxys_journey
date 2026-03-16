@@ -38,8 +38,11 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
     if (members.some((m) => m.user_id === newUserId)) return toast({ title: 'Usuário já é membro', variant: 'destructive' });
     setAdding(true);
     try {
-      // Insert member; project_members unique constraint will prevent duplicates
-      const { data, error } = await supabase.from('project_members').insert([{ project_id: projectId, user_id: newUserId, role_in_project: 'member' }]).select();
+      // Get tenant_id from the project
+      const { data: proj } = await supabase.from('projects').select('tenant_id').eq('id', projectId).single();
+      if (!proj?.tenant_id) throw new Error('Projeto não encontrado');
+      // Insert member with tenant_id
+      const { data, error } = await supabase.from('project_members').insert([{ tenant_id: proj.tenant_id, project_id: projectId, user_id: newUserId, role_in_project: 'member' }]).select();
       if (error) throw error;
       toast({ title: 'Membro adicionado' });
       setNewUserId('');
