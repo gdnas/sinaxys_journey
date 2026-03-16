@@ -49,8 +49,13 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
           .select()
           .maybeSingle();
         if (error) throw error;
-        // Sync owner in project_members: add new owner as owner if not already a member
+        // Sync owner in project_members
         if (ownerUserId !== project.owner_user_id) {
+          // 1. Downgrade previous owner to 'member' if exists
+          if (project.owner_user_id) {
+            await supabase.from('project_members').update({ role_in_project: 'member' }).match({ project_id: project.id, user_id: project.owner_user_id });
+          }
+          // 2. Ensure new owner is in project_members as 'owner'
           const existingOwnerMember = await supabase.from('project_members').select('id').match({ project_id: project.id, user_id: ownerUserId }).maybeSingle();
           if (!existingOwnerMember?.data) {
             await supabase.from('project_members').insert([{ tenant_id: tenantId, project_id: project.id, user_id: ownerUserId, role_in_project: 'owner' }]);
