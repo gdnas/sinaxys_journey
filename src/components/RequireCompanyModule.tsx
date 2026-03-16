@@ -20,7 +20,11 @@ export function RequireCompanyModule({
 
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
 
-  if (user.role === "MASTERADMIN") return <>{children}</>;
+  // NOTE:
+  // For the Projects module we intentionally do NOT provide a global bypass for MASTERADMIN.
+  // This ensures strict tenant isolation: even MASTERADMIN must operate within the tenant context
+  // for the Gestão de Projetos module. For other modules, older behavior remains.
+  if (user.role === "MASTERADMIN" && moduleKey !== "PROJECTS") return <>{children}</>;
 
   if (isLoading) {
     return (
