@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { DatePicker } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/lib/company';
@@ -73,7 +72,7 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
 
         if (error) throw error;
 
-        // insert project member as owner
+        // insert project member as owner (ignore duplicate errors)
         await supabase.from('project_members').insert([{ tenant_id: tenantId, project_id: data.id, user_id: ownerUserId, role_in_project: 'owner' }]);
 
         toast({ title: 'Projeto criado' });

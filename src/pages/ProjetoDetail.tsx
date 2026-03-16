@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import ProjectForm from '@/components/projects/ProjectForm';
+import ProjectMembersSection from '@/components/projects/ProjectMembersSection';
 
 export default function ProjetoDetail() {
   const { projectId } = useParams();
@@ -19,9 +20,7 @@ export default function ProjetoDetail() {
       try {
         const { data, error } = await supabase
           .from('projects')
-          .select(`*, 
-            owner:profiles(id,name,avatar_url), 
-            members:project_members(user_id,role_in_project)`)
+          .select(`*, owner:profiles(id,name,avatar_url)`) 
           .eq('id', projectId)
           .maybeSingle();
         if (error) throw error;
@@ -60,21 +59,7 @@ export default function ProjetoDetail() {
         </div>
       </Card>
 
-      <Card className="p-6">
-        <h3 className="font-semibold">Membros</h3>
-        <div className="mt-3">
-          {project.members?.length ? (
-            project.members.map((m: any) => (
-              <div key={m.user_id} className="flex items-center justify-between py-2">
-                <div>{m.user_id}</div>
-                <div className="text-sm text-muted-foreground">{m.role_in_project}</div>
-              </div>
-            ))
-          ) : (
-            <div className="text-sm text-muted-foreground">Nenhum membro</div>
-          )}
-        </div>
-      </Card>
+      <ProjectMembersSection projectId={String(projectId)} />
 
       <Card className="p-6">
         <h3 className="font-semibold">OKRs (placeholder)</h3>
