@@ -17,6 +17,7 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
   const [dueDate, setDueDate] = useState(project?.due_date ?? '');
   const [status, setStatus] = useState(project?.status ?? 'not_started');
   const [departmentId, setDepartmentId] = useState(project?.department_id ?? '');
+  const [visibility, setVisibility] = useState(project?.visibility ?? 'public');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -27,6 +28,7 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
     setDueDate(project?.due_date ?? '');
     setStatus(project?.status ?? 'not_started');
     setDepartmentId(project?.department_id ?? '');
+    setVisibility(project?.visibility ?? 'public');
   }, [project]);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -76,7 +78,7 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
               description,
               owner_user_id: ownerUserId,
               created_by_user_id: user?.id,
-              visibility: 'public',
+              visibility,
               admin_private_mode: null,
               status,
               start_date: startDate || null,
@@ -122,6 +124,14 @@ export default function ProjectForm({ project, onSaved }: { project?: any; onSav
       <div className="grid gap-2">
         <Label>Departamento (opcional)</Label>
         <Input value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} placeholder="ID do departamento" />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Visibilidade</Label>
+        <select value={visibility} onChange={(e) => setVisibility(e.target.value)} className="rounded-xl border p-2">
+          <option value="public">Público - visível para todos</option>
+          <option value="private">Privado - visível apenas para membros</option>
+        </select>
       </div>
 
       <div className="grid sm:grid-cols-2 gap-4">

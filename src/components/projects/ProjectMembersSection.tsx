@@ -2,11 +2,14 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
+import { useProjectAccess } from '@/hooks/useProjectAccess';
+import AccessDenied from '@/components/AccessDenied';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export default function ProjectMembersSection({ projectId }: { projectId: string }) {
   const { toast } = useToast();
+  const { canManageMembers, isLoading } = useProjectAccess(projectId);
   const [members, setMembers] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -31,7 +34,7 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
 
   useEffect(() => {
     loadMembers();
-  }, [projectId]);
+  }, [projectId, canManageMembers]);
 
   async function handleAdd() {
     if (!newUserId.trim()) return toast({ title: 'Informe o ID do usuário', variant: 'destructive' });
@@ -68,6 +71,9 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
       setLoading(false);
     }
   }
+
+  if (isLoading) return <Card className="p-4"><div className="text-sm text-muted-foreground">Carregando...</div></Card>;
+  if (!canManageMembers) return <AccessDenied message="Você não tem permissão para gerenciar membros. Apenas o owner e admins podem adicionar/remover membros." />;
 
   return (
     <Card className="p-4">

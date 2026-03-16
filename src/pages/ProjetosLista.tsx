@@ -6,11 +6,13 @@ import { Input } from "@/components/ui/input";
 import { useTranslation } from "react-i18next";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectForm from "@/components/projects/ProjectForm";
 
 export default function ProjetosLista() {
   const { t } = useTranslation();
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [projects, setProjects] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,22 @@ export default function ProjetosLista() {
       if (error) throw error;
 
       const rows = (data ?? []) as any[];
-      const mapped = rows.map((r) => ({
+
+      // Filter by visibility rules
+      const isAdmin = user?.role === 'ADMIN' || user?.role === 'MASTERADMIN';
+      const filtered = rows.filter((r) => {
+        // Admins see all projects
+        if (isAdmin) return true;
+
+        // Public projects are visible to everyone
+        if (r.visibility === 'public') return true;
+
+        // Private projects only if user is a member
+        const isMember = Array.isArray(r.project_members) && r.project_members.some((m: any) => m.user_id === user?.id);
+        return isMember;
+      });
+
+      const mapped = filtered.map((r) => ({
         ...r,
         member_count: Array.isArray(r.project_members) ? r.project_members.length : 0,
         owner_name: r.owner?.name ?? null,

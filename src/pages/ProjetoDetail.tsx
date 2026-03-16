@@ -4,37 +4,20 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useProjectAccess } from '@/hooks/useProjectAccess';
+import AccessDenied from '@/components/AccessDenied';
 import ProjectForm from '@/components/projects/ProjectForm';
 import ProjectMembersSection from '@/components/projects/ProjectMembersSection';
 
 export default function ProjetoDetail() {
   const { projectId } = useParams();
   const { toast } = useToast();
-  const [project, setProject] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { canView, canEdit, canManageMembers, isLoading, project } = useProjectAccess(String(projectId ?? ''));
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('projects')
-          .select(`*, owner:profiles(id,name,avatar_url)`) 
-          .eq('id', projectId)
-          .maybeSingle();
-        if (error) throw error;
-        setProject(data);
-      } catch (err: any) {
-        toast({ title: 'Erro ao carregar projeto', description: err.message || String(err), variant: 'destructive' });
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [projectId]);
+  if (isLoading) return <div className="p-6">Carregando...</div>;
+  if (!canView) return <AccessDenied />;
 
-  if (loading) return <div className="p-6">Carregando...</div>;
   if (!project) return <div className="p-6">Projeto não encontrado</div>;
 
   return (
@@ -43,7 +26,9 @@ export default function ProjetoDetail() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-bold">{project.name}</h1>
-            <div className="text-sm text-muted-foreground">Status: {project.status}</div>
+            <div className="text-sm text-muted-foreground">
+              Status: {project.status} • Visibilidade: {project.visibility === 'public' ? 'Público' : 'Privado'}
+            </div>
             <p className="mt-3 text-sm text-muted-foreground">{project.description}</p>
             <div className="mt-3 text-sm">
               <div>Owner: {project.owner?.name ?? '—'}</div>
@@ -53,11 +38,13 @@ export default function ProjetoDetail() {
             </div>
           </div>
           <div className="flex flex-col gap-2">
-            <Button onClick={() => navigate('editar')}>Editar</Button>
+            {canEdit && <Button onClick={() => navigate('editar')}>Editar</Button>}
             <Button variant="outline" onClick={() => navigate('/app/projetos/lista')}>Voltar</Button>
           </div>
         </div>
       </Card>
+
+      {canManageMembers && <ProjectMembersSection projectId={String(projectId)} />}
 
       <ProjectMembersSection projectId={String(projectId)} />
 
