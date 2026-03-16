@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ImageIcon, Palette, RotateCcw, Save, Trash2, Handshake, Target, Trophy, GraduationCap, Wallet, BarChart3, Network } from "lucide-react";
+import { ImageIcon, Palette, RotateCcw, Save, Trash2, Handshake, Target, Trophy, GraduationCap, Wallet, BarChart3, Network, CalendarClock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -135,6 +135,12 @@ export default function AdminBrand() {
   const { data: tracksEnabled = true, refetch: refetchTracks } = useQuery({
     queryKey: ["company-module", companyId, "TRACKS"],
     queryFn: () => isCompanyModuleEnabled(String(companyId), "TRACKS"),
+    enabled: queryEnabled,
+  });
+
+  const { data: projectsEnabled = true, refetch: refetchProjects } = useQuery({
+    queryKey: ["company-module", companyId, "PROJECTS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "PROJECTS"),
     enabled: queryEnabled,
   });
 
@@ -395,6 +401,19 @@ export default function AdminBrand() {
               if (!companyId) return;
               await setCompanyModuleEnabled(companyId, "TRACKS", v);
               await refetchTracks();
+              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+            }}
+          />
+
+          <ModuleToggle
+            icon={<CalendarClock className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+            title="Gestão de Projetos"
+            description="Gerencie projetos, tarefas e acompanhe o progresso operacional da empresa."
+            checked={projectsEnabled}
+            onChange={async (v) => {
+              if (!companyId) return;
+              await setCompanyModuleEnabled(companyId, "PROJECTS", v);
+              await refetchProjects();
               toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
             }}
           />
