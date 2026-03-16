@@ -77,6 +77,10 @@ import KnowledgeNewSpace from "./pages/KnowledgeNewSpace";
 import KnowledgeNewPage from "./pages/KnowledgeNewPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import Settings from "./pages/Settings";
+import ProjetosHome from "./pages/ProjetosHome";
+import ProjetosDashboard from "./pages/ProjetosDashboard";
+import ProjetosLista from "./pages/ProjetosLista";
+import ProjetosTarefas from "./pages/ProjetosTarefas";
 
 const queryClient = new QueryClient();
 
@@ -515,6 +519,48 @@ const App = () => (
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="KNOWLEDGE">
                           <KnowledgePage />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  {/* Gestão de Projetos */}
+                  <Route
+                    path="/app/projetos"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <ProjetosHome />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/projetos/dashboard"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <ProjetosDashboard />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/projetos/lista"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <ProjetosLista />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/projetos/tarefas"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <ProjetosTarefas />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }

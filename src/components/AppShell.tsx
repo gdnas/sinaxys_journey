@@ -4,8 +4,10 @@ import {
   Award,
   BadgeCheck,
   BarChart3,
+  BookOpen,
   Building2,
   CalendarClock,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   Crown,
@@ -27,7 +29,6 @@ import {
   Wallet,
   Wrench,
   Users,
-  BookOpen,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -151,6 +152,40 @@ const nav: NavItem[] = [
     icon: <Target className="h-4 w-4" />,
     roles: ["ADMIN", "HEAD", "COLABORADOR"],
     moduleKey: "OKR",
+  },
+
+  // Gestão de Projetos
+  {
+    type: "group",
+    label: "nav.projects.group",
+    icon: <CalendarClock className="h-4 w-4" />,
+    moduleKey: "PROJECTS",
+    children: [
+      {
+        type: "link",
+        to: "/app/projetos/dashboard",
+        label: "nav.projects.home",
+        icon: <LayoutDashboard className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "PROJECTS",
+      },
+      {
+        type: "link",
+        to: "/app/projetos/lista",
+        label: "nav.projects.list",
+        icon: <Layers className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "PROJECTS",
+      },
+      {
+        type: "link",
+        to: "/app/projetos/tarefas",
+        label: "nav.projects.tasks",
+        icon: <CheckCircle2 className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "PROJECTS",
+      },
+    ],
   },
 
   // Knowledge Base
@@ -546,6 +581,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => isCompanyModuleEnabled(String(companyId), "KNOWLEDGE"),
     enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
   });
+  const { data: projectsEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "PROJECTS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "PROJECTS"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
 
   if (!user) return <>{children}</>;
 
@@ -556,6 +596,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const allowOkr = user.role === "MASTERADMIN" ? true : !!okrEnabled;
   const allowOrg = user.role === "MASTERADMIN" ? true : !!orgEnabled;
   const allowKnowledge = user.role === "MASTERADMIN" ? true : !!knowledgeEnabled;
+  const allowProjects = user.role === "MASTERADMIN" ? true : !!projectsEnabled;
 
   const moduleAllowed = (key?: string) => {
     if (!key) return true;
@@ -574,6 +615,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return allowOrg;
       case "KNOWLEDGE":
         return allowKnowledge;
+      case "PROJECTS":
+        return allowProjects;
       default:
         return true;
     }
