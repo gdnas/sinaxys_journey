@@ -346,7 +346,7 @@ function isLinkActive(pathname: string, to: string) {
   return pathname === to || pathname.startsWith(to + "/");
 }
 
-function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => void }) {
+function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNavigate?: () => void; moduleAllowed: (key?: string) => boolean }) {
   const { pathname } = useLocation();
   const { t } = useTranslation();
 
@@ -363,7 +363,8 @@ function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
             // Determine if the module for this link is allowed for the company
             const allowed = moduleAllowed(item.moduleKey);
             // If user doesn't have role for this link, skip
-            if (!item.roles.includes(useAuth().user?.role ?? "" as any)) return null;
+            const { user } = useAuth();
+            if (!item.roles.includes(user?.role ?? "" as any)) return null;
 
             if (allowed) {
               return (
@@ -422,7 +423,8 @@ function SideNav({ items, onNavigate }: { items: NavItem[]; onNavigate?: () => v
                   {item.children.map((child) => {
                     // Show child even if module disabled, but render disabled appearance when not allowed
                     const childAllowed = moduleAllowed(child.moduleKey);
-                    if (!child.roles.includes(useAuth().user?.role ?? "" as any)) return null;
+                    const { user } = useAuth();
+                    if (!child.roles.includes(user?.role ?? "" as any)) return null;
 
                     if (childAllowed) {
                       return (
@@ -701,7 +703,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     <SheetTitle className="text-[color:var(--sinaxys-ink)]">{t('menu.title')}</SheetTitle>
                   </SheetHeader>
                   <div className="mt-4 grid gap-3">
-                    <SideNav items={visible} onNavigate={() => setMenuOpen(false)} />
+                    <SideNav items={visible} onNavigate={() => setMenuOpen(false)} moduleAllowed={moduleAllowed} />
                     {user.role !== "MASTERADMIN" ? (
                       <>
                         <Separator />

@@ -81,6 +81,8 @@ import ProjetosHome from "./pages/ProjetosHome";
 import ProjetosDashboard from "./pages/ProjetosDashboard";
 import ProjetosLista from "./pages/ProjetosLista";
 import ProjetosTarefas from "./pages/ProjetosTarefas";
+import ProjetoDetail from "./pages/ProjetoDetail";
+import ProjetoEdit from "./pages/ProjetoEdit";
 
 const queryClient = new QueryClient();
 
