@@ -567,6 +567,28 @@ const App = () => (
                   />
 
                   <Route
+                    path="/app/projetos/:projectId"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <ProjetoDetail />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/app/projetos/:projectId/editar"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <ProjetoEdit />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
                     path="/rankings"
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>

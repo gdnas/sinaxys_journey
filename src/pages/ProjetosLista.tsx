@@ -55,26 +55,61 @@ export default function ProjetosLista() {
         </div>
       </Card>
 
-      {/* Empty State */}
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/30 p-12">
-        <div className="flex flex-col items-center justify-center text-center gap-4">
-          <div className="h-20 w-20 rounded-3xl bg-white flex items-center justify-center shadow-sm">
-            <FolderKanban className="h-10 w-10 text-[color:var(--sinaxys-primary)]" />
-          </div>
-          <div className="max-w-md">
-            <h3 className="text-xl font-bold text-[color:var(--sinaxys-ink)]">
-              Nenhum projeto encontrado
-            </h3>
-            <p className="mt-2 text-muted-foreground">
-              Não há projetos cadastrados ainda. Crie seu primeiro projeto para começar.
-            </p>
-          </div>
-          <Button className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white" disabled>
+      {/* Controls */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <Input placeholder="Buscar projetos..." value={query} onChange={(e) => setQuery(e.target.value)} className="rounded-xl" />
+        </div>
+        <div className="flex items-center gap-2">
+          <Button onClick={() => setShowCreate(true)} className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white">
             <Plus className="mr-2 h-4 w-4" />
-            Criar primeiro projeto
+            Novo Projeto
           </Button>
         </div>
-      </Card>
+      </div>
+
+      {/* List / Loading / Empty */}
+      {loading ? (
+        <div className="py-8 text-center">Carregando...</div>
+      ) : projects.length ? (
+        <div className="grid gap-4">
+          {projects.map((p: any) => (
+            <ProjectCard key={p.id} project={p} />
+          ))}
+        </div>
+      ) : (
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/30 p-12">
+          <div className="flex flex-col items-center justify-center text-center gap-4">
+            <div className="h-20 w-20 rounded-3xl bg-white flex items-center justify-center shadow-sm">
+              <FolderKanban className="h-10 w-10 text-[color:var(--sinaxys-primary)]" />
+            </div>
+            <div className="max-w-md">
+              <h3 className="text-xl font-bold text-[color:var(--sinaxys-ink)]">
+                Nenhum projeto encontrado
+              </h3>
+              <p className="mt-2 text-muted-foreground">
+                Não há projetos cadastrados ainda. Crie seu primeiro projeto para começar.
+              </p>
+            </div>
+            <Button className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white" onClick={() => setShowCreate(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Criar primeiro projeto
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Create dialog */}
+      {showCreate && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30">
+          <div className="w-full max-w-2xl p-6">
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4">Novo projeto</h3>
+              <ProjectForm onSaved={(p) => { setShowCreate(false); fetchProjects(); }} />
+            </Card>
+          </div>
+        </div>
+      )}
 
       {/* Placeholder Info */}
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-amber-50 dark:bg-amber-950/20 p-6">
