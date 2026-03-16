@@ -10,7 +10,6 @@ export type ProjectAccess = {
   isOwner: boolean;
   isMember: boolean;
   isAdmin: boolean;
-  isMasterAdmin: boolean;
   isLoading: boolean;
   project: any;
 };
@@ -61,27 +60,24 @@ export function useProjectAccess(projectId: string): ProjectAccess {
     loadProjectAccess();
   }, [projectId, user?.id]);
 
-  // Determine access based on rules
+  // Determine access based on rules (MASTERADMIN removed from projects module per scope)
   const isAdmin = user?.role === 'ADMIN';
-  const isMasterAdmin = user?.role === 'MASTERADMIN';
   const isOwner = project?.owner_user_id === user?.id;
   const isMember = memberRole !== null;
 
   const canView =
-    !project ||
-    project.visibility === 'public' ||
-    isMember ||
-    isAdmin ||
-    isMasterAdmin;
+    project && (
+      project.visibility === 'public' ||
+      isMember ||
+      isAdmin
+    );
 
   const canEdit =
     isAdmin ||
-    isMasterAdmin ||
     isOwner;
 
   const canManageMembers =
     isAdmin ||
-    isMasterAdmin ||
     isOwner;
 
   return {
@@ -91,7 +87,6 @@ export function useProjectAccess(projectId: string): ProjectAccess {
     isOwner,
     isMember,
     isAdmin,
-    isMasterAdmin,
     isLoading,
     project,
   };

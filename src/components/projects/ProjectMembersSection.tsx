@@ -34,7 +34,7 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
 
   useEffect(() => {
     loadMembers();
-  }, [projectId, canManageMembers]);
+  }, [projectId]);
 
   async function handleAdd() {
     if (!newUserId.trim()) return toast({ title: 'Informe o ID do usuário', variant: 'destructive' });
@@ -44,7 +44,7 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
       // Get tenant_id from the project
       const { data: proj } = await supabase.from('projects').select('tenant_id').eq('id', projectId).single();
       if (!proj?.tenant_id) throw new Error('Projeto não encontrado');
-      // Insert member with tenant_id
+      // Insert member with tenant_id - RLS will enforce permission
       const { data, error } = await supabase.from('project_members').insert([{ tenant_id: proj.tenant_id, project_id: projectId, user_id: newUserId, role_in_project: 'member' }]).select();
       if (error) throw error;
       toast({ title: 'Membro adicionado' });
@@ -61,6 +61,7 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
     if (!confirm('Remover este membro do projeto?')) return;
     setLoading(true);
     try {
+      // RLS will enforce permission - only owner or ADMIN can delete members
       const { error } = await supabase.from('project_members').delete().match({ project_id: projectId, user_id: userId });
       if (error) throw error;
       toast({ title: 'Membro removido' });
@@ -73,7 +74,10 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
   }
 
   if (isLoading) return <Card className="p-4"><div className="text-sm text-muted-foreground">Carregando...</div></Card>;
-  if (!canManageMembers) return <AccessDenied message="Você não tem permissão para gerenciar membros. Apenas o owner e admins podem adicionar/remover membros." />;
+
+  if (!canManageMembers) {
+    return <AccessDenied message="Você não tem permissão para gerenciar membros. Apenas o owner e admins podem adicionar/remover membros." />;
+  }
 
   return (
     <Card className="p-4">

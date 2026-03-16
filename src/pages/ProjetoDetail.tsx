@@ -6,7 +6,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
 import AccessDenied from '@/components/AccessDenied';
-import ProjectForm from '@/components/projects/ProjectForm';
 import ProjectMembersSection from '@/components/projects/ProjectMembersSection';
 
 export default function ProjetoDetail() {
@@ -45,8 +44,6 @@ export default function ProjetoDetail() {
       </Card>
 
       {canManageMembers && <ProjectMembersSection projectId={String(projectId)} />}
-
-      <ProjectMembersSection projectId={String(projectId)} />
 
       <Card className="p-6">
         <h3 className="font-semibold">OKRs (placeholder)</h3>

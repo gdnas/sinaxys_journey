@@ -36,21 +36,8 @@ export default function ProjetosLista() {
 
       const rows = (data ?? []) as any[];
 
-      // Filter by visibility rules
-      const isAdmin = user?.role === 'ADMIN' || user?.role === 'MASTERADMIN';
-      const filtered = rows.filter((r) => {
-        // Admins see all projects
-        if (isAdmin) return true;
-
-        // Public projects are visible to everyone
-        if (r.visibility === 'public') return true;
-
-        // Private projects only if user is a member
-        const isMember = Array.isArray(r.project_members) && r.project_members.some((m: any) => m.user_id === user?.id);
-        return isMember;
-      });
-
-      const mapped = filtered.map((r) => ({
+      // RLS filters automatically; no client-side filtering needed
+      const mapped = rows.map((r) => ({
         ...r,
         member_count: Array.isArray(r.project_members) ? r.project_members.length : 0,
         owner_name: r.owner?.name ?? null,
