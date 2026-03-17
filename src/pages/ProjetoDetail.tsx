@@ -7,8 +7,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
 import AccessDenied from '@/components/AccessDenied';
 import ProjectMembersSection from '@/components/projects/ProjectMembersSection';
-import { ArrowLeft, Calendar, User, Users, FolderKanban, Edit } from 'lucide-react';
+import { ArrowLeft, Calendar, User, Users, FolderKanban, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
+import ProjectCard from '@/components/projects/ProjectCard';
 
 export default function ProjetoDetail() {
   const { projectId } = useParams();
@@ -16,7 +17,6 @@ export default function ProjetoDetail() {
   const navigate = useNavigate();
   const { canView, canEdit, canManageMembers, isLoading, project } = useProjectAccess(String(projectId ?? ''));
   
-  // Extended project data with relationships
   const [projectWithRelations, setProjectWithRelations] = useState<any>(null);
   const [tasksCount, setTasksCount] = useState(0);
   const [loadingDetails, setLoadingDetails] = useState(true);
@@ -75,6 +75,18 @@ export default function ProjetoDetail() {
 
   return (
     <div className="mx-auto max-w-5xl grid gap-6 pb-12">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
+        <Link to="/app/projetos/lista" className="hover:text-[color:var(--sinaxys-primary)]">
+          Projetos
+        </Link>
+        <span>/</span>
+        <span className="text-[color:var(--sinaxys-primary)]">{proj.name}</span>
+        <span>/</span>
+        <span className="text-[color:var(--sinaxys-ink)]">Detalhes</span>
+      </nav>
+
+      {/* Main Card */}
       <Card className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -88,10 +100,11 @@ export default function ProjetoDetail() {
             </Button>
             <h1 className="text-3xl font-bold">{proj.name}</h1>
             
-            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mt-2">
               <div className="flex items-center gap-1">
-                <FolderKanban className="h-4 w-4" />
-                Status: <span className="font-medium text-[color:var(--sinaxys-ink)]">
+                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                Status: 
+                <span className="font-medium text-[color:var(--sinaxys-ink)]">
                   {proj.status === 'not_started' ? 'Não iniciado' :
                    proj.status === 'on_track' ? 'No prazo' :
                    proj.status === 'at_risk' ? 'Em risco' :
@@ -100,7 +113,7 @@ export default function ProjetoDetail() {
                 </span>
               </div>
               <div className="flex items-center gap-1">
-                <FolderKanban className="h-4 w-4" />
+                <FolderKanban className="h-4 w-4 text-muted-foreground" />
                 Visibilidade: <span className="font-medium text-[color:var(--sinaxys-ink)]">
                   {proj.visibility === 'public' ? 'Público' : 'Privado'}
                 </span>
@@ -111,7 +124,8 @@ export default function ProjetoDetail() {
               <p className="mt-4 text-sm text-muted-foreground">{proj.description}</p>
             )}
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+            {/* Details Grid */}
+            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 mt-6">
               <div className="flex items-center gap-2">
                 <User className="h-4 w-4 text-muted-foreground" />
                 <div className="text-sm">
@@ -156,7 +170,7 @@ export default function ProjetoDetail() {
                 <Users className="h-4 w-4 text-muted-foreground" />
                 <div className="text-sm">
                   <div className="text-muted-foreground">Membros</div>
-                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
+                  <div className="font-medium text-[color:var(--sinaxysys-ink)]">
                     {memberCount}
                   </div>
                 </div>
@@ -171,45 +185,52 @@ export default function ProjetoDetail() {
                   </div>
                 </div>
               </div>
+
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <div className="text-sm">
+                  <div className="text-muted-foreground">Criado em</div>
+                  <div className="font-medium text-[color:var(--sinaxysys-ink)]">
+                    {proj.created_at ? format(new Date(proj.created_at), 'dd/MM/yyyy') : '—'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-col gap-2">
+              {canEdit && (
+                <Button onClick={() => navigate(`/app/projetos/${projectId}/editar`)}>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Editar projeto
+                </Button>
+              )}
+              <Button 
+                variant="outline" 
+                onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}
+              >
+                <FolderKanban className="mr-2 h-4 w-4" />
+                Ver tarefas
+              </Button>
             </div>
           </div>
-          
-          <div className="flex flex-col gap-2">
-            {canEdit && (
-              <Button onClick={() => navigate(`/app/projetos/${projectId}/editar`)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Editar
-              </Button>
-            )}
-            <Button 
-              variant="outline" 
-              onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}
-            >
-              Ver tarefas
+        </div>
+
+        {canManageMembers && <ProjectMembersSection projectId={String(projectId)} />}
+
+        {/* Tasks Preview */}
+        <Card className="p-6">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold">Tarefas</h3>
+            <Button variant="outline" onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}>
+              Ver todas
             </Button>
           </div>
-        </div>
-      </Card>
-
-      {canManageMembers && <ProjectMembersSection projectId={String(projectId)} />}
-
-      {/* Tasks Preview */}
-      <Card className="p-6">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Tarefas</h3>
-          <Button 
-            variant="outline" 
-            onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}
-          >
-            Ver todas
-          </Button>
-        </div>
-        <div className="mt-4 text-sm text-muted-foreground">
-          {tasksCount > 0 
-            ? `Este projeto possui ${tasksCount} tarefa${tasksCount > 1 ? 's' : ''}`
-            : 'Nenhuma tarefa cadastrada neste projeto ainda.'}
-        </div>
-      </Card>
+          <div className="mt-4 text-sm text-muted-foreground">
+            {tasksCount > 0 
+              ? `Este projeto possui ${tasksCount} tarefa${tasksCount > 1 ? 's' : ''}`
+              : 'Nenhuma tarefa cadastrada neste projeto ainda.'}
+          </div>
+        </Card>
     </div>
   );
 }
