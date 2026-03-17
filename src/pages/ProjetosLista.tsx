@@ -49,8 +49,15 @@ export default function ProjetosLista() {
       const rows = (data ?? []) as any[];
       
       // ETAPA 2: Extrair IDs e buscar relacionados separadamente
-      const ownerIds = rows.map(r => r.owner_user_id);
-      const departmentIds = rows.filter(r => r.department_id).map(r => r.department_id);
+      const ownerIds = Array.from(new Set(rows.map(r => r.owner_user_id).filter(Boolean)));
+
+      // Collect department ids from department_id and department_ids (array)
+      const deptIdSet = new Set<string>();
+      rows.forEach(r => {
+        if (r.department_id) deptIdSet.add(r.department_id);
+        if (Array.isArray(r.department_ids)) r.department_ids.forEach((d: string) => { if (d) deptIdSet.add(d); });
+      });
+      const departmentIds = Array.from(deptIdSet);
       
       // Buscar profiles (owners)
       let profilesMap: Record<string, { name: string | null; avatar_url: string | null }> = {};
@@ -62,7 +69,7 @@ export default function ProjetosLista() {
         profilesMap = (profiles ?? []).reduce((acc, p) => ({ ...acc, [p.id]: { name: p.name, avatar_url: p.avatar_url } }), {});
       }
       
-      // Buscar departments
+      // Buscar departments (all used ids)
       let departmentsMap: Record<string, string> = {};
       if (departmentIds.length > 0) {
         const { data: departments } = await supabase
@@ -73,13 +80,27 @@ export default function ProjetosLista() {
       }
       
       // ETAPA 3: Montar objeto final com dados relacionados
-      const mapped = rows.map((r) => ({
-        ...r,
-        member_count: r.project_member_count?.[0]?.count ?? 0,
-        owner_name: profilesMap[r.owner_user_id]?.name ?? null,
-        owner_avatar_url: profilesMap[r.owner_user_id]?.avatar_url ?? null,
-        department_name: r.department_id ? (departmentsMap[r.department_id] ?? null) : null,
-      }));
+      const mapped = rows.map((r) => {
+        // build department name(s)
+        const deptNames: string[] = [];
+        if (Array.isArray(r.department_ids) && r.department_ids.length) {
+          r.department_ids.forEach((did: string) => {
+            if (did && departmentsMap[did]) deptNames.push(departmentsMap[did]);
+          });
+        } else if (r.department_id) {
+          const name = departmentsMap[r.department_id];
+          if (name) deptNames.push(name);
+        }
+
+        return ({
+          ...r,
+          member_count: r.project_member_count?.[0]?.count ?? 0,
+          owner_name: profilesMap[r.owner_user_id]?.name ?? null,
+          owner_avatar_url: profilesMap[r.owner_user_id]?.avatar_url ?? null,
+          department_names: deptNames,
+          department_name: deptNames.length ? deptNames[0] : null,
+        });
+      });
       
       setProjects(mapped);
     } catch (err: any) {

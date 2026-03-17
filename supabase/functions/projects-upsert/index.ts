@@ -73,6 +73,40 @@ serve(async (req) => {
 
     const isAdmin = (callerProfile.role || '').toUpperCase() === 'ADMIN' || (callerProfile.role || '').toUpperCase() === 'MASTERADMIN';
 
+    // Validate owner_user_id exists and belongs to tenant
+    const ownerId = payload.owner_user_id as string;
+    const { data: ownerProfile, error: ownerErr } = await svc
+      .from('profiles')
+      .select('id,company_id')
+      .eq('id', ownerId)
+      .maybeSingle();
+    if (ownerErr) {
+      console.error('[projects-upsert] owner profile lookup failed', ownerErr);
+      return new Response(JSON.stringify({ error: 'Owner profile lookup failed' }), { status: 500, headers: corsHeaders });
+    }
+    if (!ownerProfile || ownerProfile.company_id !== tenantId) {
+      return new Response(JSON.stringify({ error: 'Invalid owner_user_id: profile not found or not in tenant' }), { status: 400, headers: corsHeaders });
+    }
+
+    // Validate members (if provided) exist and belong to tenant
+    const members: string[] = Array.isArray(payload.members) ? payload.members : [];
+    if (members.length > 0) {
+      const { data: validProfiles, error: membersErr } = await svc
+        .from('profiles')
+        .select('id')
+        .in('id', members)
+        .eq('company_id', tenantId);
+      if (membersErr) {
+        console.error('[projects-upsert] members lookup failed', membersErr);
+        return new Response(JSON.stringify({ error: 'Members lookup failed' }), { status: 500, headers: corsHeaders });
+      }
+      const validIds = new Set((validProfiles ?? []).map((p: any) => p.id));
+      const invalid = members.filter((m) => !validIds.has(m));
+      if (invalid.length > 0) {
+        return new Response(JSON.stringify({ error: 'Invalid members: some user_ids not found in tenant', invalid }), { status: 400, headers: corsHeaders });
+      }
+    }
+
     // Normalize department fields: if department_id is missing but department_ids present, use first item as primary
     if ((!payload.department_id || payload.department_id === null) && Array.isArray(payload.department_ids) && payload.department_ids.length > 0) {
       payload.department_id = payload.department_ids[0];
@@ -131,8 +165,7 @@ serve(async (req) => {
       projectRow = updated;
 
       // Sync project_members: ensure owner role and member set
-      const members: string[] = Array.isArray(payload.members) ? payload.members : [];
-
+      // members variable defined earlier
       // Fetch existing members
       const { data: existingMembers, error: existingMembersErr } = await svc
         .from('project_members')
@@ -205,7 +238,6 @@ serve(async (req) => {
       projectRow = created;
 
       // Insert members separately
-      const members: string[] = Array.isArray(payload.members) ? payload.members : [];
       const finalMemberSet = Array.from(new Set([...(members || []), payload.owner_user_id]));
       const inserts = finalMemberSet.map((id: string) => ({ tenant_id: tenantId, project_id: created.id, user_id: id, role_in_project: id === payload.owner_user_id ? 'owner' : 'member' }));
       if (inserts.length) {
