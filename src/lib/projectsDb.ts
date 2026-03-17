@@ -55,7 +55,9 @@ export interface DbProject {
   tenant_id: string;
   name: string;
   description: string | null;
+  // Support multiple departments: primary department_id kept for backward compatibility
   department_id: string | null;
+  department_ids?: string[] | null;
   owner_user_id: string;
   created_by_user_id: string;
   visibility: ProjectVisibility;
@@ -111,6 +113,8 @@ export interface CreateProjectInput {
   name: string;
   description?: string;
   department_id?: string;
+  // Optional array when project involves multiple departments
+  department_ids?: string[];
   owner_user_id: string;
   created_by_user_id: string;
   visibility?: ProjectVisibility;
@@ -127,6 +131,7 @@ export interface UpdateProjectInput {
   name?: string;
   description?: string;
   department_id?: string;
+  department_ids?: string[] | null;
   visibility?: ProjectVisibility;
   admin_private_mode?: ProjectAdminPrivateMode;
   status?: ProjectStatus;
@@ -223,6 +228,7 @@ export interface ProjectStats {
 export interface ProjectFilters {
   status?: ProjectStatus[];
   visibility?: ProjectVisibility[];
+  // department_id filter can match primary id or any department in department_ids
   department_id?: string[];
   owner_user_id?: string;
   search?: string;

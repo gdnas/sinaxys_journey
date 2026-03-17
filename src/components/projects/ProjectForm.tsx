@@ -20,6 +20,7 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
   const [dueDate, setDueDate] = useState(project?.due_date ?? '');
   const [status, setStatus] = useState(project?.status ?? 'not_started');
   const [departmentId, setDepartmentId] = useState<string | undefined>(project?.department_id);
+  const [departmentIds, setDepartmentIds] = useState<string[]>(() => project?.department_ids ?? (project?.department_id ? [project.department_id] : []));
   const [visibility, setVisibility] = useState(project?.visibility ?? 'public');
   const [loading, setLoading] = useState(false);
   
@@ -82,12 +83,18 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
     return copy;
   })();
 
-  // Derive filtered users according to selected department (if any)
-  const filteredUsers = departmentId
-    ? departmentId === '__none__'
-      ? users.filter((u) => !u.department_id)
-      : users.filter((u) => u.department_id === departmentId)
-    : users;
+  // If multiple departments selected, include users from any of them
+  const filteredUsers = (() => {
+    if (!departmentId && (!departmentIds || departmentIds.length === 0)) return users;
+    const selectedIds = new Set<string>([...(departmentIds ?? []), ...(departmentId ? [departmentId] : [])].filter(Boolean));
+    // Handle special '__none__' meaning users without department
+    const includesNone = selectedIds.has('__none__');
+    const actualIds = new Set(Array.from(selectedIds).filter((id) => id !== '__none__'));
+    return users.filter((u) => {
+      if (!u.department_id) return includesNone;
+      return actualIds.size === 0 ? true : actualIds.has(u.department_id);
+    });
+  })();
 
   function toggleMember(userId: string) {
     setMembers((prev) => {
@@ -120,7 +127,8 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
             start_date: startDate || null, 
             due_date: dueDate || null, 
             status, 
-            department_id: departmentId === '__none__' ? null : departmentId || null 
+            department_id: departmentId === '__none__' ? null : departmentId || null,
+            department_ids: (departmentIds && departmentIds.length) ? departmentIds : null
           })
           .eq('id', project.id)
           .select()
@@ -187,6 +195,7 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
               start_date: startDate || null,
               due_date: dueDate || null,
               department_id: departmentId === '__none__' ? null : departmentId || null,
+              department_ids: (departmentIds && departmentIds.length) ? departmentIds : null,
             }])
           .select()
           .maybeSingle();
@@ -237,6 +246,32 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
             ))}
           </SelectContent>
         </Select>
+        {/* Simple multi-department hint UI: show selected extra departments and allow adding by clicking names (lightweight) */}
+        {departments.length > 1 && (
+          <div className="mt-2 text-sm text-muted-foreground">Departamentos adicionais envolvidos:</div>
+        )}
+        <div className="grid gap-2 grid-cols-2 sm:grid-cols-3">
+          {departments.map((d) => {
+            const checked = (departmentIds || []).includes(d.id);
+            return (
+              <label key={d.id} className="flex items-center gap-2 cursor-pointer text-sm">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    setDepartmentIds((prev) => {
+                      const s = new Set(prev || []);
+                      if (s.has(d.id)) s.delete(d.id); else s.add(d.id);
+                      return Array.from(s);
+                    });
+                  }}
+                  className="h-4 w-4 rounded"
+                />
+                <div>{d.name}</div>
+              </label>
+            );
+          })}
+        </div>
       </div>
 
       <div className="grid gap-2">
