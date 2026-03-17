@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
-export function useWorkItems(projectId: string) {
-  const [workItems, setWorkItems] = useState<any[]>([]);
+export default function useWorkItems(projectId: string) {
+  const [taskList, setTaskList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -12,7 +12,7 @@ export function useWorkItems(projectId: string) {
       return;
     }
 
-    async function loadWorkItems() {
+    async function loadTaskList() {
       setLoading(true);
       setError(null);
       try {
@@ -23,7 +23,7 @@ export function useWorkItems(projectId: string) {
           .order('created_at', { ascending: false });
 
         if (err) throw err;
-        setWorkItems(data ?? []);
+        setTaskList(data ?? []);
       } catch (err: any) {
         setError(err.message || String(err));
       } finally {
@@ -31,12 +31,10 @@ export function useWorkItems(projectId: string) {
       }
     }
 
-    loadWorkItems();
+    loadTaskList();
   }, [projectId]);
 
-  const refetch = () => {
-    loadWorkItems();
-  };
+  const refetch = () => loadTaskList();
 
-  return { workItems, loading, error, refetch };
+  return { taskList, loading, error, refetch };
 }
