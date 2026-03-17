@@ -116,102 +116,38 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
       // Ensure owner is always part of members
       const finalMemberSet = Array.from(new Set([...(members ?? []), ownerUserId!])) as string[];
 
-      if (project) {
-        // update
-        const { data, error } = await supabase
-          .from('projects')
-          .update({ 
-            name, 
-            description, 
-            owner_user_id: ownerUserId, 
-            start_date: startDate || null, 
-            due_date: dueDate || null, 
-            status, 
-            department_id: departmentId === '__none__' ? null : departmentId || null,
-            department_ids: (departmentIds && departmentIds.length) ? departmentIds : null
-          })
-          .eq('id', project.id)
-          .select()
-          .maybeSingle();
-        
-        if (error) throw error;
+      // Use Edge Function to upsert project securely (avoids RLS issues)
+      const payload: any = {
+        id: project?.id,
+        tenant_id: tenantId,
+        name,
+        description,
+        owner_user_id: ownerUserId,
+        visibility,
+        status,
+        start_date: startDate || null,
+        due_date: dueDate || null,
+        department_id: departmentId === '__none__' ? null : departmentId || null,
+        department_ids: (departmentIds && departmentIds.length) ? departmentIds : null,
+        members: finalMemberSet,
+      };
 
-        // Sync project_members: fetch existing
-        const { data: existingMembers } = await supabase.from('project_members').select('user_id, role_in_project').eq('project_id', project.id);
-        const existingIds = (existingMembers ?? []).map((m: any) => m.user_id);
+      // Call edge function (projects-upsert)
+      const res = await supabase.functions.invoke('projects-upsert', {
+        body: payload,
+      });
 
-        // To add
-        const toAdd = finalMemberSet.filter((id) => !existingIds.includes(id)).map((id) => ({ tenant_id: tenantId, project_id: project.id, user_id: id, role_in_project: id === ownerUserId ? 'owner' : 'member' }));
-        if (toAdd.length) {
-          await supabase.from('project_members').insert(toAdd);
-        }
+      if (res.error) throw new Error(res.error.message || 'Edge function error');
 
-        // To remove (except ensure owner cannot be removed here; owner should be in finalMemberSet)
-        const toRemove = existingIds.filter((id) => !finalMemberSet.includes(id));
-        if (toRemove.length) {
-          await supabase.from('project_members').delete().match({ project_id: project.id }).in('user_id', toRemove as any);
-        }
+      const projectResult = res.data;
 
-        // Ensure roles are correct (owner)
-        // Downgrade previous owner(s) if owner changed
-        if (ownerUserId !== project.owner_user_id) {
-          if (project.owner_user_id) {
-            await supabase.from('project_members').update({ role_in_project: 'member' }).match({ project_id: project.id, user_id: project.owner_user_id });
-          }
-          // Set new owner role: try update first, if no row updated then insert
-          const { data: ownerRow, error: ownerSelectErr } = await supabase.from('project_members').select('user_id').match({ project_id: project.id, user_id: ownerUserId }).maybeSingle();
-          if (ownerSelectErr) throw ownerSelectErr;
-          if (ownerRow) {
-            await supabase.from('project_members').update({ role_in_project: 'owner' }).match({ project_id: project.id, user_id: ownerUserId });
-          } else {
-            await supabase.from('project_members').insert([{ tenant_id: tenantId, project_id: project.id, user_id: ownerUserId, role_in_project: 'owner' }]);
-          }
-        } else {
-          // Make sure owner row exists and has correct role
-          await supabase.from('project_members').update({ role_in_project: 'owner' }).match({ project_id: project.id, user_id: ownerUserId });
-        }
-
-        // For other members ensure role is 'member'
-        const otherMembers = finalMemberSet.filter((id) => id !== ownerUserId);
-        if (otherMembers.length) {
-          await supabase.from('project_members').update({ role_in_project: 'member' }).match({ project_id: project.id }).in('user_id', otherMembers as any);
-        }
-
-        toast({ title: 'Projeto atualizado' });
-        onSaved?.(data);
-      } else {
-        // insert
-        const { data, error } = await supabase
-          .from('projects')
-          .insert([{
-              tenant_id: tenantId,
-              name,
-              description,
-              owner_user_id: ownerUserId,
-              created_by_user_id: user?.id,
-              visibility,
-              admin_private_mode: null,
-              status,
-              start_date: startDate || null,
-              due_date: dueDate || null,
-              department_id: departmentId === '__none__' ? null : departmentId || null,
-              department_ids: (departmentIds && departmentIds.length) ? departmentIds : null,
-            }])
-          .select()
-          .maybeSingle();
-
-        if (error) throw error;
-
-        // insert project members: owner as 'owner', others as 'member'
-        // Create members in a second request to isolate from project creation
-        const inserts = finalMemberSet.map((id) => ({ tenant_id: tenantId, project_id: data.id, user_id: id, role_in_project: id === ownerUserId ? 'owner' : 'member' }));
-        if (inserts.length) {
-          await supabase.from('project_members').insert(inserts);
-        }
-        
-        toast({ title: 'Projeto criado' });
-        onSaved?.(data);
+      if (!projectResult?.success) {
+        throw new Error(projectResult?.error || 'Failed to upsert project');
       }
+
+      toast({ title: project ? 'Projeto atualizado' : 'Projeto criado' });
+      onSaved?.(projectResult.project);
+       
     } catch (err: any) {
       toast({ title: 'Erro', description: err.message || String(err), variant: 'destructive' });
     } finally {
