@@ -73,6 +73,11 @@ serve(async (req) => {
 
     const isAdmin = (callerProfile.role || '').toUpperCase() === 'ADMIN' || (callerProfile.role || '').toUpperCase() === 'MASTERADMIN';
 
+    // Normalize department fields: if department_id is missing but department_ids present, use first item as primary
+    if ((!payload.department_id || payload.department_id === null) && Array.isArray(payload.department_ids) && payload.department_ids.length > 0) {
+      payload.department_id = payload.department_ids[0];
+    }
+
     // Determine create vs update
     const isUpdate = !!payload.id;
     let projectRow: any = null;
@@ -108,7 +113,7 @@ serve(async (req) => {
         start_date: payload.start_date ?? null,
         due_date: payload.due_date ?? null,
         department_id: payload.department_id ?? null,
-        department_ids: payload.department_ids ?? null,
+        department_ids: Array.isArray(payload.department_ids) ? payload.department_ids : (payload.department_ids ? [payload.department_ids] : null),
       };
 
       const { data: updated, error: updateErr } = await svc
@@ -188,7 +193,7 @@ serve(async (req) => {
         start_date: payload.start_date ?? null,
         due_date: payload.due_date ?? null,
         department_id: payload.department_id ?? null,
-        department_ids: payload.department_ids ?? null,
+        department_ids: Array.isArray(payload.department_ids) ? payload.department_ids : (payload.department_ids ? [payload.department_ids] : null),
       };
 
       const { data: created, error: createErr } = await svc.from('projects').insert([insertPayload]).select().maybeSingle();
