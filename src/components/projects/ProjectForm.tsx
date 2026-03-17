@@ -26,6 +26,8 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
   // Users and departments for dropdowns
   const [users, setUsers] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  // project members selection (can be multiple)
+  const [members, setMembers] = useState<string[]>(() => project?.project_members?.map((m: any) => m.user_id) ?? []);
 
   useEffect(() => {
     setName(project?.name ?? '');
@@ -36,15 +38,16 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
     setStatus(project?.status ?? 'not_started');
     setDepartmentId(project?.department_id);
     setVisibility(project?.visibility ?? 'public');
+    setMembers(project?.project_members?.map((m: any) => m.user_id) ?? []);
   }, [project]);
 
   useEffect(() => {
     async function loadData() {
       try {
-        // Load company users
+        // Load company users (include department_id so we can filter)
         const { data: usersData } = await supabase
           .from('profiles')
-          .select('id, name, email')
+          .select('id, name, email, department_id')
           .eq('company_id', companyId)
           .eq('active', true)
           .order('name', { ascending: true });
@@ -67,6 +70,20 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
     }
   }, [companyId]);
 
+  // Derive filtered users according to selected department (if any)
+  const filteredUsers = departmentId
+    ? departmentId === '__none__'
+      ? users.filter((u) => !u.department_id)
+      : users.filter((u) => u.department_id === departmentId)
+    : users;
+
+  function toggleMember(userId: string) {
+    setMembers((prev) => {
+      if (prev.includes(userId)) return prev.filter((id) => id !== userId);
+      return [...prev, userId];
+    });
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return toast({ title: 'Nome é obrigatório', variant: 'destructive' });
@@ -77,6 +94,9 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
     try {
       const tenantId = companyId;
       
+      // Ensure owner is always part of members
+      const finalMemberSet = Array.from(new Set([...(members ?? []), ownerUserId!])) as string[];
+
       if (project) {
         // update
         const { data, error } = await supabase
@@ -95,22 +115,42 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
           .maybeSingle();
         
         if (error) throw error;
-        
-        // Sync owner in project_members
+
+        // Sync project_members: fetch existing
+        const { data: existingMembers } = await supabase.from('project_members').select('user_id, role_in_project').eq('project_id', project.id);
+        const existingIds = (existingMembers ?? []).map((m: any) => m.user_id);
+
+        // To add
+        const toAdd = finalMemberSet.filter((id) => !existingIds.includes(id)).map((id) => ({ tenant_id: tenantId, project_id: project.id, user_id: id, role_in_project: id === ownerUserId ? 'owner' : 'member' }));
+        if (toAdd.length) {
+          await supabase.from('project_members').insert(toAdd);
+        }
+
+        // To remove (except ensure owner cannot be removed here; owner should be in finalMemberSet)
+        const toRemove = existingIds.filter((id) => !finalMemberSet.includes(id));
+        if (toRemove.length) {
+          await supabase.from('project_members').delete().match({ project_id: project.id }).in('user_id', toRemove as any);
+        }
+
+        // Ensure roles are correct (owner)
+        // Downgrade previous owner(s) if owner changed
         if (ownerUserId !== project.owner_user_id) {
-          // 1. Downgrade previous owner to 'member' if exists
           if (project.owner_user_id) {
             await supabase.from('project_members').update({ role_in_project: 'member' }).match({ project_id: project.id, user_id: project.owner_user_id });
           }
-          // 2. Ensure new owner is in project_members as 'owner'
-          const existingOwnerMember = await supabase.from('project_members').select('id').match({ project_id: project.id, user_id: ownerUserId }).maybeSingle();
-          if (!existingOwnerMember?.data) {
-            await supabase.from('project_members').insert([{ tenant_id: tenantId, project_id: project.id, user_id: ownerUserId, role_in_project: 'owner' }]);
-          } else {
-            await supabase.from('project_members').update({ role_in_project: 'owner' }).match({ project_id: project.id, user_id: ownerUserId });
-          }
+          // Set new owner role
+          await supabase.from('project_members').upsert({ tenant_id: tenantId, project_id: project.id, user_id: ownerUserId, role_in_project: 'owner' }, { onConflict: ['project_id', 'user_id'] });
+        } else {
+          // Make sure owner row exists and has correct role
+          await supabase.from('project_members').update({ role_in_project: 'owner' }).match({ project_id: project.id, user_id: ownerUserId });
         }
-        
+
+        // For other members ensure role is 'member'
+        const otherMembers = finalMemberSet.filter((id) => id !== ownerUserId);
+        if (otherMembers.length) {
+          await supabase.from('project_members').update({ role_in_project: 'member' }).match({ project_id: project.id }).in('user_id', otherMembers as any);
+        }
+
         toast({ title: 'Projeto atualizado' });
         onSaved?.(data);
       } else {
@@ -135,8 +175,11 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
 
         if (error) throw error;
 
-        // insert project member as owner
-        await supabase.from('project_members').insert([{ tenant_id: tenantId, project_id: data.id, user_id: ownerUserId, role_in_project: 'owner' }]);
+        // insert project members: owner as 'owner', others as 'member'
+        const inserts = finalMemberSet.map((id) => ({ tenant_id: tenantId, project_id: data.id, user_id: id, role_in_project: id === ownerUserId ? 'owner' : 'member' }));
+        if (inserts.length) {
+          await supabase.from('project_members').insert(inserts);
+        }
         
         toast({ title: 'Projeto criado' });
         onSaved?.(data);
@@ -161,24 +204,8 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
       </div>
 
       <div className="grid gap-2">
-        <Label>Responsável</Label>
-        <Select value={ownerUserId} onValueChange={setOwnerUserId} required>
-          <SelectTrigger className="rounded-xl">
-            <SelectValue placeholder="Selecione um responsável" />
-          </SelectTrigger>
-          <SelectContent>
-            {users.map((u) => (
-              <SelectItem key={u.id} value={u.id}>
-                {u.name || u.email}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="grid gap-2">
         <Label>Departamento (opcional)</Label>
-        <Select value={departmentId} onValueChange={(val) => setDepartmentId(val || undefined)}>
+        <Select value={departmentId} onValueChange={(val) => setDepartmentId(val === '__none__' ? '__none__' : (val || undefined))}>
           <SelectTrigger className="rounded-xl">
             <SelectValue placeholder="Selecione um departamento" />
           </SelectTrigger>
@@ -191,6 +218,41 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Responsável</Label>
+        <Select value={ownerUserId} onValueChange={setOwnerUserId} required>
+          <SelectTrigger className="rounded-xl">
+            <SelectValue placeholder="Selecione um responsável" />
+          </SelectTrigger>
+          <SelectContent>
+            {filteredUsers.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.name || u.email}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Membros do projeto (pode selecionar vários)</Label>
+        <div className="grid gap-2 max-h-40 overflow-auto p-2 rounded-xl border border-border bg-[color:var(--sinaxys-surface)]">
+          {filteredUsers.map((u) => (
+            <label key={u.id} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={members.includes(u.id)}
+                onChange={() => toggleMember(u.id)}
+                className="h-4 w-4 rounded"
+              />
+              <div className="text-sm">{u.name || u.email}</div>
+              {ownerUserId === u.id && <div className="ml-auto text-xs text-muted-foreground">Responsável</div>}
+            </label>
+          ))}
+          {filteredUsers.length === 0 && <div className="text-sm text-muted-foreground">Nenhuma pessoa no departamento selecionado.</div>}
+        </div>
       </div>
 
       <div className="grid gap-2">
