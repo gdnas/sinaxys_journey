@@ -29,8 +29,7 @@ export default function ProjetosLista() {
         .from("projects")
         .select(`
           *,
-          owner_profile:owner_user_id!profiles(id, name, avatar_url),
-          department:department_id!departments(id, name),
+          owner_profile:profiles!fk_projects_owner_user_id(id, name, avatar_url),
           project_member_count:project_members(count)
         `);
       
@@ -42,11 +41,23 @@ export default function ProjetosLista() {
       if (error) throw error;
       
       const rows = (data ?? []) as any[];
+      
+      // Fetch departments for projects that have one
+      const departmentIds = rows.filter(r => r.department_id).map(r => r.department_id);
+      let departmentsMap: Record<string, string> = {};
+      if (departmentIds.length > 0) {
+        const { data: departments } = await supabase
+          .from("departments")
+          .select("id, name")
+          .in("id", departmentIds);
+        departmentsMap = (departments ?? []).reduce((acc, d) => ({ ...acc, [d.id]: d.name }), {});
+      }
+      
       const mapped = rows.map((r) => ({
         ...r,
         member_count: r.project_member_count?.[0]?.count ?? 0,
         owner_name: r.owner_profile?.name ?? null,
-        department_name: r.department?.name ?? null,
+        department_name: r.department_id ? (departmentsMap[r.department_id] ?? null) : null,
       }));
       
       setProjects(mapped);

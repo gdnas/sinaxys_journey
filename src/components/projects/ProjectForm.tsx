@@ -190,12 +190,12 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
 
         <div className="grid gap-2">
           <Label>Departamento (opcional)</Label>
-          <Select value={departmentId} onValueChange={setDepartmentId}>
+          <Select value={departmentId || "__none__"} onValueChange={(val) => setDepartmentId(val === "__none__" ? "" : val)}>
             <SelectTrigger className="rounded-xl">
               <SelectValue placeholder="Selecione um departamento" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sem departamento</SelectItem>
+              <SelectItem value="__none__">Sem departamento</SelectItem>
               {departments.map((d) => (
                 <SelectItem key={d.id} value={d.id}>
                   {d.name}
@@ -212,8 +212,8 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <option value="public">Público - visível para todos</option>
-              <option value="private">Privado - visível apenas para membros</option>
+              <SelectItem value="public">Público - visível para todos</SelectItem>
+              <SelectItem value="private">Privado - visível apenas para membros</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -236,11 +236,11 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <option value="not_started">Não iniciado</option>
-              <option value="on_track">No prazo</option>
-              <option value="at_risk">Em risco</option>
-              <option value="delayed">Atrasado</option>
-              <option value="completed">Concluído</option>
+              <SelectItem value="not_started">Não iniciado</SelectItem>
+              <SelectItem value="on_track">No prazo</SelectItem>
+              <SelectItem value="at_risk">Em risco</SelectItem>
+              <SelectItem value="delayed">Atrasado</SelectItem>
+              <SelectItem value="completed">Concluído</SelectItem>
             </SelectContent>
           </Select>
         </div>

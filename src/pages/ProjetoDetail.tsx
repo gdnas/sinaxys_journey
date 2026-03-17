@@ -32,18 +32,30 @@ export default function ProjetoDetail() {
           .from('projects')
           .select(`
             *,
-            owner:owner_user_id!profiles(id, name, avatar_url),
-            department:department_id!departments(id, name),
+            owner:profiles!fk_projects_owner_user_id(id, name, avatar_url),
             project_members:project_members(
               user_id,
               role_in_project,
-              user:user_id!profiles(id, name, avatar_url)
+              user:profiles!fk_project_members_user_id(id, name, avatar_url)
             )
           `)
           .eq('id', projectId)
           .maybeSingle();
 
         if (projError) throw projError;
+        
+        // Load department separately since there's no FK constraint
+        let departmentData = null;
+        if (projData?.department_id) {
+          const { data: dept } = await supabase
+            .from('departments')
+            .select('id, name')
+            .eq('id', projData.department_id)
+            .maybeSingle();
+          departmentData = dept;
+        }
+        
+        const projWithDept = { ...projData, department: departmentData };
         
         // Load tasks count
         const { count, error: countError } = await supabase
@@ -53,7 +65,7 @@ export default function ProjetoDetail() {
 
         if (countError) throw countError;
 
-        setProjectWithRelations(projData);
+        setProjectWithRelations(projWithDept);
         setTasksCount(count ?? 0);
       } catch (err: any) {
         toast({ title: 'Erro ao carregar detalhes', description: err.message || String(err), variant: 'destructive' });
