@@ -70,6 +70,18 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
     }
   }, [companyId]);
 
+  // Put 'Empresa toda' first in departments list if present
+  const orderedDepartments = (() => {
+    if (!departments || departments.length === 0) return [];
+    const copy = [...departments];
+    const idx = copy.findIndex((d) => (d.name || '').toLowerCase() === 'empresa toda');
+    if (idx > 0) {
+      const [found] = copy.splice(idx, 1);
+      copy.unshift(found);
+    }
+    return copy;
+  })();
+
   // Derive filtered users according to selected department (if any)
   const filteredUsers = departmentId
     ? departmentId === '__none__'
@@ -108,7 +120,7 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
             start_date: startDate || null, 
             due_date: dueDate || null, 
             status, 
-            department_id: departmentId || null 
+            department_id: departmentId === '__none__' ? null : departmentId || null 
           })
           .eq('id', project.id)
           .select()
@@ -168,7 +180,7 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
               status,
               start_date: startDate || null,
               due_date: dueDate || null,
-              department_id: departmentId || null,
+              department_id: departmentId === '__none__' ? null : departmentId || null,
             }])
           .select()
           .maybeSingle();
@@ -211,7 +223,7 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">Sem departamento</SelectItem>
-            {departments.map((d) => (
+            {orderedDepartments.map((d) => (
               <SelectItem key={d.id} value={d.id}>
                 {d.name}
               </SelectItem>
