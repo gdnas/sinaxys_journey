@@ -6,35 +6,35 @@ export default function useWorkItems(projectId: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadTaskList = async () => {
     if (!projectId) {
       setLoading(false);
       return;
     }
 
-    async function loadTaskList() {
-      setLoading(true);
-      setError(null);
-      try {
-        const { data, error: err } = await supabase
-          .from('work_items')
-          .select(`
-            *,
-            assignee:assignee_user_id!profiles(id, name, email),
-            parent_task:parent_id!work_items(id, title, status)
-          `)
-          .eq('project_id', projectId)
-          .order('created_at', { ascending: false });
+    setLoading(true);
+    setError(null);
+    try {
+      const { data, error: err } = await supabase
+        .from('work_items')
+        .select(`
+          *,
+          assignee:assignee_user_id!profiles(id, name, email),
+          parent_task:parent_id!work_items(id, title, status)
+        `)
+        .eq('project_id', projectId)
+        .order('created_at', { ascending: false });
 
-        if (err) throw err;
-        setTaskList(data ?? []);
-      } catch (err: any) {
-        setError(err.message || String(err));
-      } finally {
-        setLoading(false);
-      }
+      if (err) throw err;
+      setTaskList(data ?? []);
+    } catch (err: any) {
+      setError(err.message || String(err));
+    } finally {
+      setLoading(false);
     }
+  };
 
+  useEffect(() => {
     loadTaskList();
   }, [projectId]);
 

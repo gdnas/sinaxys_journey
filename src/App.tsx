@@ -291,7 +291,8 @@ const App = () => (
                         <RequireCompanyModule moduleKey="OKR">
                           <Navigate to="/okr/quarter" replace />
                         </RequireCompanyModule>
-                      }
+                      </RequireAuth>
+                    }
                   />
 
                   <Route
@@ -368,7 +369,8 @@ const App = () => (
                         <RequireCompanyModule moduleKey="OKR">
                           <Navigate to="/okr/quarter" replace />
                         </RequireCompanyModule>
-                      }
+                      </RequireAuth>
+                    }
                   />
 
                   <Route
@@ -534,6 +536,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosHome />
                         </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
                   <Route
@@ -543,6 +546,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosDashboard />
                         </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
                   <Route
@@ -552,6 +556,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosLista />
                         </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
                   <Route
@@ -561,6 +566,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosTarefas />
                         </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
 
@@ -571,6 +577,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetoDetail />
                         </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
 
@@ -581,6 +588,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetoEdit />
                         </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
 
@@ -591,6 +599,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosTasks />
                         </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
 
@@ -601,6 +610,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <TaskCreate />
                         </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
 
@@ -610,7 +620,8 @@ const App = () => (
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <TaskEdit />
-                        </RequireModule>
+                        </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
 
@@ -621,6 +632,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="POINTS">
                           <Rankings />
                         </RequireCompanyModule>
+                      </RequireAuth>
                     }
                   />
 

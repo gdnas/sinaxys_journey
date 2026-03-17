@@ -1,13 +1,14 @@
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, CheckCircle2, Clock, AlertCircle, XCircle, Calendar, User } from 'lucide-react';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
-import { useWorkItems } from '@/hooks/useWorkItems';
-import { useState } from 'react';
+import useWorkItems from '@/hooks/useWorkItems';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/lib/company';
+import WorkItemForm from '@/components/work/WorkItemForm';
 
 export default function ProjetosTasks() {
   const { projectId } = useParams();

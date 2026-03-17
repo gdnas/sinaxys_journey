@@ -36,7 +36,8 @@ export default function TaskCard({ task, projectId }: { task: any; projectId: st
             </Button>
           </Link>
         </div>
-      </Card>
+      </div>
+    </Card>
   );
 }
 
