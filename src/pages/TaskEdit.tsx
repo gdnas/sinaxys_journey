@@ -11,7 +11,7 @@ export default function TaskEdit() {
   const { projectId, taskId } = useParams();
   const navigate = useNavigate();
   const { canView, canEdit, isLoading, workItem } = useWorkItemAccess(String(taskId ?? ''));
-
+  
   if (isLoading) return <div className="p-6">Carregando...</div>;
   if (!canView || !workItem) return <AccessDenied />;
 
@@ -26,13 +26,13 @@ export default function TaskEdit() {
           </Button>
         </div>
         {canEdit ? (
-          <WorkItemForm workItem={workItem} projectId={String(projectId)} onSaved={(wi) => navigate(`/app/projetos/${projectId}/tarefas/${wi.id}`)} />
+          <WorkItemForm workItem={workItem} projectId={String(projectId)} onSaved={(wi) => navigate(`/app/projetos/${projectId}/tarefas`)} onCancel={() => navigate(`/app/projetos/${projectId}/tarefas`)} />
         ) : (
-          <AccessDenied message="Voce nao tem permissao para editar esta tarefa." />
+          <AccessDenied message="Você não tem permissão para editar esta tarefa." />
         )}
-
-        {canEdit && <TaskStatusHistory workItemId={String(taskId ?? '')} />}
       </Card>
+      
+      {canEdit && <TaskStatusHistory workItemId={String(taskId ?? '')} />}
     </div>
   );
 }

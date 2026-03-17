@@ -83,6 +83,9 @@ import ProjetosLista from "./pages/ProjetosLista";
 import ProjetosTarefas from "./pages/ProjetosTarefas";
 import ProjetoDetail from "./pages/ProjetoDetail";
 import ProjetoEdit from "./pages/ProjetoEdit";
+import ProjetosTasks from "./pages/ProjetosTasks";
+import TaskCreate from "./pages/TaskCreate";
+import TaskEdit from "./pages/TaskEdit";
 
 const queryClient = new QueryClient();
 
@@ -175,7 +178,6 @@ const App = () => (
                       </RequireAuth>
                     }
                   />
-
 
                   <Route
                     path="/password"
@@ -289,8 +291,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="OKR">
                           <Navigate to="/okr/quarter" replace />
                         </RequireCompanyModule>
-                      </RequireAuth>
-                    }
+                      }
                   />
 
                   <Route
@@ -367,8 +368,7 @@ const App = () => (
                         <RequireCompanyModule moduleKey="OKR">
                           <Navigate to="/okr/quarter" replace />
                         </RequireCompanyModule>
-                      </RequireAuth>
-                    }
+                      }
                   />
 
                   <Route
@@ -534,7 +534,6 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosHome />
                         </RequireCompanyModule>
-                      </RequireAuth>
                     }
                   />
                   <Route
@@ -544,7 +543,6 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosDashboard />
                         </RequireCompanyModule>
-                      </RequireAuth>
                     }
                   />
                   <Route
@@ -554,7 +552,6 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosLista />
                         </RequireCompanyModule>
-                      </RequireAuth>
                     }
                   />
                   <Route
@@ -564,7 +561,6 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosTarefas />
                         </RequireCompanyModule>
-                      </RequireAuth>
                     }
                   />
 
@@ -575,7 +571,6 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetoDetail />
                         </RequireCompanyModule>
-                      </RequireAuth>
                     }
                   />
 
@@ -586,7 +581,36 @@ const App = () => (
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetoEdit />
                         </RequireCompanyModule>
-                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/app/projetos/:projectId/tarefas"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <ProjetosTasks />
+                        </RequireCompanyModule>
+                    }
+                  />
+
+                  <Route
+                    path="/app/projetos/:projectId/tarefas/criar"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <TaskCreate />
+                        </RequireCompanyModule>
+                    }
+                  />
+
+                  <Route
+                    path="/app/projetos/:projectId/tarefas/:taskId/editar"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <TaskEdit />
+                        </RequireModule>
                     }
                   />
 
@@ -597,10 +621,8 @@ const App = () => (
                         <RequireCompanyModule moduleKey="POINTS">
                           <Rankings />
                         </RequireCompanyModule>
-                      </RequireAuth>
                     }
                   />
-
 
                   {/* Master */}
                   <Route
@@ -806,7 +828,6 @@ const App = () => (
                       </RequireAuth>
                     }
                   />
-
 
                   <Route path="*" element={<NotFound />} />
                 </Routes>

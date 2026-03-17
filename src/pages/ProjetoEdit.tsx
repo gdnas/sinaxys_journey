@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 export default function ProjetoEdit() {
   const { projectId } = useParams();
   const { canView, canEdit, isLoading } = useProjectAccess(String(projectId ?? ''));
-  const [project, setProject] = useState<any | null>(null);
+  const [project, setProject] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -19,7 +19,11 @@ export default function ProjetoEdit() {
     async function load() {
       setLoading(true);
       try {
-        const { data, error } = await supabase.from('projects').select('*').eq('id', projectId).maybeSingle();
+        const { data, error } = await supabase
+          .from('projects')
+          .select('*')
+          .eq('id', projectId)
+          .maybeSingle();
         if (error) throw error;
         setProject(data);
       } catch (err: any) {
@@ -39,7 +43,7 @@ export default function ProjetoEdit() {
     <div className="mx-auto max-w-3xl p-6">
       <Card className="p-6">
         <h2 className="text-lg font-semibold mb-4">Editar projeto</h2>
-        <ProjectForm project={project} onSaved={() => navigate(`/app/projetos/${projectId}`)} />
+        <ProjectForm project={project} onSaved={() => navigate(`/app/projetos/${projectId}`)} onCancel={() => navigate(`/app/projetos/${projectId}`)} />
       </Card>
     </div>
   );

@@ -10,11 +10,10 @@ export default function TaskCreate() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const { canView, canEdit, isLoading: projectLoading, project } = useProjectAccess(String(projectId ?? ''));
-
+  
   if (projectLoading) return <div className="p-6">Carregando...</div>;
   if (!canView || !project) return <AccessDenied />;
-
-  if (!canEdit) return <AccessDenied message="Voce nao tem permissao para criar tarefas neste projeto." />;
+  if (!canEdit) return <AccessDenied message="Você não tem permissão para criar tarefas neste projeto." />;
 
   return (
     <div className="mx-auto max-w-3xl p-6">
@@ -26,7 +25,7 @@ export default function TaskCreate() {
             Voltar
           </Button>
         </div>
-        <WorkItemForm projectId={String(projectId)} onSaved={(wi) => navigate(`/app/projetos/${projectId}/tarefas/${wi.id}`)} />
+        <WorkItemForm projectId={String(projectId)} onSaved={(wi) => navigate(`/app/projetos/${projectId}/tarefas/${wi.id}`)} onCancel={() => navigate(`/app/projetos/${projectId}/tarefas`)} />
       </Card>
     </div>
   );

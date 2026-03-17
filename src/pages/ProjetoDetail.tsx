@@ -7,52 +7,208 @@ import { supabase } from '@/integrations/supabase/client';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
 import AccessDenied from '@/components/AccessDenied';
 import ProjectMembersSection from '@/components/projects/ProjectMembersSection';
+import { ArrowLeft, Calendar, User, Users, FolderKanban, Edit } from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function ProjetoDetail() {
   const { projectId } = useParams();
   const { toast } = useToast();
   const navigate = useNavigate();
   const { canView, canEdit, canManageMembers, isLoading, project } = useProjectAccess(String(projectId ?? ''));
+  
+  // Extended project data with relationships
+  const [projectWithRelations, setProjectWithRelations] = useState<any>(null);
+  const [tasksCount, setTasksCount] = useState(0);
+  const [loadingDetails, setLoadingDetails] = useState(true);
 
-  if (isLoading) return <div className="p-6">Carregando...</div>;
+  useEffect(() => {
+    async function loadProjectDetails() {
+      if (!projectId || isLoading) return;
+      
+      setLoadingDetails(true);
+      try {
+        // Load project with owner and department
+        const { data: projData, error: projError } = await supabase
+          .from('projects')
+          .select(`
+            *,
+            owner:owner_user_id!profiles(id, name, avatar_url),
+            department:department_id!departments(id, name),
+            project_members:project_members(
+              user_id,
+              role_in_project,
+              user:user_id!profiles(id, name, avatar_url)
+            )
+          `)
+          .eq('id', projectId)
+          .maybeSingle();
+
+        if (projError) throw projError;
+        
+        // Load tasks count
+        const { count, error: countError } = await supabase
+          .from('work_items')
+          .select('*', { count: 'exact', head: true })
+          .eq('project_id', projectId);
+
+        if (countError) throw countError;
+
+        setProjectWithRelations(projData);
+        setTasksCount(count ?? 0);
+      } catch (err: any) {
+        toast({ title: 'Erro ao carregar detalhes', description: err.message || String(err), variant: 'destructive' });
+      } finally {
+        setLoadingDetails(false);
+      }
+    }
+
+    loadProjectDetails();
+  }, [projectId, isLoading]);
+
+  if (isLoading || loadingDetails) return <div className="p-6">Carregando...</div>;
   if (!canView) return <AccessDenied />;
+  
+  const proj = projectWithRelations || project;
+  if (!proj) return <div className="p-6">Projeto não encontrado</div>;
 
-  if (!project) return <div className="p-6">Projeto não encontrado</div>;
+  const memberCount = Array.isArray(proj.project_members) ? proj.project_members.length : 0;
 
   return (
-    <div className="mx-auto max-w-4xl grid gap-6 pb-12">
+    <div className="mx-auto max-w-5xl grid gap-6 pb-12">
       <Card className="p-6">
         <div className="flex items-start justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{project.name}</h1>
-            <div className="text-sm text-muted-foreground">
-              Status: {project.status} • Visibilidade: {project.visibility === 'public' ? 'Público' : 'Privado'}
+          <div className="flex-1">
+            <Button 
+              variant="ghost" 
+              className="mb-4" 
+              onClick={() => navigate('/app/projetos/lista')}
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Voltar
+            </Button>
+            <h1 className="text-3xl font-bold">{proj.name}</h1>
+            
+            <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+              <div className="flex items-center gap-1">
+                <FolderKanban className="h-4 w-4" />
+                Status: <span className="font-medium text-[color:var(--sinaxys-ink)]">
+                  {proj.status === 'not_started' ? 'Não iniciado' :
+                   proj.status === 'on_track' ? 'No prazo' :
+                   proj.status === 'at_risk' ? 'Em risco' :
+                   proj.status === 'delayed' ? 'Atrasado' :
+                   proj.status === 'completed' ? 'Concluído' : proj.status}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                <FolderKanban className="h-4 w-4" />
+                Visibilidade: <span className="font-medium text-[color:var(--sinaxys-ink)]">
+                  {proj.visibility === 'public' ? 'Público' : 'Privado'}
+                </span>
+              </div>
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">{project.description}</p>
-            <div className="mt-3 text-sm">
-              <div>Owner: {project.owner?.name ?? '—'}</div>
-              <div>Departamento: {project.department_id ?? '—'}</div>
-              <div>Início: {project.start_date ?? '—'}</div>
-              <div>Prazo: {project.due_date ?? '—'}</div>
+
+            {proj.description && (
+              <p className="mt-4 text-sm text-muted-foreground">{proj.description}</p>
+            )}
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 md:grid-cols-3">
+              <div className="flex items-center gap-2">
+                <User className="h-4 w-4 text-muted-foreground" />
+                <div className="text-sm">
+                  <div className="text-muted-foreground">Responsável</div>
+                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
+                    {proj.owner?.name || '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <div className="text-sm">
+                  <div className="text-muted-foreground">Departamento</div>
+                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
+                    {proj.department?.name || '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <div className="text-sm">
+                  <div className="text-muted-foreground">Início</div>
+                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
+                    {proj.start_date ? format(new Date(proj.start_date), 'dd/MM/yyyy') : '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <div className="text-sm">
+                  <div className="text-muted-foreground">Prazo</div>
+                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
+                    {proj.due_date ? format(new Date(proj.due_date), 'dd/MM/yyyy') : '—'}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Users className="h-4 w-4 text-muted-foreground" />
+                <div className="text-sm">
+                  <div className="text-muted-foreground">Membros</div>
+                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
+                    {memberCount}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <FolderKanban className="h-4 w-4 text-muted-foreground" />
+                <div className="text-sm">
+                  <div className="text-muted-foreground">Tarefas</div>
+                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
+                    {tasksCount}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
+          
           <div className="flex flex-col gap-2">
-            {canEdit && <Button onClick={() => navigate('editar')}>Editar</Button>}
-            <Button variant="outline" onClick={() => navigate('/app/projetos/lista')}>Voltar</Button>
+            {canEdit && (
+              <Button onClick={() => navigate(`/app/projetos/${projectId}/editar`)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Editar
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}
+            >
+              Ver tarefas
+            </Button>
           </div>
         </div>
       </Card>
 
       {canManageMembers && <ProjectMembersSection projectId={String(projectId)} />}
 
+      {/* Tasks Preview */}
       <Card className="p-6">
-        <h3 className="font-semibold">OKRs (placeholder)</h3>
-        <div className="mt-3 text-sm text-muted-foreground">Integração com OKR será implementada futuramente.</div>
-      </Card>
-
-      <Card className="p-6">
-        <h3 className="font-semibold">Tarefas (placeholder)</h3>
-        <div className="mt-3 text-sm text-muted-foreground">Tarefas por projeto serão implementadas na próxima fase.</div>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Tarefas</h3>
+          <Button 
+            variant="outline" 
+            onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}
+          >
+            Ver todas
+          </Button>
+        </div>
+        <div className="mt-4 text-sm text-muted-foreground">
+          {tasksCount > 0 
+            ? `Este projeto possui ${tasksCount} tarefa${tasksCount > 1 ? 's' : ''}`
+            : 'Nenhuma tarefa cadastrada neste projeto ainda.'}
+        </div>
       </Card>
     </div>
   );
