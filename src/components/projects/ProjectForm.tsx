@@ -150,8 +150,14 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
           if (project.owner_user_id) {
             await supabase.from('project_members').update({ role_in_project: 'member' }).match({ project_id: project.id, user_id: project.owner_user_id });
           }
-          // Set new owner role
-          await supabase.from('project_members').upsert({ tenant_id: tenantId, project_id: project.id, user_id: ownerUserId, role_in_project: 'owner' }, { onConflict: ['project_id', 'user_id'] });
+          // Set new owner role: try update first, if no row updated then insert
+          const { data: ownerRow, error: ownerSelectErr } = await supabase.from('project_members').select('user_id').match({ project_id: project.id, user_id: ownerUserId }).maybeSingle();
+          if (ownerSelectErr) throw ownerSelectErr;
+          if (ownerRow) {
+            await supabase.from('project_members').update({ role_in_project: 'owner' }).match({ project_id: project.id, user_id: ownerUserId });
+          } else {
+            await supabase.from('project_members').insert([{ tenant_id: tenantId, project_id: project.id, user_id: ownerUserId, role_in_project: 'owner' }]);
+          }
         } else {
           // Make sure owner row exists and has correct role
           await supabase.from('project_members').update({ role_in_project: 'owner' }).match({ project_id: project.id, user_id: ownerUserId });
@@ -188,6 +194,7 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
         if (error) throw error;
 
         // insert project members: owner as 'owner', others as 'member'
+        // Create members in a second request to isolate from project creation
         const inserts = finalMemberSet.map((id) => ({ tenant_id: tenantId, project_id: data.id, user_id: id, role_in_project: id === ownerUserId ? 'owner' : 'member' }));
         if (inserts.length) {
           await supabase.from('project_members').insert(inserts);
