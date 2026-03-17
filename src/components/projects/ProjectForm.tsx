@@ -8,7 +8,6 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/lib/company';
 import { useAuth } from '@/lib/auth';
-import { X } from 'lucide-react';
 
 export default function ProjectForm({ project, onSaved, onCancel }: { project?: any; onSaved?: (p: any) => void; onCancel?: () => void }) {
   const { toast } = useToast();
@@ -16,11 +15,11 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
   const { user } = useAuth();
   const [name, setName] = useState(project?.name ?? '');
   const [description, setDescription] = useState(project?.description ?? '');
-  const [ownerUserId, setOwnerUserId] = useState(project?.owner_user_id ?? '');
+  const [ownerUserId, setOwnerUserId] = useState<string | undefined>(project?.owner_user_id);
   const [startDate, setStartDate] = useState(project?.start_date ?? '');
   const [dueDate, setDueDate] = useState(project?.due_date ?? '');
   const [status, setStatus] = useState(project?.status ?? 'not_started');
-  const [departmentId, setDepartmentId] = useState(project?.department_id ?? '');
+  const [departmentId, setDepartmentId] = useState<string | undefined>(project?.department_id);
   const [visibility, setVisibility] = useState(project?.visibility ?? 'public');
   const [loading, setLoading] = useState(false);
   
@@ -31,11 +30,11 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
   useEffect(() => {
     setName(project?.name ?? '');
     setDescription(project?.description ?? '');
-    setOwnerUserId(project?.owner_user_id ?? '');
+    setOwnerUserId(project?.owner_user_id);
     setStartDate(project?.start_date ?? '');
     setDueDate(project?.due_date ?? '');
     setStatus(project?.status ?? 'not_started');
-    setDepartmentId(project?.department_id ?? '');
+    setDepartmentId(project?.department_id);
     setVisibility(project?.visibility ?? 'public');
   }, [project]);
 
@@ -150,112 +149,100 @@ export default function ProjectForm({ project, onSaved, onCancel }: { project?: 
   }
 
   return (
-    <div className="relative">
-      {onCancel && (
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          className="absolute right-0 top-0"
-          onClick={onCancel}
-        >
-          <X className="h-4 w-4" />
+    <form onSubmit={handleSubmit} className="grid gap-4">
+      <div className="grid gap-2">
+        <Label>Nome</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} required />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Descrição</Label>
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Responsável</Label>
+        <Select value={ownerUserId} onValueChange={setOwnerUserId} required>
+          <SelectTrigger className="rounded-xl">
+            <SelectValue placeholder="Selecione um responsável" />
+          </SelectTrigger>
+          <SelectContent>
+            {users.map((u) => (
+              <SelectItem key={u.id} value={u.id}>
+                {u.name || u.email}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Departamento (opcional)</Label>
+        <Select value={departmentId} onValueChange={(val) => setDepartmentId(val || undefined)}>
+          <SelectTrigger className="rounded-xl">
+            <SelectValue placeholder="Selecione um departamento" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">Sem departamento</SelectItem>
+            {departments.map((d) => (
+              <SelectItem key={d.id} value={d.id}>
+                {d.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Visibilidade</Label>
+        <Select value={visibility} onValueChange={setVisibility}>
+          <SelectTrigger className="rounded-xl">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="public">Público - visível para todos</SelectItem>
+            <SelectItem value="private">Privado - visível apenas para membros</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div>
+          <Label>Data de início</Label>
+          <Input type="date" value={startDate ?? ''} onChange={(e) => setStartDate(e.target.value)} />
+        </div>
+        <div>
+          <Label>Prazo final</Label>
+          <Input type="date" value={dueDate ?? ''} onChange={(e) => setDueDate(e.target.value)} />
+        </div>
+      </div>
+
+      <div className="grid gap-2">
+        <Label>Status</Label>
+        <Select value={status} onValueChange={setStatus}>
+          <SelectTrigger className="rounded-xl">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="not_started">Não iniciado</SelectItem>
+            <SelectItem value="on_track">No prazo</SelectItem>
+            <SelectItem value="at_risk">Em risco</SelectItem>
+            <SelectItem value="delayed">Atrasado</SelectItem>
+            <SelectItem value="completed">Concluído</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex gap-2">
+        <Button type="submit" className="rounded-xl" disabled={loading}>
+          {loading ? 'Salvando...' : project ? 'Salvar' : 'Criar projeto'}
         </Button>
-      )}
-      <form onSubmit={handleSubmit} className="grid gap-4">
-        <div className="grid gap-2">
-          <Label>Nome</Label>
-          <Input value={name} onChange={(e) => setName(e.target.value)} required />
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Descrição</Label>
-          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Responsável</Label>
-          <Select value={ownerUserId} onValueChange={setOwnerUserId} required>
-            <SelectTrigger className="rounded-xl">
-              <SelectValue placeholder="Selecione um responsável" />
-            </SelectTrigger>
-            <SelectContent>
-              {users.map((u) => (
-                <SelectItem key={u.id} value={u.id}>
-                  {u.name || u.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Departamento (opcional)</Label>
-          <Select value={departmentId || "__none__"} onValueChange={(val) => setDepartmentId(val === "__none__" ? "" : val)}>
-            <SelectTrigger className="rounded-xl">
-              <SelectValue placeholder="Selecione um departamento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">Sem departamento</SelectItem>
-              {departments.map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Visibilidade</Label>
-          <Select value={visibility} onValueChange={setVisibility}>
-            <SelectTrigger className="rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="public">Público - visível para todos</SelectItem>
-              <SelectItem value="private">Privado - visível apenas para membros</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <Label>Data de início</Label>
-            <Input type="date" value={startDate ?? ''} onChange={(e) => setStartDate(e.target.value)} />
-          </div>
-          <div>
-            <Label>Prazo final</Label>
-            <Input type="date" value={dueDate ?? ''} onChange={(e) => setDueDate(e.target.value)} />
-          </div>
-        </div>
-
-        <div className="grid gap-2">
-          <Label>Status</Label>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="rounded-xl">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="not_started">Não iniciado</SelectItem>
-              <SelectItem value="on_track">No prazo</SelectItem>
-              <SelectItem value="at_risk">Em risco</SelectItem>
-              <SelectItem value="delayed">Atrasado</SelectItem>
-              <SelectItem value="completed">Concluído</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex gap-2">
-          <Button type="submit" className="rounded-xl" disabled={loading}>
-            {loading ? 'Salvando...' : project ? 'Salvar' : 'Criar projeto'}
+        {onCancel && (
+          <Button type="button" variant="outline" className="rounded-xl" onClick={onCancel}>
+            Cancelar
           </Button>
-          {onCancel && (
-            <Button type="button" variant="outline" className="rounded-xl" onClick={onCancel}>
-              Cancelar
-            </Button>
-          )}
-        </div>
-      </form>
-    </div>
+        )}
+      </div>
+    </form>
   );
 }

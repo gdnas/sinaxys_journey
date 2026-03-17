@@ -27,16 +27,14 @@ export default function ProjetoDetail() {
       
       setLoadingDetails(true);
       try {
-        // Load project with owner and department
+        // ETAPA 1: Load project without embed
         const { data: projData, error: projError } = await supabase
           .from('projects')
           .select(`
             *,
-            owner:profiles!fk_projects_owner_user_id(id, name, avatar_url),
             project_members:project_members(
               user_id,
-              role_in_project,
-              user:profiles!fk_project_members_user_id(id, name, avatar_url)
+              role_in_project
             )
           `)
           .eq('id', projectId)
@@ -44,7 +42,18 @@ export default function ProjetoDetail() {
 
         if (projError) throw projError;
         
-        // Load department separately since there's no FK constraint
+        // ETAPA 2: Load owner profile
+        let ownerProfile = null;
+        if (projData?.owner_user_id) {
+          const { data: owner } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .eq('id', projData.owner_user_id)
+            .maybeSingle();
+          ownerProfile = owner;
+        }
+        
+        // ETAPA 3: Load department
         let departmentData = null;
         if (projData?.department_id) {
           const { data: dept } = await supabase
@@ -55,7 +64,27 @@ export default function ProjetoDetail() {
           departmentData = dept;
         }
         
-        const projWithDept = { ...projData, department: departmentData };
+        // ETAPA 4: Load member profiles
+        let membersWithProfiles = projData.project_members ?? [];
+        if (membersWithProfiles.length > 0) {
+          const userIds = membersWithProfiles.map((m: any) => m.user_id);
+          const { data: memberProfiles } = await supabase
+            .from('profiles')
+            .select('id, name, avatar_url')
+            .in('id', userIds);
+          const profilesMap = (memberProfiles ?? []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
+          membersWithProfiles = membersWithProfiles.map((m: any) => ({
+            ...m,
+            user: profilesMap[m.user_id] ?? null
+          }));
+        }
+        
+        const projWithRelations = { 
+          ...projData, 
+          owner: ownerProfile, 
+          department: departmentData,
+          project_members: membersWithProfiles
+        };
         
         // Load tasks count
         const { count, error: countError } = await supabase
@@ -65,7 +94,7 @@ export default function ProjetoDetail() {
 
         if (countError) throw countError;
 
-        setProjectWithRelations(projWithDept);
+        setProjectWithRelations(projWithRelations);
         setTasksCount(count ?? 0);
       } catch (err: any) {
         toast({ title: 'Erro ao carregar detalhes', description: err.message || String(err), variant: 'destructive' });

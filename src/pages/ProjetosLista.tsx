@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { FolderKanban, Plus, Search, Filter, X } from "lucide-react";
+import { FolderKanban, Plus, Search, Filter } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +10,12 @@ import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectForm from "@/components/projects/ProjectForm";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function ProjetosLista() {
   const { t } = useTranslation();
@@ -25,11 +31,11 @@ export default function ProjetosLista() {
     setLoading(true);
     setError(null);
     try {
+      // ETAPA 1: Buscar projetos sem embed de profiles
       let q = supabase
         .from("projects")
         .select(`
           *,
-          owner_profile:profiles!fk_projects_owner_user_id(id, name, avatar_url),
           project_member_count:project_members(count)
         `);
       
@@ -42,8 +48,21 @@ export default function ProjetosLista() {
       
       const rows = (data ?? []) as any[];
       
-      // Fetch departments for projects that have one
+      // ETAPA 2: Extrair IDs e buscar relacionados separadamente
+      const ownerIds = rows.map(r => r.owner_user_id);
       const departmentIds = rows.filter(r => r.department_id).map(r => r.department_id);
+      
+      // Buscar profiles (owners)
+      let profilesMap: Record<string, { name: string | null; avatar_url: string | null }> = {};
+      if (ownerIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from("profiles")
+          .select("id, name, avatar_url")
+          .in("id", ownerIds);
+        profilesMap = (profiles ?? []).reduce((acc, p) => ({ ...acc, [p.id]: { name: p.name, avatar_url: p.avatar_url } }), {});
+      }
+      
+      // Buscar departments
       let departmentsMap: Record<string, string> = {};
       if (departmentIds.length > 0) {
         const { data: departments } = await supabase
@@ -53,10 +72,12 @@ export default function ProjetosLista() {
         departmentsMap = (departments ?? []).reduce((acc, d) => ({ ...acc, [d.id]: d.name }), {});
       }
       
+      // ETAPA 3: Montar objeto final com dados relacionados
       const mapped = rows.map((r) => ({
         ...r,
         member_count: r.project_member_count?.[0]?.count ?? 0,
-        owner_name: r.owner_profile?.name ?? null,
+        owner_name: profilesMap[r.owner_user_id]?.name ?? null,
+        owner_avatar_url: profilesMap[r.owner_user_id]?.avatar_url ?? null,
         department_name: r.department_id ? (departmentsMap[r.department_id] ?? null) : null,
       }));
       
@@ -148,21 +169,17 @@ export default function ProjetosLista() {
       )}
 
       {/* Create dialog */}
-      {showCreate && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={() => setShowCreate(false)}>
-          <div className="w-full max-w-2xl p-6" onClick={(e) => e.stopPropagation()}>
-            <Card className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Novo projeto</h3>
-              </div>
-              <ProjectForm 
-                onSaved={(p) => { setShowCreate(false); fetchProjects(); }} 
-                onCancel={() => setShowCreate(false)} 
-              />
-            </Card>
-          </div>
-        </div>
-      )}
+      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Novo projeto</DialogTitle>
+          </DialogHeader>
+          <ProjectForm 
+            onSaved={(p) => { setShowCreate(false); fetchProjects(); }} 
+            onCancel={() => setShowCreate(false)} 
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
