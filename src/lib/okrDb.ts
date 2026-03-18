@@ -130,6 +130,25 @@ export interface DbCompanyFundamentals {
 export type KrConfidence = 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
 export type KrKind = 'METRIC' | 'DELIVERABLE';
 
+export type PiKind = 'BOOLEAN' | 'COUNTER' | 'CURRENCY' | 'PERCENTAGE' | 'NUMBER' | 'METRIC';
+export type PiConfidence = 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
+
+export interface DbPerformanceIndicator {
+  id: string;
+  key_result_id?: string;
+  objective_id?: string;
+  title: string;
+  kind: PiKind;
+  confidence: PiConfidence;
+  achieved: boolean;
+  unit?: string | null;
+  metric_unit?: string | null;
+  start_value?: number | null;
+  current_value?: number | null;
+  target_value?: number | null;
+  due_at?: string | null;
+}
+
 export type TaskSourceType = 'project' | 'deliverable' | 'okr' | 'unknown';
 
 // Função auxiliar para determinar o tipo de tarefa
@@ -240,5 +259,9 @@ export async function listKrChangeLogs(krId: string): Promise<DbKrChangeLog[]> {
 }
 
 export function krProgressPct(kr: DbOkrKeyResult): number | null {
+  return null;
+}
+
+export function piProgressPct(pi: DbPerformanceIndicator): number | null {
   return null;
 }
