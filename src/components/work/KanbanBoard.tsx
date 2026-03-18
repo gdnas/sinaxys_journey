@@ -12,6 +12,7 @@ import { useKanban, KanbanTask, TaskStatus } from '@/hooks/useKanban';
 import KanbanColumn from './KanbanColumn';
 import KanbanTaskCard from './KanbanTaskCard';
 import WorkItemForm from './WorkItemForm';
+import KanbanTaskDialog from './KanbanTaskDialog';
 import { Card } from '@/components/ui/card';
 
 interface KanbanBoardProps {
@@ -42,6 +43,7 @@ export default function KanbanBoard({
   } = useKanban(projectId);
 
   const [showCreate, setShowCreate] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
   const [localTasks, setLocalTasks] = useState<KanbanTask[]>(tasks);
 
@@ -103,6 +105,10 @@ export default function KanbanBoard({
     [localTasks, moveTask, onRefresh]
   );
 
+  const handleTaskClick = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId);
+  }, []);
+
   const groupedTasks = groupTasksByStatus(localTasks);
 
   if (loading) {
@@ -131,6 +137,7 @@ export default function KanbanBoard({
                 tasks={groupedTasks[status]}
                 projectId={projectId}
                 taskCount={groupedTasks[status].length}
+                onTaskClick={handleTaskClick}
               />
             ))}
           </div>
@@ -164,6 +171,15 @@ export default function KanbanBoard({
           </div>
         </div>
       )}
+
+      {/* Task View/Edit Dialog */}
+      <KanbanTaskDialog
+        taskId={selectedTaskId ?? ''}
+        projectId={projectId}
+        open={!!selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        onRefresh={onRefresh}
+      />
     </>
   );
 }

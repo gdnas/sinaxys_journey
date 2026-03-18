@@ -11,9 +11,10 @@ interface KanbanColumnProps {
   tasks: KanbanTask[];
   projectId: string;
   taskCount?: number;
+  onTaskClick?: (taskId: string) => void;
 }
 
-export default function KanbanColumn({ status, label, tasks, projectId, taskCount }: KanbanColumnProps) {
+export default function KanbanColumn({ status, label, tasks, projectId, taskCount, onTaskClick }: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
   });
@@ -46,7 +47,12 @@ export default function KanbanColumn({ status, label, tasks, projectId, taskCoun
                 </div>
               ) : (
                 tasks.map((task) => (
-                  <KanbanTaskCard key={task.id} task={task} projectId={projectId} />
+                  <KanbanTaskCard
+                    key={task.id}
+                    task={task}
+                    projectId={projectId}
+                    onTaskClick={onTaskClick}
+                  />
                 ))
               )}
             </div>

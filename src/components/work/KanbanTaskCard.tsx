@@ -10,9 +10,10 @@ interface KanbanTaskCardProps {
   task: KanbanTask;
   projectId: string;
   isDragging?: boolean;
+  onTaskClick?: (taskId: string) => void;
 }
 
-export default function KanbanTaskCard({ task, projectId, isDragging }: KanbanTaskCardProps) {
+export default function KanbanTaskCard({ task, projectId, isDragging, onTaskClick }: KanbanTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -38,17 +39,27 @@ export default function KanbanTaskCard({ task, projectId, isDragging }: KanbanTa
 
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done';
 
+  const handleCardClick = () => {
+    if (onTaskClick && !isSortableDragging) {
+      onTaskClick(task.id);
+    }
+  };
+
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <Card
-        className={`p-3 cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow ${
+        className={`p-3 hover:shadow-md transition-shadow cursor-pointer ${
           isDragging ? 'ring-2 ring-primary' : ''
         }`}
-        {...listeners}
+        onClick={handleCardClick}
       >
         {/* Drag handle */}
         <div className="flex items-start gap-2">
-          <div className="mt-1 text-muted-foreground">
+          <div
+            className="mt-1 text-muted-foreground cursor-grab active:cursor-grabbing"
+            {...listeners}
+            onClick={(e) => e.stopPropagation()}
+          >
             <GripVertical className="h-4 w-4" />
           </div>
 
