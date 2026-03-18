@@ -27,6 +27,19 @@ export interface DbTaskWithSource {
 
 export interface DbTaskWithContext extends DbTaskWithSource {
   objective_id?: string;
+  objective_title?: string;
+}
+
+export interface DbOkrCycle {
+  id: string;
+  type: 'QUARTERLY' | 'YEARLY';
+  status: 'ACTIVE' | 'CLOSED';
+}
+
+export interface DbOkrObjective {
+  id: string;
+  level: string;
+  department_id?: string;
 }
 
 export type TaskSourceType = 'project' | 'deliverable' | 'okr' | 'unknown';
@@ -37,4 +50,36 @@ export function getTaskSourceType(task: DbTaskWithSource): TaskSourceType {
   if (task.key_result_id) return 'okr';
   if (task.project_id) return 'project';
   return 'unknown';
+}
+
+// Funções stub para listagem (TODO: implementar com Supabase)
+export async function listOkrCycles(companyId: string): Promise<DbOkrCycle[]> {
+  return [];
+}
+
+export async function listOkrObjectives(companyId: string, cycleId: string): Promise<DbOkrObjective[]> {
+  return [];
+}
+
+export async function listTasksForUser(
+  companyId: string,
+  userId: string,
+  options: { from: string; to: string }
+): Promise<DbTaskWithContext[]> {
+  return [];
+}
+
+export async function listTasksForCompany(
+  companyId: string,
+  options: { from: string; to: string }
+): Promise<DbTaskWithContext[]> {
+  return [];
+}
+
+export async function listTasksForDepartment(
+  companyId: string,
+  departmentId: string,
+  options: { from: string; to: string }
+): Promise<DbTaskWithContext[]> {
+  return [];
 }
