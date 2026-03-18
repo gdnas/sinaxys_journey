@@ -4,9 +4,10 @@ import { DepartmentMultiSelect } from "@/components/okr/DepartmentMultiSelect";
 import { UserMultiSelect } from "@/components/okr/UserMultiSelect";
 import { TaskHierarchyView } from "@/components/okr/TaskHierarchyView";
 import { DeliverableTimeline } from "@/components/okr/DeliverableTimeline";
+import KanbanTaskDialog from "@/components/work/KanbanTaskDialog";
 import { useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp, ChevronRight, ListChecks, KeyRound, Pencil, Plus, Target, Trash2, Link2, Unlink2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Circle, ChevronDown, ChevronUp, ChevronRight, ListChecks, KeyRound, Pencil, Plus, Target, Trash2, Link2, Unlink2, ExternalLink } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ import {
   listOkrObjectives,
   listOkrObjectivesByIds,
   listTasksByDeliverableIds,
+  listTasksByKeyResultIds,
   updateKeyResult,
   updateOkrObjective,
   updateTask,
@@ -288,9 +290,9 @@ export default function OkrObjectiveDetail() {
   const deliverableIds = useMemo(() => deliverables.map((d) => d.id), [deliverables]);
 
   const { data: tasks = [] } = useQuery({
-    queryKey: ["okr-tasks-for-objective", objectiveId, deliverableIds.join(",")],
-    enabled: deliverableIds.length > 0,
-    queryFn: () => listTasksByDeliverableIds(deliverableIds),
+    queryKey: ["okr-tasks-for-objective", objectiveId, krIds.join(",")],
+    enabled: krIds.length > 0,
+    queryFn: () => listTasksByKeyResultIds(krIds),
   });
 
   const { data: profiles = [] } = useQuery({
@@ -327,9 +329,21 @@ export default function OkrObjectiveDetail() {
   const tasksByDeliverableId = useMemo(() => {
     const m = new Map<string, DbTask[]>();
     for (const t of tasks) {
+      if (!t.deliverable_id) continue;
       const arr = m.get(t.deliverable_id) ?? [];
       arr.push(t);
       m.set(t.deliverable_id, arr);
+    }
+    return m;
+  }, [tasks]);
+
+  const tasksByKeyResultId = useMemo(() => {
+    const m = new Map<string, DbTask[]>();
+    for (const t of tasks) {
+      if (!t.key_result_id) continue;
+      const arr = m.get(t.key_result_id) ?? [];
+      arr.push(t);
+      m.set(t.key_result_id, arr);
     }
     return m;
   }, [tasks]);
@@ -400,20 +414,22 @@ export default function OkrObjectiveDetail() {
   const [taskMode, setTaskMode] = useState<"create" | "edit">("create");
   const [taskEditingId, setTaskEditingId] = useState<string | null>(null);
   const [taskDeliverableId, setTaskDeliverableId] = useState<string | null>(null);
+  const [taskKeyResultId, setTaskKeyResultId] = useState<string | null>(null);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskDesc, setTaskDesc] = useState("");
   const [taskOwner, setTaskOwner] = useState<string>(user.id);
   const [taskDue, setTaskDue] = useState<string>("");
   const [taskEstimate, setTaskEstimate] = useState<string>("");
   const [taskSaving, setTaskSaving] = useState(false);
-
   const [taskDeleteOpen, setTaskDeleteOpen] = useState(false);
   const [taskDeleteId, setTaskDeleteId] = useState<string | null>(null);
+  const [taskDetailId, setTaskDetailId] = useState<string | null>(null);
 
   const resetTask = () => {
     setTaskMode("create");
     setTaskEditingId(null);
     setTaskDeliverableId(null);
+    setTaskKeyResultId(null);
     setTaskTitle("");
     setTaskDesc("");
     setTaskOwner(user.id);
@@ -735,6 +751,7 @@ export default function OkrObjectiveDetail() {
               kr={kr}
               deliverables={deliverablesByKrId.get(kr.id) ?? []}
               tasksByDeliverableId={tasksByDeliverableId}
+              tasksByKeyResultId={tasksByKeyResultId}
               byUserId={byUserId}
               profileById={profileById}
               canWrite={canWrite}
@@ -780,17 +797,19 @@ export default function OkrObjectiveDetail() {
                 setLinkObjectiveId(SELECT_NONE);
                 setLinkOpen(true);
               }}
-              onAddTask={(deliverableId) => {
+              onAddTask={(keyResultId, deliverableId) => {
                 resetTask();
                 setTaskMode("create");
-                setTaskDeliverableId(deliverableId);
+                setTaskKeyResultId(keyResultId);
+                setTaskDeliverableId(deliverableId ?? null);
                 setTaskOpen(true);
               }}
               onEditTask={(t) => {
                 resetTask();
                 setTaskMode("edit");
                 setTaskEditingId(t.id);
-                setTaskDeliverableId(t.deliverable_id);
+                setTaskKeyResultId(t.key_result_id ?? null);
+                setTaskDeliverableId(t.deliverable_id ?? null);
                 setTaskTitle(t.title);
                 setTaskDesc(t.description ?? "");
                 setTaskOwner(t.owner_user_id);
@@ -802,7 +821,11 @@ export default function OkrObjectiveDetail() {
                 setTaskDeleteId(t.id);
                 setTaskDeleteOpen(true);
               }}
+              onOpenTask={(t) => {
+                setTaskDetailId(t.id);
+              }}
               onToggleTask={toggleTaskDone}
+
               onDeleteKr={() => {
                 setDeleteKrId(kr.id);
                 setDeleteKrOpen(true);
@@ -992,6 +1015,16 @@ export default function OkrObjectiveDetail() {
         </DialogContent>
       </Dialog>
 
+      <KanbanTaskDialog
+        taskId={taskDetailId ?? ""}
+        projectId={tasks.find((item) => item.id === taskDetailId)?.project_id ?? ""}
+        open={!!taskDetailId}
+        onClose={() => setTaskDetailId(null)}
+        onRefresh={() => {
+          void qc.invalidateQueries({ queryKey: ["okr-tasks-for-objective", objectiveId] });
+        }}
+      />
+
       <Dialog
         open={delOpen}
         onOpenChange={(v) => {
@@ -1160,14 +1193,14 @@ export default function OkrObjectiveDetail() {
               className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
               disabled={
                 (!canWrite && taskMode === "create") ||
-                !taskDeliverableId ||
+                (!taskDeliverableId && !taskKeyResultId) ||
                 taskTitle.trim().length < 4 ||
                 !taskBusinessOk ||
                 taskSaving ||
                 (taskMode === "edit" && (!taskEditingId || !(canWrite || taskOwner === user.id)))
               }
               onClick={async () => {
-                if (!taskDeliverableId || taskSaving) return;
+                if ((!taskDeliverableId && !taskKeyResultId) || taskSaving) return;
 
                 setTaskSaving(true);
                 try {
@@ -1193,7 +1226,9 @@ export default function OkrObjectiveDetail() {
                   if (!canWrite) return;
 
                   await createTask({
+                    key_result_id: taskKeyResultId,
                     deliverable_id: taskDeliverableId,
+                    project_id: null,
                     parent_task_id: null,
                     depth: 0,
                     level_type: "TASK",
@@ -1222,7 +1257,7 @@ export default function OkrObjectiveDetail() {
                 }
               }}
             >
-              {taskMode === "edit" ? "Salvar" : "Criar"}
+              Salvar
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1351,6 +1386,7 @@ function KrCard({
   kr,
   deliverables,
   tasksByDeliverableId,
+  tasksByKeyResultId,
   byUserId,
   profileById,
   canWrite,
@@ -1365,14 +1401,17 @@ function KrCard({
   onAddTask,
   onEditTask,
   onDeleteTask,
+  onOpenTask,
   onToggleTask,
   onDeleteKr,
+
   canAddDeliverable,
   objectiveId,
 }: {
   kr: DbOkrKeyResult;
   deliverables: DbDeliverable[];
   tasksByDeliverableId: Map<string, DbTask[]>;
+  tasksByKeyResultId: Map<string, DbTask[]>;
   byUserId: Map<string, string>;
   profileById: Map<string, { name: string; monthlyCostBRL: number | null; avatarUrl?: string | null }>;
   canWrite: boolean;
@@ -1384,10 +1423,12 @@ function KrCard({
   linkedObjectives: { id: string; objectiveId: string }[];
   objectiveTitleById: Map<string, string>;
   onUnlinkObjective: (linkId: string, tier2ObjectiveId: string) => void;
-  onAddTask: (deliverableId: string) => void;
+  onAddTask: (keyResultId: string, deliverableId?: string | null) => void;
   onEditTask: (t: DbTask) => void;
   onDeleteTask: (t: DbTask) => void;
+  onOpenTask: (t: DbTask) => void;
   onToggleTask: (t: DbTask) => void;
+
   onDeleteKr: () => void;
   canAddDeliverable: boolean;
   objectiveId: string;
@@ -1417,6 +1458,7 @@ function KrCard({
   const pct = krProgressPct(kr);
   const unit = kr.metric_unit?.trim() ?? "";
   const unitSuffix = unit ? ` ${unit}` : "";
+  const directKrTasks = (tasksByKeyResultId.get(kr.id) ?? []).filter((task) => !task.deliverable_id);
 
   const [open, setOpen] = useState(true);
 
@@ -1577,12 +1619,121 @@ function KrCard({
               Entregável
             </Button>
           ) : null}
+
+          {canWrite ? (
+            <Button variant="outline" className="h-11 rounded-xl bg-white" onClick={() => onAddTask(kr.id, null)} title="Criar tarefa diretamente neste KR">
+              <Plus className="mr-2 h-4 w-4" />
+              Tarefa KR
+            </Button>
+          ) : null}
         </div>
       </div>
 
       {open ? (
               <>
                 <Separator className="my-5" />
+
+                {directKrTasks.length ? (
+                  <div className="mb-4 grid gap-2 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4">
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Tarefas ligadas diretamente ao KR</div>
+                    {directKrTasks.map((t) => {
+                      const editable = canEditTask(t);
+                      return (
+                        <div
+                          key={t.id}
+                          role={editable ? "button" : undefined}
+                          tabIndex={editable ? 0 : -1}
+                          className={
+                            "group flex w-full items-start gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-3 text-left transition" +
+                            (editable ? " cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/40" : " opacity-80")
+                          }
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (!editable) return;
+                            onToggleTask(t);
+                          }}
+                        >
+                          <div className="mt-0.5 text-[color:var(--sinaxys-primary)]">
+                            {t.status === "DONE" ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]" title={t.title}>{t.title}</div>
+                              <div className="flex items-center gap-2">
+                                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{statusLabel(t.status)}</Badge>
+                                {editable ? (
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onOpenTask(t);
+                                      }}
+                                      title="Abrir detalhes"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onEditTask(t);
+                                      }}
+
+                                      title="Editar tarefa"
+                                    >
+                                      <Pencil className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onDeleteTask(t);
+                                      }}
+                                      title="Excluir tarefa"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      onOpenTask(t);
+                                    }}
+                                    title="Abrir detalhes"
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+
+                                )}
+                              </div>
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">Resp.: {byUserId.get(t.owner_user_id) ?? "—"} • Sem entregável</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : null}
       
                 {/* Timeline de Gantt para os entregáveis */}
                 <DeliverableTimeline
@@ -1621,7 +1772,7 @@ function KrCard({
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          onAddTask(d.id);
+                          onAddTask(kr.id, d.id);
                         }}
                       >
                         <Plus className="mr-2 h-4 w-4" />
@@ -1675,8 +1826,23 @@ function KrCard({
                                         onClick={(e) => {
                                           e.preventDefault();
                                           e.stopPropagation();
+                                          onOpenTask(t);
+                                        }}
+                                        title="Abrir detalhes"
+                                      >
+                                        <ExternalLink className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          e.stopPropagation();
                                           onEditTask(t);
                                         }}
+
                                         title="Editar tarefa"
                                       >
                                         <Pencil className="h-4 w-4" />
@@ -1696,7 +1862,23 @@ function KrCard({
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
                                     </div>
-                                  ) : null}
+                                  ) : (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        onOpenTask(t);
+                                      }}
+                                      title="Abrir detalhes"
+                                    >
+                                      <ExternalLink className="h-4 w-4" />
+                                    </Button>
+
+                                  )}
                                 </div>
                               </div>
                               <div className="mt-1 text-xs text-muted-foreground">Resp.: {byUserId.get(t.owner_user_id) ?? "—"}</div>

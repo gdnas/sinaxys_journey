@@ -19,7 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface KanbanTaskDialogProps {
   taskId: string;
-  projectId: string;
+  projectId?: string;
   open: boolean;
   onClose: () => void;
   onRefresh?: () => void;
@@ -51,7 +51,6 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
     if (open && taskId) {
       loadTask();
       loadUsers();
-      // If commentId is provided, switch to comments tab and highlight
       if (commentId) {
         setActiveTab('comments');
         setHighlightCommentId(commentId);
@@ -149,8 +148,18 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
     }
   };
 
+  const detailHref = task?.project_id
+    ? `/app/projetos/${task.project_id}/tarefas/${taskId}/editar`
+    : task?.deliverable_id
+      ? `/okr/entregaveis/${task.deliverable_id}?taskId=${taskId}`
+      : projectId
+        ? `/app/projetos/${projectId}/tarefas/${taskId}/editar`
+        : null;
+
   const handleGoToPage = () => {
-    navigate(`/app/projetos/${projectId}/tarefas/${taskId}/editar`);
+    if (detailHref) {
+      navigate(detailHref);
+    }
   };
 
   const handleCommentsUpdate = () => {
@@ -175,28 +184,26 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
         <Card className="border-border/50 shadow-xl">
-          {/* Header - Task View Style */}
           <div className="p-6 border-b border-border/50">
             <div className="flex items-start justify-between gap-4 mb-4">
-              {/* Status and Priority */}
               <div className="flex items-center gap-2">
                 <WorkItemStatusBadge status={status} />
                 <WorkItemPriorityBadge priority={priority} />
               </div>
 
-              {/* Actions */}
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={handleGoToPage} className="text-muted-foreground hover:text-foreground">
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Página completa
-                </Button>
+                {detailHref ? (
+                  <Button variant="ghost" size="sm" onClick={handleGoToPage} className="text-muted-foreground hover:text-foreground">
+                    <ExternalLink className="mr-2 h-4 w-4" />
+                    Página completa
+                  </Button>
+                ) : null}
                 <Button variant="ghost" size="icon" onClick={onClose}>
                   <X className="h-4 w-4" />
                 </Button>
               </div>
             </div>
 
-            {/* Title - Inline Edit */}
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -209,7 +216,6 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
             <div className="p-6 text-center">Carregando...</div>
           ) : (
             <div className="p-6 space-y-6">
-              {/* Description - Inline Edit */}
               <div className="space-y-2">
                 <Label className="text-sm font-medium text-muted-foreground">Descrição</Label>
                 <Textarea
@@ -221,9 +227,7 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                 />
               </div>
 
-              {/* Properties Grid */}
               <div className="grid sm:grid-cols-2 gap-4">
-                {/* Status */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-muted-foreground">Status</Label>
                   <Select value={status} onValueChange={setStatus}>
@@ -240,7 +244,6 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                   </Select>
                 </div>
 
-                {/* Priority */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-muted-foreground">Prioridade</Label>
                   <Select value={priority} onValueChange={setPriority}>
@@ -256,7 +259,6 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                   </Select>
                 </div>
 
-                {/* Assignee */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-muted-foreground">Responsável</Label>
                   <Select value={assigneeUserId} onValueChange={setAssigneeUserId}>
@@ -274,14 +276,12 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                   </Select>
                 </div>
 
-                {/* Due Date */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium text-muted-foreground">Prazo final</Label>
                   <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 </div>
               </div>
 
-              {/* Tabs for Subtasks, Comments, Timeline */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="subtasks">Subtarefas</TabsTrigger>
@@ -313,7 +313,6 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                 </TabsContent>
               </Tabs>
 
-              {/* Meta Info */}
               <div className="bg-muted/30 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="h-4 w-4 text-muted-foreground" />
@@ -335,7 +334,6 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                 )}
               </div>
 
-              {/* Actions */}
               <div className="flex items-center justify-between pt-4 border-t border-border/50">
                 <Button variant="outline" onClick={onClose}>
                   Cancelar

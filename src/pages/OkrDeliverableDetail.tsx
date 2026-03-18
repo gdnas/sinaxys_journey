@@ -1,6 +1,6 @@
 import { TaskHierarchyView } from "@/components/okr/TaskHierarchyView";
-import { useMemo, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ArrowLeft,
@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   Circle,
+  ExternalLink,
   ListChecks,
   Pencil,
   Plus,
@@ -36,11 +37,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
+import KanbanTaskDialog from "@/components/work/KanbanTaskDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { listProfilesByCompany } from "@/lib/profilesDb";
 import {
+  createTask,
   deleteDeliverable,
   deleteTask,
   listTasksByDeliverableIds,
@@ -149,10 +152,11 @@ async function getKeyResultObjectiveId(keyResultId: string) {
 
 export default function OkrDeliverableDetail() {
   const { deliverableId } = useParams();
-  const { user } = useAuth();
-  const { companyId } = useCompany();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const qc = useQueryClient();
+  const { user } = useAuth();
+  const { companyId } = useCompany();
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [taskOpen, setTaskOpen] = useState(false);
@@ -170,13 +174,19 @@ export default function OkrDeliverableDetail() {
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
 
   const [stepOpen, setStepOpen] = useState(false);
-  const [stepMode, setStepMode] = useState<"add" | "edit">("add");
   const [stepTaskId, setStepTaskId] = useState<string | null>(null);
   const [stepParentId, setStepParentId] = useState<string | null>(null);
   const [stepEditId, setStepEditId] = useState<string | null>(null);
-  const [stepDepth, setStepDepth] = useState<number>(1);
+  const [stepDepth, setStepDepth] = useState(1);
+  const [stepMode, setStepMode] = useState<"add" | "edit">("add");
   const [stepTitle, setStepTitle] = useState("");
   const [stepSaving, setStepSaving] = useState(false);
+  const [taskDetailId, setTaskDetailId] = useState<string | null>(searchParams.get("taskId"));
+  const highlightedCommentId = searchParams.get("commentId") ?? undefined;
+
+  useEffect(() => {
+    setTaskDetailId(searchParams.get("taskId"));
+  }, [searchParams]);
 
   if (!deliverableId || !user) return null;
 
@@ -606,7 +616,24 @@ export default function OkrDeliverableDetail() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setTaskDetailId(t.id);
+                                }}
+                                title="Abrir detalhes"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  resetTask();
                                   setTaskMode("edit");
                                   setTaskEditingId(t.id);
                                   setTaskTitle(t.title);
@@ -624,7 +651,9 @@ export default function OkrDeliverableDetail() {
                                 variant="ghost"
                                 size="icon"
                                 className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => {
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
                                   setTaskDeleteId(t.id);
                                   setTaskDeleteOpen(true);
                                 }}
@@ -632,8 +661,24 @@ export default function OkrDeliverableDetail() {
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
+
                             </>
-                          ) : null}
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-9 w-9 rounded-xl text-muted-foreground hover:bg-[color:var(--sinaxys-tint)] hover:text-[color:var(--sinaxys-ink)]"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setTaskDetailId(t.id);
+                              }}
+                              title="Abrir detalhes"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
 
@@ -772,8 +817,13 @@ export default function OkrDeliverableDetail() {
                 setTaskSaving(true);
                 try {
                   if (taskMode === "create") {
-                    const { error } = await supabase.from("okr_tasks").insert({
+                    await createTask({
+                      key_result_id: deliverable?.key_result_id ?? null,
                       deliverable_id: deliverableId,
+                      project_id: null,
+                      parent_task_id: null,
+                      depth: 0,
+                      level_type: "TASK",
                       title: taskTitle.trim(),
                       description: taskDesc.trim() ? taskDesc.trim() : null,
                       owner_user_id: taskOwner,
@@ -781,8 +831,10 @@ export default function OkrDeliverableDetail() {
                       due_date: taskDue.trim() || null,
                       estimate_minutes: null,
                       checklist: null,
+                      estimated_value_brl: null,
+                      estimated_cost_brl: null,
+                      estimated_roi_pct: null,
                     });
-                    if (error) throw error;
                     toast({ title: "Tarefa criada" });
                   } else {
                     if (!taskEditingId) return;
@@ -814,6 +866,17 @@ export default function OkrDeliverableDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <KanbanTaskDialog
+        taskId={taskDetailId ?? ""}
+        projectId={tasks.find((item) => item.id === taskDetailId)?.project_id ?? ""}
+        open={!!taskDetailId}
+        onClose={() => setTaskDetailId(null)}
+        onRefresh={() => {
+          void qc.invalidateQueries({ queryKey: ["okr-tasks-for-deliverable", deliverableId] });
+        }}
+        commentId={highlightedCommentId}
+      />
 
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent className="rounded-3xl">

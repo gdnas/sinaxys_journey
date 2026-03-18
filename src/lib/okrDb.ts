@@ -476,7 +476,7 @@ export async function deleteDeliverable(deliverableId: string) {
 }
 
 export async function deleteTask(taskId: string) {
-  const { error } = await supabase.from("okr_tasks").delete().eq("id", taskId);
+  const { error } = await supabase.from("work_items").delete().eq("id", taskId);
   if (error) throw error;
 }
 
@@ -809,8 +809,11 @@ export async function createDeliverable(payload: Omit<DbDeliverable, "id" | "cre
 
 export type DbTask = {
   id: string;
-  deliverable_id: string;
+  key_result_id?: string | null;
+  deliverable_id: string | null;
+  project_id?: string | null;
   parent_task_id: string | null;
+
   depth: number | null;
   level_type: "TASK" | "LIST" | "CHECKLIST" | "CHECKLIST_ITEM" | null;
   title: string;
@@ -821,7 +824,6 @@ export type DbTask = {
   estimate_minutes: number | null;
   checklist: any;
   completed_at: string | null;
-  // Business case (optional)
   estimated_value_brl: number | null;
   estimated_cost_brl: number | null;
   estimated_roi_pct: number | null;
@@ -829,40 +831,226 @@ export type DbTask = {
   updated_at: string | null;
 };
 
-const taskSelect =
-  "id,deliverable_id,parent_task_id,depth,level_type,title,description,owner_user_id,status,due_date,estimate_minutes,checklist,completed_at,estimated_value_brl,estimated_cost_brl,estimated_roi_pct,created_at,updated_at";
+type WorkItemTaskRow = {
+  id: string;
+  key_result_id: string | null;
+  deliverable_id: string | null;
+  project_id: string | null;
+  parent_id: string | null;
+  title: string;
+  description: string | null;
+  assignee_user_id: string | null;
+  created_by_user_id: string;
+  status: string;
+  due_date: string | null;
+  start_date: string | null;
+  estimate_minutes: number | null;
+  checklist: any;
+  completed_at: string | null;
+  estimated_value_brl: number | null;
+  estimated_cost_brl: number | null;
+  estimated_roi_pct: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+const workItemTaskSelect =
+  "id,key_result_id,deliverable_id,project_id,parent_id,title,description,assignee_user_id,created_by_user_id,status,due_date,start_date,estimate_minutes,checklist,completed_at,estimated_value_brl,estimated_cost_brl,estimated_roi_pct,created_at,updated_at";
+
+function toLegacyTaskStatus(status: string | null | undefined): WorkStatus {
+  if (status === "done") return "DONE";
+  if (status === "in_progress" || status === "review" || status === "blocked") return "IN_PROGRESS";
+  return "TODO";
+}
+
+function toWorkItemTaskStatus(status: WorkStatus | undefined) {
+  if (status === "DONE") return "done";
+  if (status === "IN_PROGRESS") return "in_progress";
+  return "todo";
+}
+
+function levelTypeForDepth(depth: number): TaskLevelType {
+  if (depth <= 0) return "TASK";
+  if (depth === 1) return "LIST";
+  if (depth === 2) return "CHECKLIST";
+  return "CHECKLIST_ITEM";
+}
+
+function computeDepthMap(rows: WorkItemTaskRow[]) {
+  const rowsById = new Map(rows.map((row) => [row.id, row] as const));
+  const memo = new Map<string, number>();
+
+  const getDepth = (row: WorkItemTaskRow): number => {
+    if (memo.has(row.id)) return memo.get(row.id)!;
+    if (!row.parent_id) {
+      memo.set(row.id, 0);
+      return 0;
+    }
+
+    const parent = rowsById.get(row.parent_id);
+    const depth = parent ? getDepth(parent) + 1 : 0;
+    memo.set(row.id, depth);
+    return depth;
+  };
+
+  rows.forEach((row) => getDepth(row));
+  return memo;
+}
+
+function mapWorkItemRowsToLegacyTasks(rows: WorkItemTaskRow[]): DbTask[] {
+  const depthById = computeDepthMap(rows);
+
+  return rows.map((row) => {
+    const depth = depthById.get(row.id) ?? 0;
+    return {
+      id: row.id,
+      key_result_id: row.key_result_id,
+      deliverable_id: row.deliverable_id,
+      project_id: row.project_id,
+      parent_task_id: row.parent_id,
+      depth,
+      level_type: levelTypeForDepth(depth),
+      title: row.title,
+      description: row.description,
+      owner_user_id: row.assignee_user_id ?? row.created_by_user_id,
+      status: toLegacyTaskStatus(row.status),
+      due_date: row.due_date ? row.due_date.slice(0, 10) : null,
+      estimate_minutes: row.estimate_minutes,
+      checklist: row.checklist,
+      completed_at: row.completed_at,
+      estimated_value_brl: row.estimated_value_brl,
+      estimated_cost_brl: row.estimated_cost_brl,
+      estimated_roi_pct: row.estimated_roi_pct,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  });
+}
+
+function mapTaskContextRow<T extends Record<string, any>>(row: T): DbTask {
+  return mapWorkItemRowsToLegacyTasks([row as unknown as WorkItemTaskRow])[0];
+}
+
+function mapRpcTaskRow(row: any): DbTask {
+  return {
+    id: row.id,
+    key_result_id: row.key_result_id ?? null,
+    deliverable_id: row.deliverable_id ?? null,
+    project_id: row.project_id ?? null,
+    parent_task_id: row.parent_id ?? null,
+    depth: 0,
+    level_type: "TASK",
+    title: row.title,
+    description: row.description ?? null,
+    owner_user_id: row.owner_user_id,
+    status: toLegacyTaskStatus(row.status),
+    due_date: row.due_date ? String(row.due_date).slice(0, 10) : null,
+    estimate_minutes: row.estimate_minutes ?? null,
+    checklist: row.checklist ?? null,
+    completed_at: row.completed_at ?? null,
+    estimated_value_brl: row.estimated_value_brl ?? null,
+    estimated_cost_brl: row.estimated_cost_brl ?? null,
+    estimated_roi_pct: row.estimated_roi_pct ?? null,
+    created_at: row.created_at ?? null,
+    updated_at: row.updated_at ?? null,
+  };
+}
+
+async function resolveDeliverableTenantContext(deliverableId: string) {
+
+  const { data: deliverable, error: deliverableError } = await supabase
+    .from("okr_deliverables")
+    .select("id, key_result_id")
+    .eq("id", deliverableId)
+    .maybeSingle();
+  if (deliverableError || !deliverable) throw deliverableError ?? new Error("Entregável não encontrado");
+
+  const { data: keyResult, error: keyResultError } = await supabase
+    .from("okr_key_results")
+    .select("id, objective_id")
+    .eq("id", deliverable.key_result_id)
+    .maybeSingle();
+  if (keyResultError || !keyResult) throw keyResultError ?? new Error("KR não encontrado");
+
+  const { data: objective, error: objectiveError } = await supabase
+    .from("okr_objectives")
+    .select("company_id")
+    .eq("id", keyResult.objective_id)
+    .maybeSingle();
+  if (objectiveError || !objective) throw objectiveError ?? new Error("OKR não encontrado");
+
+  return {
+    tenantId: objective.company_id,
+    keyResultId: deliverable.key_result_id,
+    deliverableId: deliverable.id,
+  };
+}
+
+async function resolveKeyResultTenantContext(keyResultId: string) {
+  const { data: keyResult, error: keyResultError } = await supabase
+    .from("okr_key_results")
+    .select("id, objective_id")
+    .eq("id", keyResultId)
+    .maybeSingle();
+  if (keyResultError || !keyResult) throw keyResultError ?? new Error("KR não encontrado");
+
+  const { data: objective, error: objectiveError } = await supabase
+    .from("okr_objectives")
+    .select("company_id")
+    .eq("id", keyResult.objective_id)
+    .maybeSingle();
+  if (objectiveError || !objective) throw objectiveError ?? new Error("OKR não encontrado");
+
+  return {
+    tenantId: objective.company_id,
+    keyResultId: keyResult.id,
+    deliverableId: null,
+  };
+}
 
 export async function listTasksByDeliverableIds(deliverableIds: string[]) {
   if (!deliverableIds.length) return [] as DbTask[];
   const { data, error } = await supabase
-    .from("okr_tasks")
-    .select(taskSelect)
+    .from("work_items")
+    .select(workItemTaskSelect)
     .in("deliverable_id", deliverableIds)
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 
   if (error) throw error;
-  return (data ?? []) as DbTask[];
+  return mapWorkItemRowsToLegacyTasks((data ?? []) as WorkItemTaskRow[]);
+}
+
+export async function listTasksByKeyResultIds(keyResultIds: string[]) {
+  if (!keyResultIds.length) return [] as DbTask[];
+  const { data, error } = await supabase
+    .from("work_items")
+    .select(workItemTaskSelect)
+    .in("key_result_id", keyResultIds)
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return mapWorkItemRowsToLegacyTasks((data ?? []) as WorkItemTaskRow[]);
 }
 
 export async function listTasksForUser(companyId: string, userId: string, opts?: { from?: string; to?: string }) {
-  // We filter by owner on okr_tasks, and by date range (optional).
+  void companyId;
+
   let q = supabase
-    .from("okr_tasks")
-    .select(taskSelect)
-    .eq("owner_user_id", userId)
+    .from("work_items")
+    .select(workItemTaskSelect)
+    .eq("assignee_user_id", userId)
+    .not("key_result_id", "is", null)
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: false });
-
-  // Keep companyId in the queryKey; RLS ensures we only see tasks from our company.
-  void companyId;
 
   if (opts?.from) q = q.gte("due_date", opts.from);
   if (opts?.to) q = q.lte("due_date", opts.to);
 
   const { data, error } = await q;
   if (error) throw error;
-  return (data ?? []) as DbTask[];
+  return mapWorkItemRowsToLegacyTasks((data ?? []) as WorkItemTaskRow[]);
 }
 
 export async function updateTask(
@@ -883,49 +1071,69 @@ export async function updateTask(
     >
   >,
 ) {
+  const update: Record<string, unknown> = {};
+
+  if ("status" in patch) update.status = toWorkItemTaskStatus(patch.status);
+  if ("title" in patch) update.title = patch.title;
+  if ("description" in patch) update.description = patch.description;
+  if ("owner_user_id" in patch) update.assignee_user_id = patch.owner_user_id;
+  if ("due_date" in patch) update.due_date = patch.due_date ?? null;
+  if ("estimate_minutes" in patch) update.estimate_minutes = patch.estimate_minutes ?? null;
+  if ("checklist" in patch) update.checklist = patch.checklist ?? null;
+  if ("estimated_value_brl" in patch) update.estimated_value_brl = patch.estimated_value_brl ?? null;
+  if ("estimated_cost_brl" in patch) update.estimated_cost_brl = patch.estimated_cost_brl ?? null;
+  if ("estimated_roi_pct" in patch) update.estimated_roi_pct = patch.estimated_roi_pct ?? null;
+
   const { data, error } = await supabase
-    .from("okr_tasks")
-    .update({
-      status: patch.status,
-      title: patch.title,
-      description: patch.description,
-      owner_user_id: patch.owner_user_id,
-      due_date: patch.due_date,
-      estimate_minutes: patch.estimate_minutes,
-      checklist: patch.checklist,
-      estimated_value_brl: patch.estimated_value_brl,
-      estimated_cost_brl: patch.estimated_cost_brl,
-      estimated_roi_pct: patch.estimated_roi_pct,
-    })
+    .from("work_items")
+    .update(update)
     .eq("id", taskId)
-    .select(taskSelect)
+    .select(workItemTaskSelect)
     .maybeSingle();
 
   if (error) throw error;
-  return (data ?? null) as DbTask | null;
+  return data ? mapTaskContextRow(data) : null;
 }
 
 export async function createTask(payload: Omit<DbTask, "id" | "created_at" | "updated_at" | "completed_at">) {
+  const context = payload.deliverable_id
+    ? await resolveDeliverableTenantContext(payload.deliverable_id)
+    : payload.key_result_id
+      ? await resolveKeyResultTenantContext(payload.key_result_id)
+      : null;
+
+  if (!context) {
+    throw new Error("Uma tarefa de OKR precisa estar ligada a um KR ou a um entregável.");
+  }
+
   const { data, error } = await supabase
-    .from("okr_tasks")
+    .from("work_items")
     .insert({
-      deliverable_id: payload.deliverable_id,
+      tenant_id: context.tenantId,
+      project_id: payload.project_id ?? null,
+      key_result_id: payload.key_result_id ?? context.keyResultId,
+      deliverable_id: payload.deliverable_id ?? context.deliverableId ?? null,
       title: payload.title.trim(),
       description: payload.description ?? null,
-      owner_user_id: payload.owner_user_id,
-      status: payload.status,
+      type: "task",
+      status: toWorkItemTaskStatus(payload.status),
+      priority: "medium",
+      assignee_user_id: payload.owner_user_id,
+      created_by_user_id: payload.owner_user_id,
+      parent_id: payload.parent_task_id ?? null,
       due_date: payload.due_date ?? null,
+      start_date: payload.due_date ?? null,
       estimate_minutes: payload.estimate_minutes ?? null,
       checklist: payload.checklist ?? null,
       estimated_value_brl: payload.estimated_value_brl ?? null,
       estimated_cost_brl: payload.estimated_cost_brl ?? null,
       estimated_roi_pct: payload.estimated_roi_pct ?? null,
     })
-    .select(taskSelect)
+    .select(workItemTaskSelect)
     .single();
 
   if (error) throw error;
-  return data as DbTask;
+  return mapTaskContextRow(data);
 }
 
 export function krProgressPct(kr: Pick<DbOkrKeyResult, "kind" | "start_value" | "current_value" | "target_value" | "achieved">) {
@@ -967,7 +1175,13 @@ export async function listTasksForCompany(companyId: string, opts?: { from?: str
     p_to: opts?.to ?? null,
   });
   if (error) throw error;
-  return (data ?? []) as unknown as DbTaskWithContext[];
+  return ((data ?? []) as any[]).map((row) => ({
+    ...mapRpcTaskRow(row),
+    objective_id: row.objective_id,
+    objective_title: row.objective_title,
+    objective_level: row.objective_level,
+    department_id: row.department_id,
+  })) as DbTaskWithContext[];
 }
 
 export async function listTasksForDepartment(companyId: string, departmentId: string, opts?: { from?: string; to?: string }) {
@@ -978,7 +1192,13 @@ export async function listTasksForDepartment(companyId: string, departmentId: st
     p_to: opts?.to ?? null,
   });
   if (error) throw error;
-  return (data ?? []) as unknown as DbTaskWithContext[];
+  return ((data ?? []) as any[]).map((row) => ({
+    ...mapRpcTaskRow(row),
+    objective_id: row.objective_id,
+    objective_title: row.objective_title,
+    objective_level: row.objective_level,
+    department_id: row.department_id,
+  })) as DbTaskWithContext[];
 }
 
 export async function listTasksForUserWithContext(userId: string, opts?: { from?: string; to?: string }) {
@@ -988,7 +1208,13 @@ export async function listTasksForUserWithContext(userId: string, opts?: { from?
     p_to: opts?.to ?? null,
   });
   if (error) throw error;
-  return (data ?? []) as unknown as DbTaskWithContext[];
+  return ((data ?? []) as any[]).map((row) => ({
+    ...mapRpcTaskRow(row),
+    objective_id: row.objective_id,
+    objective_title: row.objective_title,
+    objective_level: row.objective_level,
+    department_id: row.department_id,
+  })) as DbTaskWithContext[];
 }
 
 export async function listTasksForUserWithContextV2(userId: string, opts?: { from?: string; to?: string }) {
@@ -998,7 +1224,21 @@ export async function listTasksForUserWithContextV2(userId: string, opts?: { fro
     p_to: opts?.to ?? null,
   });
   if (error) throw error;
-  return (data ?? []) as unknown as DbTaskWithContextV2[];
+  return ((data ?? []) as any[]).map((row) => ({
+    ...mapRpcTaskRow(row),
+    objective_id: row.objective_id,
+    objective_title: row.objective_title,
+    objective_level: row.objective_level,
+    department_id: row.department_id,
+    deliverable_title: row.deliverable_title,
+    key_result_id: row.key_result_id,
+    key_result_title: row.key_result_title,
+    key_result_kind: row.key_result_kind,
+    cycle_id: row.cycle_id,
+    cycle_type: row.cycle_type,
+    cycle_year: row.cycle_year,
+    cycle_quarter: row.cycle_quarter,
+  })) as DbTaskWithContextV2[];
 }
 
 // --- Long-term KRs (Strategy) ---
@@ -1324,56 +1564,80 @@ export type DbTaskHierarchy = {
   updated_at: string;
 };
 
+async function getWorkItemDepth(parentId: string | null) {
+  let depth = 0;
+  let currentId = parentId;
+
+  while (currentId) {
+    const { data, error } = await supabase
+      .from("work_items")
+      .select("parent_id")
+      .eq("id", currentId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) break;
+
+    depth += 1;
+    currentId = data.parent_id;
+  }
+
+  return depth;
+}
+
 export async function createTaskWithParent(
   parentId: string | null,
   levelType: TaskLevelType,
   taskData: Omit<DbTask, "id" | "created_at" | "updated_at" | "parent_task_id" | "depth" | "level_type">
 ): Promise<DbTask> {
-  // Calcular depth baseado no nível do pai
-  let depth = 0;
-  if (parentId) {
-    const parent = await supabase
-      .from("okr_tasks")
-      .select("depth")
-      .eq("id", parentId)
-      .single();
-    if (parent.data) {
-      depth = (parent.data as any).depth + 1;
-    }
-  }
+  const depth = await getWorkItemDepth(parentId);
 
-  // Validar profundidade máxima (4)
-  if (depth > 4) {
+  if (depth > 3) {
     throw new Error("Profundidade máxima de 4 níveis atingida");
   }
 
-  // Validar nível do tipo
-  const levelDepths: Record<TaskLevelType, number> = {
-    TASK: 0,
-    LIST: 1,
-    CHECKLIST: 2,
-    CHECKLIST_ITEM: 3,
-  };
-
-  if (levelType !== Object.keys(levelDepths)[depth]) {
+  if (levelTypeForDepth(depth) !== levelType) {
     throw new Error(`Tipo ${levelType} inválido para depth ${depth}`);
   }
 
+  const context = taskData.deliverable_id
+    ? await resolveDeliverableTenantContext(taskData.deliverable_id)
+    : taskData.key_result_id
+      ? await resolveKeyResultTenantContext(taskData.key_result_id)
+      : null;
+
+  if (!context) {
+    throw new Error("Uma tarefa hierárquica precisa estar ligada a um KR ou a um entregável.");
+  }
+
   const { data, error } = await supabase
-    .from("okr_tasks")
+    .from("work_items")
     .insert({
-      ...taskData,
-      parent_task_id: parentId,
-      depth,
-      level_type: levelType,
-      task_hierarchy: {},
+      tenant_id: context.tenantId,
+      project_id: taskData.project_id ?? null,
+      key_result_id: taskData.key_result_id ?? context.keyResultId,
+      deliverable_id: taskData.deliverable_id ?? context.deliverableId ?? null,
+      parent_id: parentId,
+      title: taskData.title.trim(),
+      description: taskData.description ?? null,
+      type: "task",
+      status: toWorkItemTaskStatus(taskData.status),
+      priority: "medium",
+      assignee_user_id: taskData.owner_user_id,
+      created_by_user_id: taskData.owner_user_id,
+      due_date: taskData.due_date ?? null,
       start_date: taskData.due_date ? taskData.due_date : new Date().toISOString(),
+      estimate_minutes: taskData.estimate_minutes ?? null,
+      checklist: taskData.checklist ?? null,
+      estimated_value_brl: taskData.estimated_value_brl ?? null,
+      estimated_cost_brl: taskData.estimated_cost_brl ?? null,
+      estimated_roi_pct: taskData.estimated_roi_pct ?? null,
     })
-    .select(taskSelect)
+    .select(workItemTaskSelect)
     .single();
 
   if (error) throw error;
-  return data as DbTask;
+  return mapTaskContextRow(data);
 }
 
 export async function updateTaskHierarchy(
@@ -1381,21 +1645,69 @@ export async function updateTaskHierarchy(
   hierarchy: any
 ): Promise<void> {
   const { error } = await supabase
-    .from("okr_tasks")
-    .update({ task_hierarchy: hierarchy })
+    .from("work_items")
+    .update({ checklist: hierarchy })
     .eq("id", taskId);
   if (error) throw error;
 }
 
 export async function listTasksByHierarchy(deliverableId: string): Promise<DbTaskHierarchy[]> {
   const { data, error } = await supabase
-    .from("okr_tasks")
-    .select("id,deliverable_id,parent_task_id,depth,level_type,task_hierarchy,created_at,updated_at")
+    .from("work_items")
+    .select("id,deliverable_id,parent_id,checklist,start_date,created_at,updated_at")
     .eq("deliverable_id", deliverableId)
-    .order("depth, created_at", { ascending: true });
-  
+    .order("created_at", { ascending: true });
+
   if (error) throw error;
-  return (data ?? []) as DbTaskHierarchy[];
+
+  const rows = (data ?? []) as Array<{
+    id: string;
+    deliverable_id: string;
+    parent_id: string | null;
+    checklist: any;
+    start_date: string | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+  const depthById = computeDepthMap(
+    rows.map((row) => ({
+      id: row.id,
+      key_result_id: null,
+      deliverable_id: row.deliverable_id,
+      project_id: null,
+      parent_id: row.parent_id,
+      title: "",
+      description: null,
+      assignee_user_id: null,
+      created_by_user_id: "",
+      status: "todo",
+      due_date: null,
+      start_date: row.start_date,
+      estimate_minutes: null,
+      checklist: row.checklist,
+      completed_at: null,
+      estimated_value_brl: null,
+      estimated_cost_brl: null,
+      estimated_roi_pct: null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    }))
+  );
+
+  return rows.map((row) => {
+    const depth = depthById.get(row.id) ?? 0;
+    return {
+      id: row.id,
+      deliverable_id: row.deliverable_id,
+      parent_task_id: row.parent_id,
+      depth,
+      level_type: levelTypeForDepth(depth),
+      task_hierarchy: row.checklist ?? {},
+      start_date: row.start_date,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+    };
+  });
 }
 
 // ============================================================================

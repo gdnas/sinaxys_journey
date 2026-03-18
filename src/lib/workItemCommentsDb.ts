@@ -72,6 +72,20 @@ async function listCompanyMentionProfiles(companyId: string) {
   return (data ?? []) as MentionProfile[];
 }
 
+function getWorkItemHref(workItem: { project_id: string | null; deliverable_id?: string | null }, workItemId: string, commentId?: string) {
+  const qs = commentId ? `?taskId=${workItemId}&commentId=${commentId}` : `?taskId=${workItemId}`;
+
+  if (workItem.project_id) {
+    return `/app/projetos/${workItem.project_id}/tarefas${qs}`;
+  }
+
+  if (workItem.deliverable_id) {
+    return `/okr/entregaveis/${workItem.deliverable_id}${qs}`;
+  }
+
+  return null;
+}
+
 export async function getComments(workItemId: string, page = 0, perPage = 20) {
   const start = page * perPage;
   const end = start + perPage - 1;
@@ -88,44 +102,55 @@ export async function getComments(workItemId: string, page = 0, perPage = 20) {
   const rows = data ?? [];
   const total = typeof count === "number" ? count : rows.length;
 
-  if (rows.length === 0) return { rows: [], total };
+  const userIds = Array.from(new Set(rows.map((row) => row.user_id).filter(Boolean)));
+  const mentionTokens = Array.from(new Set(rows.flatMap((row) => extractMentionTokens(row.content ?? ""))));
 
-  const userIds = Array.from(new Set(rows.map((row: any) => row.user_id)));
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, name, avatar_url, company_id")
-    .in("id", userIds);
+  const [profilesResult, mentionProfilesResult] = await Promise.all([
+    userIds.length
+      ? supabase
+          .from("profiles")
+          .select("id, name, avatar_url")
+          .in("id", userIds)
+      : Promise.resolve({ data: [], error: null } as const),
+    mentionTokens.length
+      ? supabase
+          .from("profiles")
+          .select("id, name, email")
+          .eq("active", true)
+      : Promise.resolve({ data: [], error: null } as const),
+  ]);
 
-  const profilesById: Record<string, any> = {};
-  (profiles ?? []).forEach((profile: any) => {
-    profilesById[profile.id] = profile;
-  });
+  if (profilesResult.error) throw profilesResult.error;
+  if (mentionProfilesResult.error) throw mentionProfilesResult.error;
 
-  const companyProfilesCache = new Map<string, MentionProfile[]>();
-  const enrichedRows: any[] = [];
+  const profilesById = Object.fromEntries(
+    (profilesResult.data ?? []).map((profile) => [profile.id, profile])
+  ) as Record<string, { id: string; name: string | null; avatar_url: string | null }>;
+
+  const mentionProfiles = (mentionProfilesResult.data ?? []) as MentionProfile[];
+
+  const enrichedRows: Array<{
+    id: string;
+    content: string;
+    user_id: string;
+    created_at: string;
+    work_item_id: string;
+    user_name: string;
+    avatar_url: string | null;
+    mentions: Array<{ token: string; id: string; name: string }>;
+  }> = [];
 
   for (const row of rows) {
-    const authorCompany = profilesById[row.user_id]?.company_id ?? null;
-    const mentionTokens = extractMentionTokens(row.content ?? "");
-    const mentionMap: { token: string; match: { id: string; name: string } | null }[] = [];
+    const tokens = extractMentionTokens(row.content ?? "");
+    const mentionMap: Array<{ token: string; id: string; name: string }> = [];
 
-    if (authorCompany && mentionTokens.length > 0) {
-      let companyProfiles = companyProfilesCache.get(authorCompany);
-      if (!companyProfiles) {
-        companyProfiles = await listCompanyMentionProfiles(authorCompany);
-        companyProfilesCache.set(authorCompany, companyProfiles);
-      }
-
-      for (const token of mentionTokens) {
-        const match = resolveMentionMatch(token, companyProfiles);
+    for (const token of tokens) {
+      const match = resolveMentionMatch(token, mentionProfiles);
+      if (match) {
         mentionMap.push({
           token,
-          match: match
-            ? {
-                id: match.id,
-                name: getDisplayName(match),
-              }
-            : null,
+          id: match.id,
+          name: getDisplayName(match),
         });
       }
     }
@@ -148,7 +173,7 @@ export async function getComments(workItemId: string, page = 0, perPage = 20) {
 export async function addComment(workItemId: string, userId: string, content: string) {
   const { data: workItem } = await supabase
     .from("work_items")
-    .select("project_id, tenant_id")
+    .select("project_id, deliverable_id, tenant_id")
     .eq("id", workItemId)
     .single();
 
@@ -202,14 +227,14 @@ export async function addComment(workItemId: string, userId: string, content: st
           try {
             const title = "Você foi mencionado em um comentário de tarefa";
             const snippet = content.length > 200 ? `${content.slice(0, 200)}…` : content;
-            const href = `/app/projetos/${workItem.project_id}/tarefas?taskId=${workItemId}&commentId=${comment.id}`;
+            const href = getWorkItemHref(workItem, workItemId, comment?.id);
 
             await notificationsDb.createNotification({
               userId: mentionedUser.id,
               actorUserId: userId,
               title,
               content: snippet,
-              href,
+              href: href ?? undefined,
               notifType: "work_item_mention",
             });
 
@@ -247,7 +272,7 @@ export async function updateComment(commentId: string, userId: string, content: 
 
   const { data: workItem } = await supabase
     .from("work_items")
-    .select("project_id")
+    .select("project_id, deliverable_id")
     .eq("id", existingComment.work_item_id)
     .single();
 
@@ -299,7 +324,7 @@ export async function updateComment(commentId: string, userId: string, content: 
             actorUserId: userId,
             title: "Você foi mencionado em um comentário de tarefa",
             content: content.length > 200 ? `${content.slice(0, 200)}…` : content,
-            href: `/app/projetos/${workItem.project_id}/tarefas?taskId=${existingComment.work_item_id}&commentId=${commentId}`,
+            href: getWorkItemHref(workItem, existingComment.work_item_id, commentId) ?? undefined,
             notifType: "work_item_mention",
           });
         }
