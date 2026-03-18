@@ -6,14 +6,16 @@ import { useProjectAccess } from '@/hooks/useProjectAccess';
 import AccessDenied from '@/components/AccessDenied';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ProjectMembersSection({ projectId }: { projectId: string }) {
   const { toast } = useToast();
-  const { canManageMembers, isLoading } = useProjectAccess(projectId);
+  const { canManageMembers, isLoading, project } = useProjectAccess(projectId);
   const [members, setMembers] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [newUserId, setNewUserId] = useState('');
+  const [candidates, setCandidates] = useState<any[]>([]);
 
   async function loadMembers() {
     if (!projectId) return;
@@ -36,8 +38,29 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
     loadMembers();
   }, [projectId]);
 
+  // Load candidate profiles for the tenant (for adding members) when we have project
+  useEffect(() => {
+    async function loadCandidates() {
+      if (!project?.tenant_id) return;
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .eq('company_id', project.tenant_id)
+          .eq('active', true)
+          .order('name', { ascending: true });
+        if (error) throw error;
+        setCandidates(data ?? []);
+      } catch (err) {
+        console.error('Error loading candidate profiles:', err);
+        setCandidates([]);
+      }
+    }
+    loadCandidates();
+  }, [project?.tenant_id]);
+
   async function handleAdd() {
-    if (!newUserId.trim()) return toast({ title: 'Informe o ID do usuário', variant: 'destructive' });
+    if (!newUserId) return toast({ title: 'Selecione um usuário', variant: 'destructive' });
     if (members.some((m) => m.user_id === newUserId)) return toast({ title: 'Usuário já é membro', variant: 'destructive' });
     setAdding(true);
     try {
@@ -100,11 +123,21 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
         )) : <div className="text-sm text-muted-foreground">Nenhum membro</div>}
 
         <div className="pt-2 border-t mt-2">
-          <div className="flex gap-2">
-            <Input placeholder="ID do usuário" value={newUserId} onChange={(e) => setNewUserId(e.target.value)} />
-            <Button onClick={handleAdd} disabled={adding}>Adicionar</Button>
+          <div className="flex gap-2 items-center">
+            <Select value={newUserId} onValueChange={setNewUserId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Selecione um usuário pelo nome ou email" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">Selecione...</SelectItem>
+                {candidates.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={handleAdd} disabled={adding || !newUserId}>Adicionar</Button>
           </div>
-          <div className="text-xs text-muted-foreground mt-2">Adicione membros pelo ID do profile. Implementar busca por nome na próxima fase.</div>
+          <div className="text-xs text-muted-foreground mt-2">Adicione membros pelo nome ou email. O usuário selecionado será adicionado ao projeto.</div>
         </div>
       </div>
     </Card>
