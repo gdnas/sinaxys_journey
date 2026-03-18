@@ -46,6 +46,8 @@ export interface DbOkrCycle {
   id: string;
   type: 'QUARTERLY' | 'YEARLY' | 'ANNUAL';
   status: 'ACTIVE' | 'CLOSED';
+  year?: number;
+  quarter?: number;
 }
 
 export interface DbOkrObjective {
@@ -54,6 +56,36 @@ export interface DbOkrObjective {
   department_id?: string;
   owner_user_id?: string;
   title: string;
+  parent_objective_id?: string;
+  cycle_id?: string;
+  strategy_objective_id?: string;
+  tier?: string | null;
+  moderator_user_id?: string | null;
+  strategic_reason?: string | null;
+  linked_fundamental?: string | null;
+  linked_fundamental_text?: string | null;
+  due_at?: string | null;
+  estimated_value_brl?: number | null;
+  estimated_effort_hours?: number | null;
+  estimated_cost_brl?: number | null;
+  estimated_roi_pct?: number | null;
+  expected_profit_brl?: number | null;
+  profit_thesis?: string | null;
+  expected_revenue_at?: string | null;
+  expected_attainment_pct?: number;
+}
+
+export interface DbDeliverable {
+  id: string;
+  key_result_id: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  start_date?: string | null;
+  due_at?: string | null;
+  owner_user_id?: string;
+  tier?: string;
+  performance_indicator_id?: string | null;
 }
 
 export interface DbOkrKeyResult {
@@ -65,6 +97,7 @@ export interface DbOkrKeyResult {
   start_value?: number | null;
   current_value?: number | null;
   target_value?: number | null;
+  kind?: 'METRIC' | 'DELIVERABLE';
 }
 
 export interface DbKrChangeLog {
@@ -80,6 +113,10 @@ export interface DbStrategyObjective {
   id: string;
   horizon_years: number;
   title: string;
+  parent_strategy_objective_id?: string;
+  order_index?: number;
+  target_year?: number | null;
+  linked_fundamental?: 'VISION' | 'FUNDAMENTAL' | null;
 }
 
 export interface DbCompanyFundamentals {
@@ -91,6 +128,7 @@ export interface DbCompanyFundamentals {
 }
 
 export type KrConfidence = 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
+export type KrKind = 'METRIC' | 'DELIVERABLE';
 
 export type TaskSourceType = 'project' | 'deliverable' | 'okr' | 'unknown';
 
@@ -127,8 +165,28 @@ export async function upsertCompanyFundamentals(companyId: string, fundamentals:
   return;
 }
 
-export function krProgressPct(kr: DbOkrKeyResult): number | null {
-  return null;
+export async function listKeyResults(objectiveId: string): Promise<DbOkrKeyResult[]> {
+  return [];
+}
+
+export async function listDeliverablesByKeyResultIds(krIds: string[]): Promise<DbDeliverable[]> {
+  return [];
+}
+
+export async function createKeyResult(data: any): Promise<DbOkrKeyResult> {
+  return {} as DbOkrKeyResult;
+}
+
+export async function createDeliverable(data: any): Promise<DbDeliverable> {
+  return {} as DbDeliverable;
+}
+
+export async function createOkrObjective(data: any): Promise<DbOkrObjective> {
+  return {} as DbOkrObjective;
+}
+
+export async function createStrategyObjective(data: any): Promise<DbStrategyObjective> {
+  return {} as DbStrategyObjective;
 }
 
 export async function listTasksForUser(
@@ -179,4 +237,8 @@ export async function createKrChangeLog(log: Omit<DbKrChangeLog, 'id' | 'created
 
 export async function listKrChangeLogs(krId: string): Promise<DbKrChangeLog[]> {
   return [];
+}
+
+export function krProgressPct(kr: DbOkrKeyResult): number | null {
+  return null;
 }
