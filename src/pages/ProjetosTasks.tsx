@@ -118,6 +118,40 @@ export default function ProjetosTasks() {
     }
   };
 
+  const handleToggleTaskDone = async (taskId: string) => {
+    try {
+      // Find the task and determine new status
+      const task = taskList.find(t => t.id === taskId);
+      if (!task) return;
+
+      const newStatus = task.status === 'done' ? 'todo' : 'done';
+      const completedAt = newStatus === 'done' ? new Date().toISOString() : null;
+
+      const { error } = await supabase
+        .from('work_items')
+        .update({ 
+          status: newStatus,
+          completed_at: completedAt,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      toast({ 
+        title: newStatus === 'done' ? 'Tarefa concluída!' : 'Tarefa reaberta',
+        description: newStatus === 'done' ? 'Ótimo trabalho!' : 'Tarefa movida para pendente'
+      });
+      refetch();
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err.message || 'Erro ao atualizar tarefa',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (projectLoading) return <div className="p-6">Carregando...</div>;
   if (!canView || !project) {
     return (
@@ -240,6 +274,7 @@ export default function ProjetosTasks() {
                     onChangeAssignee={handleChangeAssignee}
                     onCreateSubtask={handleCreateSubtask}
                     onDelete={handleDeleteTask}
+                    onToggleDone={handleToggleTaskDone}
                   />
                 ))}
               </div>

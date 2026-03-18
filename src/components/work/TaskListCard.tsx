@@ -1,12 +1,13 @@
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Calendar, User, MoreHorizontal, ExternalLink, Edit, UserPlus, Plus, Trash2 } from 'lucide-react';
+import { Calendar, User, MoreHorizontal, ExternalLink, Edit, UserPlus, Plus, Trash2, CheckCircle2 } from 'lucide-react';
 import WorkItemPriorityBadge from './WorkItemPriorityBadge';
 import WorkItemStatusBadge from './WorkItemStatusBadge';
 
@@ -19,6 +20,7 @@ interface TaskListCardProps {
   onChangeAssignee?: (taskId: string) => void;
   onCreateSubtask?: (taskId: string) => void;
   onDelete?: (taskId: string) => void;
+  onToggleDone?: (taskId: string) => void;
 }
 
 export default function TaskListCard({
@@ -30,6 +32,7 @@ export default function TaskListCard({
   onChangeAssignee,
   onCreateSubtask,
   onDelete,
+  onToggleDone,
 }: TaskListCardProps) {
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Sem prazo';
@@ -41,6 +44,7 @@ export default function TaskListCard({
   };
 
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'done';
+  const isDone = task.status === 'done';
 
   const handleCardClick = () => {
     if (onTaskClick) {
@@ -53,24 +57,47 @@ export default function TaskListCard({
     action();
   };
 
+  const handleToggleDone = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onToggleDone) {
+      onToggleDone(task.id);
+    }
+  };
+
   return (
     <Card
-      className="p-4 hover:shadow-md transition-all cursor-pointer bg-background border-border/50 hover:border-border group"
+      className={`p-4 hover:shadow-md transition-all cursor-pointer bg-background border-border/50 hover:border-border group ${
+        isDone ? 'opacity-75' : ''
+      }`}
       onClick={handleCardClick}
     >
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start gap-4">
+        {/* Checkbox para marcar como concluído */}
+        <div className="flex-shrink-0 pt-0.5">
+          <Checkbox
+            checked={isDone}
+            onCheckedChange={() => onToggleDone?.(task.id)}
+            onClick={(e) => e.stopPropagation()}
+            className={`h-5 w-5 ${isDone ? 'data-[state=checked]:bg-green-600 data-[state=checked]:border-green-600' : ''}`}
+          />
+        </div>
+
         {/* Main content */}
         <div className="flex-1 min-w-0">
           {/* Header: Status + Title + Priority */}
           <div className="flex items-center gap-3 mb-2">
             <WorkItemStatusBadge status={task.status} />
-            <h3 className="font-semibold text-base leading-tight flex-1">{task.title}</h3>
+            <h3 className={`font-semibold text-base leading-tight flex-1 ${isDone ? 'line-through text-muted-foreground' : ''}`}>
+              {task.title}
+            </h3>
             <WorkItemPriorityBadge priority={task.priority} />
           </div>
 
           {/* Description */}
           {task.description && (
-            <p className="text-sm text-muted-foreground mb-3 line-clamp-2 leading-relaxed">
+            <p className={`text-sm mb-3 line-clamp-2 leading-relaxed ${
+              isDone ? 'text-muted-foreground/70' : 'text-muted-foreground'
+            }`}>
               {task.description}
             </p>
           )}
@@ -88,6 +115,14 @@ export default function TaskListCard({
               <span className="flex items-center gap-1.5">
                 <User className="h-3.5 w-3.5 flex-shrink-0" />
                 <span className="truncate max-w-32">{task.assignee.name || task.assignee.email}</span>
+              </span>
+            )}
+
+            {/* Concluído indicator */}
+            {isDone && (
+              <span className="flex items-center gap-1.5 text-green-600">
+                <CheckCircle2 className="h-3.5 w-3.5 flex-shrink-0" />
+                <span>Concluído</span>
               </span>
             )}
           </div>
@@ -113,6 +148,10 @@ export default function TaskListCard({
               </DropdownMenuItem>
               {canEdit && (
                 <>
+                  <DropdownMenuItem onClick={(e) => handleMenuAction(e, () => onToggleDone?.(task.id))}>
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    {isDone ? 'Marcar como pendente' : 'Marcar como concluído'}
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={(e) => handleMenuAction(e, () => onEdit?.(task.id))}>
                     <Edit className="mr-2 h-4 w-4" />
                     Editar
