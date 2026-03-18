@@ -854,8 +854,50 @@ type WorkItemTaskRow = {
   updated_at: string | null;
 };
 
+type WorkItemTaskRowWithSource = WorkItemTaskRow & {
+  deliverable?: { id: string; title: string } | { id: string; title: string }[] | null;
+  key_result?: { id: string; title: string } | { id: string; title: string }[] | null;
+  project?: { id: string; name: string } | { id: string; name: string }[] | null;
+};
+
 const workItemTaskSelect =
   "id,key_result_id,deliverable_id,project_id,parent_id,title,description,assignee_user_id,created_by_user_id,status,due_date,start_date,estimate_minutes,checklist,completed_at,estimated_value_brl,estimated_cost_brl,estimated_roi_pct,created_at,updated_at";
+
+const workItemTaskWithSourceSelect = `
+  id,
+  title,
+  status,
+  priority,
+  project_id,
+  key_result_id,
+  deliverable_id,
+  assignee_user_id,
+  created_by_user_id,
+  parent_id,
+  description,
+  due_date,
+  start_date,
+  estimate_minutes,
+  checklist,
+  completed_at,
+  estimated_value_brl,
+  estimated_cost_brl,
+  estimated_roi_pct,
+  created_at,
+  updated_at,
+  deliverable:okr_deliverables (
+    id,
+    title
+  ),
+  key_result:okr_key_results (
+    id,
+    title
+  ),
+  project:projects (
+    id,
+    name
+  )
+`;
 
 function toLegacyTaskStatus(status: string | null | undefined): WorkStatus {
   if (status === "done") return "DONE";
@@ -929,6 +971,31 @@ function mapWorkItemRowsToLegacyTasks(rows: WorkItemTaskRow[]): DbTask[] {
 
 function mapTaskContextRow<T extends Record<string, any>>(row: T): DbTask {
   return mapWorkItemRowsToLegacyTasks([row as unknown as WorkItemTaskRow])[0];
+}
+
+function pickSingleRelation<T>(value: T | T[] | null | undefined) {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
+function mapTaskWithSourceRow(row: WorkItemTaskRowWithSource) {
+  const task = mapTaskContextRow(row);
+  const deliverable = pickSingleRelation(row.deliverable);
+  const keyResult = pickSingleRelation(row.key_result);
+  const project = pickSingleRelation(row.project);
+
+  return {
+    ...task,
+    deliverable: deliverable
+      ? { id: deliverable.id, title: deliverable.title }
+      : null,
+    key_result: keyResult
+      ? { id: keyResult.id, title: keyResult.title }
+      : null,
+    project: project
+      ? { id: project.id, name: project.name }
+      : null,
+  };
 }
 
 function mapRpcTaskRow(row: any): DbTask {
@@ -1022,16 +1089,16 @@ export async function listTasksByDeliverableIds(deliverableIds: string[]) {
 }
 
 export async function listTasksByKeyResultIds(keyResultIds: string[]) {
-  if (!keyResultIds.length) return [] as DbTask[];
+  if (!keyResultIds.length) return [] as DbTaskWithSource[];
   const { data, error } = await supabase
     .from("work_items")
-    .select(workItemTaskSelect)
+    .select(workItemTaskWithSourceSelect)
     .in("key_result_id", keyResultIds)
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });
 
   if (error) throw error;
-  return mapWorkItemRowsToLegacyTasks((data ?? []) as WorkItemTaskRow[]);
+  return ((data ?? []) as unknown as WorkItemTaskRowWithSource[]).map(mapTaskWithSourceRow);
 }
 
 export async function listTasksForUser(companyId: string, userId: string, opts?: { from?: string; to?: string }) {
@@ -1170,6 +1237,14 @@ export type DbTaskWithContext = DbTask & {
   objective_title: string;
   objective_level: ObjectiveLevel;
   department_id: string | null;
+};
+
+export type TaskSourceType = "project" | "deliverable" | "okr" | "unknown";
+
+export type DbTaskWithSource = DbTask & {
+  deliverable: { id: string; title: string } | null;
+  key_result: { id: string; title: string } | null;
+  project: { id: string; name: string } | null;
 };
 
 export type DbTaskWithContextV2 = DbTaskWithContext & {
