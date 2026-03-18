@@ -5,11 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/lib/company';
-import { X, ExternalLink, Calendar, User, Clock, AlertCircle } from 'lucide-react';
+import { X, ExternalLink, Calendar, User, Clock, AlertCircle, Save } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import WorkItemPriorityBadge from './WorkItemPriorityBadge';
 import WorkItemStatusBadge from './WorkItemStatusBadge';
@@ -147,54 +146,60 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/30 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm p-4" onClick={onClose}>
       <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
-        <Card className="p-6">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
+        <Card className="border-border/50 shadow-xl">
+          {/* Header - Task View Style */}
+          <div className="p-6 border-b border-border/50">
+            <div className="flex items-start justify-between gap-4 mb-4">
+              {/* Status and Priority */}
+              <div className="flex items-center gap-2">
                 <WorkItemStatusBadge status={status} />
                 <WorkItemPriorityBadge priority={priority} />
               </div>
-              <h2 className="text-xl font-bold">{title}</h2>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={handleGoToPage} className="text-muted-foreground hover:text-foreground">
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Página completa
+                </Button>
+                <Button variant="ghost" size="icon" onClick={onClose}>
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={handleGoToPage}>
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Página completa
-              </Button>
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
+
+            {/* Title - Inline Edit */}
+            <Input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Título da tarefa"
+              className="text-2xl font-bold border-none px-0 focus-visible:ring-0 focus-visible:ring-offset-0 h-auto py-0"
+            />
           </div>
 
           {loading ? (
-            <div className="text-center py-8">Carregando...</div>
+            <div className="p-6 text-center">Carregando...</div>
           ) : (
-            <form onSubmit={(e) => { e.preventDefault(); handleSave(); }} className="space-y-4">
-              {/* Title */}
+            <div className="p-6 space-y-6">
+              {/* Description - Inline Edit */}
               <div className="space-y-2">
-                <Label>Título</Label>
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Título da tarefa" />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label>Descrição</Label>
+                <Label className="text-sm font-medium text-muted-foreground">Descrição</Label>
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Descrição detalhada da tarefa"
+                  placeholder="Adicione uma descrição..."
                   rows={4}
+                  className="resize-none"
                 />
               </div>
 
-              {/* Status and Priority */}
+              {/* Properties Grid */}
               <div className="grid sm:grid-cols-2 gap-4">
+                {/* Status */}
                 <div className="space-y-2">
-                  <Label>Status</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Status</Label>
                   <Select value={status} onValueChange={setStatus}>
                     <SelectTrigger>
                       <SelectValue />
@@ -210,8 +215,9 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                   </Select>
                 </div>
 
+                {/* Priority */}
                 <div className="space-y-2">
-                  <Label>Prioridade</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Prioridade</Label>
                   <Select value={priority} onValueChange={setPriority}>
                     <SelectTrigger>
                       <SelectValue />
@@ -224,71 +230,65 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
 
-              {/* Assignee */}
-              <div className="space-y-2">
-                <Label>Responsável</Label>
-                <Select value={assigneeUserId} onValueChange={setAssigneeUserId}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Selecione um responsável" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">Sem responsável</SelectItem>
-                    {users.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.name || u.email}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Dates */}
-              <div className="grid sm:grid-cols-2 gap-4">
+                {/* Assignee */}
                 <div className="space-y-2">
-                  <Label>Data de início</Label>
-                  <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  <Label className="text-sm font-medium text-muted-foreground">Responsável</Label>
+                  <Select value={assigneeUserId} onValueChange={setAssigneeUserId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione um responsável" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">Sem responsável</SelectItem>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.name || u.email}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
+                {/* Due Date */}
                 <div className="space-y-2">
-                  <Label>Prazo final</Label>
+                  <Label className="text-sm font-medium text-muted-foreground">Prazo final</Label>
                   <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 </div>
               </div>
 
-              {/* Meta info */}
-              <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+              {/* Meta Info */}
+              <div className="bg-muted/30 rounded-lg p-4 space-y-2">
                 <div className="flex items-center gap-2 text-sm">
                   <Clock className="h-4 w-4 text-muted-foreground" />
                   <span className="text-muted-foreground">Criado em:</span>
-                  <span>{formatDate(task?.created_at)}</span>
+                  <span className="font-medium">{formatDate(task?.created_at)}</span>
                 </div>
                 {task?.completed_at && (
                   <div className="flex items-center gap-2 text-sm">
                     <AlertCircle className="h-4 w-4 text-green-600" />
                     <span className="text-muted-foreground">Concluído em:</span>
-                    <span className="text-green-600">{formatDate(task.completed_at)}</span>
+                    <span className="font-medium text-green-600">{formatDate(task.completed_at)}</span>
                   </div>
                 )}
                 {isOverdue && (
                   <div className="flex items-center gap-2 text-sm text-red-600">
                     <AlertCircle className="h-4 w-4" />
-                    <span>Esta tarefa está atrasada!</span>
+                    <span className="font-medium">Esta tarefa está atrasada!</span>
                   </div>
                 )}
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-4">
-                <Button type="submit" disabled={saving}>
-                  {saving ? 'Salvando...' : 'Salvar alterações'}
-                </Button>
-                <Button type="button" variant="outline" onClick={onClose}>
+              <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                <Button variant="outline" onClick={onClose}>
                   Cancelar
                 </Button>
+                <Button onClick={handleSave} disabled={saving}>
+                  <Save className="mr-2 h-4 w-4" />
+                  {saving ? 'Salvando...' : 'Salvar alterações'}
+                </Button>
               </div>
-            </form>
+            </div>
           )}
         </Card>
       </div>

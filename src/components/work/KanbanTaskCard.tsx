@@ -1,5 +1,4 @@
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Calendar, User, GripVertical } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -48,53 +47,53 @@ export default function KanbanTaskCard({ task, projectId, isDragging, onTaskClic
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <Card
-        className={`p-3 hover:shadow-md transition-shadow cursor-pointer ${
-          isDragging ? 'ring-2 ring-primary' : ''
+        className={`p-2.5 hover:shadow-md transition-all cursor-pointer bg-background border-border/50 hover:border-border ${
+          isDragging ? 'ring-2 ring-primary shadow-lg' : ''
         }`}
         onClick={handleCardClick}
       >
-        {/* Drag handle */}
-        <div className="flex items-start gap-2">
+        {/* Header: Title + Priority */}
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-sm leading-tight line-clamp-2">{task.title}</h4>
+          </div>
+          <div className="flex-shrink-0">
+            <WorkItemPriorityBadge priority={task.priority} />
+          </div>
+        </div>
+
+        {/* Description preview */}
+        {task.description && (
+          <p className="text-xs text-muted-foreground mb-2 line-clamp-2 leading-relaxed">{task.description}</p>
+        )}
+
+        {/* Footer: Drag handle + Meta info */}
+        <div className="flex items-center gap-2">
+          {/* Drag handle */}
           <div
-            className="mt-1 text-muted-foreground cursor-grab active:cursor-grabbing"
+            className="text-muted-foreground/50 cursor-grab active:cursor-grabbing hover:text-muted-foreground transition-colors"
             {...listeners}
             onClick={(e) => e.stopPropagation()}
           >
-            <GripVertical className="h-4 w-4" />
+            <GripVertical className="h-3.5 w-3.5" />
           </div>
 
-          <div className="flex-1 min-w-0">
-            {/* Title */}
-            <h4 className="font-medium text-sm mb-2 line-clamp-2">{task.title}</h4>
+          {/* Meta info */}
+          <div className="flex items-center gap-2 text-xs text-muted-foreground flex-1">
+            {/* Due date */}
+            {task.due_date && (
+              <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+                <Calendar className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate">{formatDate(task.due_date)}</span>
+              </span>
+            )}
 
-            {/* Priority badge */}
-            <div className="mb-2">
-              <WorkItemPriorityBadge priority={task.priority} />
-            </div>
-
-            {/* Meta info */}
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-              {/* Due date */}
-              {task.due_date && (
-                <span className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
-                  <Calendar className="h-3 w-3" />
-                  {formatDate(task.due_date)}
-                  {isOverdue && ' (atrasado)'}
-                </span>
-              )}
-
-              {/* Assignee */}
-              {task.assignee && (
-                <span className="flex items-center gap-1">
-                  <User className="h-3 w-3" />
-                  <span className="truncate max-w-24">{task.assignee.name || task.assignee.email}</span>
-                </span>
-              )}
-            </div>
-
-            {/* Description preview */}
-            {task.description && (
-              <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{task.description}</p>
+            {/* Assignee */}
+            {task.assignee && (
+              <span className="flex items-center gap-1 truncate">
+                <User className="h-3 w-3 flex-shrink-0" />
+                <span className="truncate max-w-20">{task.assignee.name || task.assignee.email}</span>
+              </span>
             )}
           </div>
         </div>
