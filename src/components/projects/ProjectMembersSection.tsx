@@ -129,7 +129,7 @@ export default function ProjectMembersSection({ projectId }: { projectId: string
                 <SelectValue placeholder="Selecione um usuário pelo nome ou email" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Selecione...</SelectItem>
+                <SelectItem value="__none__">Selecione...</SelectItem>
                 {candidates.map((u) => (
                   <SelectItem key={u.id} value={u.id}>{u.name || u.email}</SelectItem>
                 ))}

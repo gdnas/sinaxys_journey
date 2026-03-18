@@ -192,7 +192,7 @@ export default function WorkItemForm({ workItem, projectId, onSaved, onCancel }:
               <SelectValue placeholder="Selecione um responsável" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sem responsável</SelectItem>
+              <SelectItem value="__none__">Sem responsável</SelectItem>
               {users.map((u) => (
                 <SelectItem key={u.id} value={u.id}>
                   {u.name || u.email}
@@ -209,7 +209,7 @@ export default function WorkItemForm({ workItem, projectId, onSaved, onCancel }:
               <SelectValue placeholder="Selecione uma tarefa pai" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Sem tarefa pai</SelectItem>
+              <SelectItem value="__none__">Sem tarefa pai</SelectItem>
               {availableTasks.map((t) => (
                 <SelectItem key={t.id} value={t.id}>
                   {t.title}
