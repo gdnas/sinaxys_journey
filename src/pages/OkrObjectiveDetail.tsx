@@ -1,5 +1,7 @@
 // ... existing imports ...
 
+import { listOkrObjectivesByIds } from "@/lib/okrDb";
+
 const OkrObjectiveDetail = () => {
   const { toast } = useToast();
   const { data: deliverables = [] } = useQuery({
