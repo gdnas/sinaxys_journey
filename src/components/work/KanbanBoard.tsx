@@ -14,6 +14,9 @@ import KanbanTaskCard from './KanbanTaskCard';
 import WorkItemForm from './WorkItemForm';
 import KanbanTaskDialog from './KanbanTaskDialog';
 import { Card } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface KanbanBoardProps {
   projectId: string;
@@ -34,6 +37,8 @@ export default function KanbanBoard({
   onRefresh,
   onCreateTask,
 }: KanbanBoardProps) {
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const {
     moveTask,
     getStatusLabel,
@@ -109,6 +114,46 @@ export default function KanbanBoard({
     setSelectedTaskId(taskId);
   }, []);
 
+  const handleEditTask = useCallback((taskId: string) => {
+    navigate(`/app/projetos/${projectId}/tarefas/${taskId}/editar`);
+  }, [navigate, projectId]);
+
+  const handleChangeAssignee = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId);
+  }, []);
+
+  const handleCreateSubtask = useCallback((taskId: string) => {
+    setSelectedTaskId(taskId);
+    toast({
+      title: 'Funcionalidade em desenvolvimento',
+      description: 'Subtarefas serão implementadas em breve',
+    });
+  }, [toast]);
+
+  const handleDeleteTask = useCallback(async (taskId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta tarefa?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('work_items')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      toast({ title: 'Tarefa excluída com sucesso' });
+      if (onRefresh) onRefresh();
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err.message || 'Erro ao excluir tarefa',
+        variant: 'destructive',
+      });
+    }
+  }, [toast, onRefresh]);
+
   const groupedTasks = groupTasksByStatus(localTasks);
 
   if (loading) {
@@ -138,6 +183,10 @@ export default function KanbanBoard({
                 projectId={projectId}
                 taskCount={groupedTasks[status].length}
                 onTaskClick={handleTaskClick}
+                onEdit={canEdit ? handleEditTask : undefined}
+                onChangeAssignee={canEdit ? handleChangeAssignee : undefined}
+                onCreateSubtask={canEdit ? handleCreateSubtask : undefined}
+                onDelete={canEdit ? handleDeleteTask : undefined}
               />
             ))}
           </div>
@@ -172,7 +221,7 @@ export default function KanbanBoard({
         </div>
       )}
 
-      {/* Task View/Edit Dialog */}
+      {/* Task View Dialog */}
       <KanbanTaskDialog
         taskId={selectedTaskId ?? ''}
         projectId={projectId}

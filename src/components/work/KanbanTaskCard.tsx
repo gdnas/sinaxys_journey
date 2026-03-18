@@ -1,5 +1,12 @@
 import { Card } from '@/components/ui/card';
-import { Calendar, User, GripVertical } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Calendar, User, GripVertical, MoreHorizontal, ExternalLink, Edit, UserPlus, Plus, Trash2 } from 'lucide-react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import WorkItemPriorityBadge from './WorkItemPriorityBadge';
@@ -10,9 +17,22 @@ interface KanbanTaskCardProps {
   projectId: string;
   isDragging?: boolean;
   onTaskClick?: (taskId: string) => void;
+  onEdit?: (taskId: string) => void;
+  onChangeAssignee?: (taskId: string) => void;
+  onCreateSubtask?: (taskId: string) => void;
+  onDelete?: (taskId: string) => void;
 }
 
-export default function KanbanTaskCard({ task, projectId, isDragging, onTaskClick }: KanbanTaskCardProps) {
+export default function KanbanTaskCard({
+  task,
+  projectId,
+  isDragging,
+  onTaskClick,
+  onEdit,
+  onChangeAssignee,
+  onCreateSubtask,
+  onDelete,
+}: KanbanTaskCardProps) {
   const {
     attributes,
     listeners,
@@ -44,21 +64,67 @@ export default function KanbanTaskCard({ task, projectId, isDragging, onTaskClic
     }
   };
 
+  const handleMenuAction = (e: React.MouseEvent, action: () => void) => {
+    e.stopPropagation();
+    action();
+  };
+
   return (
     <div ref={setNodeRef} style={style} {...attributes}>
       <Card
-        className={`p-2.5 hover:shadow-md transition-all cursor-pointer bg-background border-border/50 hover:border-border ${
+        className={`p-2.5 hover:shadow-md transition-all cursor-pointer bg-background border-border/50 hover:border-border group ${
           isDragging ? 'ring-2 ring-primary shadow-lg' : ''
         }`}
         onClick={handleCardClick}
       >
-        {/* Header: Title + Priority */}
+        {/* Header: Title + Priority + Actions */}
         <div className="flex items-start justify-between gap-2 mb-2">
           <div className="flex-1 min-w-0">
             <h4 className="font-semibold text-sm leading-tight line-clamp-2">{task.title}</h4>
           </div>
-          <div className="flex-shrink-0">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <WorkItemPriorityBadge priority={task.priority} />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <MoreHorizontal className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={(e) => handleMenuAction(e, () => onTaskClick?.(task.id))}>
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Abrir tarefa
+                </DropdownMenuItem>
+                {onEdit && (
+                  <>
+                    <DropdownMenuItem onClick={(e) => handleMenuAction(e, () => onEdit?.(task.id))}>
+                      <Edit className="mr-2 h-4 w-4" />
+                      Editar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleMenuAction(e, () => onChangeAssignee?.(task.id))}>
+                      <UserPlus className="mr-2 h-4 w-4" />
+                      Mudar responsável
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={(e) => handleMenuAction(e, () => onCreateSubtask?.(task.id))}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Criar subtarefa
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={(e) => handleMenuAction(e, () => onDelete?.(task.id))}
+                      className="text-red-600 focus:text-red-600"
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Excluir
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

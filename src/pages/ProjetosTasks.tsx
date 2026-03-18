@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, CheckCircle2, Clock, AlertCircle, XCircle, Calendar, User, LayoutList, LayoutGrid } from 'lucide-react';
+import { ArrowLeft, Plus, AlertCircle, LayoutList, LayoutGrid } from 'lucide-react';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
 import useWorkItems from '@/hooks/useWorkItems';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,7 +10,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/lib/company';
 import WorkItemForm from '@/components/work/WorkItemForm';
 import KanbanBoard from '@/components/work/KanbanBoard';
+import KanbanTaskDialog from '@/components/work/KanbanTaskDialog';
+import TaskListCard from '@/components/work/TaskListCard';
 import { KanbanTask } from '@/hooks/useKanban';
+import { useToast } from '@/hooks/use-toast';
 
 type ViewMode = 'list' | 'kanban';
 
@@ -18,11 +21,11 @@ export default function ProjetosTasks() {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const { companyId } = useCompany();
+  const { toast } = useToast();
   const { canView, canEdit, isLoading: projectLoading, project } = useProjectAccess(String(projectId ?? ''));
   const { taskList, loading, error, refetch } = useWorkItems(String(projectId ?? ''));
   const [showCreate, setShowCreate] = useState(false);
-  const [taskData, setTaskData] = useState<any>(null);
-  const [creating, setCreating] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
@@ -52,6 +55,51 @@ export default function ProjetosTasks() {
     assignee: task.assignee,
   }));
 
+  const handleTaskClick = (taskId: string) => {
+    setSelectedTaskId(taskId);
+  };
+
+  const handleEditTask = (taskId: string) => {
+    navigate(`/app/projetos/${projectId}/tarefas/${taskId}/editar`);
+  };
+
+  const handleChangeAssignee = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    // Modal will open and user can change assignee there
+  };
+
+  const handleCreateSubtask = (taskId: string) => {
+    setSelectedTaskId(taskId);
+    toast({
+      title: 'Funcionalidade em desenvolvimento',
+      description: 'Subtarefas serão implementadas em breve',
+    });
+  };
+
+  const handleDeleteTask = async (taskId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta tarefa?')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('work_items')
+        .delete()
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      toast({ title: 'Tarefa excluída com sucesso' });
+      refetch();
+    } catch (err: any) {
+      toast({
+        title: 'Erro',
+        description: err.message || 'Erro ao excluir tarefa',
+        variant: 'destructive',
+      });
+    }
+  };
+
   if (projectLoading) return <div className="p-6">Carregando...</div>;
   if (!canView || !project) {
     return (
@@ -66,55 +114,6 @@ export default function ProjetosTasks() {
       </div>
     );
   }
-
-  // Helper to get status icon
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'done':
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case 'in_progress':
-        return <Clock className="h-4 w-4 text-blue-600" />;
-      case 'blocked':
-        return <XCircle className="h-4 w-4 text-red-600" />;
-      default:
-        return <AlertCircle className="h-4 w-4 text-yellow-600" />;
-    }
-  };
-
-  // Helper to get status text
-  const getStatusText = (status: string) => {
-    const statusMap: Record<string, string> = {
-      backlog: 'Backlog',
-      todo: 'A fazer',
-      in_progress: 'Em progresso',
-      review: 'Em revisão',
-      done: 'Concluído',
-      blocked: 'Bloqueado',
-    };
-    return statusMap[status] || status;
-  };
-
-  // Helper to get priority color
-  const getPriorityColor = (priority: string) => {
-    const colorMap: Record<string, string> = {
-      low: 'bg-gray-100 text-gray-700',
-      medium: 'bg-blue-100 text-blue-700',
-      high: 'bg-orange-100 text-orange-700',
-      urgent: 'bg-red-100 text-red-700',
-    };
-    return colorMap[priority] || 'bg-gray-100 text-gray-700';
-  };
-
-  // Helper to get priority text
-  const getPriorityText = (priority: string) => {
-    const priorityMap: Record<string, string> = {
-      low: 'Baixa',
-      medium: 'Média',
-      high: 'Alta',
-      urgent: 'Urgente',
-    };
-    return priorityMap[priority] || priority;
-  };
 
   return (
     <div className="h-full flex flex-col">
@@ -211,51 +210,19 @@ export default function ProjetosTasks() {
                 Nenhuma tarefa encontrada{statusFilter !== 'all' && ' com este filtro'}
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {filteredTasks.map((task) => (
-                  <Card key={task.id} className="p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-3 mb-2">
-                          {getStatusIcon(task.status)}
-                          <h3 className="text-lg font-semibold">{task.title}</h3>
-                          <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
-                            {getPriorityText(task.priority)}
-                          </span>
-                        </div>
-
-                        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-3">
-                          <span className="flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            {task.due_date ? new Date(task.due_date).toLocaleDateString('pt-BR') : 'Sem prazo'}
-                          </span>
-                          {task.assignee && (
-                            <span className="flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {task.assignee?.name || task.assignee?.email || '—'}
-                            </span>
-                          )}
-                        </div>
-
-                        {task.description && (
-                          <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {canEdit && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              navigate(`/app/projetos/${projectId}/tarefas/${task.id}/editar`);
-                            }}
-                          >
-                            Editar
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  </Card>
+                  <TaskListCard
+                    key={task.id}
+                    task={task}
+                    projectId={String(projectId)}
+                    canEdit={canEdit}
+                    onTaskClick={handleTaskClick}
+                    onEdit={handleEditTask}
+                    onChangeAssignee={handleChangeAssignee}
+                    onCreateSubtask={handleCreateSubtask}
+                    onDelete={handleDeleteTask}
+                  />
                 ))}
               </div>
             )}
@@ -280,6 +247,15 @@ export default function ProjetosTasks() {
           </div>
         </div>
       )}
+
+      {/* Task View Dialog */}
+      <KanbanTaskDialog
+        taskId={selectedTaskId ?? ''}
+        projectId={String(projectId)}
+        open={!!selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        onRefresh={refetch}
+      />
     </div>
   );
 }

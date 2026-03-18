@@ -12,9 +12,24 @@ interface KanbanColumnProps {
   projectId: string;
   taskCount?: number;
   onTaskClick?: (taskId: string) => void;
+  onEdit?: (taskId: string) => void;
+  onChangeAssignee?: (taskId: string) => void;
+  onCreateSubtask?: (taskId: string) => void;
+  onDelete?: (taskId: string) => void;
 }
 
-export default function KanbanColumn({ status, label, tasks, projectId, taskCount, onTaskClick }: KanbanColumnProps) {
+export default function KanbanColumn({
+  status,
+  label,
+  tasks,
+  projectId,
+  taskCount,
+  onTaskClick,
+  onEdit,
+  onChangeAssignee,
+  onCreateSubtask,
+  onDelete,
+}: KanbanColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
   });
@@ -52,6 +67,10 @@ export default function KanbanColumn({ status, label, tasks, projectId, taskCoun
                     task={task}
                     projectId={projectId}
                     onTaskClick={onTaskClick}
+                    onEdit={onEdit}
+                    onChangeAssignee={onChangeAssignee}
+                    onCreateSubtask={onCreateSubtask}
+                    onDelete={onDelete}
                   />
                 ))
               )}
