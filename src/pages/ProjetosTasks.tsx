@@ -2,13 +2,17 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, CheckCircle2, Clock, AlertCircle, XCircle, Calendar, User } from 'lucide-react';
+import { ArrowLeft, Plus, CheckCircle2, Clock, AlertCircle, XCircle, Calendar, User, LayoutList, LayoutGrid } from 'lucide-react';
 import { useProjectAccess } from '@/hooks/useProjectAccess';
 import useWorkItems from '@/hooks/useWorkItems';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useCompany } from '@/lib/company';
 import WorkItemForm from '@/components/work/WorkItemForm';
+import KanbanBoard from '@/components/work/KanbanBoard';
+import { KanbanTask } from '@/hooks/useKanban';
+
+type ViewMode = 'list' | 'kanban';
 
 export default function ProjetosTasks() {
   const { projectId } = useParams();
@@ -20,11 +24,12 @@ export default function ProjetosTasks() {
   const [taskData, setTaskData] = useState<any>(null);
   const [creating, setCreating] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<ViewMode>('kanban');
 
   const tasksWithNames = taskList; // already assembled by hook
 
-  const filteredTasks = statusFilter === 'all' 
-    ? tasksWithNames 
+  const filteredTasks = statusFilter === 'all'
+    ? tasksWithNames
     : tasksWithNames.filter(t => t.status === statusFilter);
 
   const taskCounts = {
@@ -33,6 +38,19 @@ export default function ProjetosTasks() {
     in_progress: tasksWithNames.filter(t => t.status === 'in_progress').length,
     done: tasksWithNames.filter(t => t.status === 'done').length,
   };
+
+  // Convert tasks to KanbanTask format
+  const kanbanTasks: KanbanTask[] = tasksWithNames.map(task => ({
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    priority: task.priority,
+    assignee_user_id: task.assignee_user_id,
+    due_date: task.due_date,
+    start_date: task.start_date,
+    assignee: task.assignee,
+  }));
 
   if (projectLoading) return <div className="p-6">Carregando...</div>;
   if (!canView || !project) {
@@ -99,8 +117,9 @@ export default function ProjetosTasks() {
   };
 
   return (
-    <div className="mx-auto max-w-6xl grid gap-6 pb-12">
-      <Card className="p-6">
+    <div className="h-full flex flex-col">
+      {/* Header Card */}
+      <Card className="p-6 flex-shrink-0">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">{project.name} - Tarefas</h1>
@@ -120,87 +139,129 @@ export default function ProjetosTasks() {
           </div>
         </div>
 
-        {/* Status Filter */}
-        <div className="mt-4 flex items-center gap-2">
-          <span className="text-sm text-muted-foreground">Filtrar por status:</span>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-48">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas ({taskCounts.all})</SelectItem>
-              <SelectItem value="todo">A fazer ({taskCounts.todo})</SelectItem>
-              <SelectItem value="in_progress">Em progresso ({taskCounts.in_progress})</SelectItem>
-              <SelectItem value="done">Concluídas ({taskCounts.done})</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* View Toggle and Status Filter */}
+        <div className="mt-4 flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">Visualização:</span>
+            <div className="flex border rounded-lg">
+              <Button
+                variant={viewMode === 'kanban' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-r-none"
+                onClick={() => setViewMode('kanban')}
+              >
+                <LayoutGrid className="mr-2 h-4 w-4" />
+                Kanban
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                className="rounded-l-none"
+                onClick={() => setViewMode('list')}
+              >
+                <LayoutList className="mr-2 h-4 w-4" />
+                Lista
+              </Button>
+            </div>
+          </div>
+
+          {viewMode === 'list' && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Filtrar por status:</span>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas ({taskCounts.all})</SelectItem>
+                  <SelectItem value="todo">A fazer ({taskCounts.todo})</SelectItem>
+                  <SelectItem value="in_progress">Em progresso ({taskCounts.in_progress})</SelectItem>
+                  <SelectItem value="done">Concluídas ({taskCounts.done})</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </Card>
 
-      {/* Tasks List */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-4">
-          <div className="text-sm text-muted-foreground">{filteredTasks.length} tarefas</div>
-        </div>
-
-        {loading ? (
-          <div className="text-center py-8">Carregando tarefas...</div>
-        ) : error ? (
-          <div className="text-center py-8 text-red-600">Erro: {error}</div>
-        ) : filteredTasks.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            Nenhuma tarefa encontrada{statusFilter !== 'all' && ' com este filtro'}
-          </div>
+      {/* Content */}
+      <div className="flex-1 mt-4 overflow-hidden">
+        {viewMode === 'kanban' ? (
+          <KanbanBoard
+            projectId={String(projectId)}
+            projectName={project.name}
+            tasks={kanbanTasks}
+            loading={loading}
+            canEdit={canEdit}
+            onRefresh={refetch}
+            onViewChange={(view) => setViewMode(view)}
+          />
         ) : (
-          <div className="space-y-3">
-            {filteredTasks.map((task) => (
-              <Card key={task.id} className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3 mb-2">
-                      {getStatusIcon(task.status)}
-                      <h3 className="text-lg font-semibold">{task.title}</h3>
-                      <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
-                        {getPriorityText(task.priority)}
-                      </span>
-                    </div>
+          <Card className="p-4 h-full overflow-auto">
+            <div className="flex items-center justify-between mb-4">
+              <div className="text-sm text-muted-foreground">{filteredTasks.length} tarefas</div>
+            </div>
 
-                    <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-3">
-                      <span className="flex items-center gap-1">
-                        <Calendar className="h-3 w-3" />
-                        {task.due_date ? new Date(task.due_date).toLocaleDateString('pt-BR') : 'Sem prazo'}
-                      </span>
-                      {task.assignee && (
-                        <span className="flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          {task.assignee?.name || task.assignee?.email || '—'}
-                        </span>
-                      )}
-                    </div>
+            {loading ? (
+              <div className="text-center py-8">Carregando tarefas...</div>
+            ) : error ? (
+              <div className="text-center py-8 text-red-600">Erro: {error}</div>
+            ) : filteredTasks.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhuma tarefa encontrada{statusFilter !== 'all' && ' com este filtro'}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {filteredTasks.map((task) => (
+                  <Card key={task.id} className="p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3 mb-2">
+                          {getStatusIcon(task.status)}
+                          <h3 className="text-lg font-semibold">{task.title}</h3>
+                          <span className={`text-xs px-2 py-1 rounded-full ${getPriorityColor(task.priority)}`}>
+                            {getPriorityText(task.priority)}
+                          </span>
+                        </div>
 
-                    {task.description && (
-                      <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {canEdit && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          navigate(`/app/projetos/${projectId}/tarefas/${task.id}/editar`);
-                        }}
-                      >
-                        Editar
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                        <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mb-3">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {task.due_date ? new Date(task.due_date).toLocaleDateString('pt-BR') : 'Sem prazo'}
+                          </span>
+                          {task.assignee && (
+                            <span className="flex items-center gap-1">
+                              <User className="h-3 w-3" />
+                              {task.assignee?.name || task.assignee?.email || '—'}
+                            </span>
+                          )}
+                        </div>
+
+                        {task.description && (
+                          <p className="text-sm text-muted-foreground line-clamp-2">{task.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {canEdit && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              navigate(`/app/projetos/${projectId}/tarefas/${task.id}/editar`);
+                            }}
+                          >
+                            Editar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </Card>
         )}
-      </Card>
+      </div>
 
       {/* Create Task Dialog */}
       {showCreate && (
@@ -210,10 +271,10 @@ export default function ProjetosTasks() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold">Nova tarefa</h3>
               </div>
-              <WorkItemForm 
-                projectId={String(projectId)} 
-                onSaved={(wi) => { setShowCreate(false); refetch(); }} 
-                onCancel={() => setShowCreate(false)} 
+              <WorkItemForm
+                projectId={String(projectId)}
+                onSaved={(wi) => { setShowCreate(false); refetch(); }}
+                onCancel={() => setShowCreate(false)}
               />
             </Card>
           </div>

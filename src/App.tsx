@@ -86,6 +86,7 @@ import ProjetoEdit from "./pages/ProjetoEdit";
 import ProjetosTasks from "./pages/ProjetosTasks";
 import TaskCreate from "./pages/TaskCreate";
 import TaskEdit from "./pages/TaskEdit";
+import ProjetosKanban from "./pages/ProjetosKanban";
 
 const queryClient = new QueryClient();
 
@@ -598,6 +599,17 @@ const App = () => (
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="PROJECTS">
                           <ProjetosTasks />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/app/projetos/:projectId/kanban"
+                    element={
+                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="PROJECTS">
+                          <ProjetosKanban />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
