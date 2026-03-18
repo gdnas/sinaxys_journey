@@ -32,6 +32,16 @@ export interface DbTaskWithContext extends DbTaskWithSource {
   objective_title?: string;
 }
 
+export interface DbTaskWithContextV2 extends DbTaskWithSource {
+  objective_id?: string;
+  objective_title?: string;
+  deliverable_title?: string;
+  key_result_title?: string;
+  cycle_type?: 'QUARTERLY' | 'YEARLY';
+  cycle_quarter?: number;
+  cycle_year?: number;
+}
+
 export interface DbOkrCycle {
   id: string;
   type: 'QUARTERLY' | 'YEARLY' | 'ANNUAL';
@@ -109,6 +119,13 @@ export async function listTasksForUser(
   return [];
 }
 
+export async function listTasksForUserWithContextV2(
+  userId: string,
+  options: { from: string; to: string }
+): Promise<DbTaskWithContextV2[]> {
+  return [];
+}
+
 export async function listTasksForCompany(
   companyId: string,
   options: { from: string; to: string }
@@ -122,4 +139,12 @@ export async function listTasksForDepartment(
   options: { from: string; to: string }
 ): Promise<DbTaskWithContext[]> {
   return [];
+}
+
+export async function updateTask(taskId: string, updates: any): Promise<void> {
+  return;
+}
+
+export async function deleteTask(taskId: string): Promise<void> {
+  return;
 }
