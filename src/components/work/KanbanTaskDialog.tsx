@@ -23,9 +23,10 @@ interface KanbanTaskDialogProps {
   open: boolean;
   onClose: () => void;
   onRefresh?: () => void;
+  commentId?: string;
 }
 
-export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onRefresh }: KanbanTaskDialogProps) {
+export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onRefresh, commentId }: KanbanTaskDialogProps) {
   const { toast } = useToast();
   const { companyId } = useCompany();
   const navigate = useNavigate();
@@ -44,13 +45,21 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
   const [users, setUsers] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('subtasks');
   const [timelineRefreshTrigger, setTimelineRefreshTrigger] = useState(0);
+  const [highlightCommentId, setHighlightCommentId] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && taskId) {
       loadTask();
       loadUsers();
+      // If commentId is provided, switch to comments tab and highlight
+      if (commentId) {
+        setActiveTab('comments');
+        setHighlightCommentId(commentId);
+      } else {
+        setHighlightCommentId(null);
+      }
     }
-  }, [open, taskId]);
+  }, [open, taskId, commentId]);
 
   useEffect(() => {
     if (activeTab === 'timeline') {
@@ -273,7 +282,7 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
               </div>
 
               {/* Tabs for Subtasks, Comments, Timeline */}
-              <Tabs defaultValue="subtasks" className="w-full">
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-3">
                   <TabsTrigger value="subtasks">Subtarefas</TabsTrigger>
                   <TabsTrigger value="comments">Comentários</TabsTrigger>
@@ -291,6 +300,7 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                 <TabsContent value="comments" className="mt-4">
                   <WorkItemComments 
                     workItemId={taskId} 
+                    highlightCommentId={highlightCommentId}
                     onUpdate={handleCommentsUpdate}
                   />
                 </TabsContent>

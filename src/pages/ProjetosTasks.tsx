@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Plus, AlertCircle, LayoutList, LayoutGrid } from 'lucide-react';
@@ -20,6 +20,7 @@ type ViewMode = 'list' | 'kanban';
 export default function ProjetosTasks() {
   const { projectId } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { companyId } = useCompany();
   const { toast } = useToast();
   const { canView, canEdit, isLoading: projectLoading, project } = useProjectAccess(String(projectId ?? ''));
@@ -28,6 +29,23 @@ export default function ProjetosTasks() {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [viewMode, setViewMode] = useState<ViewMode>('kanban');
+  const [pendingCommentId, setPendingCommentId] = useState<string | null>(null);
+
+  // Handle commentId from URL to open task dialog
+  useEffect(() => {
+    const commentId = searchParams.get('commentId');
+    const taskId = searchParams.get('taskId');
+
+    if (taskId) {
+      setPendingCommentId(commentId);
+      setSelectedTaskId(taskId);
+      // Clean the URL parameters
+      navigate(`/app/projetos/${projectId}/tarefas`, { replace: true });
+    }
+  }, [searchParams, projectId, navigate]);
+
+  // Store commentId to pass to dialog
+  const urlCommentId = searchParams.get('commentId');
 
   const tasksWithNames = taskList; // already assembled by hook
 
@@ -253,8 +271,12 @@ export default function ProjetosTasks() {
         taskId={selectedTaskId ?? ''}
         projectId={String(projectId)}
         open={!!selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
+        onClose={() => {
+          setSelectedTaskId(null);
+          setPendingCommentId(null);
+        }}
         onRefresh={refetch}
+        commentId={pendingCommentId ?? undefined}
       />
     </div>
   );
