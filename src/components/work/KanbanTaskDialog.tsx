@@ -12,6 +12,10 @@ import { X, ExternalLink, Calendar, User, Clock, AlertCircle, Save } from 'lucid
 import { useNavigate } from 'react-router-dom';
 import WorkItemPriorityBadge from './WorkItemPriorityBadge';
 import WorkItemStatusBadge from './WorkItemStatusBadge';
+import { WorkItemSubtasks } from './WorkItemSubtasks';
+import { WorkItemComments } from './WorkItemComments';
+import { WorkItemTimeline } from './WorkItemTimeline';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface KanbanTaskDialogProps {
   taskId: string;
@@ -210,7 +214,6 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                       <SelectItem value="in_progress">Em progresso</SelectItem>
                       <SelectItem value="review">Em revisão</SelectItem>
                       <SelectItem value="done">Concluído</SelectItem>
-                      <SelectItem value="blocked">Bloqueado</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -255,6 +258,31 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                   <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
                 </div>
               </div>
+
+              {/* Tabs for Subtasks, Comments, Timeline */}
+              <Tabs defaultValue="subtasks" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="subtasks">Subtarefas</TabsTrigger>
+                  <TabsTrigger value="comments">Comentários</TabsTrigger>
+                  <TabsTrigger value="timeline">Histórico</TabsTrigger>
+                </TabsList>
+                
+                <TabsContent value="subtasks" className="mt-4">
+                  <WorkItemSubtasks 
+                    workItemId={taskId} 
+                    tenantId={companyId}
+                    onUpdate={onRefresh}
+                  />
+                </TabsContent>
+                
+                <TabsContent value="comments" className="mt-4">
+                  <WorkItemComments workItemId={taskId} />
+                </TabsContent>
+                
+                <TabsContent value="timeline" className="mt-4">
+                  <WorkItemTimeline workItemId={taskId} />
+                </TabsContent>
+              </Tabs>
 
               {/* Meta Info */}
               <div className="bg-muted/30 rounded-lg p-4 space-y-2">
