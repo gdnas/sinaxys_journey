@@ -2,22 +2,55 @@ import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/lib/auth";
 
+export type ProjectMemberRole = "owner" | "editor" | "viewer" | "member";
+
+export type DbProject = {
+  id: string;
+  name: string;
+  description?: string;
+  owner_user_id: string;
+  department_id?: string;
+  department_ids?: string[];
+  tenant_id: string;
+  visibility: string;
+  status: string;
+  start_date?: string;
+  due_date?: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DbProjectMember = {
+  id: string;
+  project_id: string;
+  user_id: string;
+  role_in_project: ProjectMemberRole;
+  created_at: string;
+};
+
 export type ProjectAccess = {
   canView: boolean;
-  canEdit: boolean;
+  canEditProject: boolean;
+  canEditWorkItems: boolean;
   canManageMembers: boolean;
   isOwner: boolean;
   isMember: boolean;
   isAdmin: boolean;
   isHeadScoped: boolean;
   isLoading: boolean;
-  project: any;
+  project: DbProject | null;
+  memberRole: ProjectMemberRole | null;
 };
 
-export function useProjectAccess(projectId: string): ProjectAccess {
+// Manter compatibilidade com canEdit (deprecado mas funcional)
+type ProjectAccessCompat = Omit<ProjectAccess, "canEditProject" | "canEditWorkItems"> & {
+  canEdit: boolean; // = canEditProject
+};
+
+export function useProjectAccess(projectId: string): ProjectAccessCompat & ProjectAccess {
   const { user } = useAuth();
-  const [project, setProject] = useState<any>(null);
-  const [memberRole, setMemberRole] = useState<string | null>(null);
+  const [project, setProject] = useState<DbProject | null>(null);
+  const [memberRole, setMemberRole] = useState<ProjectMemberRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -46,7 +79,7 @@ export function useProjectAccess(projectId: string): ProjectAccess {
             .select("role_in_project")
             .match({ project_id: projectId, user_id: user.id })
             .maybeSingle();
-          setMemberRole(member?.role_in_project ?? null);
+          setMemberRole((member?.role_in_project as ProjectMemberRole) ?? null);
         } else {
           setMemberRole(null);
         }
@@ -62,22 +95,39 @@ export function useProjectAccess(projectId: string): ProjectAccess {
     loadProjectAccess();
   }, [projectId, user?.id]);
 
+  // Verificar se é admin ou masteradmin
   const isAdmin = user?.role === "ADMIN" || user?.role === "MASTERADMIN";
+
+  // Verificar se é owner do projeto
   const isOwner = project?.owner_user_id === user?.id;
+
+  // Verificar se é membro do projeto
   const isMember = memberRole !== null;
+
+  // Verificar se é HEAD escopado ao departamento do projeto
   const isHeadScoped = useMemo(() => {
     if (!project || user?.role !== "HEAD" || !user.departmentId) return false;
     const extraDepartments = Array.isArray(project.department_ids) ? project.department_ids : [];
     return project.department_id === user.departmentId || extraDepartments.includes(user.departmentId);
   }, [project, user?.departmentId, user?.role]);
 
-  const canView = !!project;
-  const canEdit = !!project && (isAdmin || isHeadScoped);
-  const canManageMembers = canEdit;
+  // Regras de permissão
+  const canView = isAdmin || isOwner || isHeadScoped || isMember;
+
+  const canEditProject = isAdmin || isOwner || isHeadScoped;
+
+  const canEditWorkItems = isAdmin || isOwner || isHeadScoped || (isMember && (memberRole === "owner" || memberRole === "editor"));
+
+  const canManageMembers = isAdmin || isOwner || isHeadScoped;
+
+  // Compatibilidade: canEdit = canEditProject (para não quebrar código existente)
+  const canEdit = canEditProject;
 
   return {
     canView,
     canEdit,
+    canEditProject,
+    canEditWorkItems,
     canManageMembers,
     isOwner,
     isMember,
@@ -85,5 +135,6 @@ export function useProjectAccess(projectId: string): ProjectAccess {
     isHeadScoped,
     isLoading,
     project,
+    memberRole,
   };
 }
