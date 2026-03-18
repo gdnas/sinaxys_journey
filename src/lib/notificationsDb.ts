@@ -56,13 +56,13 @@ export async function createNotification(payload: { userId: string; actorUserId?
     console.log("[notificationsDb] createNotification ->", payload);
   } catch {}
 
-  const { error } = await supabase.from("notifications").insert({
-    user_id: payload.userId,
-    actor_user_id: payload.actorUserId ?? null,
-    title: payload.title,
-    content: payload.content ?? null,
-    href: payload.href ?? null,
-    notif_type: payload.notifType ?? null,
+  const { data, error } = await supabase.rpc("create_notification", {
+    p_user_id: payload.userId,
+    p_title: payload.title,
+    p_actor_user_id: payload.actorUserId ?? null,
+    p_content: payload.content ?? null,
+    p_href: payload.href ?? null,
+    p_notif_type: payload.notifType ?? null,
   });
 
   if (error) {
@@ -72,7 +72,7 @@ export async function createNotification(payload: { userId: string; actorUserId?
     throw error;
   }
 
-  return { ok: true };
+  return { ok: true, id: data ?? null };
 }
 
 export async function getUnreadCount(userId: string) {
