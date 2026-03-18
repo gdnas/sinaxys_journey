@@ -109,66 +109,70 @@ import { OkrStrategyMapCanvas } from "@/components/okr/OkrStrategyMapCanvas";
 import { PerformanceIndicatorEditor } from "@/components/okr/PerformanceIndicatorEditor";
 import { KrLinkViewer } from "@/components/okr/KrLinkViewer";
 
-type NodeId = string;
+export type NodeId = `root` | `fundamentals` | `fundamental` | `strategy` | `strategyObjective` | `cycles` | `cycle` | `objective` | `kr`;
 
-type Node = {
-    kind: "root";
-    id: "root";
-} | {
-    kind: "fundamentals";
-    id: "fundamentals";
-} | {
-    kind: "fundamental";
-    id: `fund:${keyof DbCompanyFundamentals}`;
-    field: keyof DbCompanyFundamentals;
-} | {
-    kind: "strategy";
-    id: "strategy";
-} | {
-    kind: "strategyObjective";
-    id: `so:${string}`;
-    soId: string;
-} | {
-    kind: "cycles";
-    id: "cycles";
-} | {
-    kind: "cycle";
-    id: `c:${string}`;
-    cycleId: string;
-} | {
-    kind: "objective";
-    id: `o:${string}`;
-    objectiveId: string;
-} | {
-    kind: "kr";
-    id: `kr:${string}`;
-    krId: string;
-};
+// Define explicit string types for node IDs
+const FUNDAMENTALS_ID = `fundamentals`;
+const FUNDAMENTAL_ID = `fundamental`;
+const STRATEGY_ID = `strategy`;
+const STRATEGY_OBJECTIVE_ID = `strategyObjective`;
+const CYCLES_ID = `cycles`;
+const CYCLE_ID = `cycle`;
+const OBJECTIVE_ID = `objective`;
+const KR_ID = `kr`;
+
+// Type for node data
+interface FundamentalNode {
+  kind: "fundamental";
+  id: "fundamentals";
+  field: "mission" | "vision" | "purpose" | "values" | "culture" | "strategic_north" | "annual_drivers";
+}
+
+interface StrategyObjectiveNode {
+  kind: "strategy";
+  id: `so:${string}`;
+  soId: string;
+}
+
+interface CycleNode {
+  kind: "cycle";
+  id: `c:${string}`;
+  cycleId: string;
+}
+
+interface ObjectiveNode {
+  kind: "objective";
+  id: `o:${string}`;
+  objectiveId: string;
+}
+
+interface KrNode {
+  kind: "kr";
+  id: `kr:${string}`;
+  krId: string;
+}
+
+interface RootNode {
+  kind: "root";
+  id: "root";
+}
+
+export type Node = RootNode | FundamentalNode | StrategyNode | CycleNode | ObjectiveNode | KrNode;
 
 function parseListValue(v: string | null | undefined) {
-    if (!v?.trim())
-        return [];
-
-    return v.split("\n").map(s => s.trim()).map(s => s.replace(/^[-•]\s+/, "")).filter(Boolean);
+    if (!v?.trim()) return [];
+    return v.split("\n").map(s => s.trim()).filter(Boolean);
 }
 
 function serializeListValue(items: string[]) {
     return items.map(s => s.trim()).filter(Boolean).join("\n");
 }
 
-function initials(name: string) {
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    const a = parts[0]?.[0] ?? "";
-    const b = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
-    return (a + b).toUpperCase();
-}
-
 function hueFromId(id: string) {
     let h = 0;
-
-    for (let i = 0; i < id.length; i++)
+    for (let i = 0; i < id.length; i++) {
         h = (h * 31 + id.charCodeAt(i)) % 360;
-
+    }
     return h;
 }
 
@@ -184,53 +188,16 @@ function StrategyYearIcon({ so }: { so: DbStrategyObjective }) {
 }
 
 function nodeTitle(n: Node) {
-    if (n.kind === "root")
-        return "Mapa";
-
-    if (n.kind === "fundamentals")
-        return "Fundamentos";
-
-    if (n.kind === "fundamental") {
-        const map: Record<keyof DbCompanyFundamentals, string> = {
-            company_id: "Empresa",
-            mission: "Missão",
-            vision: "Visão",
-            purpose: "Propósito",
-            values: "Valores",
-            culture: "Cultura",
-            strategic_north: "(removido)",
-            annual_drivers: "Direcionadores do ano",
-            created_at: "Criado em",
-            updated_at: "Atualizado em"
-        };
-
-        return map[n.field] ?? String(n.field);
-    }
-
-    if (n.kind === "strategy")
-        return "Objetivos de longo prazo";
-
-    if (n.kind === "cycles")
-        return "OKRs (ciclos)";
-
-    if (n.kind === "cycle")
-        return "Ciclo";
-
-    if (n.kind === "objective")
-        return "Objetivo";
-
-    if (n.kind === "kr")
-        return "KR";
-
-    if (n.kind === "strategyObjective")
-        return "Objetivo longo prazo";
-
+    if (n.kind === "root") return "Mapa";
+    if (n.kind === "fundamentals") return "Fundamentos";
+    if (n kind === "fundamental") return "Fundamento";
+    if (n.kind === "strategy") return "Objetivos de longo prazo";
+    if (n kind === "cycles") return "Ciclos";
+    if (nn.kind === "cycle") return "Ciclo";
+    if (n kind === "objective") return "Objetivo";
+    if (n kind === "kr") return "KR";
+    if (n kind === "strategyObjective") return "Objetivo longo prazo";
     return "";
-}
-
-function cycleLabel(c: DbOkrCycle) {
-    const base = c.type === "ANNUAL" ? `${c.year}` : `Q${c.quarter ?? "?"} / ${c.year}`;
-    return c.name?.trim() ? `${c.name} · ${base}` : base;
 }
 
 function rowIndentStyle(depth: number) {
@@ -253,7 +220,6 @@ function toneFromKind(kind: Node["kind"]): RowTone {
             ink: "var(--map-fundamentals-ink)",
         };
     }
-
     if (kind === "strategy" || kind === "strategyObjective") {
         return {
             bg: "var(--map-strategy-bg)",
@@ -261,7 +227,6 @@ function toneFromKind(kind: Node["kind"]): RowTone {
             ink: "var(--map-strategy-ink)",
         };
     }
-
     if (kind === "cycles" || kind === "cycle") {
         return {
             bg: "var(--map-cycles-bg)",
@@ -269,7 +234,6 @@ function toneFromKind(kind: Node["kind"]): RowTone {
             ink: "var(--map-cycles-ink)",
         };
     }
-
     if (kind === "objective" || kind === "kr") {
         return {
             bg: "var(--map-objectives-bg)",
@@ -277,7 +241,6 @@ function toneFromKind(kind: Node["kind"]): RowTone {
             ink: "var(--map-objectives-ink)",
         };
     }
-
     return {
         bg: "var(--map-neutral-bg)",
         border: "var(--map-neutral-border)",
@@ -1842,7 +1805,7 @@ function Tree(
             const byCycle = new Map<string, DbOkrObjective[]>();
 
             await Promise.all(expandedCycleIds.map(async cycleId => {
-                const objs = await listOkrObjectives(ctx.cid, cycleId);
+                const objs = await listOkrObjectivesByCycle(ctx.cid, cycleId);
                 byCycle.set(cycleId, objs);
             }));
 

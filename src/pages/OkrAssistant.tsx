@@ -438,7 +438,7 @@ export default function OkrAssistant() {
   const qAnnualObjectives = useQuery({
     queryKey: ["okr-annual-objectives", cid, annualCycleId],
     enabled: hasCompany && !!annualCycleId,
-    queryFn: () => listOkrObjectives(cid, annualCycleId),
+    queryFn: () => listOkrObjectivesByCycle(cid, annualCycleId),
   });
 
   const annualObjectives = useMemo(() => {
@@ -2981,3 +2981,5 @@ export default function OkrAssistant() {
                         </div>
                       );
                     }
+
+}

@@ -93,7 +93,7 @@ export default function Person() {
 
   const qActiveCycleObjectives = useQuery({
     queryKey: ["okr", "objectives", "cycle", companyId, activeCycleId],
-    queryFn: () => listOkrObjectives(companyId, activeCycleId as string),
+    queryFn: () => listOkrObjectivesByCycle(companyId, activeCycleId as string),
     enabled: !!companyId && !!activeCycleId,
   });
 

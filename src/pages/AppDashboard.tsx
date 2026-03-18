@@ -258,7 +258,7 @@ export default function AppDashboard() {
   const { data: quarterObjectives = [] } = useQuery({
     queryKey: ["okr-objectives", companyId, activeQuarter?.id],
     enabled: !!companyId && !!activeQuarter?.id && (isHead || isAdmin),
-    queryFn: () => listOkrObjectives(companyId as string, String(activeQuarter?.id)),
+    queryFn: () => listOkrObjectivesByCycle(companyId as string, String(activeQuarter?.id)),
   });
 
   const scopedObjectives = useMemo(() => {

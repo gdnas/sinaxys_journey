@@ -25,6 +25,7 @@ import {
   listKeyResultsByObjectiveIds,
   listOkrCycles,
   listOkrObjectives,
+  listOkrObjectivesByCycle,
   listStrategyObjectives,
   type DbOkrKeyResult,
   type DbOkrObjective,
