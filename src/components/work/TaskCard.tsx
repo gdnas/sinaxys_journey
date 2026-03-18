@@ -59,7 +59,7 @@ export function TaskPriorityBadge({ priority }: { priority: string }) {
     low: { label: 'Baixa', variant: 'secondary' },
     medium: { label: 'Média', variant: 'default' },
     high: { label: 'Alta', variant: 'default' },
-    urgent: { label: 'Urgente', variant: 'destructive' },
+    critical: { label: 'Urgente', variant: 'destructive' },
   };
   const config = priorityMap[priority] || { label: priority, variant: 'default' };
   return <Badge variant={config.variant}>{config.label}</Badge>;

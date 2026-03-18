@@ -178,7 +178,7 @@ export default function WorkItemForm({ workItem, projectId, onSaved, onCancel }:
                 <SelectItem value="low">Baixa</SelectItem>
                 <SelectItem value="medium">Média</SelectItem>
                 <SelectItem value="high">Alta</SelectItem>
-                <SelectItem value="urgent">Urgente</SelectItem>
+                <SelectItem value="critical">Urgente</SelectItem>
               </SelectContent>
             </Select>
           </div>
