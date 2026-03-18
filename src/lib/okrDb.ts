@@ -1,6 +1,8 @@
 // Tipos de origem de tarefa
 export type TaskOrigin = 'project' | 'deliverable' | 'okr' | 'unknown';
 
+export type ObjectiveLevel = 'COMPANY' | 'DEPARTMENT' | 'TEAM';
+
 export interface DbTaskWithSource {
   id: string;
   title: string;
