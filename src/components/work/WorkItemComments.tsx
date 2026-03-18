@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, MoreVertical, Pencil, Trash2, X, Check, AtSign } from 'lucide-react';
+import { Send, MoreVertical, Pencil, Trash2, X, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -26,7 +26,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { useCompany } from '@/lib/company';
 import * as workItemCommentsDb from '@/lib/workItemCommentsDb';
-import { MentionAutocomplete } from '@/components/comments/MentionAutocomplete';
+import { MentionAutocomplete, type User as MentionUser } from '@/components/comments/MentionAutocomplete';
 
 interface WorkItemCommentsProps {
   workItemId: string;
@@ -44,6 +44,33 @@ interface Comment {
   mentions?: { token: string; match: { id: string; name: string } | null }[];
 }
 
+function normalizeMentionToken(value: string) {
+  try {
+    return value
+      .normalize('NFD')
+      .replace(/\p{Diacritic}/gu, '')
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '.')
+      .replace(/[^a-z0-9._-]/g, '');
+  } catch {
+    return String(value)
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, '.')
+      .replace(/[^a-z0-9._-]/g, '');
+  }
+}
+
+function getMentionToken(user: MentionUser) {
+  const emailPrefix = user.email.split('@')[0] ?? '';
+  return normalizeMentionToken(emailPrefix || user.name || user.id);
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: WorkItemCommentsProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -55,42 +82,35 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const commentsContainerRef = useRef<HTMLDivElement>(null);
 
-  // Estados para edição
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Estados para exclusão
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [commentToDelete, setCommentToDelete] = useState<string | null>(null);
   const [deletingComment, setDeletingComment] = useState(false);
 
-  // Estados para menções (novo comentário)
   const [showMentionMenu, setShowMentionMenu] = useState(false);
   const [mentionSearch, setMentionSearch] = useState('');
   const [mentionPosition, setMentionPosition] = useState({ top: 0, left: 0 });
   const [mentionStartIndex, setMentionStartIndex] = useState(0);
 
-  // Estados para menções (edição)
   const [showEditMentionMenu, setShowEditMentionMenu] = useState(false);
   const [editMentionSearch, setEditMentionSearch] = useState('');
   const [editMentionPosition, setEditMentionPosition] = useState({ top: 0, left: 0 });
   const [editMentionStartIndex, setEditMentionStartIndex] = useState(0);
 
   useEffect(() => {
-    fetchComments();
+    void fetchComments();
   }, [workItemId]);
 
-  // Scroll to highlighted comment
   useEffect(() => {
     if (highlightCommentId && commentsContainerRef.current) {
-      // Wait for comments to load
       setTimeout(() => {
         const commentElement = document.getElementById(`comment-${highlightCommentId}`);
         if (commentElement) {
           commentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Add highlight animation
           commentElement.classList.add('ring-2', 'ring-blue-500', 'ring-offset-2');
           setTimeout(() => {
             commentElement.classList.remove('ring-2', 'ring-blue-500', 'ring-offset-2');
@@ -121,36 +141,27 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
       setNewComment(value);
     }
 
-    // Detect @ mention
     const cursorPosition = textarea.selectionStart;
     const textBeforeCursor = value.substring(0, cursorPosition);
-
-    // Find the last @ symbol before cursor
     const lastAtIndex = textBeforeCursor.lastIndexOf('@');
 
     if (lastAtIndex !== -1) {
-      // Check if there's a space after the @ (meaning we're still typing the mention)
       const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
       const hasSpaceAfterAt = textAfterAt.includes(' ');
 
       if (!hasSpaceAfterAt) {
-        // We're typing a mention
-        const search = textAfterAt;
         const rect = textarea.getBoundingClientRect();
-        const lineHeight = 24; // approximate line height
-
-        // Calculate position (simplified)
         const top = rect.bottom + window.scrollY + 5;
         const left = rect.left + window.scrollX;
 
         if (isEdit) {
-          setEditMentionSearch(search);
+          setEditMentionSearch(textAfterAt);
           setEditMentionPosition({ top, left });
           setEditMentionStartIndex(lastAtIndex);
           setShowEditMentionMenu(true);
           setShowMentionMenu(false);
         } else {
-          setMentionSearch(search);
+          setMentionSearch(textAfterAt);
           setMentionPosition({ top, left });
           setMentionStartIndex(lastAtIndex);
           setShowMentionMenu(true);
@@ -160,41 +171,79 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
       }
     }
 
-    // No mention being typed
     setShowMentionMenu(false);
     setShowEditMentionMenu(false);
   };
 
-  const handleMentionSelect = (userId: string, name: string, isEdit = false) => {
+  const handleMentionSelect = (mentionedUser: MentionUser, isEdit = false) => {
+    const token = getMentionToken(mentionedUser);
+
     if (isEdit) {
       const beforeMention = editingContent.substring(0, editMentionStartIndex);
       const afterMention = editingContent.substring(editMentionStartIndex + editMentionSearch.length + 1);
-      const newContent = `${beforeMention}@${name} ${afterMention}`;
+      const newContent = `${beforeMention}@${token} ${afterMention}`;
       setEditingContent(newContent);
       setShowEditMentionMenu(false);
-      // Focus back on textarea
+
       setTimeout(() => {
         editTextareaRef.current?.focus();
         editTextareaRef.current?.setSelectionRange(
-          editMentionStartIndex + name.length + 2,
-          editMentionStartIndex + name.length + 2
+          editMentionStartIndex + token.length + 2,
+          editMentionStartIndex + token.length + 2,
         );
       }, 0);
-    } else {
-      const beforeMention = newComment.substring(0, mentionStartIndex);
-      const afterMention = newComment.substring(mentionStartIndex + mentionSearch.length + 1);
-      const newContent = `${beforeMention}@${name} ${afterMention}`;
-      setNewComment(newContent);
-      setShowMentionMenu(false);
-      // Focus back on textarea
-      setTimeout(() => {
-        textareaRef.current?.focus();
-        textareaRef.current?.setSelectionRange(
-          mentionStartIndex + name.length + 2,
-          mentionStartIndex + name.length + 2
-        );
-      }, 0);
+
+      return;
     }
+
+    const beforeMention = newComment.substring(0, mentionStartIndex);
+    const afterMention = newComment.substring(mentionStartIndex + mentionSearch.length + 1);
+    const newContent = `${beforeMention}@${token} ${afterMention}`;
+    setNewComment(newContent);
+    setShowMentionMenu(false);
+
+    setTimeout(() => {
+      textareaRef.current?.focus();
+      textareaRef.current?.setSelectionRange(
+        mentionStartIndex + token.length + 2,
+        mentionStartIndex + token.length + 2,
+      );
+    }, 0);
+  };
+
+  const buildMentionFeedback = (
+    result: Awaited<ReturnType<typeof workItemCommentsDb.addComment>>,
+    action: 'criado' | 'editado',
+  ) => {
+    const mentions = result.mentionTokens.length;
+    const notified = result.mentionedUserIds.length;
+    const notifErrors = result.notifErrors.length;
+
+    if (mentions === 0) {
+      return {
+        title: `Comentário ${action}`,
+        description: 'Seu comentário foi salvo com sucesso.',
+      };
+    }
+
+    if (notified > 0 && notifErrors === 0) {
+      return {
+        title: `Comentário ${action}`,
+        description: `${notified} pessoa${notified > 1 ? 's foram' : ' foi'} notificada${notified > 1 ? 's' : ''}.`,
+      };
+    }
+
+    if (notified > 0 && notifErrors > 0) {
+      return {
+        title: `Comentário ${action}`,
+        description: `${notified} pessoa${notified > 1 ? 's foram' : ' foi'} notificada${notified > 1 ? 's' : ''}, mas ${notifErrors} notificação(ões) falharam.`,
+      };
+    }
+
+    return {
+      title: `Comentário ${action}`,
+      description: 'A menção foi salva, mas nenhuma pessoa válida foi notificada.',
+    };
   };
 
   const addComment = async () => {
@@ -205,15 +254,14 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
-      await workItemCommentsDb.addComment(workItemId, userData.user.id, newComment.trim());
+      const result = await workItemCommentsDb.addComment(workItemId, userData.user.id, newComment.trim());
 
       setNewComment('');
-      fetchComments();
+      await fetchComments();
       onUpdate?.();
-      toast({
-        title: 'Comentário adicionado',
-        description: 'Seu comentário foi adicionado com sucesso.',
-      });
+
+      const feedback = buildMentionFeedback(result, 'criado');
+      toast(feedback);
     } catch (error) {
       console.error('Error adding comment:', error);
       toast({
@@ -245,15 +293,16 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
-      await workItemCommentsDb.updateComment(editingCommentId, userData.user.id, editingContent.trim());
+      const result = await workItemCommentsDb.updateComment(editingCommentId, userData.user.id, editingContent.trim());
 
       setEditingCommentId(null);
       setEditingContent('');
-      fetchComments();
+      await fetchComments();
       onUpdate?.();
+
       toast({
         title: 'Comentário editado',
-        description: 'Seu comentário foi atualizado com sucesso.',
+        description: result ? 'Seu comentário foi atualizado com sucesso.' : 'Seu comentário foi salvo.',
       });
     } catch (error) {
       console.error('Error editing comment:', error);
@@ -284,7 +333,7 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
 
       setDeleteDialogOpen(false);
       setCommentToDelete(null);
-      fetchComments();
+      await fetchComments();
       onUpdate?.();
       toast({
         title: 'Comentário excluído',
@@ -311,7 +360,7 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
   const getInitials = (name: string) => {
     return name
       .split(' ')
-      .map((n) => n[0])
+      .map((part) => part[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
@@ -324,24 +373,38 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
 
     let result = content;
     mentions.forEach(({ token, match }) => {
-      if (match) {
-        // Replace @token with highlighted version
-        const regex = new RegExp(`@${token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g');
-        result = result.replace(regex, `@${match.name}`);
+      if (!match) return;
+
+      const displayName = match.name.trim();
+      const tokenRegex = new RegExp(`@${escapeRegExp(token)}`, 'g');
+      const displayStartsWithToken = displayName.toLowerCase().startsWith(token.toLowerCase());
+
+      if (displayStartsWithToken) {
+        const remainder = displayName.slice(token.length).trim();
+        if (remainder) {
+          const fullNameRegex = new RegExp(`@${escapeRegExp(token)}(?:\\s+${escapeRegExp(remainder)})?`, 'g');
+          result = result.replace(fullNameRegex, `@${displayName}`);
+          return;
+        }
       }
+
+      result = result.replace(tokenRegex, `@${displayName}`);
     });
 
-    // Simple highlighting for @mentions
     const parts = result.split(/(@[\w.\-]+)/g);
     return parts.map((part, index) => {
-      if (part.startsWith('@')) {
-        return (
-          <span key={index} className="font-semibold text-blue-600 bg-blue-50 px-1 rounded">
-            {part}
-          </span>
-        );
+      if (!part.startsWith('@')) {
+        return part;
       }
-      return part;
+
+      return (
+        <span
+          key={index}
+          className="rounded-md bg-violet-500/15 px-1.5 py-0.5 font-semibold text-violet-200"
+        >
+          {part}
+        </span>
+      );
     });
   };
 
@@ -351,14 +414,11 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
 
   return (
     <div className="space-y-4">
-      <h3 className="text-sm font-semibold">
-        Comentários ({comments.length})
-      </h3>
+      <h3 className="text-sm font-semibold">Comentários ({comments.length})</h3>
 
-      {/* Comments list */}
-      <div ref={commentsContainerRef} className="space-y-3 max-h-60 overflow-y-auto">
+      <div ref={commentsContainerRef} className="max-h-60 space-y-3 overflow-y-auto">
         {comments.length === 0 ? (
-          <p className="text-sm text-muted-foreground text-center py-4">
+          <p className="py-4 text-center text-sm text-muted-foreground">
             Nenhum comentário ainda. Seja o primeiro a comentar!
           </p>
         ) : (
@@ -366,25 +426,21 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
             <div
               key={comment.id}
               id={`comment-${comment.id}`}
-              className={`flex gap-3 group transition-all duration-300 ${
-                highlightCommentId === comment.id ? 'ring-2 ring-blue-500 ring-offset-2 rounded-lg p-2' : ''
+              className={`group flex gap-3 transition-all duration-300 ${
+                highlightCommentId === comment.id ? 'rounded-lg p-2 ring-2 ring-blue-500 ring-offset-2' : ''
               }`}
             >
               <Avatar className="h-8 w-8 flex-shrink-0">
                 {comment.avatar_url ? (
                   <img src={comment.avatar_url} alt={comment.user_name} />
                 ) : (
-                  <AvatarFallback className="text-xs">
-                    {getInitials(comment.user_name)}
-                  </AvatarFallback>
+                  <AvatarFallback className="text-xs">{getInitials(comment.user_name)}</AvatarFallback>
                 )}
               </Avatar>
 
-              <div className="flex-1 space-y-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-medium">
-                    {comment.user_name}
-                  </span>
+              <div className="min-w-0 flex-1 space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-sm font-medium">{comment.user_name}</span>
                   <span className="text-xs text-muted-foreground">
                     {formatDistanceToNow(new Date(comment.created_at), {
                       addSuffix: true,
@@ -394,7 +450,6 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
                 </div>
 
                 {editingCommentId === comment.id ? (
-                  // Modo de edição
                   <div className="space-y-2">
                     <div className="relative">
                       <Textarea
@@ -405,15 +460,15 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
                         disabled={savingEdit}
                         autoFocus
                       />
-                      {showEditMentionMenu && (
+                      {showEditMentionMenu ? (
                         <MentionAutocomplete
                           search={editMentionSearch}
-                          onSelect={(userId, name) => handleMentionSelect(userId, name, true)}
+                          onSelect={(mentionedUser) => handleMentionSelect(mentionedUser, true)}
                           position={editMentionPosition}
                           companyId={companyId}
                           onClose={() => setShowEditMentionMenu(false)}
                         />
-                      )}
+                      ) : null}
                     </div>
                     <div className="flex gap-2">
                       <Button
@@ -421,7 +476,7 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
                         onClick={saveEdit}
                         disabled={!editingContent.trim() || savingEdit}
                       >
-                        <Check className="h-4 w-4 mr-1" />
+                        <Check className="mr-1 h-4 w-4" />
                         Salvar
                       </Button>
                       <Button
@@ -430,44 +485,43 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
                         onClick={cancelEditing}
                         disabled={savingEdit}
                       >
-                        <X className="h-4 w-4 mr-1" />
+                        <X className="mr-1 h-4 w-4" />
                         Cancelar
                       </Button>
                     </div>
                   </div>
                 ) : (
-                  // Modo de visualização
                   <div className="flex items-start gap-2">
-                    <p className="text-sm text-foreground whitespace-pre-wrap flex-1">
+                    <p className="flex-1 whitespace-pre-wrap text-sm text-foreground">
                       {renderContentWithMentions(comment.content, comment.mentions)}
                     </p>
 
-                    {canEditOrDelete(comment) && (
+                    {canEditOrDelete(comment) ? (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="h-6 w-6 opacity-0 transition-opacity group-hover:opacity-100"
                           >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => startEditing(comment)}>
-                            <Pencil className="h-4 w-4 mr-2" />
+                            <Pencil className="mr-2 h-4 w-4" />
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => confirmDelete(comment.id)}
                             className="text-destructive"
                           >
-                            <Trash2 className="h-4 w-4 mr-2" />
+                            <Trash2 className="mr-2 h-4 w-4" />
                             Excluir
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    )}
+                    ) : null}
                   </div>
                 )}
               </div>
@@ -476,7 +530,6 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
         )}
       </div>
 
-      {/* Add comment */}
       <div className="space-y-2">
         <div className="relative">
           <Textarea
@@ -487,35 +540,30 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey && !showMentionMenu) {
                 e.preventDefault();
-                addComment();
+                void addComment();
               }
             }}
             className="min-h-[60px] resize-none"
             disabled={submitting}
           />
-          {showMentionMenu && (
+          {showMentionMenu ? (
             <MentionAutocomplete
               search={mentionSearch}
-              onSelect={(userId, name) => handleMentionSelect(userId, name, false)}
+              onSelect={(mentionedUser) => handleMentionSelect(mentionedUser, false)}
               position={mentionPosition}
               companyId={companyId}
               onClose={() => setShowMentionMenu(false)}
             />
-          )}
+          ) : null}
         </div>
         <div className="flex justify-end">
-          <Button
-            size="sm"
-            onClick={addComment}
-            disabled={!newComment.trim() || submitting}
-          >
-            <Send className="h-4 w-4 mr-1" />
+          <Button size="sm" onClick={() => void addComment()} disabled={!newComment.trim() || submitting}>
+            <Send className="mr-1 h-4 w-4" />
             Enviar
           </Button>
         </div>
       </div>
 
-      {/* Dialog de confirmação de exclusão */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -525,11 +573,9 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingComment}>
-              Cancelar
-            </AlertDialogCancel>
+            <AlertDialogCancel disabled={deletingComment}>Cancelar</AlertDialogCancel>
             <AlertDialogAction
-              onClick={deleteComment}
+              onClick={() => void deleteComment()}
               disabled={deletingComment}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >

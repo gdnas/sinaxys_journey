@@ -1,16 +1,75 @@
 import { supabase } from "@/integrations/supabase/client";
 import * as notificationsDb from "@/lib/notificationsDb";
 
-function normalizeText(s: string) {
+type MentionProfile = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  company_id?: string | null;
+};
+
+function normalizeText(value: string) {
   try {
-    return s
+    return value
       .normalize("NFD")
       .replace(/\p{Diacritic}/gu, "")
       .toLowerCase()
       .trim();
   } catch {
-    return String(s).toLowerCase().trim();
+    return String(value).toLowerCase().trim();
   }
+}
+
+function normalizeMentionToken(value: string) {
+  return normalizeText(value)
+    .replace(/\s+/g, ".")
+    .replace(/[^a-z0-9._-]/g, "");
+}
+
+function getEmailMentionToken(email: string | null | undefined) {
+  const prefix = String(email ?? "").split("@")[0] ?? "";
+  return normalizeMentionToken(prefix);
+}
+
+function getNameMentionToken(name: string | null | undefined) {
+  return normalizeMentionToken(String(name ?? ""));
+}
+
+function getDisplayName(profile: MentionProfile) {
+  return profile.name?.trim() || profile.email?.trim() || profile.id;
+}
+
+function extractMentionTokens(content: string) {
+  const mentionRegex = /@([\w.\-]+)/g;
+  return Array.from(new Set(Array.from(content.matchAll(mentionRegex)).map((match) => match[1])));
+}
+
+function resolveMentionMatch(token: string, profiles: MentionProfile[]) {
+  const normalizedToken = normalizeMentionToken(token);
+  const exactByEmail = profiles.find((profile) => getEmailMentionToken(profile.email) === normalizedToken);
+  if (exactByEmail) return exactByEmail;
+
+  const exactByName = profiles.find((profile) => getNameMentionToken(getDisplayName(profile)) === normalizedToken);
+  if (exactByName) return exactByName;
+
+  const startsWithName = profiles.find((profile) => getNameMentionToken(getDisplayName(profile)).startsWith(normalizedToken));
+  if (startsWithName) return startsWithName;
+
+  return (
+    profiles.find((profile) => normalizeText(getDisplayName(profile)).includes(normalizeText(token))) ?? null
+  );
+}
+
+async function listCompanyMentionProfiles(companyId: string) {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, name, email, company_id")
+    .eq("company_id", companyId)
+    .eq("active", true)
+    .order("name", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as MentionProfile[];
 }
 
 export async function getComments(workItemId: string, page = 0, perPage = 20) {
@@ -31,57 +90,54 @@ export async function getComments(workItemId: string, page = 0, perPage = 20) {
 
   if (rows.length === 0) return { rows: [], total };
 
-  // Fetch author profiles (including company_id) for each comment author
-  const userIds = Array.from(new Set(rows.map((r: any) => r.user_id)));
-  const { data: profiles } = await supabase.from("profiles").select("id, name, avatar_url, company_id").in("id", userIds);
+  const userIds = Array.from(new Set(rows.map((row: any) => row.user_id)));
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id, name, avatar_url, company_id")
+    .in("id", userIds);
 
   const profilesById: Record<string, any> = {};
-  (profiles ?? []).forEach((p: any) => (profilesById[p.id] = p));
+  (profiles ?? []).forEach((profile: any) => {
+    profilesById[profile.id] = profile;
+  });
 
-  const mentionRegex = /@([\w.\-]+)/g;
+  const companyProfilesCache = new Map<string, MentionProfile[]>();
+  const enrichedRows: any[] = [];
 
-  // Resolve mentions per-comment and restrict matches to the author's company
-  const enrichedRows = [] as any[];
-  for (const r of rows) {
-    const text = r.content ?? "";
-    const tokens = Array.from(new Set(Array.from(text.matchAll(mentionRegex) ?? []).map((m: any) => m[1])));
+  for (const row of rows) {
+    const authorCompany = profilesById[row.user_id]?.company_id ?? null;
+    const mentionTokens = extractMentionTokens(row.content ?? "");
     const mentionMap: { token: string; match: { id: string; name: string } | null }[] = [];
 
-    const authorCompany = profilesById[r.user_id]?.company_id ?? null;
+    if (authorCompany && mentionTokens.length > 0) {
+      let companyProfiles = companyProfilesCache.get(authorCompany);
+      if (!companyProfiles) {
+        companyProfiles = await listCompanyMentionProfiles(authorCompany);
+        companyProfilesCache.set(authorCompany, companyProfiles);
+      }
 
-    if (tokens.length && authorCompany) {
-      for (const t of tokens) {
-        // search for profiles within the same company first
-        const qname = await supabase
-          .from("profiles")
-          .select("id,name,email,company_id")
-          .ilike("name", `%${t}%`)
-          .eq("company_id", authorCompany)
-          .limit(10);
-        const qemail = await supabase
-          .from("profiles")
-          .select("id,name,email,company_id")
-          .like("email", `${t}%`)
-          .eq("company_id", authorCompany)
-          .limit(10);
-        const found = [...(qname.data ?? []), ...(qemail.data ?? [])];
-        const unique = Array.from(new Map(found.map((p: any) => [p.id, p])).values());
-        const matches = unique
-          .map((p: any) => ({ id: p.id, name: p.name ?? p.email, nameNorm: normalizeText(p.name ?? p.email) }))
-          .filter((p: any) => p.nameNorm.includes(normalizeText(t)) || p.nameNorm.startsWith(normalizeText(t)));
-        const chosen = matches[0] ? { id: matches[0].id, name: matches[0].name } : null;
-        mentionMap.push({ token: t, match: chosen });
+      for (const token of mentionTokens) {
+        const match = resolveMentionMatch(token, companyProfiles);
+        mentionMap.push({
+          token,
+          match: match
+            ? {
+                id: match.id,
+                name: getDisplayName(match),
+              }
+            : null,
+        });
       }
     }
 
     enrichedRows.push({
-      id: r.id,
-      content: r.content,
-      user_id: r.user_id,
-      created_at: r.created_at,
-      work_item_id: r.work_item_id,
-      user_name: profilesById[r.user_id]?.name ?? r.user_id,
-      avatar_url: profilesById[r.user_id]?.avatar_url ?? null,
+      id: row.id,
+      content: row.content,
+      user_id: row.user_id,
+      created_at: row.created_at,
+      work_item_id: row.work_item_id,
+      user_name: profilesById[row.user_id]?.name ?? row.user_id,
+      avatar_url: profilesById[row.user_id]?.avatar_url ?? null,
       mentions: mentionMap,
     });
   }
@@ -90,7 +146,6 @@ export async function getComments(workItemId: string, page = 0, perPage = 20) {
 }
 
 export async function addComment(workItemId: string, userId: string, content: string) {
-  // First, get the work item to know the project_id
   const { data: workItem } = await supabase
     .from("work_items")
     .select("project_id, tenant_id")
@@ -109,94 +164,73 @@ export async function addComment(workItemId: string, userId: string, content: st
   if (error) throw error;
   const comment = data?.[0];
 
-  const notifErrors: { mentionedUserId: string; error: any }[] = [];
+  const notifErrors: { mentionedUserId: string; error: unknown }[] = [];
   const mentionedUserIds: string[] = [];
   const resolvedProfiles: { token: string; id: string; name: string }[] = [];
-  const mentionTokens: string[] = [];
+  const mentionTokens = extractMentionTokens(content);
 
   try {
-    const mentionRegex = /@([\w.\-]+)/g;
-    const matches = Array.from(new Set(Array.from(content.matchAll(mentionRegex)).map((m) => m[1])));
-    
-    if (matches.length > 0) {
-      mentionTokens.push(...matches);
+    if (mentionTokens.length > 0) {
       const { data: authorProfile } = await supabase
         .from("profiles")
-        .select("id, company_id, name, email")
+        .select("id, company_id")
         .eq("id", userId)
         .maybeSingle();
+
       const authorCompany = authorProfile?.company_id ?? null;
+      if (authorCompany) {
+        const companyProfiles = await listCompanyMentionProfiles(authorCompany);
+        const resolvedUsers = new Map<string, { id: string; name: string; token: string }>();
 
-      // Enforce: mentions must resolve to profiles within the same company. If author's company is not set, do not notify anyone.
-      if (!authorCompany) {
-        // skip mention resolution to avoid cross-company notifications
-      } else {
-        const resolved: string[] = [];
-        for (const name of matches) {
-          let q;
-          q = await supabase
-            .from("profiles")
-            .select("id, name, email, company_id")
-            .ilike("name", `%${name}%`)
-            .eq("company_id", authorCompany)
-            .limit(1)
-            .maybeSingle();
+        for (const token of mentionTokens) {
+          const match = resolveMentionMatch(token, companyProfiles);
+          if (!match || match.id === userId) continue;
 
-          if (q.data && q.data.id) {
-            const mentionedId = q.data.id;
-            if (mentionedId !== userId) resolved.push(mentionedId);
-            if (q.data && q.data.id) resolvedProfiles.push({ token: name, id: q.data.id, name: q.data.name ?? q.data.email });
-            continue;
-          }
-
-          let q2;
-          q2 = await supabase
-            .from("profiles")
-            .select("id, name, email, company_id")
-            .like("email", `${name}%`)
-            .eq("company_id", authorCompany)
-            .limit(1)
-            .maybeSingle();
-          
-          if (q2.data && q2.data.id) {
-            const mentionedId = q2.data.id;
-            if (mentionedId !== userId) resolved.push(mentionedId);
-            resolvedProfiles.push({ token: name, id: q2.data.id, name: q2.data.name ?? q2.data.email });
-          }
+          resolvedProfiles.push({
+            token,
+            id: match.id,
+            name: getDisplayName(match),
+          });
+          resolvedUsers.set(match.id, {
+            id: match.id,
+            name: getDisplayName(match),
+            token,
+          });
         }
 
-        // Create notifications for each mentioned user
-        for (const mentionedUserId of resolved) {
+        for (const mentionedUser of resolvedUsers.values()) {
           try {
             const title = "Você foi mencionado em um comentário de tarefa";
-            const snippet = content.length > 200 ? content.slice(0, 200) + "…" : content;
+            const snippet = content.length > 200 ? `${content.slice(0, 200)}…` : content;
             const href = `/app/projetos/${workItem.project_id}/tarefas?taskId=${workItemId}&commentId=${comment.id}`;
 
             await notificationsDb.createNotification({
-              userId: mentionedUserId,
+              userId: mentionedUser.id,
               actorUserId: userId,
               title,
               content: snippet,
               href,
               notifType: "work_item_mention",
             });
-            mentionedUserIds.push(mentionedUserId);
-          } catch (ne) {
-            notifErrors.push({ mentionedUserId, error: ne });
+
+            mentionedUserIds.push(mentionedUser.id);
+          } catch (notificationError) {
+            notifErrors.push({
+              mentionedUserId: mentionedUser.id,
+              error: notificationError,
+            });
           }
         }
       }
     }
-  } catch (e) {
-    // ignore mention errors
-    console.error("[workItemCommentsDb] Error processing mentions:", e);
+  } catch (mentionError) {
+    console.error("[workItemCommentsDb] Error processing mentions:", mentionError);
   }
 
   return { comment, notifErrors, mentionedUserIds, mentionTokens, resolvedProfiles };
 }
 
 export async function updateComment(commentId: string, userId: string, content: string) {
-  // Get the comment to check ownership and get work_item_id
   const { data: existingComment } = await supabase
     .from("work_item_comments")
     .select("id, work_item_id, user_id, content")
@@ -211,7 +245,6 @@ export async function updateComment(commentId: string, userId: string, content: 
     throw new Error("You can only edit your own comments");
   }
 
-  // Get the work item to know the project_id
   const { data: workItem } = await supabase
     .from("work_items")
     .select("project_id")
@@ -222,20 +255,10 @@ export async function updateComment(commentId: string, userId: string, content: 
     throw new Error("Work item not found");
   }
 
-  // Extract old mentions
-  const oldMentions = new Set(
-    Array.from((existingComment.content ?? "").matchAll(/@([\w.\-]+)/g) ?? []).map((m) => m[1])
-  );
+  const oldMentions = new Set(extractMentionTokens(existingComment.content ?? ""));
+  const newMentions = new Set(extractMentionTokens(content));
+  const addedMentions = Array.from(newMentions).filter((mention) => !oldMentions.has(mention));
 
-  // Extract new mentions
-  const newMentions = new Set(
-    Array.from(content.matchAll(/@([\w.\-]+)/g) ?? []).map((m) => m[1])
-  );
-
-  // Find newly added mentions (in new but not in old)
-  const addedMentions = Array.from(newMentions).filter((m) => !oldMentions.has(m));
-
-  // Update the comment
   const { data, error } = await supabase
     .from("work_item_comments")
     .update({ content, updated_at: new Date().toISOString() })
@@ -246,69 +269,43 @@ export async function updateComment(commentId: string, userId: string, content: 
 
   if (error) throw error;
 
-  // Create notifications only for newly added mentions
   if (addedMentions.length > 0) {
     try {
       const { data: authorProfile } = await supabase
         .from("profiles")
-        .select("id, company_id, name, email")
+        .select("id, company_id")
         .eq("id", userId)
         .maybeSingle();
+
       const authorCompany = authorProfile?.company_id ?? null;
-
       if (authorCompany) {
-        for (const name of addedMentions) {
-          let q;
-          q = await supabase
-            .from("profiles")
-            .select("id, name, email, company_id")
-            .ilike("name", `%${name}%`)
-            .eq("company_id", authorCompany)
-            .limit(1)
-            .maybeSingle();
+        const companyProfiles = await listCompanyMentionProfiles(authorCompany);
+        const resolvedUsers = new Map<string, { id: string; name: string; token: string }>();
 
-          if (q.data && q.data.id && q.data.id !== userId) {
-            const title = "Você foi mencionado em um comentário de tarefa";
-            const snippet = content.length > 200 ? content.slice(0, 200) + "…" : content;
-            const href = `/app/projetos/${workItem.project_id}/tarefas?taskId=${existingComment.work_item_id}&commentId=${commentId}`;
+        for (const token of addedMentions) {
+          const match = resolveMentionMatch(token, companyProfiles);
+          if (!match || match.id === userId) continue;
 
-            await notificationsDb.createNotification({
-              userId: q.data.id,
-              actorUserId: userId,
-              title,
-              content: snippet,
-              href: `/app/projetos/${workItem.project_id}/tarefas?taskId=${existingComment.work_item_id}&commentId=${commentId}`,
-              notifType: "work_item_mention",
-            });
-            continue;
-          }
+          resolvedUsers.set(match.id, {
+            id: match.id,
+            name: getDisplayName(match),
+            token,
+          });
+        }
 
-          let q2;
-          q2 = await supabase
-            .from("profiles")
-            .select("id, name, email, company_id")
-            .like("email", `${name}%`)
-            .eq("company_id", authorCompany)
-            .limit(1)
-            .maybeSingle();
-          if (q2.data && q2.data.id && q2.data.id !== userId) {
-            const title = "Você foi mencionado em um comentário de tarefa";
-            const snippet = content.length > 200 ? content.slice(0, 200) + "…" : content;
-            const href = `/app/projetos/${workItem.project_id}/tarefas?taskId=${existingComment.work_item_id}&commentId=${commentId}`;
-
-            await notificationsDb.createNotification({
-              userId: q2.data.id,
-              actorUserId: userId,
-              title,
-              content: snippet,
-              href: `/app/projetos/${workItem.project_id}/tarefas?taskId=${existingComment.work_item_id}&commentId=${commentId}`,
-              notifType: "work_item_mention",
-            });
-          }
+        for (const mentionedUser of resolvedUsers.values()) {
+          await notificationsDb.createNotification({
+            userId: mentionedUser.id,
+            actorUserId: userId,
+            title: "Você foi mencionado em um comentário de tarefa",
+            content: content.length > 200 ? `${content.slice(0, 200)}…` : content,
+            href: `/app/projetos/${workItem.project_id}/tarefas?taskId=${existingComment.work_item_id}&commentId=${commentId}`,
+            notifType: "work_item_mention",
+          });
         }
       }
-    } catch (e) {
-      console.error("[workItemCommentsDb] Error processing new mentions on edit:", e);
+    } catch (mentionError) {
+      console.error("[workItemCommentsDb] Error processing new mentions on edit:", mentionError);
     }
   }
 
