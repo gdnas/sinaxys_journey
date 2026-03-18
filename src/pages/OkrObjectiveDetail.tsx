@@ -4,7 +4,7 @@ const OkrObjectiveDetail = () => {
   const { toast } = useToast();
   const { data: deliverables = [] } = useQuery({
     queryKey: ["okr-deliverables", objectiveId],
-    enabled: objectiveId ? krIds.length > 0,
+    enabled: objectiveId && krIds.length > 0,
     queryFn: () => listDeliverables(objectiveId),
   });
 
