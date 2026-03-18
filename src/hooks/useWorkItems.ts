@@ -20,6 +20,7 @@ export default function useWorkItems(projectId: string) {
         .from('work_items')
         .select('id, title, description, status, priority, assignee_user_id, parent_id, due_date, start_date, created_at')
         .eq('project_id', projectId)
+        .is('parent_id', null)  // ✅ Mostrar apenas tarefas principais no Kanban
         .order('created_at', { ascending: false });
 
       if (err) throw err;
