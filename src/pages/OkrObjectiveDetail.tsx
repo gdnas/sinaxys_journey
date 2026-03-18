@@ -39,56 +39,48 @@ const OkrObjectiveDetail = () => {
     const sortedOrigins = Object.keys(grouped).sort();
 
     return (
-      <>
+      <div>
         {sortedOrigins.map((origin) => (
-          <>
-            <div className="mb-4">
-              <h3 className="text-lg font-semibold">{getTaskOriginLabel(origin)}</h3>
-            </div>
-            {grouped[origin].map((task) => (
-              <TaskCard 
-                task={task}
-                assigneeName={task.assignee_user_id ? getUserName(task.assignee_id) : "Sem responsável"}
-                editable={canReadTasks.data[task.id]}
-                key={task.key_result_id}
-                deliverable={task.deliverable_id}
-                project={task.project_id}
-                onToggle={() => {
-                  if (!canReadTasks.data[task.id]) return;
-                  setToast({ title: "Sem permissão para alternar status", variant: "deliverative" });
-                  }}
-                onOpen={() => {
-                  if (!canReadTasks.data[task.id]) return;
-                  setToast({ title: "Sem permissão para ver detalhes", variant: "deliverative" });
-                  }}
-                />
-              ))}
-          </div>
-        ))}
-      </>
-    );
-  };
-
-  // Render principal
-  return (
-    <>
-      {sortedOrigins.map((origin) => {
-          <div key={origin}>
-            <h2 className="text-xl font-semibold mb-6">{getTaskOriginLabel(origin)}</h2>
-            </h2>
+          <div key={origin} className="mb-6">
+            <h3 className="text-lg font-semibold mb-4">{getTaskOriginLabel(origin)}</h3>
             {grouped[origin].map((task) => (
               <TaskCard 
                 task={task}
                 assigneeName={task.assignee_user_id ? getUserName(task.assignee_user_id) : "Sem responsável"}
                 editable={canReadTasks.data[task.id]}
                 key={task.key_result_id}
-                deliverable={task.deliverable_id}
-                project={task.project_id}
+                onToggle={() => {
+                  if (!canReadTasks.data[task.id]) return;
+                  setToast({ title: "Sem permissão para alternar status", variant: "destructive" });
+                }}
+                onOpen={() => {
+                  if (!canReadTasks.data[task.id]) return;
+                  setToast({ title: "Sem permissão para ver detalhes", variant: "destructive" });
+                }}
+                onEdit={() => {
+                  if (!canReadTasks.data[task.id]) return;
+                  setToast({ title: "Sem permissão para editar", variant: "destructive" });
+                }}
+                onDelete={() => {
+                  if (!canReadTasks.data[task.id]) return;
+                  setToast({ title: "Sem permissão para excluir", variant: "destructive" });
+                }}
               />
             ))}
           </div>
         ))}
-      </>
+      </div>
     );
   };
+
+  // Render principal
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-6">Detalhes do Objetivo</h1>
+      <div className="mb-4">
+        <span className="text-sm text-muted-foreground">Nível: {deliverableTier}</span>
+      </div>
+      {tasks.length > 0 && renderTasksByOrigin(tasks)}
+    </div>
+  );
 };
