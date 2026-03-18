@@ -40,11 +40,10 @@ import {
   listOkrObjectives,
   listOkrObjectivesByCycle,
   listKeyResultsByObjectiveIds,
-  listOkrKeyResults,
   listKeyResults,
   listDeliverables,
   listDeliverablesByKeyResultIds,
-  listDeliverablesDateHistory,
+  listDeliverableDateHistory,
   listStrategyObjectives,
   listPerformanceIndicators,
   listTasksByDeliverableIds,
@@ -52,12 +51,9 @@ import {
   listTasksForDepartment,
   listTasksForUser,
   listTasksForUserWithContext,
-  listTasksByDeliverableIds,
-  listTasksForUserWithContext,
   listOkrObjectivesForOwner,
   listKrChangeLogs,
   getCompanyFundamentals,
-  listDeliverableDateHistory,
   createOkrObjective,
   createKeyResult,
   createOkrCycle,
@@ -86,6 +82,14 @@ import {
   togglePerformanceIndicatorAchieved,
   krProgressPct,
   piProgressPct,
+  type DbOkrObjective,
+  type DbOkrCycle,
+  type DbStrategyObjective,
+  type CycleType,
+  type CycleStatus,
+  type ObjectiveLevel,
+  type KrKind,
+  type KrConfidence,
 } from "@/lib/okrDb";
 import { listStrategyObjectives, type DbStrategyObjective } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
@@ -97,9 +101,9 @@ const SELECT_NONE = "__none__";
 
 type OkrCyclesScope = "quarter" | "year";
 
-function cycleLabel(c: { type: CycleType; year: number; quarter: number | null; name: string | null }) {
+function cycleLabel(c: DbOkrCycle) {
   const base = c.type === "ANNUAL" ? `${c.year}` : `Q${c.quarter ?? "?"} / ${c.year}`;
-  return c.name?.trim() ? `${c.name} · ${base}` : base;
+  return c.name ? `${c.name} · ${base}` : base;
 }
 
 function levelBadge(level: ObjectiveLevel) {
@@ -354,13 +358,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
     if (existing) return existing;
 
     // Use edge function so non-admin users can still open cycles as needed.
-    const created = await ensureOkrCycle({
-      type: "ANNUAL",
-      year: currentYear,
-      quarter: null,
-      status: "ACTIVE",
-      name: null,
-    });
+    const created = await ensureOkrCycle(cid, "ANNUAL", currentYear, null);
 
     await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
     return created.id;
@@ -371,13 +369,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
     const existing = cycles.find((c) => c.type === "QUARTERLY" && c.year === currentYear && c.quarter === q)?.id ?? null;
     if (existing) return existing;
 
-    const created = await ensureOkrCycle({
-      type: "QUARTERLY",
-      year: currentYear,
-      quarter: q,
-      status: "ACTIVE",
-      name: null,
-    });
+    const created = await ensureOkrCycle(cid, "QUARTERLY", currentYear, q);
 
     await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
     return created.id;
@@ -615,13 +607,7 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
                 if (cycleSaving) return;
                 setCycleSaving(true);
                 try {
-                  const ensured = await ensureOkrCycle({
-                    type: cycleType,
-                    year: cycleYear,
-                    quarter: cycleType === "QUARTERLY" ? cycleQuarter : null,
-                    status: cycleStatus,
-                    name: cycleName.trim() || null,
-                  });
+                  const ensured = await ensureOkrCycle(cid, cycleType, cycleYear, cycleType === "QUARTERLY" ? cycleQuarter : null);
 
                   await qc.invalidateQueries({ queryKey: ["okr-cycles", cid] });
                   setCycleId(ensured.id);

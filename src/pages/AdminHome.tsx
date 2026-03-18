@@ -110,7 +110,7 @@ export default function AdminHome() {
   const { data: weekCompanyTasks = [] } = useQuery({
     queryKey: ["home-admin", "okr-company", companyId, weekFrom, weekTo],
     enabled,
-    queryFn: () => listTasksForCompany(String(companyId), { from: weekFrom, to: weekTo }),
+    queryFn: () => listTasksForCompany(String(companyId), weekFrom, weekTo),
   });
 
   const { data: vacationRows = [] } = useQuery({

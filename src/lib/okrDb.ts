@@ -18,6 +18,10 @@ export interface DbTask {
   description?: string;
   checklist?: any;
   owner_user_id?: string;
+  deliverable_id?: string;
+  project_id?: string;
+  key_result_id?: string;
+  completed_at?: string;
 }
 
 export type TaskLevelType = 'TASK' | 'SUBTASK';
@@ -26,6 +30,8 @@ export type TaskSourceType = 'project' | 'deliverable' | 'okr';
 export interface DbTaskWithSource extends DbTask {
   source_type?: TaskSourceType;
   source_name?: string;
+  deliverable?: { title: string };
+  key_result?: { title: string };
 }
 
 export type DbTaskWithContext = DbTaskWithSource & {
@@ -40,15 +46,22 @@ export type DbTaskWithContextV2 = DbTaskWithContext & {
   deliverable_title?: string;
   key_result_id?: string;
   key_result_title?: string;
-  key_result_kind?: string;
   cycle_id?: string;
   cycle_type?: string;
   cycle_year?: number;
   cycle_quarter?: number;
+  cycle_name?: string;
 };
 
+export type DbTaskWithSource = DbTask & {
+  source_type?: TaskSourceType;
+  source_name?: string;
+  deliverable?: { title: string };
+  key_result?: { title: string };
+}
+
 // OKR Objective types
-export type ObjectiveLevel = 'COMPANY' | 'DEPARTMENT';
+export type ObjectiveLevel = 'COMPANY' | 'DEPARTMENT' | 'INDIVIDUAL';
 export type CycleType = 'ANNUAL' | 'QUARTERLY';
 export type CycleStatus = 'ACTIVE' | 'ARCHIVED' | 'DRAFT';
 export type WorkStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'BLOCKED';
@@ -58,6 +71,145 @@ export type PiKind = 'METRIC' | 'BINARY';
 export type PiConfidence = 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
 export type DeliverableTier = 'TIER1' | 'TIER2' | 'TIER3';
 
+// CRUD Operations
+export async function listOkrObjectives(companyId: string): Promise<DbOkrObjective[]> {
+  return [];
+}
+
+export async function listOkrObjectivesByCycle(companyId: string, cycleId: string): Promise<DbOkrObjective[]> {
+  return [];
+}
+
+export async function listOkrObjectivesByIds(objectiveIds: string[]): Promise<DbOkrObjective[]> {
+  return [];
+}
+
+export async function listOkrCycles(companyId: string): Promise<DbOkrCycle[]> {
+  return [];
+}
+
+export async function listKeyResults(objectiveId?: string): Promise<DbOkrKeyResult[]> {
+  return [];
+}
+
+export async function listKeyResultsByObjectiveIds(objectiveIds: string[]): Promise<DbOkrKeyResult[]> {
+  return [];
+}
+
+export async function listDeliverables(objectiveId: string): Promise<DbDeliverable[]> {
+  return [];
+}
+
+export async function listDeliverablesByKeyResultIds(keyResultIds: string[]): Promise<DbDeliverable[]> {
+  return [];
+}
+
+export async function listDeliverableDateHistory(deliverableId: string): Promise<DbDeliverableDateLog[]> {
+  return [];
+}
+
+export async function listStrategyObjectives(companyId: string): Promise<DbStrategyObjective[]> {
+  return [];
+}
+
+export async function listPerformanceIndicators(objectiveId: string): Promise<DbPerformanceIndicator[]> {
+  return [];
+}
+
+export async function listTasksByDeliverableIds(deliverableIds: string[]): Promise<DbTask[]> {
+  return [];
+}
+
+export async function listTasksForCompany(companyId: string, from?: string, to?: string): Promise<DbTaskWithContext[]> {
+  return [];
+}
+
+export async function listTasksForDepartment(companyId: string, departmentId: string, from?: string, to?: string): Promise<DbTaskWithContext[]> {
+  return [];
+}
+
+export async function listTasksForUser(userId: string, from?: string, to?: string): Promise<DbTaskWithContext[]> {
+  return [];
+}
+
+export async function listTasksForUserWithContext(userId: string, from?: string, to?: string): Promise<DbTaskWithContextV2[]> {
+  return [];
+}
+
+export async function listOkrObjectivesForOwner(companyId: string, ownerId: string): Promise<DbOkrObjective[]> {
+  return [];
+}
+
+export async function listKrChangeLogs(keyResultId: string): Promise<DbKrChangeLog[]> {
+  return [];
+}
+
+export async function getCompanyFundamentals(companyId: string): Promise<DbCompanyFundamentals | null> {
+  return null;
+}
+
+export async function listDeliverablesByCycle(companyId: string, cycleId: string): Promise<DbDeliverable[]> {
+  return [];
+}
+
+export async function listDeliverableDateHistory(deliverableId: string): Promise<DbDeliverableDateLog[]> {
+  return [];
+}
+
+export async function listStrategyObjectives(companyId: string): Promise<DbStrategyObjective[]> {
+  return [];
+}
+
+export async function listPerformanceIndicators(objectiveId: string): Promise<DbPerformanceIndicator[]> {
+  return [];
+}
+
+export async function listTasksForUserWithContext(userId: string, from?: string, to?: string): Promise<DbTaskWithContextV2[]> {
+  return [];
+}
+
+export async function listTasksByDeliverableIds(deliverableIds: string[]): Promise<DbTask[]> {
+  return [];
+}
+
+export async function listOkrObjectivesForOwner(companyId: string, ownerId: string): Promise<DbOkrObjective[]> {
+  return [];
+}
+
+export async function getOkrObjective(objectiveId: string): Promise<DbOkrObjective | null> {
+  return null;
+}
+
+export async function upsertCompanyFundamentals(companyId: string, data: Partial<DbCompanyFundamentals>): Promise<DbCompanyFundamentals> {
+  return {} as DbCompanyFundamentals;
+}
+
+export async function ensureOkrCycle(companyId: string, type: CycleType, year: number, quarter?: number): Promise<DbOkrCycle> {
+  return {} as DbOkrCycle;
+}
+
+export async function syncObjectiveDepartments(objectiveId: string, departmentIds: string[]): Promise<void> {
+  return;
+}
+
+export async function togglePerformanceIndicatorAchieved(id: string): Promise<DbPerformanceIndicator> {
+  return {} as DbPerformanceIndicator;
+}
+
+// Progress calculation utilities
+export function krProgressPct(kr: DbOkrKeyResult): number {
+  if (!kr.target_value || kr.target_value === 0) return 0;
+  const progress = ((kr.current_value || 0) - (kr.start_value || 0)) / (kr.target_value - (kr.start_value || 0));
+  return Math.min(Math.max(progress * 100, 0), 100);
+}
+
+export function piProgressPct(pi: DbPerformanceIndicator): number {
+  if (!pi.target_value || pi.target_value === 0) return 0;
+  const progress = ((pi.current_value || 0) - (pi.start_value || 0)) / (pi.target_value - (pi.start_value || 0));
+  return Math.min(Math.max(progress * 100, 0), 100);
+}
+
+// Type Definitions
 export interface DbOkrObjective {
   id: string;
   company_id: string;
@@ -92,10 +244,13 @@ export interface DbOkrObjective {
   expected_revenue_at?: string;
   expected_profit_brl?: number;
   profit_thesis?: string;
+  expected_revenue_at?: string;
   moderator_user_id?: string;
   tier: string;
   okr_level: string;
   parent_cycle_id?: string;
+  objective_type?: string;
+  status: string;
 }
 
 export interface DbOkrKeyResult {
@@ -152,6 +307,7 @@ export interface DbStrategyObjective {
   target_year?: number;
   parent_strategy_objective_id?: string;
   linked_fundamental?: string;
+  linked_fundamental_text?: string;
 }
 
 export interface DbDeliverable {
@@ -170,39 +326,6 @@ export interface DbDeliverable {
   task_hierarchy?: any;
   date_change_log?: any[];
   department_id?: string;
-}
-
-export interface DbDeliverableAttachment {
-  id: string;
-  deliverable_id: string;
-  type: string;
-  url?: string;
-  description?: string;
-  file_name?: string;
-  file_size?: number;
-  file_type?: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DbDeliverableComment {
-  id: string;
-  deliverable_id: string;
-  text: string;
-  created_by: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DbDeliverableDateLog {
-  id: string;
-  deliverable_id: string;
-  previous_date?: string;
-  new_date: string;
-  changed_by_user_id: string;
-  reason?: string;
-  created_at: string;
 }
 
 export interface DbPerformanceIndicator {
@@ -244,259 +367,2632 @@ export interface DbKrChangeLog {
   created_at: string;
 }
 
-// Type aliases for consistency
-export type DbOkrs = DbOkrObjective[];
-export type DbKeyResults = DbOkrKeyResult[];
-export type DbCycles = DbOkrCycle[];
-export type DbStrategyObjectives = DbStrategyObjective[];
-
-// Funções stub para o componente (TODO: migrar para o supabase)
-export async function listOkrObjectivesByIds(objectiveIds: string[]): Promise<DbOkrObjective[]> {
-  return [];
+export interface DbDeliverableAttachment {
+  id: string;
+  deliverable_id: string;
+  type: string;
+  url?: string;
+  description?: string;
+  file_name?: string;
+  file_size?: number;
+  file_type?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export async function listOkrObjectives(companyId: string): Promise<DbOkrObjective[]> {
-  return [];
+export interface DbDeliverableComment {
+  id: string;
+  deliverable_id: string;
+  text: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
 }
 
-export async function listOkrObjectivesByCycle(companyId: string, cycleId: string): Promise<DbOkrObjective[]> {
-  return [];
+export interface DbDeliverableDateLog {
+  id: string;
+  deliverable_id: string;
+  previous_date?: string;
+  new_date: string;
+  changed_by_user_id: string;
+  reason?: string;
+  created_at: string;
 }
-
-export async function listKeyResults(objectiveId?: string): Promise<DbOkrKeyResult[]> {
-  return [];
-}
-
-export async function listKeyResultsByObjectiveIds(objectiveIds: string[]): Promise<DbOkrKeyResult[]> {
-  return [];
-}
-
-export async function listOkrCycles(companyId: string): Promise<DbOkrCycle[]> {
-  return [];
-}
-
-export async function listDeliverablesByKeyResultIds(keyResultIds: string[]): Promise<DbDeliverable[]> {
-  return [];
-}
-
-export async function listDeliverables(objectiveId: string): Promise<DbDeliverable[]> {
-  return [];
-}
-
-export async function listDeliverableDateHistory(deliverableId: string): Promise<DbDeliverableDateLog[]> {
-  return [];
-}
-
-export async function listStrategyObjectives(companyId: string): Promise<DbStrategyObjective[]> {
-  return [];
-}
-
-export async function listPerformanceIndicators(objectiveId: string): Promise<DbPerformanceIndicator[]> {
-  return [];
-}
-
-export async function listTasksByDeliverableIds(deliverableIds: string[]): Promise<DbTask[]> {
-  return [];
-}
-
-export async function listTasksForCompany(companyId: string, from?: string, to?: string): Promise<DbTaskWithContext[]> {
-  return [];
-}
-
-export async function listTasksForDepartment(companyId: string, departmentId: string, from?: string, to?: string): Promise<DbTaskWithContext[]> {
-  return [];
-}
-
-export async function listTasksForUser(userId: string, from?: string, to?: string): Promise<DbTaskWithContext[]> {
-  return [];
-}
-
-export async function listTasksForUserWithContext(userId: string, from?: string, to?: string): Promise<DbTaskWithContextV2[]> {
-  return [];
-}
-
-export async function listOkrObjectivesForOwner(companyId: string, ownerId: string): Promise<DbOkrObjective[]> {
-  return [];
-}
-
-export async function listKrChangeLogs(keyResultId: string): Promise<DbKrChangeLog[]> {
-  return [];
-}
-
-export async function getOkrObjective(objectiveId: string): Promise<DbOkrObjective | null> {
-  return null;
-}
-
-export async function getCompanyFundamentals(companyId: string): Promise<DbCompanyFundamentals | null> {
-  return null;
-}
-
-// CRUD operations
-export async function createOkrObjective(data: Partial<DbOkrObjective>): Promise<DbOkrObjective> {
-  return {} as DbOkrObjective;
-}
-
-export async function createKeyResult(data: Partial<DbOkrKeyResult>): Promise<DbOkrKeyResult> {
-  return {} as DbOkrKeyResult;
-}
-
-export async function createOkrCycle(data: Partial<DbOkrCycle>): Promise<DbOkrCycle> {
-  return {} as DbOkrCycle;
-}
-
-export async function createDeliverable(data: Partial<DbDeliverable>): Promise<DbDeliverable> {
-  return {} as DbDeliverable;
-}
-
-export async function createStrategyObjective(data: Partial<DbStrategyObjective>): Promise<DbStrategyObjective> {
-  return {} as DbStrategyObjective;
-}
-
-export async function createPerformanceIndicator(data: Partial<DbPerformanceIndicator>): Promise<DbPerformanceIndicator> {
-  return {} as DbPerformanceIndicator;
-}
-
-export async function createTask(data: Partial<DbTask>): Promise<DbTask> {
-  return {} as DbTask;
-}
-
-export async function createTaskWithParent(data: Partial<DbTask>): Promise<DbTask> {
-  return {} as DbTask;
-}
-
-export async function updateOkrObjective(id: string, data: Partial<DbOkrObjective>): Promise<DbOkrObjective> {
-  return {} as DbOkrObjective;
-}
-
-export async function updateKeyResult(id: string, data: Partial<DbOkrKeyResult>): Promise<DbOkrKeyResult> {
-  return {} as DbOkrKeyResult;
-}
-
-export async function updateDeliverable(id: string, data: Partial<DbDeliverable>): Promise<DbDeliverable> {
-  return {} as DbDeliverable;
-}
-
-export async function updateDeliverableWithDates(id: string, data: Partial<DbDeliverable>): Promise<DbDeliverable> {
-  return {} as DbDeliverable;
-}
-
-export async function updateStrategyObjective(id: string, data: Partial<DbStrategyObjective>): Promise<DbStrategyObjective> {
-  return {} as DbStrategyObjective;
-}
-
-export async function updatePerformanceIndicator(id: string, data: Partial<DbPerformanceIndicator>): Promise<DbPerformanceIndicator> {
-  return {} as DbPerformanceIndicator;
-}
-
-export async function updateTask(id: string, data: Partial<DbTask>): Promise<DbTask> {
-  return {} as DbTask;
-}
-
-export async function deleteTask(id: string): Promise<void> {
-  return;
-}
-
-export async function deleteDeliverable(id: string): Promise<void> {
-  return;
-}
-
-export async function deleteOkrObjectiveCascade(id: string): Promise<void> {
-  return;
-}
-
-export async function deleteKeyResultCascade(id: string): Promise<void> {
-  return;
-}
-
-export async function deleteStrategyObjective(id: string): Promise<void> {
-  return;
-}
-
-export async function deletePerformanceIndicator(id: string): Promise<void> {
-  return;
-}
-
-export async function createKrChangeLog(data: Partial<DbKrChangeLog>): Promise<DbKrChangeLog> {
-  return {} as DbKrChangeLog;
-}
-
-export async function upsertCompanyFundamentals(companyId: string, data: Partial<DbCompanyFundamentals>): Promise<DbCompanyFundamentals> {
-  return {} as DbCompanyFundamentals;
-}
-
-export async function ensureOkrCycle(companyId: string, type: CycleType, year: number, quarter?: number): Promise<DbOkrCycle> {
-  return {} as DbOkrCycle;
-}
-
-export async function syncObjectiveDepartments(objectiveId: string, departmentIds: string[]): Promise<void> {
-  return;
-}
-
-export async function togglePerformanceIndicatorAchieved(id: string, achieved: boolean): Promise<DbPerformanceIndicator> {
-  return {} as DbPerformanceIndicator;
-}
-
-// Progress calculation utilities
-export function krProgressPct(kr: DbOkrKeyResult): number {
-  if (!kr.target_value || kr.target_value === 0) return 0;
-  const progress = ((kr.current_value || 0) - (kr.start_value || 0)) / (kr.target_value - (kr.start_value || 0));
-  return Math.min(Math.max(progress * 100, 0), 100);
-}
-
-export function piProgressPct(pi: DbPerformanceIndicator): number {
-  if (!pi.target_value || pi.target_value === 0) return 0;
-  const progress = ((pi.current_value || 0) - (pi.start_value || 0)) / (pi.target_value - (pi.start_value || 0));
-  return Math.min(Math.max(progress * 100, 0), 100);
-}
-
-// Legacy / compatibility exports
-export type DbTaskLegacy = DbTask;
-export type DbDeliverableLegacy = DbDeliverable;
 
 // UI Helper types
-export const ObjectiveLevelLabel: Record<ObjectiveLevel, string> = {
-  COMPANY: 'Empresa',
-  DEPARTMENT: 'Departamento'
+export type DbTaskWithContext = DbTaskWithSource & {
+  deliverable_id?: string;
+  objective_id?: string;
+  objective_title?: string;
+  objective_level?: string;
+  department_id?: string;
+};
+
+export type DbTaskWithContextV2 = DbTaskWithContext & {
+  deliverable_title?: string;
+  key_result_id?: string;
+  key_result_title?: string;
+  cycle_id?: string;
+  cycle_type?: string;
+  cycle_year?: number;
+  cycle_quarter?: number;
+  cycle_name?: string;
+};
+
+export type DbTaskWithSource = DbTask & {
+  source_type?: TaskSourceType;
+  source_name?: string;
+  deliverable?: { title: string };
+  key_result?: { title: string };
+};
+
+// Helper functions
+export const objectiveLevelLabel = (level: ObjectiveLevel): string => {
+  if (level === 'COMPANY') return 'Empresa';
+  return level === 'DEPARTMENT' ? 'Departamento' : 'Individual';
 };
 
 export const objectiveTypeLabel = (level: ObjectiveLevel): string => {
-  if (level === 'COMPANY') {
-    return 'Empresa';
-  }
+  if (level === 'COMPANY') return 'Empresa';
   return level === 'DEPARTMENT' ? 'Departamento' : 'Empresa';
 };
 
 export const objectiveTypeBadgeClass = (level: ObjectiveLevel): string => {
-  if (level === 'COMPANY') {
-    return 'bg-blue-100 text-blue-900 hover:bg-blue-200';
-  }
+  if (level === 'COMPANY') return 'bg-blue-100 text-blue-900 hover:bg-blue-200';
   return 'bg-purple-100 text-purple-900 hover:bg-purple-200';
 };
 
 export const CycleTypeLabel = (type: CycleType): string => {
-  if (type === 'ANNUAL') {
-    return 'Anual';
-  }
+  if (type === 'ANNUAL') return 'Anual';
   return 'Trimestral';
 };
 
 export const CycleStatusLabel = (status: CycleStatus): string => {
-  if (status === 'ACTIVE') {
-    return 'Ativo';
-  }
+  if (status === 'ACTIVE') return 'Ativo';
   return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
 };
 
 export const KrKindLabel = (kind: KrKind): string => {
-  if (kind === 'DELIVERABLE') {
-    return 'Entregável';
-  }
+  if (kind === 'DELIVERABLE') return 'Entregável';
   return 'Métrico';
 };
 
 export const KrConfidenceLabel = (confidence: KrConfidence): string => {
-  if (confidence === 'ON_TRACK') {
-    return 'No rastro';
-  }
+  if (confidence === 'ON_TRACK') return 'No rastro';
   return 'Em risco';
 };
+
+export const PiKindLabel = (kind: PiKind): string => {
+  return kind === 'BINARY' ? 'Binário' : 'Métrica';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
+  if (confidence === 'ON_TRACK') return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const CycleTypeLabel = (type: CycleType): string => {
+  if (type === 'ANNUAL') return 'Anual';
+  return 'Trimestral';
+};
+
+export const CycleStatusLabel = (status: CycleStatus): string => {
+  if (status === 'ACTIVE') return 'Ativo';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
+};
+
+export const KrKindLabel = (kind: KrKind): string => {
+  if (kind === 'DELIVERABLE') return 'Entregável';
+  return 'Métrico';
+};
+
+export const KrConfidenceLabel = (confidence: KrConfidence: string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return 'No rastro';
+  return 'Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = ( confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidence = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = (confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidenceLabel = (confidence: PiConfidence): string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco';
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence = PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: PiConfidence string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: confidence: string => {
+  if (confidence === 'ON_TRACK') return rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: confidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: confidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConf: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK) return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence = string => {
+  if (confidence === 'ON_TRACK') => No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+}
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: PiConfidence string = {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence: string => {
+  if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+});
+
+export const PiConfidence: PiConf: string => {
+  if (confidence === 'ON_TRACK') => No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = PiConfidence string => {
+    if (confidence === 'ON_TRACK') return rastro;
+  return Em risco;
+  };
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+  };
+
+export const PiConfidence = PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return rastro;
+    return Em risco;
+  };
+
+export const PiConfidence = PiConf = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+  };
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+  return Em risco;
+};
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string = {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+});
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return Em risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return rastro;
+    return Em risco;
+};
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No rastro;
+    return risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return risco;
+};
+
+export const PiConfidence = string => {
+    if (confidence === 'ON_TRACK') return No risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No risco;
+    return risco;
+});
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return risco;
+});
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return No risco;
+};
+
+export const PiConfidence: string => {
+    if (confidence === 'ON_TRACK') return risco;
+});

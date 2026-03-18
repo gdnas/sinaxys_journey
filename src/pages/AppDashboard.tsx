@@ -225,7 +225,7 @@ export default function AppDashboard() {
   const { data: myWeekTasks = [] } = useQuery({
     queryKey: ["okr-my-tasks", companyId, user.id, weekFrom, weekTo],
     enabled: !!companyId,
-    queryFn: () => listTasksForUser(companyId as string, user.id, { from: weekFrom, to: weekTo }),
+    queryFn: () => listTasksForUser(user.id, weekFrom, weekTo),
   });
 
   const myOpenTasks = useMemo(() => myWeekTasks.filter((t) => t.status !== "DONE"), [myWeekTasks]);
@@ -235,8 +235,8 @@ export default function AppDashboard() {
     queryKey: ["okr-scope-tasks", companyId, user.role, user.departmentId, weekFrom, weekTo],
     enabled: !!companyId && ((isHead && !!user.departmentId) || isAdmin),
     queryFn: () => {
-      if (isAdmin) return listTasksForCompany(companyId as string, { from: weekFrom, to: weekTo });
-      return listTasksForDepartment(companyId as string, user.departmentId as string, { from: weekFrom, to: weekTo });
+      if (isAdmin) return listTasksForCompany(companyId as string, weekFrom, weekTo);
+      return listTasksForDepartment(companyId as string, user.departmentId as string, weekFrom, weekTo);
     },
   });
 

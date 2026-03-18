@@ -126,7 +126,7 @@ export default function CollaboratorHome() {
   const { data: myWeekTasks = [] } = useQuery({
     queryKey: ["home-collab", "okr-my-week", companyId, user.id, weekFrom, weekTo],
     enabled: !!companyId,
-    queryFn: () => listTasksForUser(String(companyId), user.id, { from: weekFrom, to: weekTo }),
+    queryFn: () => listTasksForUser(user.id, weekFrom, weekTo),
   });
 
   const openTasks = useMemo(() => myWeekTasks.filter((t) => t.status !== "DONE").length, [myWeekTasks]);

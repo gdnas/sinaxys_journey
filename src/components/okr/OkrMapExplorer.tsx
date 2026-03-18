@@ -188,16 +188,28 @@ function StrategyYearIcon({ so }: { so: DbStrategyObjective }) {
 }
 
 function nodeTitle(n: Node) {
-    if (n.kind === "root") return "Mapa";
-    if (n.kind === "fundamentals") return "Fundamentos";
-    if (n kind === "fundamental") return "Fundamento";
-    if (n.kind === "strategy") return "Objetivos de longo prazo";
-    if (n kind === "cycles") return "Ciclos";
-    if (nn.kind === "cycle") return "Ciclo";
-    if (n kind === "objective") return "Objetivo";
-    if (n kind === "kr") return "KR";
-    if (n kind === "strategyObjective") return "Objetivo longo prazo";
-    return "";
+  if (n.kind === "root") return "Mapa";
+  if (n.kind === "fundamentals") return "Fundamentos";
+  if (n.kind === "fundamental") return "Fundamento";
+  if (n.kind === "strategy") return "Objetivos de longo prazo";
+  if (n.kind === "cycles") return "Ciclos";
+  if (n.kind === "cycle") return "Ciclo";
+  if (n.kind === "objective") return "Objetivo";
+  if (n.kind === "kr") return "KR";
+  if (n.kind === "strategyObjective") return "Objetivo longo prazo";
+  return "";
+}
+
+function cycleLabel(c: DbOkrCycle) {
+  const base = c.type === "ANNUAL" ? `${c.year}` : `Q${c.quarter ?? "?"} / ${c.year}`;
+  return c.name ? `${base} • ${c.name}` : base;
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const a = parts[0]?.[0] ?? "";
+  const b = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
+  return (a + b).toUpperCase();
 }
 
 function rowIndentStyle(depth: number) {
