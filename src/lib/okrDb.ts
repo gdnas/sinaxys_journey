@@ -1114,29 +1114,36 @@ export async function createTask(payload: Omit<DbTask, "id" | "created_at" | "up
   if (authError) throw authError;
   if (!user) throw new Error("Sessão inválida. Faça login novamente.");
 
+  const insertPayload = {
+    tenant_id: context.tenantId,
+    project_id: payload.project_id ?? null,
+    key_result_id: payload.key_result_id ?? context.keyResultId,
+    deliverable_id: payload.deliverable_id ?? context.deliverableId ?? null,
+    title: payload.title.trim(),
+    description: payload.description ?? null,
+    type: "task",
+    status: toWorkItemTaskStatus(payload.status),
+    priority: "medium",
+    assignee_user_id: payload.owner_user_id,
+    created_by_user_id: user.id,
+    parent_id: payload.parent_task_id ?? null,
+    due_date: payload.due_date ?? null,
+    start_date: payload.due_date ?? null,
+    estimate_minutes: payload.estimate_minutes ?? null,
+    checklist: payload.checklist ?? null,
+    estimated_value_brl: payload.estimated_value_brl ?? null,
+    estimated_cost_brl: payload.estimated_cost_brl ?? null,
+    estimated_roi_pct: payload.estimated_roi_pct ?? null,
+  };
+
+  console.info("[work_items.createTask] insert payload", {
+    source: insertPayload.project_id ? "project" : "okr",
+    insertPayload,
+  });
+
   const { data, error } = await supabase
     .from("work_items")
-    .insert({
-      tenant_id: context.tenantId,
-      project_id: payload.project_id ?? null,
-      key_result_id: payload.key_result_id ?? context.keyResultId,
-      deliverable_id: payload.deliverable_id ?? context.deliverableId ?? null,
-      title: payload.title.trim(),
-      description: payload.description ?? null,
-      type: "task",
-      status: toWorkItemTaskStatus(payload.status),
-      priority: "medium",
-      assignee_user_id: payload.owner_user_id,
-      created_by_user_id: user.id,
-      parent_id: payload.parent_task_id ?? null,
-      due_date: payload.due_date ?? null,
-      start_date: payload.due_date ?? null,
-      estimate_minutes: payload.estimate_minutes ?? null,
-      checklist: payload.checklist ?? null,
-      estimated_value_brl: payload.estimated_value_brl ?? null,
-      estimated_cost_brl: payload.estimated_cost_brl ?? null,
-      estimated_roi_pct: payload.estimated_roi_pct ?? null,
-    })
+    .insert(insertPayload)
     .select(workItemTaskSelect)
     .single();
 
@@ -1626,29 +1633,37 @@ export async function createTaskWithParent(
   if (authError) throw authError;
   if (!user) throw new Error("Sessão inválida. Faça login novamente.");
 
+  const insertPayload = {
+    tenant_id: context.tenantId,
+    project_id: taskData.project_id ?? null,
+    key_result_id: taskData.key_result_id ?? context.keyResultId,
+    deliverable_id: taskData.deliverable_id ?? context.deliverableId ?? null,
+    parent_id: parentId,
+    title: taskData.title.trim(),
+    description: taskData.description ?? null,
+    type: "task",
+    status: toWorkItemTaskStatus(taskData.status),
+    priority: "medium",
+    assignee_user_id: taskData.owner_user_id,
+    created_by_user_id: user.id,
+    due_date: taskData.due_date ?? null,
+    start_date: taskData.due_date ? taskData.due_date : new Date().toISOString(),
+    estimate_minutes: taskData.estimate_minutes ?? null,
+    checklist: taskData.checklist ?? null,
+    estimated_value_brl: taskData.estimated_value_brl ?? null,
+    estimated_cost_brl: taskData.estimated_cost_brl ?? null,
+    estimated_roi_pct: taskData.estimated_roi_pct ?? null,
+  };
+
+  console.info("[work_items.createTaskWithParent] insert payload", {
+    source: insertPayload.project_id ? "project" : "okr",
+    levelType,
+    insertPayload,
+  });
+
   const { data, error } = await supabase
     .from("work_items")
-    .insert({
-      tenant_id: context.tenantId,
-      project_id: taskData.project_id ?? null,
-      key_result_id: taskData.key_result_id ?? context.keyResultId,
-      deliverable_id: taskData.deliverable_id ?? context.deliverableId ?? null,
-      parent_id: parentId,
-      title: taskData.title.trim(),
-      description: taskData.description ?? null,
-      type: "task",
-      status: toWorkItemTaskStatus(taskData.status),
-      priority: "medium",
-      assignee_user_id: taskData.owner_user_id,
-      created_by_user_id: user.id,
-      due_date: taskData.due_date ?? null,
-      start_date: taskData.due_date ? taskData.due_date : new Date().toISOString(),
-      estimate_minutes: taskData.estimate_minutes ?? null,
-      checklist: taskData.checklist ?? null,
-      estimated_value_brl: taskData.estimated_value_brl ?? null,
-      estimated_cost_brl: taskData.estimated_cost_brl ?? null,
-      estimated_roi_pct: taskData.estimated_roi_pct ?? null,
-    })
+    .insert(insertPayload)
     .select(workItemTaskSelect)
     .single();
 

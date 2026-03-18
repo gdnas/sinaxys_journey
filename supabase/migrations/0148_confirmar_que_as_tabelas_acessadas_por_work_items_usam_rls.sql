@@ -1,0 +1,1 @@
+select relname, relrowsecurity, relforcerowsecurity from pg_class where oid in ('public.profiles'::regclass, 'public.projects'::regclass, 'public.okr_key_results'::regclass, 'public.okr_deliverables'::regclass, 'public.work_items'::regclass);
