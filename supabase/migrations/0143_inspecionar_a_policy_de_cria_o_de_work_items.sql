@@ -1,0 +1,1 @@
+select pg_get_functiondef('public.can_create_work_item(uuid, uuid, uuid, uuid, uuid, uuid)'::regprocedure) as definition;

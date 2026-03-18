@@ -1106,6 +1106,14 @@ export async function createTask(payload: Omit<DbTask, "id" | "created_at" | "up
     throw new Error("Uma tarefa de OKR precisa estar ligada a um KR ou a um entregável.");
   }
 
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) throw authError;
+  if (!user) throw new Error("Sessão inválida. Faça login novamente.");
+
   const { data, error } = await supabase
     .from("work_items")
     .insert({
@@ -1119,7 +1127,7 @@ export async function createTask(payload: Omit<DbTask, "id" | "created_at" | "up
       status: toWorkItemTaskStatus(payload.status),
       priority: "medium",
       assignee_user_id: payload.owner_user_id,
-      created_by_user_id: payload.owner_user_id,
+      created_by_user_id: user.id,
       parent_id: payload.parent_task_id ?? null,
       due_date: payload.due_date ?? null,
       start_date: payload.due_date ?? null,
@@ -1610,6 +1618,14 @@ export async function createTaskWithParent(
     throw new Error("Uma tarefa hierárquica precisa estar ligada a um KR ou a um entregável.");
   }
 
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError) throw authError;
+  if (!user) throw new Error("Sessão inválida. Faça login novamente.");
+
   const { data, error } = await supabase
     .from("work_items")
     .insert({
@@ -1624,7 +1640,7 @@ export async function createTaskWithParent(
       status: toWorkItemTaskStatus(taskData.status),
       priority: "medium",
       assignee_user_id: taskData.owner_user_id,
-      created_by_user_id: taskData.owner_user_id,
+      created_by_user_id: user.id,
       due_date: taskData.due_date ?? null,
       start_date: taskData.due_date ? taskData.due_date : new Date().toISOString(),
       estimate_minutes: taskData.estimate_minutes ?? null,
