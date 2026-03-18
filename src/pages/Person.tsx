@@ -13,7 +13,7 @@ import { getPublicProfile } from "@/lib/profilePublicDb";
 import { getProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
-import { listOkrCycles, listOkrObjectives, listOkrObjectivesByIds, listOkrObjectivesForOwner, listTasksForUserWithContext, type DbOkrCycle } from "@/lib/okrDb";
+import { listOkrCycles, listOkrObjectives, listOkrObjectivesByIds, listOkrObjectivesForOwner, listTasksForUserWithContext } from "@/lib/okrDb";
 import { PersonFeedbackCard } from "@/components/PersonFeedbackCard";
 
 function initials(name: string) {
@@ -93,7 +93,7 @@ export default function Person() {
 
   const qActiveCycleObjectives = useQuery({
     queryKey: ["okr", "objectives", "cycle", companyId, activeCycleId],
-    queryFn: () => listOkrObjectivesByCycle(companyId, activeCycleId as string),
+    queryFn: () => listOkrObjectives(companyId, activeCycleId as string),
     enabled: !!companyId && !!activeCycleId,
   });
 
@@ -124,7 +124,7 @@ export default function Person() {
     for (const o of qObjectivesFromTasks.data ?? []) add(o, "tarefas");
 
     // enrich with cycle label
-    const cycleById = new Map<string, DbOkrCycle>((qCycles.data ?? []).map((c) => [c.id, c] as const));
+    const cycleById = new Map((qCycles.data ?? []).map((c) => [c.id, c] as const));
     const rows = Array.from(byId.values()).map((r) => {
       const c = cycleById.get(r.objective.cycle_id);
       const cycleLabel = c

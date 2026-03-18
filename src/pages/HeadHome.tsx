@@ -113,7 +113,7 @@ export default function HeadHome() {
   const { data: weekDeptTasks = [] } = useQuery({
     queryKey: ["home-head", "okr-dept", companyId, user.departmentId, weekFrom, weekTo],
     enabled,
-    queryFn: () => listTasksForDepartment(String(companyId), String(user.departmentId), weekFrom, weekTo),
+    queryFn: () => listTasksForDepartment(String(companyId), String(user.departmentId), { from: weekFrom, to: weekTo }),
   });
 
   const { data: vacationRows = [] } = useQuery({

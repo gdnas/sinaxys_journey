@@ -28,7 +28,6 @@ import {
   listDeliverablesByKeyResultIds,
   listKeyResults,
   listOkrObjectives,
-  listOkrObjectivesByCycle,
   type DbCompanyFundamentals,
   type DbDeliverable,
   type DbOkrCycle,
@@ -165,7 +164,7 @@ export function OkrStrategyMapCanvas(props: {
   const qQuarterObjectives = useQuery({
     queryKey: ["okr-map-canvas-quarter-objectives", companyId, quarterCycleId],
     enabled: !!quarterCycleId,
-    queryFn: () => listOkrObjectivesByCycle(companyId, quarterCycleId),
+    queryFn: () => listOkrObjectives(companyId, quarterCycleId),
     staleTime: 20_000,
   });
 

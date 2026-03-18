@@ -1,1 +1,0 @@
-select pg_get_functiondef('public.ensure_work_item_parent_validity()'::regprocedure) as definition;

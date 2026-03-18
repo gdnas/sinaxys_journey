@@ -1,1 +1,0 @@
-select pg_get_functiondef('public.log_work_item_event()'::regprocedure) as definition;

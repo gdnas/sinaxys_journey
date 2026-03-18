@@ -1,1 +1,0 @@
-select pg_get_functiondef('public.ensure_work_item_tenant_coherence()'::regprocedure) as definition;

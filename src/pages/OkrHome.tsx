@@ -25,7 +25,6 @@ import {
   listKeyResultsByObjectiveIds,
   listOkrCycles,
   listOkrObjectives,
-  listOkrObjectivesByCycle,
   listStrategyObjectives,
   type DbOkrKeyResult,
   type DbOkrObjective,
@@ -98,13 +97,13 @@ export default function OkrHome() {
   const { data: yearObjectives = [] } = useQuery({
     queryKey: ["okr-objectives-year", cid, activeYear?.id],
     enabled: hasCompany && !!activeYear?.id,
-    queryFn: () => listOkrObjectivesByCycle(cid, String(activeYear?.id)),
+    queryFn: () => listOkrObjectives(cid, String(activeYear?.id)),
   });
 
   const { data: quarterObjectives = [] } = useQuery({
     queryKey: ["okr-objectives-quarter", cid, activeQuarter?.id],
     enabled: hasCompany && !!activeQuarter?.id,
-    queryFn: () => listOkrObjectivesByCycle(cid, String(activeQuarter?.id)),
+    queryFn: () => listOkrObjectives(cid, String(activeQuarter?.id)),
   });
 
   const allObjectiveIds = useMemo(() => {

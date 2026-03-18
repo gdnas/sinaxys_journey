@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { format, startOfWeek, endOfWeek } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   ArrowRight,
@@ -108,8 +108,6 @@ export default function CollaboratorHome() {
 
   const today = new Date();
   const todayLabel = format(today, "EEEE, d 'de' MMMM", { locale: ptBR });
-  const weekFrom = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
-  const weekTo = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
   const { data: assignments = [], isLoading: loadingAssignments } = useQuery({
     queryKey: ["home-collab", "assignments", user.id],
@@ -124,9 +122,9 @@ export default function CollaboratorHome() {
     .sort((a, b) => (b.assignment.started_at ?? b.assignment.assigned_at).localeCompare(a.assignment.started_at ?? a.assignment.assigned_at))[0];
 
   const { data: myWeekTasks = [] } = useQuery({
-    queryKey: ["home-collab", "okr-my-week", companyId, user.id, weekFrom, weekTo],
+    queryKey: ["home-collab", "okr-my-week", companyId, user.id],
     enabled: !!companyId,
-    queryFn: () => listTasksForUser(user.id, weekFrom, weekTo),
+    queryFn: () => listTasksForUser(String(companyId), user.id, {}),
   });
 
   const openTasks = useMemo(() => myWeekTasks.filter((t) => t.status !== "DONE").length, [myWeekTasks]);

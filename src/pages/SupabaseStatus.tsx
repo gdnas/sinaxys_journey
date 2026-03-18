@@ -27,9 +27,8 @@ const coreTables: Array<{ table: string; countColumn: string }> = [
   { table: "okr_objectives", countColumn: "id" },
   { table: "okr_key_results", countColumn: "id" },
   { table: "okr_deliverables", countColumn: "id" },
-  { table: "work_items", countColumn: "id" },
+  { table: "okr_tasks", countColumn: "id" },
   { table: "strategy_objectives", countColumn: "id" },
-
   { table: "strategy_key_results", countColumn: "id" },
   { table: "pdi_plans", countColumn: "id" },
   { table: "pdi_skills", countColumn: "id" },
