@@ -165,7 +165,6 @@ export default function WorkItemForm({ workItem, projectId, onSaved, onCancel }:
                 <SelectItem value="in_progress">Em progresso</SelectItem>
                 <SelectItem value="review">Em revisão</SelectItem>
                 <SelectItem value="done">Concluído</SelectItem>
-                <SelectItem value="blocked">Bloqueado</SelectItem>
               </SelectContent>
             </Select>
           </div>
