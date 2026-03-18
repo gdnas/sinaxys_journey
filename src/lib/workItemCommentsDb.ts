@@ -137,20 +137,22 @@ export async function getComments(workItemId: string, page = 0, perPage = 20) {
     work_item_id: string;
     user_name: string;
     avatar_url: string | null;
-    mentions: Array<{ token: string; id: string; name: string }>;
+    mentions: Array<{ token: string; match: { id: string; name: string } | null }>;
   }> = [];
 
   for (const row of rows) {
     const tokens = extractMentionTokens(row.content ?? "");
-    const mentionMap: Array<{ token: string; id: string; name: string }> = [];
+    const mentionMap: Array<{ token: string; match: { id: string; name: string } | null }> = [];
 
     for (const token of tokens) {
       const match = resolveMentionMatch(token, mentionProfiles);
       if (match) {
         mentionMap.push({
           token,
-          id: match.id,
-          name: getDisplayName(match),
+          match: {
+            id: match.id,
+            name: getDisplayName(match),
+          },
         });
       }
     }
