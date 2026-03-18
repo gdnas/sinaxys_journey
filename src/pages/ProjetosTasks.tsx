@@ -20,36 +20,8 @@ export default function ProjetosTasks() {
   const [taskData, setTaskData] = useState<any>(null);
   const [creating, setCreating] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [tasksWithNames, setTasksWithNames] = useState<any[]>([]);
 
-  // Fetch tasks with assignee names
-  useEffect(() => {
-    async function fetchTasksWithNames() {
-      if (!projectId) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('work_items')
-          .select(`
-            *,
-            assignee:assignee_user_id!profiles(id, name, email),
-            parent_task:parent_id!work_items(id, title, status)
-          `)
-          .eq('project_id', projectId)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setTasksWithNames(data ?? []);
-      } catch (err) {
-        console.error('Error fetching tasks:', err);
-        setTasksWithNames([]);
-      }
-    }
-
-    if (projectId) {
-      fetchTasksWithNames();
-    }
-  }, [projectId, companyId]);
+  const tasksWithNames = taskList; // already assembled by hook
 
   const filteredTasks = statusFilter === 'all' 
     ? tasksWithNames 
