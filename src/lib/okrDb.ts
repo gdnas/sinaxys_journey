@@ -1367,7 +1367,7 @@ export async function createTaskWithParent(
       depth,
       level_type: levelType,
       task_hierarchy: {},
-      start_date: taskData.due_date ? taskData.due_date : new Date().toISOString(),
+      start_date: (taskData as any).start_date || new Date().toISOString(),
     })
     .select(taskSelect)
     .single();
