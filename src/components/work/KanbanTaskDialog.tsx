@@ -34,7 +34,7 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('');
   const [priority, setPriority] = useState('');
-  const [assigneeUserId, setAssigneeUserId] = useState('');
+  const [assigneeUserId, setAssigneeUserId] = useState('__none__');
   const [startDate, setStartDate] = useState('');
   const [dueDate, setDueDate] = useState('');
 
@@ -63,7 +63,7 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
       setDescription(data?.description ?? '');
       setStatus(data?.status ?? '');
       setPriority(data?.priority ?? '');
-      setAssigneeUserId(data?.assignee_user_id ?? '');
+      setAssigneeUserId(data?.assignee_user_id ?? '__none__');
       setStartDate(data?.start_date ?? '');
       setDueDate(data?.due_date ?? '');
     } catch (err: any) {
@@ -107,7 +107,7 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
           description,
           status,
           priority,
-          assignee_user_id: assigneeUserId || null,
+          assignee_user_id: assigneeUserId === '__none__' ? null : assigneeUserId,
           start_date: startDate || null,
           due_date: dueDate || null,
         })
@@ -234,7 +234,7 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                     <SelectValue placeholder="Selecione um responsável" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sem responsável</SelectItem>
+                    <SelectItem value="__none__">Sem responsável</SelectItem>
                     {users.map((u) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.name || u.email}
