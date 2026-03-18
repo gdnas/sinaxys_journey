@@ -61,6 +61,19 @@ export interface DbOkrKeyResult {
   objective_id: string;
   title: string;
   confidence?: 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
+  metric_unit?: string | null;
+  start_value?: number | null;
+  current_value?: number | null;
+  target_value?: number | null;
+}
+
+export interface DbKrChangeLog {
+  id: string;
+  company_id: string;
+  key_result_id: string;
+  user_id: string;
+  changes: Record<string, { from: any; to: any }>;
+  created_at: string;
 }
 
 export interface DbStrategyObjective {
@@ -154,4 +167,16 @@ export async function updateTask(taskId: string, updates: any): Promise<void> {
 
 export async function deleteTask(taskId: string): Promise<void> {
   return;
+}
+
+export async function updateKeyResult(krId: string, updates: Partial<DbOkrKeyResult>): Promise<void> {
+  return;
+}
+
+export async function createKrChangeLog(log: Omit<DbKrChangeLog, 'id' | 'created_at'>): Promise<void> {
+  return;
+}
+
+export async function listKrChangeLogs(krId: string): Promise<DbKrChangeLog[]> {
+  return [];
 }
