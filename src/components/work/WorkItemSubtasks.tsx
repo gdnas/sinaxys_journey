@@ -53,20 +53,44 @@ export function WorkItemSubtasks({ workItemId, tenantId, onUpdate }: WorkItemSub
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
+      // Buscar tarefa pai para obter project_id e tenant_id corretos
+      const { data: parentTask, error: parentError } = await supabase
+        .from('work_items')
+        .select('project_id, tenant_id')
+        .eq('id', workItemId)
+        .single();
+
+      if (parentError) throw parentError;
+      if (!parentTask) throw new Error('Parent task not found');
+
+      // Payload completo com todos os campos obrigatórios
+      const payload = {
+        tenant_id: parentTask.tenant_id,      // ✅ Da tarefa pai
+        project_id: parentTask.project_id,    // ✅ Da tarefa pai (OBRIGATÓRIO pela policy)
+        parent_id: workItemId,                 // ✅ ID da tarefa pai
+        title: newSubtaskTitle,                // ✅ Título da subtarefa
+        description: null,                     // ✅ Null permitido
+        type: 'task',                          // ✅ Tipo fixo
+        status: 'todo',                        // ✅ Status inicial
+        priority: 'medium',                    // ✅ Prioridade padrão
+        assignee_user_id: null,                // ✅ Sem responsável inicial
+        created_by_user_id: userData.user.id,  // ✅ Usuário autenticado
+        start_date: null,                      // ✅ Null permitido
+        due_date: null,                        // ✅ Null permitido
+      };
+
+      console.log('[WorkItemSubtasks] Criando subtarefa com payload:', payload);
+
       const { error } = await supabase
         .from('work_items')
-        .insert({
-          tenant_id: tenantId,
-          parent_id: workItemId,
-          title: newSubtaskTitle,
-          type: 'task',
-          status: 'todo',
-          priority: 'medium',
-          created_by_user_id: userData.user.id,
-        });
+        .insert(payload);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[WorkItemSubtasks] Erro no insert:', error);
+        throw error;
+      }
 
+      console.log('[WorkItemSubtasks] Subtarefa criada com sucesso');
       setNewSubtaskTitle('');
       fetchSubtasks();
       onUpdate?.();
@@ -75,7 +99,7 @@ export function WorkItemSubtasks({ workItemId, tenantId, onUpdate }: WorkItemSub
         description: 'A subtarefa foi adicionada com sucesso.',
       });
     } catch (error) {
-      console.error('Error creating subtask:', error);
+      console.error('[WorkItemSubtasks] Error creating subtask:', error);
       toast({
         title: 'Erro',
         description: 'Não foi possível criar a subtarefa.',
