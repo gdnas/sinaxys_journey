@@ -1,7 +1,6 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/lib/auth';
-import type { Role } from '@/lib/domain';
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
 
 export type ProjectAccess = {
   canView: boolean;
@@ -10,6 +9,7 @@ export type ProjectAccess = {
   isOwner: boolean;
   isMember: boolean;
   isAdmin: boolean;
+  isHeadScoped: boolean;
   isLoading: boolean;
   project: any;
 };
@@ -22,6 +22,8 @@ export function useProjectAccess(projectId: string): ProjectAccess {
 
   useEffect(() => {
     if (!projectId) {
+      setProject(null);
+      setMemberRole(null);
       setIsLoading(false);
       return;
     }
@@ -29,29 +31,29 @@ export function useProjectAccess(projectId: string): ProjectAccess {
     async function loadProjectAccess() {
       setIsLoading(true);
       try {
-        // Load project details
-        const { data: proj, error: projError } = await supabase
-          .from('projects')
-          .select('*')
-          .eq('id', projectId)
+        const { data: projectData, error: projectError } = await supabase
+          .from("projects")
+          .select("*")
+          .eq("id", projectId)
           .maybeSingle();
 
-        if (projError) throw projError;
+        if (projectError) throw projectError;
+        setProject(projectData ?? null);
 
-        setProject(proj);
-
-        // Load user's membership if logged in
-        if (user?.id) {
+        if (user?.id && projectData) {
           const { data: member } = await supabase
-            .from('project_members')
-            .select('role_in_project')
+            .from("project_members")
+            .select("role_in_project")
             .match({ project_id: projectId, user_id: user.id })
             .maybeSingle();
-
           setMemberRole(member?.role_in_project ?? null);
+        } else {
+          setMemberRole(null);
         }
-      } catch (err) {
-        console.error('Error loading project access:', err);
+      } catch (error) {
+        console.error("Error loading project access:", error);
+        setProject(null);
+        setMemberRole(null);
       } finally {
         setIsLoading(false);
       }
@@ -60,25 +62,18 @@ export function useProjectAccess(projectId: string): ProjectAccess {
     loadProjectAccess();
   }, [projectId, user?.id]);
 
-  // Determine access based on rules (MASTERADMIN removed from projects module per scope)
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = user?.role === "ADMIN" || user?.role === "MASTERADMIN";
   const isOwner = project?.owner_user_id === user?.id;
   const isMember = memberRole !== null;
+  const isHeadScoped = useMemo(() => {
+    if (!project || user?.role !== "HEAD" || !user.departmentId) return false;
+    const extraDepartments = Array.isArray(project.department_ids) ? project.department_ids : [];
+    return project.department_id === user.departmentId || extraDepartments.includes(user.departmentId);
+  }, [project, user?.departmentId, user?.role]);
 
-  const canView =
-    project && (
-      project.visibility === 'public' ||
-      isMember ||
-      isAdmin
-    );
-
-  const canEdit =
-    isAdmin ||
-    isOwner;
-
-  const canManageMembers =
-    isAdmin ||
-    isOwner;
+  const canView = !!project;
+  const canEdit = !!project && (isAdmin || isHeadScoped);
+  const canManageMembers = canEdit;
 
   return {
     canView,
@@ -87,6 +82,7 @@ export function useProjectAccess(projectId: string): ProjectAccess {
     isOwner,
     isMember,
     isAdmin,
+    isHeadScoped,
     isLoading,
     project,
   };

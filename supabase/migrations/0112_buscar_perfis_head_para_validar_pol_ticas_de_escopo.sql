@@ -1,0 +1,1 @@
+select id, email, role, company_id, department_id from public.profiles where company_id = '15de0336-fa2e-4a8d-b4d6-d783ca295b65' and role = 'HEAD' limit 5;

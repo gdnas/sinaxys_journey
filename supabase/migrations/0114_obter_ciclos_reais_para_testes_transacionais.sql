@@ -1,0 +1,1 @@
+select id, type, year, quarter from public.okr_cycles where company_id = '15de0336-fa2e-4a8d-b4d6-d783ca295b65' order by year desc, quarter desc nulls last limit 5;

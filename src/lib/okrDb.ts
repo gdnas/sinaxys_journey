@@ -249,8 +249,11 @@ export type DbOkrObjective = {
   parent_objective_id: string | null;
   strategy_objective_id: string | null;
   level: ObjectiveLevel;
+  okr_level?: "strategic" | "tactical" | null;
+
   department_id: string | null;
   tier: "TIER1" | "TIER2" | null;
+
   owner_user_id: string;
   moderator_user_id: string | null;
   title: string;
@@ -281,7 +284,7 @@ export type DbOkrObjective = {
 };
 
 const objectiveSelect =
-  "id,company_id,cycle_id,parent_objective_id,strategy_objective_id,level,department_id,tier,owner_user_id,moderator_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,expected_profit_brl,profit_thesis,expected_revenue_at,expected_attainment_pct,status,achieved_pct,achieved_at,head_performance_score,head_performance_notes,head_performance_reviewed_at,created_at,updated_at";
+  "id,company_id,cycle_id,parent_objective_id,strategy_objective_id,level,okr_level,department_id,tier,owner_user_id,moderator_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,expected_profit_brl,profit_thesis,expected_revenue_at,expected_attainment_pct,status,achieved_pct,achieved_at,head_performance_score,head_performance_notes,head_performance_reviewed_at,created_at,updated_at";
 
 export async function listOkrObjectives(companyId: string, cycleId: string) {
   const { data, error } = await supabase
@@ -341,6 +344,17 @@ export async function createOkrObjective(
     | "head_performance_reviewed_at"
   >,
 ) {
+  let departmentId = payload.department_id ?? null;
+
+  if (!departmentId && payload.level !== "COMPANY" && payload.owner_user_id) {
+    const { data: ownerProfile } = await supabase
+      .from("profiles")
+      .select("department_id")
+      .eq("id", payload.owner_user_id)
+      .maybeSingle();
+    departmentId = ownerProfile?.department_id ?? null;
+  }
+
   const { data, error } = await supabase
     .from("okr_objectives")
     .insert({
@@ -349,7 +363,8 @@ export async function createOkrObjective(
       parent_objective_id: payload.parent_objective_id ?? null,
       strategy_objective_id: payload.strategy_objective_id ?? null,
       level: payload.level,
-      department_id: payload.department_id ?? null,
+      okr_level: payload.okr_level ?? (payload.level === "COMPANY" ? "strategic" : "tactical"),
+      department_id: departmentId,
       tier: payload.tier ?? null,
       owner_user_id: payload.owner_user_id,
       moderator_user_id: payload.moderator_user_id ?? null,

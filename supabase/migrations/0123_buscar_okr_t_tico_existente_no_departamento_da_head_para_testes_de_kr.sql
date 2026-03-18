@@ -1,0 +1,1 @@
+select id, title, department_id from public.okr_objectives where company_id = '15de0336-fa2e-4a8d-b4d6-d783ca295b65' and okr_level = 'tactical' and department_id = '584dc1a1-5a09-4bcb-8340-525b64eb538c'::uuid limit 5;

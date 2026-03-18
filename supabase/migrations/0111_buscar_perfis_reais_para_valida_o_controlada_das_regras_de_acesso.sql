@@ -1,0 +1,1 @@
+select id, email, role, company_id, department_id from public.profiles where role in ('ADMIN','HEAD','COLABORADOR') order by company_id, role, created_at limit 15;

@@ -21,9 +21,13 @@ export default function ProjetoEdit() {
       try {
         const { data, error } = await supabase
           .from('projects')
-          .select('*')
+          .select(`
+            *,
+            project_members:project_members(user_id)
+          `)
           .eq('id', projectId)
           .maybeSingle();
+
         if (error) throw error;
         setProject(data);
       } catch (err: any) {
@@ -37,9 +41,10 @@ export default function ProjetoEdit() {
 
   if (isLoading || loading) return <div className="p-6">Carregando...</div>;
   if (!canView) return <AccessDenied message="Você não tem permissão para visualizar este projeto." />;
-  if (!canEdit) return <AccessDenied message="Você não tem permissão para editar este projeto. Apenas o owner e admins podem editar." />;
+  if (!canEdit) return <AccessDenied message="Você não tem permissão para editar este projeto. Apenas ADMIN e HEAD no escopo do departamento podem editar." />;
 
   return (
+
     <div className="mx-auto max-w-3xl p-6">
       <Card className="p-6">
         <h2 className="text-lg font-semibold mb-4">Editar projeto</h2>

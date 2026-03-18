@@ -1,278 +1,287 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
-import { useProjectAccess } from '@/hooks/useProjectAccess';
-import AccessDenied from '@/components/AccessDenied';
-import ProjectMembersSection from '@/components/projects/ProjectMembersSection';
-import { ArrowLeft, Calendar, User, Users, FolderKanban, CheckCircle2 } from 'lucide-react';
-import { format } from 'date-fns';
-import ProjectCard from '@/components/projects/ProjectCard';
+import { useEffect, useMemo, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import { format } from "date-fns";
+import { ArrowLeft, Calendar, FolderKanban, Goal, Layers3, ListChecks, Target, User, Users } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+import { useProjectAccess } from "@/hooks/useProjectAccess";
+import AccessDenied from "@/components/AccessDenied";
+import ProjectMembersSection from "@/components/projects/ProjectMembersSection";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 
 export default function ProjetoDetail() {
   const { projectId } = useParams();
-  const { toast } = useToast();
   const navigate = useNavigate();
-  const { canView, canEdit, canManageMembers, isLoading, project } = useProjectAccess(String(projectId ?? ''));
-  
-  const [projectWithRelations, setProjectWithRelations] = useState<any>(null);
-  const [tasksCount, setTasksCount] = useState(0);
+  const { toast } = useToast();
+  const { canView, canEdit, canManageMembers, isLoading } = useProjectAccess(String(projectId ?? ""));
+
+  const [project, setProject] = useState<any>(null);
+  const [tasks, setTasks] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(true);
 
   useEffect(() => {
     async function loadProjectDetails() {
-      if (!projectId || isLoading) return;
-      
+      if (!projectId) return;
+
       setLoadingDetails(true);
       try {
-        // ETAPA 1: Load project without embed
-        const { data: projData, error: projError } = await supabase
-          .from('projects')
+        const { data: projectData, error: projectError } = await supabase
+          .from("projects")
           .select(`
             *,
-            project_members:project_members(
-              user_id,
-              role_in_project
-            )
+            project_members:project_members(user_id, role_in_project)
           `)
-          .eq('id', projectId)
+          .eq("id", projectId)
           .maybeSingle();
 
-        if (projError) throw projError;
-        
-        // ETAPA 2: Load owner profile
-        let ownerProfile = null;
-        if (projData?.owner_user_id) {
-          const { data: owner } = await supabase
-            .from('profiles')
-            .select('id, name, avatar_url')
-            .eq('id', projData.owner_user_id)
-            .maybeSingle();
-          ownerProfile = owner;
+        if (projectError) throw projectError;
+        if (!projectData) {
+          setProject(null);
+          return;
         }
-        
-        // ETAPA 3: Load department
-        let departmentData = null;
-        if (projData?.department_id) {
-          const { data: dept } = await supabase
-            .from('departments')
-            .select('id, name')
-            .eq('id', projData.department_id)
-            .maybeSingle();
-          departmentData = dept;
-        }
-        
-        // ETAPA 4: Load member profiles
-        let membersWithProfiles = projData.project_members ?? [];
-        if (membersWithProfiles.length > 0) {
-          const userIds = membersWithProfiles.map((m: any) => m.user_id);
-          const { data: memberProfiles } = await supabase
-            .from('profiles')
-            .select('id, name, avatar_url')
-            .in('id', userIds);
-          const profilesMap = (memberProfiles ?? []).reduce((acc: any, p: any) => ({ ...acc, [p.id]: p }), {});
-          membersWithProfiles = membersWithProfiles.map((m: any) => ({
-            ...m,
-            user: profilesMap[m.user_id] ?? null
-          }));
-        }
-        
-        const projWithRelations = { 
-          ...projData, 
-          owner: ownerProfile, 
-          department: departmentData,
-          project_members: membersWithProfiles
-        };
-        
-        // Load tasks count
-        const { count, error: countError } = await supabase
-          .from('work_items')
-          .select('*', { count: 'exact', head: true })
-          .eq('project_id', projectId);
 
-        if (countError) throw countError;
+        const ownerId = projectData.owner_user_id;
+        const memberIds = (projectData.project_members ?? []).map((member: any) => member.user_id);
+        const departmentIds = Array.from(
+          new Set(
+            [projectData.department_id, ...(Array.isArray(projectData.department_ids) ? projectData.department_ids : [])].filter(Boolean),
+          ),
+        );
 
-        setProjectWithRelations(projWithRelations);
-        setTasksCount(count ?? 0);
-      } catch (err: any) {
-        toast({ title: 'Erro ao carregar detalhes', description: err.message || String(err), variant: 'destructive' });
+        const [ownerResult, membersResult, departmentsResult, keyResultResult, deliverableResult, tasksResult] = await Promise.all([
+          ownerId
+            ? supabase.from("profiles").select("id, name, avatar_url").eq("id", ownerId).maybeSingle()
+            : Promise.resolve({ data: null }),
+          memberIds.length
+            ? supabase.from("profiles").select("id, name, avatar_url").in("id", memberIds)
+            : Promise.resolve({ data: [] as any[] }),
+          departmentIds.length
+            ? supabase.from("departments").select("id, name").in("id", departmentIds)
+            : Promise.resolve({ data: [] as any[] }),
+          projectData.key_result_id
+            ? supabase.from("okr_key_results").select("id, title, objective_id").eq("id", projectData.key_result_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+          projectData.deliverable_id
+            ? supabase.from("okr_deliverables").select("id, title, key_result_id").eq("id", projectData.deliverable_id).maybeSingle()
+            : Promise.resolve({ data: null }),
+          supabase
+            .from("work_items")
+            .select("id, title, status, assignee_user_id, due_date")
+            .eq("project_id", projectId)
+            .order("created_at", { ascending: false })
+            .limit(6),
+        ]);
+
+        let objective = null;
+        if (keyResultResult.data?.objective_id) {
+          const { data } = await supabase
+            .from("okr_objectives")
+            .select("id, title, okr_level")
+            .eq("id", keyResultResult.data.objective_id)
+            .maybeSingle();
+          objective = data;
+        }
+
+        const assigneeIds = Array.from(new Set(((tasksResult.data ?? []) as any[]).map((task) => task.assignee_user_id).filter(Boolean)));
+        const { data: assignees } = assigneeIds.length
+          ? await supabase.from("profiles").select("id, name").in("id", assigneeIds)
+          : { data: [] as any[] };
+
+        const profileMap = new Map(([ownerResult.data, ...(membersResult.data ?? []), ...(assignees ?? [])].filter(Boolean) as any[]).map((item) => [item.id, item]));
+        const departmentMap = new Map((departmentsResult.data ?? []).map((item: any) => [item.id, item.name]));
+        const departmentNames = Array.isArray(projectData.department_ids) && projectData.department_ids.length
+          ? projectData.department_ids.map((id: string) => departmentMap.get(id)).filter(Boolean)
+          : projectData.department_id
+            ? [departmentMap.get(projectData.department_id)].filter(Boolean)
+            : [];
+
+        setProject({
+          ...projectData,
+          owner: ownerResult.data,
+          project_members: (projectData.project_members ?? []).map((member: any) => ({
+            ...member,
+            user: profileMap.get(member.user_id) ?? null,
+          })),
+          department_names: departmentNames,
+          key_result: keyResultResult.data,
+          deliverable: deliverableResult.data,
+          objective,
+        });
+
+        setTasks(
+          ((tasksResult.data ?? []) as any[]).map((task) => ({
+            ...task,
+            assignee_name: task.assignee_user_id ? profileMap.get(task.assignee_user_id)?.name ?? null : null,
+          })),
+        );
+      } catch (error) {
+        toast({
+          title: "Erro ao carregar detalhes",
+          description: error instanceof Error ? error.message : "Não foi possível carregar o projeto.",
+          variant: "destructive",
+        });
       } finally {
         setLoadingDetails(false);
       }
     }
 
     loadProjectDetails();
-  }, [projectId, isLoading]);
+  }, [projectId, toast]);
+
+  const tasksCount = tasks.length;
+  const memberCount = useMemo(() => (Array.isArray(project?.project_members) ? project.project_members.length : 0), [project]);
 
   if (isLoading || loadingDetails) return <div className="p-6">Carregando...</div>;
   if (!canView) return <AccessDenied />;
-  
-  const proj = projectWithRelations || project;
-  if (!proj) return <div className="p-6">Projeto não encontrado</div>;
-
-  const memberCount = Array.isArray(proj.project_members) ? proj.project_members.length : 0;
+  if (!project) return <div className="p-6">Projeto não encontrado.</div>;
 
   return (
-    <div className="mx-auto max-w-5xl grid gap-6 pb-12">
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-        <Link to="/app/projetos/lista" className="hover:text-[color:var(--sinaxys-primary)]">
-          Projetos
-        </Link>
+    <div className="mx-auto grid max-w-5xl gap-6 pb-12">
+      <nav className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Link to="/app/projetos/lista" className="hover:text-[color:var(--sinaxys-primary)]">Projetos</Link>
         <span>/</span>
-        <span className="text-[color:var(--sinaxys-primary)]">{proj.name}</span>
-        <span>/</span>
-        <span className="text-[color:var(--sinaxys-ink)]">Detalhes</span>
+        <span className="text-[color:var(--sinaxys-primary)]">{project.name}</span>
       </nav>
 
-      {/* Main Card */}
-      <Card className="p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <Button 
-              variant="ghost" 
-              className="mb-4" 
-              onClick={() => navigate('/app/projetos/lista')}
-            >
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Voltar
-            </Button>
-            <h1 className="text-3xl font-bold">{proj.name}</h1>
-            
-            <div className="flex flex-wrap gap-3 text-sm text-muted-foreground mt-2">
-              <div className="flex items-center gap-1">
-                <FolderKanban className="h-4 w-4 text-muted-foreground" />
-                Status: 
-                <span className="font-medium text-[color:var(--sinaxys-ink)]">
-                  {proj.status === 'not_started' ? 'Não iniciado' :
-                   proj.status === 'on_track' ? 'No prazo' :
-                   proj.status === 'at_risk' ? 'Em risco' :
-                   proj.status === 'delayed' ? 'Atrasado' :
-                   proj.status === 'completed' ? 'Concluído' : proj.status}
-                </span>
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <Button variant="ghost" className="mb-3 rounded-2xl" onClick={() => navigate("/app/projetos/lista")}>
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Voltar
+              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-3xl font-bold text-[color:var(--sinaxys-ink)]">{project.name}</h1>
+                <Badge variant="outline">{statusLabel(project.status)}</Badge>
+                {project.objective?.okr_level ? (
+                  <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                    {project.objective.okr_level === "strategic" ? "OKR estratégico" : "OKR tático"}
+                  </Badge>
+                ) : null}
               </div>
-              <div className="flex items-center gap-1">
-                <FolderKanban className="h-4 w-4 text-muted-foreground" />
-                Visibilidade: <span className="font-medium text-[color:var(--sinaxys-ink)]">
-                  {proj.visibility === 'public' ? 'Público' : 'Privado'}
-                </span>
-              </div>
+              {project.description ? <p className="mt-3 max-w-3xl text-sm text-muted-foreground">{project.description}</p> : null}
             </div>
 
-            {proj.description && (
-              <p className="mt-4 text-sm text-muted-foreground">{proj.description}</p>
-            )}
-
-            {/* Details Grid */}
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 mt-6">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-muted-foreground" />
-                <div className="text-sm">
-                  <div className="text-muted-foreground">Responsável</div>
-                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
-                    {proj.owner?.name || '—'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <div className="text-sm">
-                  <div className="text-muted-foreground">Departamento</div>
-                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
-                    {proj.department?.name || '—'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div className="text-sm">
-                  <div className="text-muted-foreground">Início</div>
-                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
-                    {proj.start_date ? format(new Date(proj.start_date), 'dd/MM/yyyy') : '—'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div className="text-sm">
-                  <div className="text-muted-foreground">Prazo</div>
-                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
-                    {proj.due_date ? format(new Date(proj.due_date), 'dd/MM/yyyy') : '—'}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <div className="text-sm">
-                  <div className="text-muted-foreground">Membros</div>
-                  <div className="font-medium text-[color:var(--sinaxysys-ink)]">
-                    {memberCount}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <FolderKanban className="h-4 w-4 text-muted-foreground" />
-                <div className="text-sm">
-                  <div className="text-muted-foreground">Tarefas</div>
-                  <div className="font-medium text-[color:var(--sinaxys-ink)]">
-                    {tasksCount}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-muted-foreground" />
-                <div className="text-sm">
-                  <div className="text-muted-foreground">Criado em</div>
-                  <div className="font-medium text-[color:var(--sinaxysys-ink)]">
-                    {proj.created_at ? format(new Date(proj.created_at), 'dd/MM/yyyy') : '—'}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex flex-col gap-2">
-              {canEdit && (
-                <Button onClick={() => navigate(`/app/projetos/${projectId}/editar`)}>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
+            <div className="flex flex-col gap-2">
+              {canEdit ? (
+                <Button className="rounded-2xl bg-[color:var(--sinaxys-primary)] text-white" onClick={() => navigate(`/app/projetos/${projectId}/editar`)}>
                   Editar projeto
                 </Button>
-              )}
-              <Button 
-                variant="outline" 
-                onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}
-              >
-                <FolderKanban className="mr-2 h-4 w-4" />
-                Ver tarefas
+              ) : null}
+              <Button variant="outline" className="rounded-2xl" onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}>
+                Ver work_items
               </Button>
             </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <InfoCard icon={User} label="Responsável" value={project.owner?.name ?? "—"} />
+            <InfoCard icon={FolderKanban} label="Departamento" value={project.department_names?.join(", ") || "—"} />
+            <InfoCard icon={Users} label="Equipe" value={`${memberCount} participante(s)`} />
+            <InfoCard icon={Calendar} label="Prazo" value={project.due_date ? format(new Date(project.due_date), "dd/MM/yyyy") : "—"} />
           </div>
         </div>
       </Card>
 
-        {canManageMembers && <ProjectMembersSection projectId={String(projectId)} />}
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Alinhamento com OKR</h2>
+          <p className="text-sm text-muted-foreground">Relação explícita entre objetivo, KR, entregável e execução.</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-3">
+          <InfoCard icon={Goal} label="OKR" value={project.objective?.title ?? "Sem vínculo"} />
+          <InfoCard icon={Target} label="Resultado-chave" value={project.key_result?.title ?? "Sem vínculo"} />
+          <InfoCard icon={Layers3} label="Entregável" value={project.deliverable?.title ?? "Sem vínculo"} />
+        </div>
+      </Card>
 
-        {/* Tasks Preview */}
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold">Tarefas</h3>
-            <Button variant="outline" onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}>
-              Ver todas
-            </Button>
+      {canManageMembers ? <ProjectMembersSection projectId={String(projectId)} /> : null}
+
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Tarefas associadas</h2>
+            <p className="text-sm text-muted-foreground">Os work_items seguem como única fonte de verdade da execução.</p>
           </div>
-          <div className="mt-4 text-sm text-muted-foreground">
-            {tasksCount > 0 
-              ? `Este projeto possui ${tasksCount} tarefa${tasksCount > 1 ? 's' : ''}`
-              : 'Nenhuma tarefa cadastrada neste projeto ainda.'}
+          <Badge variant="outline">{tasksCount} item(ns)</Badge>
+        </div>
+
+        {tasks.length ? (
+          <div className="grid gap-3">
+            {tasks.map((task) => (
+              <div key={task.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/15 p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="font-medium text-[color:var(--sinaxys-ink)]">{task.title}</div>
+                    <div className="mt-1 text-sm text-muted-foreground">
+                      {task.assignee_name ? `Responsável: ${task.assignee_name}` : "Sem responsável"}
+                      {task.due_date ? ` • Prazo: ${format(new Date(task.due_date), "dd/MM/yyyy")}` : ""}
+                    </div>
+                  </div>
+                  <Badge variant="outline">{taskStatusLabel(task.status)}</Badge>
+                </div>
+              </div>
+            ))}
           </div>
-        </Card>
+        ) : (
+          <div className="rounded-2xl bg-[color:var(--sinaxys-tint)]/20 p-4 text-sm text-muted-foreground">Nenhum work_item cadastrado neste projeto ainda.</div>
+        )}
+
+        <Button variant="outline" className="mt-4 rounded-2xl" onClick={() => navigate(`/app/projetos/${projectId}/tarefas`)}>
+          <ListChecks className="mr-2 h-4 w-4" />
+          Abrir execução completa
+        </Button>
+      </Card>
     </div>
   );
+}
+
+function InfoCard({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof User;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-2xl bg-[color:var(--sinaxys-tint)]/15 p-4">
+      <div className="flex items-start gap-3">
+        <div className="rounded-2xl bg-white p-2 text-[color:var(--sinaxys-primary)] shadow-sm">
+          <Icon className="h-4 w-4" />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+          <div className="mt-1 text-sm font-medium text-[color:var(--sinaxys-ink)]">{value}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    not_started: "Não iniciado",
+    on_track: "No prazo",
+    at_risk: "Em risco",
+    delayed: "Atrasado",
+    completed: "Concluído",
+  };
+  return labels[status] ?? status;
+}
+
+function taskStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    backlog: "Backlog",
+    todo: "A fazer",
+    in_progress: "Em andamento",
+    review: "Em revisão",
+    done: "Concluído",
+    blocked: "Bloqueado",
+  };
+  return labels[status] ?? status;
 }

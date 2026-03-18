@@ -1,0 +1,1 @@
+select id, name from public.departments where company_id = '15de0336-fa2e-4a8d-b4d6-d783ca295b65' and id in ('584dc1a1-5a09-4bcb-8340-525b64eb538c','1757ece5-2238-4e7c-9f5f-7a1ad0126896','bdaa6530-232c-406c-960d-e62c3636613e','da78a5f4-2094-4d67-a69f-a474a6041bb6');

@@ -66,6 +66,7 @@ import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
 import { OkrObjectiveBusinessCase } from "@/components/okr/OkrObjectiveBusinessCase";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
+import { supabase } from "@/integrations/supabase/client";
 
 const SELECT_NONE = "__none__";
 
@@ -320,6 +321,9 @@ export default function OkrObjectiveDetail() {
     return m;
   }, [deliverables]);
 
+  const keyResultById = useMemo(() => new Map(krs.map((kr) => [kr.id, kr] as const)), [krs]);
+  const deliverableById = useMemo(() => new Map(deliverables.map((deliverable) => [deliverable.id, deliverable] as const)), [deliverables]);
+
   const tasksByDeliverableId = useMemo(() => {
     const m = new Map<string, DbTask[]>();
     for (const t of tasks) {
@@ -330,8 +334,27 @@ export default function OkrObjectiveDetail() {
     return m;
   }, [tasks]);
 
+  const { data: linkedProjects = [] } = useQuery({
+    queryKey: ["okr-objective-projects", objectiveId, krIds.join(",")],
+    enabled: krIds.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select("id, name, status, due_date, owner_user_id, key_result_id, deliverable_id")
+        .in("key_result_id", krIds)
+        .order("updated_at", { ascending: false });
+
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
   const canWrite =
-    !!objective && (user.id === objective.owner_user_id || user.role === "ADMIN" || user.role === "HEAD" || user.role === "MASTERADMIN");
+    !!objective && (
+      user.role === "MASTERADMIN"
+      || user.role === "ADMIN"
+      || (user.role === "HEAD" && objective.okr_level === "tactical" && !!user.departmentId && objective.department_id === user.departmentId)
+    );
 
   const canEditTask = (t: DbTask) => canWrite || t.owner_user_id === user.id;
 
@@ -347,20 +370,9 @@ export default function OkrObjectiveDetail() {
   const [delDue, setDelDue] = useState<string>("");
   const [delSaving, setDelSaving] = useState(false);
 
-  // Collaborator should be able to create deliverables under Tier 2 KRs they own.
-  const canAddDeliverableForKr = (kr: DbOkrKeyResult) => {
-    if (canWrite) return true;
-    if (deliverableTierAuto !== "TIER2") return false;
-    return !!kr.owner_user_id && kr.owner_user_id === user.id;
-  };
+  const canAddDeliverableForKr = (_kr: DbOkrKeyResult) => canWrite;
 
-  const canCreateDeliverable = useMemo(() => {
-    if (!delKrId) return false;
-    if (canWrite) return true;
-    if (deliverableTierAuto !== "TIER2") return false;
-    const kr = krs.find((k) => k.id === delKrId);
-    return !!kr?.owner_user_id && kr.owner_user_id === user.id;
-  }, [canWrite, delKrId, deliverableTierAuto, krs, user.id]);
+  const canCreateDeliverable = useMemo(() => !!delKrId && canWrite, [canWrite, delKrId]);
 
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkKrId, setLinkKrId] = useState<string | null>(null);
@@ -665,6 +677,53 @@ export default function OkrObjectiveDetail() {
           </div>
         ) : (
           <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Objetivo não encontrado.</div>
+        )}
+      </Card>
+
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Projetos e entregáveis vinculados</h2>
+            <p className="text-sm text-muted-foreground">Visão rápida do encadeamento entre planejamento e execução.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Badge variant="outline">{linkedProjects.length} projeto(s)</Badge>
+            <Badge variant="outline">{deliverables.length} entregável(is)</Badge>
+          </div>
+        </div>
+
+        {linkedProjects.length ? (
+          <div className="mt-4 grid gap-3">
+            {linkedProjects.map((project) => {
+              const projectKr = project.key_result_id ? keyResultById.get(project.key_result_id) : null;
+              const projectDeliverable = project.deliverable_id ? deliverableById.get(project.deliverable_id) : null;
+              return (
+                <Link
+                  key={project.id}
+                  to={`/app/projetos/${project.id}`}
+                  className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/15 p-4 transition hover:bg-[color:var(--sinaxys-tint)]/30"
+                >
+                  <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="font-medium text-[color:var(--sinaxys-ink)]">{project.name}</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        KR: {projectKr?.title ?? "—"}
+                        {projectDeliverable ? ` • Entregável: ${projectDeliverable.title}` : ""}
+                        {project.owner_user_id ? ` • Resp.: ${byUserId.get(project.owner_user_id) ?? "—"}` : ""}
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {project.due_date ? `Prazo: ${fmtDate(project.due_date)}` : "Sem prazo"} • {project.status}
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">
+            Ainda não há projetos vinculados aos KRs deste OKR.
+          </div>
         )}
       </Card>
 
