@@ -184,7 +184,7 @@ export async function addComment(workItemId: string, userId: string, content: st
 
         for (const token of mentionTokens) {
           const match = resolveMentionMatch(token, companyProfiles);
-          if (!match || match.id === userId) continue;
+          if (!match) continue;
 
           resolvedProfiles.push({
             token,
@@ -284,7 +284,7 @@ export async function updateComment(commentId: string, userId: string, content: 
 
         for (const token of addedMentions) {
           const match = resolveMentionMatch(token, companyProfiles);
-          if (!match || match.id === userId) continue;
+          if (!match) continue;
 
           resolvedUsers.set(match.id, {
             id: match.id,
