@@ -52,12 +52,19 @@ export async function markAsRead(notificationId: string, userId: string) {
 }
 
 export async function createNotification(payload: { userId: string; actorUserId?: string | null; title: string; content?: string; href?: string; notifType?: string; }) {
-  // Log attempts to create notifications to help debugging mention delivery
   try {
     console.log("[notificationsDb] createNotification ->", payload);
   } catch {}
 
-  const { data, error } = await supabase.from("notifications").insert({ user_id: payload.userId, actor_user_id: payload.actorUserId ?? null, title: payload.title, content: payload.content ?? null, href: payload.href ?? null, notif_type: payload.notifType ?? null }).select();
+  const { error } = await supabase.from("notifications").insert({
+    user_id: payload.userId,
+    actor_user_id: payload.actorUserId ?? null,
+    title: payload.title,
+    content: payload.content ?? null,
+    href: payload.href ?? null,
+    notif_type: payload.notifType ?? null,
+  });
+
   if (error) {
     try {
       console.error("[notificationsDb] createNotification error ->", error);
@@ -65,14 +72,11 @@ export async function createNotification(payload: { userId: string; actorUserId?
     throw error;
   }
 
-  try {
-    console.log("[notificationsDb] created ->", data?.[0]);
-  } catch {}
-
-  return data?.[0];
+  return { ok: true };
 }
 
 export async function getUnreadCount(userId: string) {
+
   const { count, error } = await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", userId).eq("is_read", false);
   if (error) throw error;
   return typeof count === "number" ? count : 0;
