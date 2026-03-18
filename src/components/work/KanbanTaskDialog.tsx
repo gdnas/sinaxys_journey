@@ -42,6 +42,8 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
   const [dueDate, setDueDate] = useState('');
 
   const [users, setUsers] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState('subtasks');
+  const [timelineRefreshTrigger, setTimelineRefreshTrigger] = useState(0);
 
   useEffect(() => {
     if (open && taskId) {
@@ -49,6 +51,12 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
       loadUsers();
     }
   }, [open, taskId]);
+
+  useEffect(() => {
+    if (activeTab === 'timeline') {
+      setTimelineRefreshTrigger(prev => prev + 1);
+    }
+  }, [activeTab]);
 
   const loadTask = async () => {
     setLoading(true);
@@ -276,11 +284,17 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                 </TabsContent>
                 
                 <TabsContent value="comments" className="mt-4">
-                  <WorkItemComments workItemId={taskId} />
+                  <WorkItemComments 
+                    workItemId={taskId} 
+                    onUpdate={onRefresh}
+                  />
                 </TabsContent>
                 
                 <TabsContent value="timeline" className="mt-4">
-                  <WorkItemTimeline workItemId={taskId} />
+                  <WorkItemTimeline 
+                    workItemId={taskId} 
+                    refreshTrigger={timelineRefreshTrigger}
+                  />
                 </TabsContent>
               </Tabs>
 

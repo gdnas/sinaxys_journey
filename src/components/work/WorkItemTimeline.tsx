@@ -14,6 +14,7 @@ import {
 
 interface WorkItemTimelineProps {
   workItemId: string;
+  refreshTrigger?: number;
 }
 
 interface TimelineEvent {
@@ -29,13 +30,13 @@ interface TimelineEvent {
   };
 }
 
-export function WorkItemTimeline({ workItemId }: WorkItemTimelineProps) {
+export function WorkItemTimeline({ workItemId, refreshTrigger }: WorkItemTimelineProps) {
   const [events, setEvents] = useState<TimelineEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchEvents();
-  }, [workItemId]);
+  }, [workItemId, refreshTrigger]);
 
   const fetchEvents = async () => {
     try {
@@ -62,7 +63,7 @@ export function WorkItemTimeline({ workItemId }: WorkItemTimelineProps) {
       const transformedData = (data || []).map((event: any) => ({
         ...event,
         user: Array.isArray(event.user) ? event.user[0] : event.user
-      }));
+      })).filter((event: any) => event.user !== null);
       
       setEvents(transformedData);
     } catch (error) {

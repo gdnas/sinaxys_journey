@@ -131,7 +131,28 @@ export function WorkItemSubtasks({ workItemId, tenantId, onUpdate }: WorkItemSub
   };
 
   const deleteSubtask = async (subtaskId: string) => {
+    try {
+      const { error } = await supabase
+        .from('work_items')
+        .delete()
+        .eq('id', subtaskId);
 
+      if (error) throw error;
+
+      fetchSubtasks();
+      onUpdate?.();
+      toast({
+        title: 'Subtarefa excluída',
+        description: 'A subtarefa foi excluída com sucesso.',
+      });
+    } catch (error) {
+      console.error('Error deleting subtask:', error);
+      toast({
+        title: 'Erro',
+        description: 'Não foi possível excluir a subtarefa.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const completedCount = subtasks.filter(s => s.status === 'done').length;

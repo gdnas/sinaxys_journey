@@ -10,6 +10,7 @@ import { ptBR } from 'date-fns/locale';
 
 interface WorkItemCommentsProps {
   workItemId: string;
+  onUpdate?: () => void;
 }
 
 interface Comment {
@@ -23,7 +24,7 @@ interface Comment {
   };
 }
 
-export function WorkItemComments({ workItemId }: WorkItemCommentsProps) {
+export function WorkItemComments({ workItemId, onUpdate }: WorkItemCommentsProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
@@ -57,7 +58,7 @@ export function WorkItemComments({ workItemId }: WorkItemCommentsProps) {
       const transformedData = (data || []).map((comment: any) => ({
         ...comment,
         user: Array.isArray(comment.user) ? comment.user[0] : comment.user
-      }));
+      })).filter((comment: any) => comment.user !== null);
       
       setComments(transformedData);
     } catch (error) {
@@ -87,6 +88,7 @@ export function WorkItemComments({ workItemId }: WorkItemCommentsProps) {
 
       setNewComment('');
       fetchComments();
+      onUpdate?.();
       toast({
         title: 'Comentário adicionado',
         description: 'Seu comentário foi adicionado com sucesso.',
