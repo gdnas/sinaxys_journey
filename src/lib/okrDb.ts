@@ -32,7 +32,7 @@ export interface DbTaskWithContext extends DbTaskWithSource {
 
 export interface DbOkrCycle {
   id: string;
-  type: 'QUARTERLY' | 'YEARLY';
+  type: 'QUARTERLY' | 'YEARLY' | 'ANNUAL';
   status: 'ACTIVE' | 'CLOSED';
 }
 
@@ -40,7 +40,29 @@ export interface DbOkrObjective {
   id: string;
   level: string;
   department_id?: string;
+  owner_user_id?: string;
+  title: string;
 }
+
+export interface DbOkrKeyResult {
+  id: string;
+  objective_id: string;
+  title: string;
+  confidence?: 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
+}
+
+export interface DbStrategyObjective {
+  id: string;
+  horizon_years: number;
+  title: string;
+}
+
+export interface DbCompanyFundamentals {
+  purpose?: string;
+  mission?: string;
+}
+
+export type KrConfidence = 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
 
 export type TaskSourceType = 'project' | 'deliverable' | 'okr' | 'unknown';
 
@@ -59,6 +81,22 @@ export async function listOkrCycles(companyId: string): Promise<DbOkrCycle[]> {
 
 export async function listOkrObjectives(companyId: string, cycleId: string): Promise<DbOkrObjective[]> {
   return [];
+}
+
+export async function listStrategyObjectives(companyId: string): Promise<DbStrategyObjective[]> {
+  return [];
+}
+
+export async function listKeyResultsByObjectiveIds(objectiveIds: string[]): Promise<DbOkrKeyResult[]> {
+  return [];
+}
+
+export async function getCompanyFundamentals(companyId: string): Promise<DbCompanyFundamentals | null> {
+  return null;
+}
+
+export function krProgressPct(kr: DbOkrKeyResult): number | null {
+  return null;
 }
 
 export async function listTasksForUser(
