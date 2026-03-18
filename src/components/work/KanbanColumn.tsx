@@ -21,9 +21,9 @@ export default function KanbanColumn({ status, label, tasks, projectId, taskCoun
   const taskIds = tasks.map((task) => task.id);
 
   return (
-    <div className="flex-shrink-0 w-80 flex flex-col h-full">
+    <div className="flex-shrink-0 w-80 flex flex-col" style={{ height: 'calc(100vh - 280px)' }}>
       {/* Column header */}
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between flex-shrink-0">
         <h3 className="font-semibold text-sm">{label}</h3>
         <span className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
           {taskCount ?? tasks.length}
@@ -33,7 +33,7 @@ export default function KanbanColumn({ status, label, tasks, projectId, taskCoun
       {/* Column content */}
       <Card
         ref={setNodeRef}
-        className={`flex-1 p-3 transition-colors ${
+        className={`flex-1 p-3 transition-colors overflow-hidden ${
           isOver ? 'bg-accent/50' : 'bg-muted/30'
         }`}
       >

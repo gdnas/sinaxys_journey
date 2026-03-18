@@ -8,10 +8,6 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Plus, LayoutList, LayoutGrid } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useKanban, KanbanTask, TaskStatus } from '@/hooks/useKanban';
 import KanbanColumn from './KanbanColumn';
 import KanbanTaskCard from './KanbanTaskCard';
@@ -25,7 +21,7 @@ interface KanbanBoardProps {
   loading?: boolean;
   canEdit?: boolean;
   onRefresh?: () => void;
-  onViewChange?: (view: 'list' | 'kanban') => void;
+  onCreateTask?: () => void;
 }
 
 export default function KanbanBoard({
@@ -35,9 +31,8 @@ export default function KanbanBoard({
   loading = false,
   canEdit = true,
   onRefresh,
-  onViewChange,
+  onCreateTask,
 }: KanbanBoardProps) {
-  const navigate = useNavigate();
   const {
     moveTask,
     getStatusLabel,
@@ -119,66 +114,35 @@ export default function KanbanBoard({
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className="mb-4 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="sm" onClick={() => navigate(`/app/projetos/${projectId}`)}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            Voltar
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold">{projectName}</h1>
-            <p className="text-sm text-muted-foreground">Board Kanban</p>
+    <>
+      {/* Kanban Board - Horizontal Scroll */}
+      <div className="w-full overflow-x-auto overflow-y-hidden">
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex gap-4 min-w-max items-start pb-4">
+            {STATUS_ORDER.map((status) => (
+              <KanbanColumn
+                key={status}
+                status={status}
+                label={getStatusLabel(status)}
+                tasks={groupedTasks[status]}
+                projectId={projectId}
+                taskCount={groupedTasks[status].length}
+              />
+            ))}
           </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          {onViewChange && (
-            <Button variant="outline" size="sm" onClick={() => onViewChange('list')}>
-              <LayoutList className="mr-2 h-4 w-4" />
-              Lista
-            </Button>
-          )}
-          {canEdit && (
-            <Button size="sm" onClick={() => setShowCreate(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nova tarefa
-            </Button>
-          )}
-        </div>
+          {/* Drag overlay */}
+          <DragOverlay>
+            {activeTask ? (
+              <KanbanTaskCard task={activeTask} projectId={projectId} isDragging />
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
-
-      {/* Kanban Board */}
-      <ScrollArea className="flex-1">
-        <div className="pb-4">
-          <DndContext
-            sensors={sensors}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="flex gap-4 min-h-max">
-              {STATUS_ORDER.map((status) => (
-                <KanbanColumn
-                  key={status}
-                  status={status}
-                  label={getStatusLabel(status)}
-                  tasks={groupedTasks[status]}
-                  projectId={projectId}
-                  taskCount={groupedTasks[status].length}
-                />
-              ))}
-            </div>
-
-            {/* Drag overlay */}
-            <DragOverlay>
-              {activeTask ? (
-                <KanbanTaskCard task={activeTask} projectId={projectId} isDragging />
-              ) : null}
-            </DragOverlay>
-          </DndContext>
-        </div>
-      </ScrollArea>
 
       {/* Create Task Dialog */}
       {showCreate && (
@@ -200,6 +164,6 @@ export default function KanbanBoard({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

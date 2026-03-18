@@ -131,7 +131,7 @@ export default function ProjetosTasks() {
               Voltar
             </Button>
             {canEdit && (
-              <Button onClick={() => { setTaskData(null); setShowCreate(true); }}>
+              <Button onClick={() => setShowCreate(true)}>
                 <Plus className="mr-2 h-4 w-4" />
                 Nova tarefa
               </Button>
@@ -194,7 +194,7 @@ export default function ProjetosTasks() {
             loading={loading}
             canEdit={canEdit}
             onRefresh={refetch}
-            onViewChange={(view) => setViewMode(view)}
+            onCreateTask={() => setShowCreate(true)}
           />
         ) : (
           <Card className="p-4 h-full overflow-auto">
