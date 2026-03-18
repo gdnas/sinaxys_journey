@@ -6,7 +6,10 @@
  * Este arquivo define os tipos TypeScript para as tabelas do banco de dados:
  * - projects
  * - project_members
- * - tasks
+ * - work_items (execução real do projeto)
+ *
+ * NOTA: Embora este arquivo use o termo "ProjectWorkItem" nos tipos,
+ * a tabela real no banco é "work_items", que é usada para execução de projetos.
  */
 
 // =====================
@@ -29,14 +32,14 @@ export type ProjectAdminPrivateMode = null | "admin_only" | "heads_only";
 export type ProjectStatus = "not_started" | "on_track" | "at_risk" | "delayed" | "completed";
 
 /**
- * Prioridade da tarefa
+ * Prioridade do work item (tarefa) de projeto
  */
-export type TaskPriority = "low" | "medium" | "high" | "critical";
+export type ProjectWorkItemPriority = "low" | "medium" | "high" | "critical";
 
 /**
- * Status da tarefa
+ * Status do work item (tarefa) de projeto
  */
-export type TaskStatus = "backlog" | "todo" | "in_progress" | "review" | "done";
+export type ProjectWorkItemStatus = "backlog" | "todo" | "in_progress" | "review" | "done";
 
 /**
  * Papel do membro no projeto
@@ -83,9 +86,12 @@ export interface DbProjectMember {
 }
 
 /**
- * Linha da tabela tasks
+ * Linha da tabela work_items (execução de projetos)
+ *
+ * NOTA: A tabela real no banco de dados é "work_items", não "tasks".
+ * Este tipo representa um work_item vinculado a um projeto.
  */
-export interface DbTask {
+export interface DbProjectWorkItem {
   id: string;
   tenant_id: string;
   project_id: string | null;
@@ -93,8 +99,8 @@ export interface DbTask {
   description: string | null;
   assignee_user_id: string | null;
   created_by_user_id: string;
-  priority: TaskPriority;
-  status: TaskStatus;
+  priority: ProjectWorkItemPriority;
+  status: ProjectWorkItemStatus;
   due_date: string | null;
   start_date: string | null;
   completed_at: string | null;
@@ -154,30 +160,34 @@ export interface CreateProjectMemberInput {
 }
 
 /**
- * Input para criação de tarefa
+ * Input para criação de work item de projeto
+ *
+ * NOTA: A tabela real no banco é "work_items".
  */
-export interface CreateTaskInput {
+export interface CreateProjectWorkItemInput {
   tenant_id: string;
   project_id?: string;
   title: string;
   description?: string;
   assignee_user_id?: string;
   created_by_user_id: string;
-  priority?: TaskPriority;
-  status?: TaskStatus;
+  priority?: ProjectWorkItemPriority;
+  status?: ProjectWorkItemStatus;
   due_date?: string;
   start_date?: string;
 }
 
 /**
- * Input para atualização de tarefa
+ * Input para atualização de work item de projeto
+ *
+ * NOTA: A tabela real no banco é "work_items".
  */
-export interface UpdateTaskInput {
+export interface UpdateProjectWorkItemInput {
   title?: string;
   description?: string;
   assignee_user_id?: string;
-  priority?: TaskPriority;
-  status?: TaskStatus;
+  priority?: ProjectWorkItemPriority;
+  status?: ProjectWorkItemStatus;
   due_date?: string;
   start_date?: string;
   completed_at?: string;
@@ -192,15 +202,17 @@ export interface UpdateTaskInput {
  */
 export interface ProjectWithDetails extends DbProject {
   members?: DbProjectMember[];
-  tasks?: DbTask[];
+  work_items?: DbProjectWorkItem[];
   member_count?: number;
-  task_count?: number;
+  work_item_count?: number;
 }
 
 /**
- * Tarefa com dados expandidos
+ * Work item de projeto com dados expandidos
+ *
+ * NOTA: A tabela real no banco é "work_items".
  */
-export interface TaskWithDetails extends DbTask {
+export interface ProjectWorkItemWithDetails extends DbProjectWorkItem {
   project?: DbProject;
   assignee?: {
     id: string;
@@ -216,10 +228,10 @@ export interface ProjectStats {
   total_projects: number;
   by_status: Record<ProjectStatus, number>;
   by_visibility: Record<ProjectVisibility, number>;
-  total_tasks: number;
-  completed_tasks: number;
-  in_progress_tasks: number;
-  overdue_tasks: number;
+  total_work_items: number;
+  completed_work_items: number;
+  in_progress_work_items: number;
+  overdue_work_items: number;
 }
 
 // =====================
@@ -239,11 +251,13 @@ export interface ProjectFilters {
 }
 
 /**
- * Filtros para listagem de tarefas
+ * Filtros para listagem de work items de projeto
+ *
+ * NOTA: A tabela real no banco é "work_items".
  */
-export interface TaskFilters {
-  status?: TaskStatus[];
-  priority?: TaskPriority[];
+export interface ProjectWorkItemFilters {
+  status?: ProjectWorkItemStatus[];
+  priority?: ProjectWorkItemPriority[];
   project_id?: string[];
   assignee_user_id?: string;
   search?: string;
@@ -264,9 +278,11 @@ export type ProjectSortBy =
   | "status";
 
 /**
- * Opções de ordenação para tarefas
+ * Opções de ordenação para work items de projeto
+ *
+ * NOTA: A tabela real no banco é "work_items".
  */
-export type TaskSortBy =
+export type ProjectWorkItemSortBy =
   | "title_asc"
   | "title_desc"
   | "created_at_asc"
