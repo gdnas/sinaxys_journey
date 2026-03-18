@@ -72,6 +72,9 @@ export interface DbStrategyObjective {
 export interface DbCompanyFundamentals {
   purpose?: string;
   mission?: string;
+  vision?: string;
+  values?: string;
+  culture?: string;
 }
 
 export type KrConfidence = 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
@@ -105,6 +108,10 @@ export async function listKeyResultsByObjectiveIds(objectiveIds: string[]): Prom
 
 export async function getCompanyFundamentals(companyId: string): Promise<DbCompanyFundamentals | null> {
   return null;
+}
+
+export async function upsertCompanyFundamentals(companyId: string, fundamentals: Partial<DbCompanyFundamentals>): Promise<void> {
+  return;
 }
 
 export function krProgressPct(kr: DbOkrKeyResult): number | null {
