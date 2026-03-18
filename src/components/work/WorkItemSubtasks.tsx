@@ -110,13 +110,22 @@ export function WorkItemSubtasks({ workItemId, tenantId, onUpdate }: WorkItemSub
 
   const toggleSubtask = async (subtask: Subtask) => {
     try {
-      const newStatus = subtask.status === 'done' ? 'todo' : 'done';
-      const { error } = await supabase
-        .from('work_items')
-        .update({ status: newStatus })
-        .eq('id', subtask.id);
+      // Use RPC that performs permission checks server-side (SECURITY DEFINER)
+      const { data, error } = await supabase.rpc('toggle_subtask_status', { p_item_id: subtask.id });
 
-      if (error) throw error;
+      if (error) {
+        // If RPC fails, try direct update as fallback
+        console.warn('[WorkItemSubtasks] RPC toggle failed, attempting direct update:', error);
+        const newStatus = subtask.status === 'done' ? 'todo' : 'done';
+        const { error: upErr } = await supabase
+          .from('work_items')
+          .update({ status: newStatus })
+          .eq('id', subtask.id);
+        if (upErr) throw upErr;
+      } else {
+        // RPC returned updated row(s)
+        console.log('[WorkItemSubtasks] RPC toggle result:', data);
+      }
 
       fetchSubtasks();
       onUpdate?.();
