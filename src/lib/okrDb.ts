@@ -17,6 +17,7 @@ export interface DbTask {
   parent_task_id?: string;
   description?: string;
   checklist?: any;
+  owner_user_id?: string;
 }
 
 export type TaskLevelType = 'TASK' | 'SUBTASK';
@@ -51,7 +52,7 @@ export type ObjectiveLevel = 'COMPANY' | 'DEPARTMENT';
 export type CycleType = 'ANNUAL' | 'QUARTERLY';
 export type CycleStatus = 'ACTIVE' | 'ARCHIVED' | 'DRAFT';
 export type WorkStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'BLOCKED';
-export type KrKind = 'METRIC' | 'BINARY';
+export type KrKind = 'METRIC' | 'DELIVERABLE';
 export type KrConfidence = 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
 export type PiKind = 'METRIC' | 'BINARY';
 export type PiConfidence = 'ON_TRACK' | 'AT_RISK' | 'OFF_TRACK';
@@ -262,10 +263,6 @@ export async function listOkrObjectivesByCycle(companyId: string, cycleId: strin
   return [];
 }
 
-export async function listOkrObjectivesByCycle(companyId: string, cycleId: string): Promise<DbOkrObjective[]> {
-  return [];
-}
-
 export async function listKeyResults(objectiveId?: string): Promise<DbOkrKeyResult[]> {
   return [];
 }
@@ -283,10 +280,6 @@ export async function listDeliverablesByKeyResultIds(keyResultIds: string[]): Pr
 }
 
 export async function listDeliverables(objectiveId: string): Promise<DbDeliverable[]> {
-  return [];
-}
-
-export async function listDeliverablesByKeyResultIds(keyResultIds: string[]): Promise<DbDeliverable[]> {
   return [];
 }
 
@@ -322,14 +315,6 @@ export async function listTasksForUserWithContext(userId: string, from?: string,
   return [];
 }
 
-export async function listTasksForUserWithContext(userId: string, from?: string, to?: string): Promise<DbTaskWithContextV2[]> {
-  return [];
-}
-
-export async function listTasksByDeliverableIds(deliverableIds: string[]): Promise<DbTask[]> {
-  return [];
-}
-
 export async function listOkrObjectivesForOwner(companyId: string, ownerId: string): Promise<DbOkrObjective[]> {
   return [];
 }
@@ -338,36 +323,12 @@ export async function listKrChangeLogs(keyResultId: string): Promise<DbKrChangeL
   return [];
 }
 
-export async function getCompanyFundamentals(companyId: string): Promise<DbCompanyFundamentals | null> {
+export async function getOkrObjective(objectiveId: string): Promise<DbOkrObjective | null> {
   return null;
 }
 
-export async function listDeliverablesByKeyResultIds(keyResultIds: string[]): Promise<DbDeliverable[]> {
-  return [];
-}
-
-export async function listDeliverablesByCycle(companyId: string, cycleId: string): Promise<DbDeliverable[]> {
-  return [];
-}
-
-export async function listDeliverablesDateHistory(deliverableId: string): Promise<DbDeliverableDateLog[]> {
-  return [];
-}
-
-export async function listDeliverables(objectiveId: string): Promise<DbDeliverable[]> {
-  return [];
-}
-
-export async function listStrategyObjectives(companyId: string): Promise<DbStrategyObjective[]> {
-  return [];
-}
-
-export async function listPerformanceIndicators(objectiveId: string): Promise<DbPerformanceIndicator[]> {
-  return [];
-}
-
-export async function listTasksForUserWithContext(userId: string, from?: string, to?: string): Promise<DbTaskWithContextV2[]> {
-  return [];
+export async function getCompanyFundamentals(companyId: string): Promise<DbCompanyFundamentals | null> {
+  return null;
 }
 
 // CRUD operations
@@ -471,7 +432,7 @@ export async function syncObjectiveDepartments(objectiveId: string, departmentId
   return;
 }
 
-export async function togglePerformanceIndicatorAchieved(id: string): Promise<DbPerformanceIndicator> {
+export async function togglePerformanceIndicatorAchieved(id: string, achieved: boolean): Promise<DbPerformanceIndicator> {
   return {} as DbPerformanceIndicator;
 }
 
@@ -498,55 +459,42 @@ export const ObjectiveLevelLabel: Record<ObjectiveLevel, string> = {
   DEPARTMENT: 'Departamento'
 };
 
-export const objectiveTypeBadgeClass = (level: ObjectiveLevel) => {
-  const baseLevel = level === 'COMPANY' ? 'bg-#E0F2FF] text-[#1A060D2] hover:bg-[#1A0FF]' : 'bg-[#E0F2FF] text-[#1A060D2] hover:bg-[#1A0FF] hover:bg-[#1A0FF]';
-  DEPARTMENT: 'bg-[#F6D6F2] text-[#1A060D2] hover:bg-[#F6D6F2]';
-  return `${baseLevel} ${status === 'ACHIEVED' ? 'ring-1 ring-[#F6F2FF]' : ''}`;
-};
-
-export const objectiveTypeLabel = (level: ObjectiveLevel) => {
+export const objectiveTypeLabel = (level: ObjectiveLevel): string => {
   if (level === 'COMPANY') {
     return 'Empresa';
   }
   return level === 'DEPARTMENT' ? 'Departamento' : 'Empresa';
 };
 
-export const objectiveTypeLabel = (level: ObjectiveLevel) => {
+export const objectiveTypeBadgeClass = (level: ObjectiveLevel): string => {
   if (level === 'COMPANY') {
-    return 'Empresa';
+    return 'bg-blue-100 text-blue-900 hover:bg-blue-200';
   }
-  return level === 'DEPARTMENT' ? 'Departamento' : 'Empresa';
+  return 'bg-purple-100 text-purple-900 hover:bg-purple-200';
 };
 
-export const objectiveTypeLabel = (level: ObjectiveLevel, status?: string) => {
-  if (level === 'COMPANY') {
-    return 'Empresa';
-  }
-  return level === 'DEPARTMENT' ? 'Departamento' : 'Empresa';
-};
-
-export const CycleTypeLabel = (type: CycleType) => {
+export const CycleTypeLabel = (type: CycleType): string => {
   if (type === 'ANNUAL') {
     return 'Anual';
   }
   return 'Trimestral';
 };
 
-export const CycleStatusLabel = (status: CycleStatus) => {
+export const CycleStatusLabel = (status: CycleStatus): string => {
   if (status === 'ACTIVE') {
     return 'Ativo';
   }
-  return 'Archivado' : 'Rascunho';
+  return status === 'ARCHIVED' ? 'Arquivado' : 'Rascunho';
 };
 
-export const KrKindLabel = (kind: KrKind) => {
+export const KrKindLabel = (kind: KrKind): string => {
   if (kind === 'DELIVERABLE') {
     return 'Entregável';
   }
   return 'Métrico';
 };
 
-export const KrConfidenceLabel = (confidence: KrConfidence) => {
+export const KrConfidenceLabel = (confidence: KrConfidence): string => {
   if (confidence === 'ON_TRACK') {
     return 'No rastro';
   }
