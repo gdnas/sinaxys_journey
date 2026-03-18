@@ -1,0 +1,13 @@
+-- Verificar todos os eventos da timeline da tarefa de teste
+SELECT 
+  id,
+  event_type,
+  old_value,
+  new_value,
+  metadata,
+  created_at,
+  user_id
+FROM work_item_events
+WHERE work_item_id = '748ffad4-ef17-442a-969b-285458bbc799'
+ORDER BY created_at DESC
+LIMIT 10;

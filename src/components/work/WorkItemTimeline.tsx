@@ -9,7 +9,9 @@ import {
   GitBranch,
   User,
   Flag,
-  Clock
+  Clock,
+  Edit,
+  Trash2
 } from 'lucide-react';
 
 interface WorkItemTimelineProps {
@@ -81,6 +83,10 @@ export function WorkItemTimeline({ workItemId, refreshTrigger }: WorkItemTimelin
         return <CheckCircle2 className="h-4 w-4" />;
       case 'comment_added':
         return <MessageSquare className="h-4 w-4" />;
+      case 'comment_edited':
+        return <Edit className="h-4 w-4" />;
+      case 'comment_deleted':
+        return <Trash2 className="h-4 w-4" />;
       case 'subtask_created':
         return <GitBranch className="h-4 w-4" />;
       case 'subtask_completed':
@@ -102,6 +108,10 @@ export function WorkItemTimeline({ workItemId, refreshTrigger }: WorkItemTimelin
         return 'bg-green-500';
       case 'comment_added':
         return 'bg-purple-500';
+      case 'comment_edited':
+        return 'bg-amber-500';
+      case 'comment_deleted':
+        return 'bg-red-500';
       case 'subtask_created':
         return 'bg-orange-500';
       case 'subtask_completed':
@@ -123,6 +133,10 @@ export function WorkItemTimeline({ workItemId, refreshTrigger }: WorkItemTimelin
         return `Status alterado de "${event.old_value}" para "${event.new_value}"`;
       case 'comment_added':
         return 'Comentário adicionado';
+      case 'comment_edited':
+        return 'Comentário editado';
+      case 'comment_deleted':
+        return 'Comentário excluído';
       case 'subtask_created':
         return `Subtarefa criada: "${event.metadata?.subtask_title || event.new_value}"`;
       case 'subtask_completed':
@@ -133,6 +147,17 @@ export function WorkItemTimeline({ workItemId, refreshTrigger }: WorkItemTimelin
         return `Prioridade alterada de "${event.old_value}" para "${event.new_value}"`;
       default:
         return 'Evento';
+    }
+  };
+
+  const getEventDescription = (event: TimelineEvent) => {
+    switch (event.event_type) {
+      case 'comment_edited':
+        return event.new_value ? `"${event.new_value}"` : '';
+      case 'comment_deleted':
+        return event.old_value ? `"${event.old_value}"` : '';
+      default:
+        return null;
     }
   };
 
@@ -160,7 +185,7 @@ export function WorkItemTimeline({ workItemId, refreshTrigger }: WorkItemTimelin
       ) : (
         <div className="space-y-4">
           {events.map((event, index) => (
-            <div key={event.id} className="flex gap-3">
+            <div key={event.id} className="flex gap-3 relative">
               {/* Timeline line */}
               {index !== events.length - 1 && (
                 <div className="absolute left-[19px] top-10 bottom-0 w-0.5 bg-border" />
@@ -191,6 +216,11 @@ export function WorkItemTimeline({ workItemId, refreshTrigger }: WorkItemTimelin
                 <p className="text-sm text-foreground">
                   {getEventTitle(event)}
                 </p>
+                {getEventDescription(event) && (
+                  <p className="text-sm text-muted-foreground italic">
+                    {getEventDescription(event)}
+                  </p>
+                )}
               </div>
             </div>
           ))}

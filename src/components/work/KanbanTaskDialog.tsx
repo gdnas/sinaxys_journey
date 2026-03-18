@@ -144,6 +144,11 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
     navigate(`/app/projetos/${projectId}/tarefas/${taskId}/editar`);
   };
 
+  const handleCommentsUpdate = () => {
+    setTimelineRefreshTrigger(prev => prev + 1);
+    if (onRefresh) onRefresh();
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '—';
     return new Date(dateString).toLocaleDateString('pt-BR', {
@@ -286,7 +291,7 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                 <TabsContent value="comments" className="mt-4">
                   <WorkItemComments 
                     workItemId={taskId} 
-                    onUpdate={onRefresh}
+                    onUpdate={handleCommentsUpdate}
                   />
                 </TabsContent>
                 
