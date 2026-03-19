@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
+import { MentalModelRibbon } from "@/components/okr/MentalModelRibbon";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,10 +96,11 @@ export default function OkrLongTerm() {
       <div className="grid gap-6">
         <OkrPageHeader
           title="Objetivos de longo prazo"
-          subtitle="Defina e revise os objetivos estratégicos (2–10 anos) da empresa."
+          subtitle="Ambições estruturantes que orientam a estratégia da empresa."
           icon={<Target className="h-5 w-5" />}
         />
         <OkrSubnav />
+        <MentalModelRibbon />
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
         </Card>
@@ -110,11 +112,13 @@ export default function OkrLongTerm() {
     <div className="grid gap-6">
       <OkrPageHeader
         title="Objetivos de longo prazo"
-        subtitle="Revisite, edite e mantenha a estratégia da empresa sempre viva."
+        subtitle="Ambições estruturantes que orientam a estratégia da empresa."
         icon={<Target className="h-5 w-5" />}
       />
 
       <OkrSubnav />
+
+      <MentalModelRibbon />
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

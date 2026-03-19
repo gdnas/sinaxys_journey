@@ -80,6 +80,7 @@ import { syncObjectiveDepartments } from "@/lib/okrDb";
 import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
+import { MentalModelRibbon } from "@/components/okr/MentalModelRibbon";
 import { UserMultiSelect } from "@/components/okr/UserMultiSelect";
 import { DepartmentMultiSelect } from "@/components/okr/DepartmentMultiSelect";
 import { PerformanceIndicatorEditor } from "@/components/okr/PerformanceIndicatorEditor";
@@ -708,8 +709,10 @@ export default function OkrAssistant() {
 
       <OkrPageHeader
         title="Assistente estratégico (OKRs + Fundamentos)"
-        subtitle="Um fluxo guiado para estruturar fundamentos, direção e execução com alinhamento automático."
+        subtitle="Ajuda guiada para estruturar fundamentos, direção e execução."
       />
+
+      <MentalModelRibbon />
 
       <WizardProgress step={step} />
 
@@ -2981,3 +2984,5 @@ export default function OkrAssistant() {
                         </div>
                       );
                     }
+
+}

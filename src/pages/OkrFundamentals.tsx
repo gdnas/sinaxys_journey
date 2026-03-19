@@ -17,6 +17,7 @@ import {
 } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
+import { MentalModelRibbon } from "@/components/okr/MentalModelRibbon";
 import { parseDescribedItems, serializeDescribedItems, type DescribedItem } from "@/lib/fundamentalsFormat";
 import { useSearchParams } from "react-router-dom";
 import { cn } from "@/lib/utils";
@@ -217,8 +218,9 @@ export default function OkrFundamentals() {
   if (!hasCompany) {
     return (
       <div className="grid gap-6">
-        <OkrPageHeader title="Fundamentos" subtitle="Carregando contexto da empresa…" icon={<BookOpenText className="h-5 w-5" />} />
+        <OkrPageHeader title="Fundamentos" subtitle="Base cultural e estratégica que orienta decisões e execução." icon={<BookOpenText className="h-5 w-5" />} />
         <OkrSubnav />
+        <MentalModelRibbon />
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
         </Card>
@@ -231,11 +233,13 @@ export default function OkrFundamentals() {
       <div className="grid gap-6">
         <OkrPageHeader
           title="Fundamentos"
-          subtitle="Propósito, missão, visão, valores e cultura."
+          subtitle="Base cultural e estratégica que orienta decisões e execução."
           icon={<BookOpenText className="h-5 w-5" />}
         />
 
         <OkrSubnav />
+
+        <MentalModelRibbon />
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

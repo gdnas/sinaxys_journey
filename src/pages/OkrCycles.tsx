@@ -57,6 +57,7 @@ import {
 import { listStrategyObjectives, type DbStrategyObjective } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
+import { MentalModelRibbon } from "@/components/okr/MentalModelRibbon";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 import { listKrLinksByObjectiveId, clearKrLinksForObjective, linkObjectiveToKr } from "@/lib/okrAlignmentDb";
 
@@ -414,13 +415,15 @@ export default function OkrCycles({ scope = "quarter" }: { scope?: OkrCyclesScop
         title={scope === "year" ? "Objetivos do ano" : "Objetivos do trimestre"}
         subtitle={
           scope === "year"
-            ? "Revise e mantenha os objetivos anuais — com KRs, progresso e responsáveis."
-            : "Acompanhe os objetivos do trimestre — com KRs, progresso e responsáveis."
+            ? "Objetivos anuais que consolidam a direção da empresa."
+            : "Objetivos trimestrais que direcionam a execução."
         }
         icon={<Target className="h-5 w-5" />}
       />
 
       <OkrSubnav />
+
+      <MentalModelRibbon />
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">

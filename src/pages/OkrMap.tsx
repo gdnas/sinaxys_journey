@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { OkrSubnav } from "@/components/OkrSubnav";
+import { MentalModelRibbon } from "@/components/okr/MentalModelRibbon";
 import { OkrMapExplorer } from "@/components/okr/OkrMapExplorer";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
@@ -30,7 +31,7 @@ export default function OkrMap() {
     return (
       <div className="grid gap-6">
         <OkrSubnav />
-
+        <MentalModelRibbon />
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm text-muted-foreground">Aguardando identificação da empresa do seu usuário…</div>
         </Card>
@@ -41,6 +42,14 @@ export default function OkrMap() {
   return (
     <div className="grid gap-6">
       <OkrSubnav />
+
+      <MentalModelRibbon />
+
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="text-sm text-muted-foreground">
+          Visualize como visão, objetivos, projetos e entregas se conectam.
+        </div>
+      </Card>
 
       {isMobile ? (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
