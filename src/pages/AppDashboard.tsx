@@ -31,14 +31,21 @@ import { computeProgress } from "@/lib/sinaxys";
 import { getAssignmentsForUser } from "@/lib/journeyDb";
 import { fetchLeaderboard } from "@/lib/pointsDb";
 import { VacationSummaryCard } from "@/components/VacationSummaryCard";
+
+// Import okr_db functions for tasks (okr_tasks, NOT work_items)
 import {
-  listOkrCycles,
-  listOkrObjectives,
   listTasksForCompany,
   listTasksForDepartment,
   listTasksForUser,
   type DbTaskWithContext,
 } from "@/lib/okrDb";
+
+// Import work_items functions for dashboard metrics (REALITY OPERACIONAL)
+import {
+  listWorkItemsForDashboardCompany,
+  listWorkItemsForDashboardDepartment,
+  listWorkItemsForDashboardUser,
+} from "@/lib/projectsDb";
 
 function formatPts(n: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(n));
@@ -114,7 +121,7 @@ function ShortcutCard({
 
         <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
           Abrir
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight className="ml-2 h-4 w-4" />
         </div>
       </Link>
     </Card>
@@ -193,7 +200,7 @@ export default function AppDashboard() {
 
   const companyId = user.companyId ?? null;
 
-  const isCollaborator = user.role === "COLABORADOR";
+  const isCollaborador = user.role === "COLABORADOR";
   const isHead = user.role === "HEAD";
   const isAdmin = user.role === "ADMIN";
 
@@ -221,76 +228,195 @@ export default function AppDashboard() {
   const weekFrom = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
   const weekTo = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
-  // My tasks (always useful)
-  const { data: myWeekTasks = [] } = useQuery({
-    queryKey: ["okr-my-tasks", companyId, user.id, weekFrom, weekTo],
-    enabled: !!companyId,
-    queryFn: () => listTasksForUser(companyId as string, user.id, { from: weekFrom, to: weekTo }),
+  // =====================================================
+  // WORK ITEMS: Dashboard metrics (USANDO work_items como fonte única)
+  // =====================================================
+  
+  // 1. Minhas tarefas (COLABORADOR)
+  const { data: myWeekWorkItems = [] } = useQuery({
+    queryKey: ["dashboard-my-work-items", companyId, user.id, weekFrom, weekTo],
+    enabled: !!companyId && isCollaborador,
+    queryFn: () => listWorkItemsForDashboardUser(companyId as string, user.id, { from: weekFrom, to: weekTo }),
   });
 
-  const myOpenTasks = useMemo(() => myWeekTasks.filter((t) => t.status !== "DONE"), [myWeekTasks]);
+  const myOpenWorkItems = useMemo(() => myWeekWorkItems.filter((t: any) => t.status !== "done"), [myWeekWorkItems]);
 
-  // Team/company tasks (for HEAD/ADMIN)
-  const { data: scopeTasks = [] } = useQuery({
-    queryKey: ["okr-scope-tasks", companyId, user.role, user.departmentId, weekFrom, weekTo],
+  // 2. Tarefas da empresa (para HEAD/ADMIN)
+  const { data: scopeWorkItems = [] } = useQuery({
+    queryKey: ["dashboard-scope-work-items", companyId, user.role, user.departmentId, weekFrom, weekTo],
     enabled: !!companyId && ((isHead && !!user.departmentId) || isAdmin),
     queryFn: () => {
-      if (isAdmin) return listTasksForCompany(companyId as string, { from: weekFrom, to: weekTo });
-      return listTasksForDepartment(companyId as string, user.departmentId as string, { from: weekFrom, to: weekTo });
+      if (isAdmin) return listWorkItemsForDashboardCompany(companyId as string, { from: weekFrom, to: weekTo });
+      return listWorkItemsForDashboardDepartment(companyId as string, user.departmentId as string, { from: weekFrom, to: weekTo });
     },
   });
 
-  const scopeOpenTasks = useMemo(() => scopeTasks.filter((t) => t.status !== "DONE"), [scopeTasks]);
-  const scopeOverdueTasks = useMemo(
-    () => scopeOpenTasks.filter((t) => t.due_date && String(t.due_date) < todayIso),
-    [scopeOpenTasks, todayIso],
+  const scopeOpenWorkItems = useMemo(() => scopeWorkItems.filter((t: any) => t.status !== "done"), [scopeWorkItems]);
+  const scopeOverdueWorkItems = useMemo(
+    () => scopeOpenWorkItems.filter((t: any) => t.due_date && String(t.due_date) < todayIso),
+    [scopeOpenWorkItems, todayIso],
   );
 
-  // Active quarter objectives (for HEAD/ADMIN)
-  const { data: cycles = [] } = useQuery({
-    queryKey: ["okr-cycles", companyId],
-    enabled: !!companyId && (isHead || isAdmin),
-    queryFn: () => listOkrCycles(companyId as string),
-  });
+  // Calcular métricas de work items (usando work_items como fonte única)
+  const calculateWorkItemMetrics = (workItems: any[]) => {
+    const allOpenTasks = workItems.filter((t: any) => t.status !== 'done' && t.status !== 'review');
+    const completedTasks = workItems.filter((t: any) => t.status === 'done');
+    const inProgressTasks = workItems.filter((t: any) => t.status === 'in_progress');
+    const overdueTasks = workItems.filter((t: any) => t.due_date && new Date(t.due_date) < new Date() && t.status !== 'done');
+    
+    return {
+      allOpenTasks,
+      completedTasks,
+      inProgressTasks,
+      overdueTasks,
+    };
+  };
 
-  const activeQuarter = cycles.find((c) => c.type === "QUARTERLY" && c.status === "ACTIVE") ?? null;
+  const myWorkItemMetrics = useMemo(
+    () => calculateWorkItemMetrics(myWeekWorkItems),
+    [myWeekWorkItems, weekFrom, weekTo]
+  );
 
-  const { data: quarterObjectives = [] } = useQuery({
-    queryKey: ["okr-objectives", companyId, activeQuarter?.id],
-    enabled: !!companyId && !!activeQuarter?.id && (isHead || isAdmin),
-    queryFn: () => listOkrObjectives(companyId as string, String(activeQuarter?.id)),
-  });
+  const scopeWorkItemMetrics = useMemo(
+    () => calculateWorkItemMetrics(scopeWorkItems),
+    [scopeWorkItems, weekFrom, weekTo]
+  );
 
-  const scopedObjectives = useMemo(() => {
-    if (isAdmin) return quarterObjectives;
-    if (isHead) return quarterObjectives.filter((o) => o.department_id === user.departmentId);
-    return [];
-  }, [quarterObjectives, isAdmin, isHead, user.departmentId]);
-
-  const objectivesByLevel = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const o of scopedObjectives) m.set(o.level, (m.get(o.level) ?? 0) + 1);
-    return m;
-  }, [scopedObjectives]);
-
-  // Points (lightweight identity/engagement)
-  const { data: leaderboard = [] } = useQuery({
-    queryKey: ["points", "leaderboard", companyId],
+  // =====================================================
+  // 5. PROJETOS ATIVOS
+  // =====================================================
+  const { data: activeProjects = [] } = useQuery({
+    queryKey: ["dashboard-active-projects", companyId],
     enabled: !!companyId,
-    queryFn: () => fetchLeaderboard(companyId as string, 50),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select(`
+          id,
+          name,
+          status,
+          start_date,
+          due_date,
+          owner_user_id
+        `)
+        .eq("tenant_id", companyId)
+        .in("status", ["not_started", "in_progress", "at_risk", "delayed"])
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .order("name", { ascending: true })
+        .order("created_at", { ascending: true });
+      
+      if (error) throw error;
+      return data ?? [];
+    },
   });
 
-  const { myPoints, myRank } = useMemo(() => {
-    const mine = leaderboard.find((r) => r.user_id === user.id);
-    const idx = leaderboard.findIndex((r) => r.user_id === user.id);
-    return { myPoints: mine?.total_points ?? 0, myRank: idx >= 0 ? idx + 1 : null };
-  }, [leaderboard, user.id]);
+  const activeProjectsCount = useMemo(() => {
+    return activeProjects.length;
+  }, [activeProjects]);
+
+  // =====================================================
+  // 6. MEUS PROJETOS
+  // =====================================================
+  const myProjectIds = useMemo(() => {
+    return myWeekWorkItems
+      .filter((t: any) => t.project_id)
+      .map((t: any) => t.project_id);
+  }, [myWeekWorkItems]);
+
+  const myProjectIdsStr = useMemo(() => {
+    if (!myProjectIds.length) return '';
+    return `'${myProjectIds.map(id => `'${id}'`).join(',')}'`;
+  }, [myProjectIds]);
+
+  const { data: myProjects = [] } = useQuery({
+    queryKey: ["dashboard-my-projects", companyId, myProjectIdsStr],
+    enabled: !!companyId && myProjectIdsStr.length > 0,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("projects")
+        .select(`
+          id,
+          name,
+          description,
+          status,
+          start_date,
+          due_date,
+          owner_user_id
+          key_result_id,
+          deliverable_id
+        `)
+        .in("id", myProjectIdsStr)
+        .eq("tenant_id", companyId)
+        .order("due_date", { ascending: true, nullsFirst: false })
+        .order("name", { ascending: true });
+
+      if (error) throw error;
+      return (data ?? []) as unknown;
+    },
+  });
+
+  // Calcular métricas dos meus projetos
+  const myProjectMetrics = useMemo(() => {
+    if (!myProjects || myProjects.length === 0) {
+      return {
+        total: 0,
+        inProgress: 0,
+        done: 0,
+        inProgressTasks: 0,
+        myWeekTasks.length,
+      };
+    }
+
+    const inProgressProjects = myProjects.filter((p: any) => p.status === 'in_progress');
+    const doneProjects = myProjects.filter((p: any) => p.status === 'done');
+    const todoProjects = myProjects.filter((p: any) => p.status === 'not_started' || p.status === 'at_risk' || p.status === 'delayed');
+
+    // Total de tarefas
+    const inProgressTasks = myProjects.reduce((acc, p: any) => {
+      // Filtrar work_items do projeto por usuário (assignee_user_id = userId OR created_by_user_id = userId)
+      const projectTasks = myWeekWorkItems.filter((t: any) => t.project_id === p.id);
+      const userTasks = projectTasks.filter((t: any) => t.assignee_user_id === userId || t.created_by_user_id === userId);
+      const doneUserTasks = userTasks.filter((t: any) => t.status === 'done');
+      const inProgressUserTasks = userTasks.filter((t: any) => t.status === 'in_progress');
+      
+      return acc + inProgressUserTasks.length;
+    }, 0);
+
+    return {
+      total: myProjects.length,
+      inProgress: inProgressProjects.length,
+      done: doneProjects.length,
+      inProgressTasks,
+      myWeekTasks.length,
+    };
+  }, [myProjects, myProjectMetrics, myWeekTasks.length]);
+
+  const today = new Date();
+  const todayLabel = format(today, "EEEE, d 'de' MMMM", { locale: ptBR });
+  const todayIso = format(today, "yyyy-MM-dd");
+
+  // Render condicional baseado em role
+  const showTeamMetrics = isHead || isAdmin;
 
   const subtitle = isAdmin
     ? "Visão executiva: saúde do trimestre, execução crítica e atalhos de gestão."
     : isHead
       ? "Visão do time: o que está em risco e o que destrava a semana."
-      : "Seus principais atalhos: execução (OKRs), evolução (trilhas) e reconhecimento (Points).";
+      : "Seus principais atalhos: execução (OKRs), evolução (trilhas) e reconhecimento.";
+
+  // =====================================================
+  // WORK ITEMS: Dashboard metrics (usando work_items como fonte única)
+  // =====================================================
+  
+  // 1. Minhas tarefas (sempre mostrado)
+  const myWeekTasks = myWeekWorkItems;
+  const myOpenTasks = myOpenWorkItems;
+  const myOverdueTasks = myWorkItemMetrics.overdueTasks;
+
+  // 2. Tarefas da empresa (para HEAD/ADMIN)
+  const scopeTasks = scopeWorkItems;
+  const scopeOpenTasks = scopeOpenWorkItems;
+  const scopeOverdueTasks = scopeOverdueWorkItems;
 
   return (
     <div className="grid gap-6">
@@ -299,330 +425,153 @@ export default function AppDashboard() {
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold text-[color:var(--sinaxys-ink)]">
               <span className="grid h-5 w-5 place-items-center rounded-full bg-white ring-1 ring-[color:var(--sinaxys-border)]">
-                <LayoutDashboard className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
+                <LayoutDashboard className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)] />
               </span>
               Minha jornada
             </div>
 
-            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-3xl">
+            <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)]">
               {company?.name ? company.name : "Sua área"}
             </h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{todayLabel}. {subtitle}</p>
-          </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center" data-tour="dash-next-action">
-            {next ? (
-              <Button
-                asChild
-                className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              >
-                <Link to={`/app/tracks/${next.assignment.id}`}>
-                  Continuar trilha
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            ) : (
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between" data-tour="dash-next-action">
+              {next ? (
+                <Button
+                  asChild
+                  className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                >
+                  <Link to={`/app/tracks/${next.assignment.id}`}>
+                    Continuar trilha
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
+                  <Link to="/tracks">
+                    Explorar trilhas
+                    <BookOpen className="ml-2 h-4 w-4" />
+                  </Link>
+                </Button>
+              )}
               <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-                <Link to="/tracks">
-                  Explorar trilhas
-                  <BookOpen className="ml-2 h-4 w-4" />
+                <Link to={isCollaborador ? "/okr/hoje" : "/okr/quarter"}>
+                  {isCollaborador ? "Minhas tarefas" : "Ver OKRs"}
+                  <Target className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
-            )}
-
-            <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-              <Link to={isCollaborator ? "/okr/hoje" : "/okr/quarter"}>
-                {isCollaborator ? "Minhas tarefas" : "Ver OKRs"}
-                <Target className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-
-        <Separator className="my-5" />
-
-        <div className="grid gap-4 lg:grid-cols-3">
-          {isCollaborator ? (
-            <>
-              <StatPill
-                label="OKRs — tarefas abertas"
-                value={`${myOpenTasks.length}`}
-                hint="na sua semana"
-                icon={<Target className="h-5 w-5" />}
-                to="/okr/hoje"
-              />
-              <StatPill
-                label="Points"
-                value={formatPts(myPoints)}
-                hint={myRank ? `posição #${myRank} (Top 50)` : "entre no ranking"}
-                icon={<Trophy className="h-5 w-5" />}
-                to="/rankings"
-              />
-              <StatPill
-                label="Trilhas"
-                value={loadingAssignments ? "…" : `${inProgress.length}`}
-                hint={loadingAssignments ? "carregando" : inProgress.length ? "em andamento" : `${completed.length} concluídas`}
-                icon={<CheckCircle2 className="h-5 w-5" />}
-                to={inProgress.length ? "/app" : "/tracks"}
-              />
-            </>
-          ) : (
-            <>
-              <StatPill
-                label={isAdmin ? "Empresa — tarefas abertas" : "Time — tarefas abertas"}
-                value={`${scopeOpenTasks.length}`}
-                hint={`janela ${weekFrom.split("-").reverse().join("/")} → ${weekTo.split("-").reverse().join("/")}`}
-                icon={<Target className="h-5 w-5" />}
-                to="/okr/hoje"
-              />
-              <StatPill
-                label="Em risco (atrasadas)"
-                value={`${scopeOverdueTasks.length}`}
-                hint="priorize estas primeiro"
-                icon={<MapPinned className="h-5 w-5" />}
-                to="/okr/hoje"
-              />
-              <StatPill
-                label="Objetivos do trimestre"
-                value={activeQuarter ? `${scopedObjectives.length}` : "—"}
-                hint={
-                  activeQuarter
-                    ? isAdmin
-                      ? `Empresa: COMPANY ${objectivesByLevel.get("COMPANY") ?? 0} • DEPT ${objectivesByLevel.get("DEPARTMENT") ?? 0}`
-                      : `Seu depto: ${scopedObjectives.length}`
-                    : "Nenhum ciclo trimestral ativo"
-                }
-                icon={<CheckCircle2 className="h-5 w-5" />}
-                to="/okr/quarter"
-              />
-            </>
-          )}
-        </div>
-
-        {next ? (
-          <div className="mt-5 rounded-3xl border border-[color:var(--sinaxys-border)] bg-white/80 p-5 backdrop-blur">
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Próxima etapa</div>
-                <div className="mt-1 truncate text-sm text-muted-foreground">{next.track.title}</div>
-              </div>
-              <Badge className="w-fit rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                {next.completedModules} de {next.totalModules} módulos
-              </Badge>
             </div>
-            <div className="mt-3">
-              <Progress value={computeProgress(next.completedModules, next.totalModules)} className="h-2 rounded-full bg-[color:var(--sinaxys-tint)]" />
-            </div>
-          </div>
-        ) : null}
-      </Card>
-
-      <div>
-        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">O que importa agora</div>
-        <p className="mt-1 text-sm text-muted-foreground">Acesse rápido os módulos que mais destravam o seu dia.</p>
-
-        <div className="mt-4 grid gap-6 md:grid-cols-2">
-          {pdiEnabled ? (
-            <ShortcutCard
-              title="PDI & Performance"
-              desc={isAdmin ? "Acompanhe pessoas: check-ins, 1:1 e alertas leves." : isHead ? "Ritmo do time: check-ins, 1:1 e evolução." : "Seu PDI, seus check-ins e seu histórico de evolução."}
-              icon={<Handshake className="h-5 w-5" />}
-              to="/pdi-performance"
-              badge="pessoas"
-              tourId="dash-pdi"
-            />
-          ) : null}
-          <ShortcutCard
-            title="OKRs"
-            desc={isAdmin ? "Saúde do trimestre: objetivos, KRs, entregáveis e tarefas." : isHead ? "OKRs do seu departamento e execução do time." : "Suas prioridades do dia e da semana."}
-            icon={<MapPinned className="h-5 w-5" />}
-            to={isCollaborator ? "/okr/hoje" : "/okr/quarter"}
-            badge="execução"
-            tourId="dash-okr"
-          />
-          <ShortcutCard
-            title="Trilhas"
-            desc={isHead ? "Acompanhe trilhas do time e delegações." : "Aprendizado em sequência: onboarding e trilhas estratégicas."}
-            icon={<BookOpen className="h-5 w-5" />}
-            to={isHead ? "/head/tracks" : "/tracks"}
-            badge="evolução"
-            tourId="dash-trilhas"
-          />
-          <ShortcutCard
-            title="Points"
-            desc={isAdmin ? "Engajamento e regras de pontuação." : "Ranking, prêmios e recompensas."}
-            icon={<Sparkles className="h-5 w-5" />}
-            to={isAdmin ? "/rankings?tab=rules" : "/rankings"}
-            badge="reconhecimento"
-            tourId="dash-points"
-          />
-          <ShortcutCard
-            title={isAdmin ? "Empresa" : isHead ? "Time" : "Empresa"}
-            desc={isHead ? "Organograma e pessoas do seu contexto." : "Organograma e contexto da sua organização."}
-            icon={<Network className="h-5 w-5" />}
-            to="/org"
-            badge="contexto"
-            tourId="dash-org"
-          />
-          {isAdmin || isHead ? <VacationSummaryCard /> : null}
-        </div>
-      </div>
-
-      {isHead || isAdmin ? (
-        <RiskList
-          title={isAdmin ? "Execução crítica (empresa)" : "Execução crítica (time)"}
-          subtitle={isAdmin ? "Tarefas atrasadas nesta semana — priorize e reatribua." : "Tarefas atrasadas do seu depto — destrave o time."}
-          tasks={scopeOverdueTasks}
-          to="/okr/hoje"
-        />
-      ) : (
-        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Seus certificados</div>
-              <p className="mt-1 text-sm text-muted-foreground">O histórico do que você concluiu (e o que vale mostrar).</p>
-            </div>
-            <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-              <Link to="/app/certificates">
-                Abrir certificados
-                <Award className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </Card>
-      )}
-
-      {isAdmin || isHead ? (
-        <Card data-tour="dash-management" className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Atalhos de gestão</div>
-              <p className="mt-1 text-sm text-muted-foreground">Ações rápidas para destravar pessoas, custos e trilhas.</p>
-            </div>
-            <Badge className="w-fit rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-              {user.role}
-            </Badge>
           </div>
 
           <Separator className="my-5" />
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <Link
-              to="/admin/users"
-              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Usuários</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Ativação, roles e permissões.</div>
-                </div>
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-                  <Users className="h-5 w-5" />
-                </div>
-              </div>
-              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
-                Abrir
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
+          {/* =====================================================
+             MEUS PROJECTS (SOMENTE COLABORADOR)
+             ===================================================== */}
+          {isCollaborador && (
+            <>
+              {/* MY TASKS CARD */}
+              <div className="grid gap-4 lg:grid-cols-3">
+                <StatPill
+                  label="Minhas tarefas"
+                  value={myWorkItemMetrics.allOpenTasks.toString()}
+                  hint="na sua semana"
+                  icon={<Target className="h-5 w-5" />}
+                  to="/okr/hoje"
+                />
 
-            <Link
-              to="/admin/import-users"
-              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Importar usuários</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Suba uma planilha e provisiona o time rapidamente.</div>
-                </div>
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-                  <Users className="h-5 w-5" />
-                </div>
-              </div>
-              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
-                Abrir
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
+                <StatPill
+                  label="Concluídas"
+                  value={myWorkItemMetrics.completedTasks.toString()}
+                  hint={`${myWorkItemMetrics.completedTasks > 0 ? `${myWorkItemMetrics.completedTasks}/${myWorkItemMetrics.allOpenTasks.length} (${Math.round(myWorkItemMetrics.completedTasks / Math.max(myWorkItemMetrics.allOpenTasks.length, 1) * 100}%)` : "0%"`}
+                  icon={<CheckCircle2 className="h-5 w-5" />}
+                  to="/okr/hoje"
+                />
 
-            <Link
-              to="/admin/departments"
-              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Departamentos</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Estrutura do organograma e owners.</div>
-                </div>
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-                  <Users className="h-5 w-5" />
-                </div>
+                <StatPill
+                  label="Em progresso"
+                  value={myWorkItemMetrics.inProgressTasks.toString()}
+                  hint={myWorkItemMetrics.inProgressTasks.length > 0
+                    ? `${myWorkItemMetrics.inProgressTasks}/${myWorkItemMetrics.myWeekTasks.length}`
+                    : `${myWorkItemMetrics.myWeekTasks.length}/${myWorkItemMetrics.myWeekTasks.length}`
+                  }
+                  icon={<CheckCircle2 className="h-5 w-5" />}
+                  to="/okr/hoje"
+                />
               </div>
-              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
-                Abrir
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
 
-            <Link
-              to="/admin/costs"
-              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Budget, centros de custo e ROI.</div>
-                </div>
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-                  <Wallet className="h-5 w-5" />
-                </div>
-              </div>
-              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
-                Abrir
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
+              {/* MY PROJECTS CARD */}
+              {myProjectMetrics.total > 0 && (
+                <>
+                  <Link
+                    to={`/app/projetos/${myProjectIds[0]}/tarefas`}
+                    className="block mt-4"
+                  >
+                    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+                      <div className="flex items-start justify-between gap-4">
+                        <div>
+                          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Meus projetos</div>
+                          <div className="mt-1 text-sm text-muted-foreground">
+                            {myProjectMetrics.inProgressTasks} tarefas em andamento
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge className="w-fit rounded-full bg-[color:var(--sinaxys-bg)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                            {myProjectMetrics.inProgressTasks > 0
+                              ? `${myProjectMetrics.inProgressTasks}/${myProjectMetrics.total}`
+                              : `${myProjectMetrics.total}`
+                            )}
+                          </Badge>
+                        </div>
+                      </div>
+                    </Card>
+                  </Link>
+                </>
+              )}
+            </>
+          )}
 
-            <Link
-              to="/admin/brand"
-              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Marca & Módulos</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Personalize a experiência e habilite recursos.</div>
-                </div>
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-                  <Building2 className="h-5 w-5" />
-                </div>
-              </div>
-              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
-                Abrir
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
+          {/* =====================================================
+             TIME METRICS (somente HEAD/ADMIN)
+             ===================================================== */}
+          {showTeamMetrics && teamWorkItemMetrics && (
+            <>
+              <div className="grid gap-4 lg:grid-cols-3">
+                {/* 1. Tarefas abertas da empresa */}
+                <StatPill
+                      label={isAdmin ? "Empresa — tarefas abertas" : "Time — tarefas abertas"}
+                      value={`${teamWorkItemMetrics.allOpenTasks.toString()}`}
+                      hint={`Janela ${weekFrom.split("-").reverse().join("/")} → ${weekTo.split("-").reverse().join("/")}`}
+                      icon={<Target className="h-5 w-5" />}
+                      to="/okr/hoje"
+                />
 
-            <Link
-              to="/okr/quarter"
-              className="group rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5 transition hover:bg-[color:var(--sinaxys-tint)]/40"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">OKRs do trimestre</div>
-                  <div className="mt-1 text-sm text-muted-foreground">Prioridades e saúde da execução.</div>
-                </div>
-                <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-                  <Target className="h-5 w-5" />
-                </div>
+                {/* 2. Tarefas atrasadas */}
+                <StatPill
+                      label={isAdmin ? "Empresa — tarefas atrasadas" : "Time — tarefas atrasadas"}
+                      value={teamWorkItemMetrics.overdueTasks.toString()}
+                      hint="priorize estas primeiro"
+                      icon={<MapPinned className="h-5 w-5" />}
+                      to="/okr/hoje"
+                />
+
+                {/* 3. Projetos ativos */}
+                <StatPill
+                      label={isAdmin ? "Empresa — Projetos ativos" : "Time — Projetos ativos"}
+                      value={activeProjectsCount.toString()}
+                      hint={isAdmin
+                        ? `${activeProjectsCount} projetos ativos`
+                        : `${activeProjectsCount} projetos ativos`
+                      }
+                      icon={<Target className="h-5 w-5" />}
+                      to="/app/projetos/dashboard"
+                  />
+                />
               </div>
-              <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-primary)]">
-                Abrir
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
-          </div>
+            </>
+          )}
         </Card>
-      ) : null}
+      </div>
     </div>
   );
 }
