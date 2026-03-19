@@ -97,6 +97,7 @@ export function useProjectAccess(projectId: string): ProjectAccessCompat & Proje
 
   // Verificar se é admin ou masteradmin
   const isAdmin = user?.role === "ADMIN" || user?.role === "MASTERADMIN";
+  const isColaborador = user?.role === "COLABORADOR";
 
   // Verificar se é owner do projeto
   const isOwner = project?.owner_user_id === user?.id;
@@ -112,14 +113,20 @@ export function useProjectAccess(projectId: string): ProjectAccessCompat & Proje
   }, [project, user?.departmentId, user?.role]);
 
   // Regras de permissão
+  // ADMIN/MASTERADMIN: tudo
+  // HEAD: escopado ao departamento
+  // COLABORADOR: só ver e comentar, editar apenas work_items próprios/atribuídos
+  // OUTROS (membros sem role específico): igual COLABORADOR
+  
   const canView = isAdmin || isOwner || isHeadScoped || isMember;
-
   const canEditProject = isAdmin || isOwner || isHeadScoped;
-
+  
+  // canEditWorkItems: permite edição no backend (RLS vai filtrar o que cada um pode)
+  // COLABORADOR pode editar work_items, mas backend só permite se for assignee/creator
   const canEditWorkItems = isAdmin || isOwner || isHeadScoped || (isMember && (memberRole === "owner" || memberRole === "editor"));
-
+  
   const canManageMembers = isAdmin || isOwner || isHeadScoped;
-
+  
   // Compatibilidade: canEdit = canEditProject (para não quebrar código existente)
   const canEdit = canEditProject;
 
