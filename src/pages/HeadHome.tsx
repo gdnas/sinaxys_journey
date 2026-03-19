@@ -138,14 +138,20 @@ export default function HeadHome() {
               <span className="grid h-5 w-5 place-items-center rounded-full bg-white ring-1 ring-[color:var(--sinaxys-border)]">
                 <LayoutDashboard className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
               </span>
-              Minha jornada (Head)
+              Minha jornada
             </div>
 
             <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-3xl">
               {company?.name ? company.name : "Seu time"}
             </h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              {todayLabel}. O foco aqui é execução do seu departamento: riscos, prioridades e atalhos.
+            <p className="mt-1 text-xs font-medium text-[color:var(--sinaxys-primary)]">
+              Seu ponto de execução diário
+            </p>
+            <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
+              {todayLabel}. Aqui estão suas prioridades, riscos e ações para hoje.
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Aqui é onde o trabalho acontece.
             </p>
           </div>
 

@@ -205,11 +205,11 @@ export default function OkrHome() {
   return (
     <div className="mx-auto max-w-6xl grid gap-8 pb-12">
       <OkrPageHeader
-        title="Central de Comando"
-        subtitle="Direção, risco e decisão estratégica."
+        title="Estratégia"
+        subtitle="Visão consolidada da direção, riscos e decisões estratégicas."
         icon={<LayoutDashboard className="h-5 w-5" />}
         actions={
-          <Button asChild className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+          <Button asChild variant="outline" className="h-11 rounded-xl bg-white border-[color:var(--sinaxys-border)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]/30">
             <Link to="/okr/assistente">
               Abrir assistente
               <Sparkles className="ml-2 h-4 w-4" />
@@ -219,6 +219,10 @@ export default function OkrHome() {
       />
 
       <OkrSubnav />
+
+      <p className="text-sm text-muted-foreground -mt-2">
+        Aqui você analisa como o plano está evoluindo.
+      </p>
 
       {/* 1. STATUS ESTRATÉGICO */}
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-8">
