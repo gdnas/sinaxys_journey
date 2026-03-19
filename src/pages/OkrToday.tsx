@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Circle, Clock, Flame, KeyRound, ListChecks, Pencil, Target, Trash2 } from "lucide-react";
+import { CheckCircle2, Circle, Clock, Flame, KeyRound, ListChecks, Pencil, Target, Trash2, ExternalLink } from "lucide-react";
 import { format, endOfWeek, startOfWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -18,18 +18,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
-import type { DbTaskWithContextV2 } from "@/lib/okrDb";
-import { deleteTask, listTasksForUserWithContextV2, updateTask } from "@/lib/okrDb";
+import { listWorkItemsForUserWithContext, updateWorkItem, deleteWorkItem, type WorkItemWithOkrContext } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
-import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
+import WorkItemStatusBadge from "@/components/work/WorkItemStatusBadge";
+import { supabase } from "@/integrations/supabase/client";
 
 function TaskRow({
   task,
@@ -37,12 +33,12 @@ function TaskRow({
   onEdit,
   onDelete,
 }: {
-  task: DbTaskWithContextV2;
-  onToggleDone: (t: DbTaskWithContextV2) => void;
-  onEdit: (t: DbTaskWithContextV2) => void;
-  onDelete: (t: DbTaskWithContextV2) => void;
+  task: WorkItemWithOkrContext;
+  onToggleDone: (t: WorkItemWithOkrContext) => void;
+  onEdit: (t: WorkItemWithOkrContext) => void;
+  onDelete: (t: WorkItemWithOkrContext) => void;
 }) {
-  const done = task.status === "DONE";
+  const isDone = task.status === "done";
 
   return (
     <div
@@ -53,12 +49,17 @@ function TaskRow({
       title={task.objective_title ? `Objetivo: ${task.objective_title}` : undefined}
     >
       <div className="mt-0.5 text-[color:var(--sinaxys-primary)]">
-        {done ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
+        {isDone ? <CheckCircle2 className="h-5 w-5" /> : <Circle className="h-5 w-5" />}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-start justify-between gap-2">
-          <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] group-hover:text-[color:var(--sinaxys-ink)]">{task.title}</div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] group-hover:text-[color:var(--sinaxys-ink)]">
+                {task.title}
+              </div>
+              <WorkItemStatusBadge status={task.status} />
+            </div>
 
             <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
               {task.deliverable_id ? (
@@ -170,39 +171,37 @@ export default function OkrToday() {
   const weekTo = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
   const { data: tasks = [], isLoading } = useQuery({
-    queryKey: ["okr-my-tasks-v2", cid, user.id, weekFrom, weekTo],
+    queryKey: ["work-items-with-okr-context", cid, user.id, weekFrom, weekTo],
     enabled: hasCompany,
-    queryFn: () => listTasksForUserWithContextV2(user.id, { from: weekFrom, to: weekTo }),
+    queryFn: () => listWorkItemsForUserWithContext(user.id, { from: weekFrom, to: weekTo }),
   });
-
-  const [editOpen, setEditOpen] = useState(false);
-  const [editingTask, setEditingTask] = useState<DbTaskWithContextV2 | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDesc, setEditDesc] = useState("");
-  const [editDue, setEditDue] = useState("");
-  const [editEstimate, setEditEstimate] = useState("");
-  const [editSaving, setEditSaving] = useState(false);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editingTaskProjectId, setEditingTaskProjectId] = useState<string | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
 
-  const openEdit = (t: DbTaskWithContextV2) => {
-    setEditingTask(t);
-    setEditTitle(t.title);
-    setEditDesc(t.description ?? "");
-    setEditDue(t.due_date ?? "");
-    setEditEstimate(typeof t.estimate_minutes === "number" ? String(t.estimate_minutes) : "");
-    setEditOpen(true);
+  const openEdit = (t: WorkItemWithOkrContext) => {
+    if (!t.project_id) {
+      toast({
+        title: "Não é possível editar",
+        description: "Esta tarefa não está vinculada a um projeto.",
+        variant: "destructive",
+      });
+      return;
+    }
+    setEditingTaskProjectId(t.project_id);
+    setEditingTaskId(t.id);
   };
 
   const groups = useMemo(() => {
-    const overdue: DbTaskWithContextV2[] = [];
-    const todayList: DbTaskWithContextV2[] = [];
-    const week: DbTaskWithContextV2[] = [];
-    const done: DbTaskWithContextV2[] = [];
+    const overdue: WorkItemWithOkrContext[] = [];
+    const todayList: WorkItemWithOkrContext[] = [];
+    const week: WorkItemWithOkrContext[] = [];
+    const done: WorkItemWithOkrContext[] = [];
 
     for (const t of tasks) {
-      if (t.status === "DONE") {
+      if (t.status === "done") {
         done.push(t);
         continue;
       }
@@ -216,11 +215,11 @@ export default function OkrToday() {
     return { overdue, todayList, week, done };
   }, [tasks, todayIso]);
 
-  const toggleDone = async (t: DbTaskWithContextV2) => {
+  const toggleDone = async (t: WorkItemWithOkrContext) => {
     try {
-      const next = t.status === "DONE" ? "TODO" : "DONE";
-      await updateTask(t.id, { status: next });
-      await qc.invalidateQueries({ queryKey: ["okr-my-tasks-v2", cid, user.id, weekFrom, weekTo] });
+      const next = t.status === "done" ? "todo" : "done";
+      await updateWorkItem(t.id, { status: next });
+      await qc.invalidateQueries({ queryKey: ["work-items-with-okr-context", cid, user.id, weekFrom, weekTo] });
     } catch (e) {
       toast({
         title: "Não foi possível atualizar",
@@ -397,80 +396,7 @@ export default function OkrToday() {
         </div>
       </div>
 
-      <Dialog
-        open={editOpen}
-        onOpenChange={(v) => {
-          setEditOpen(v);
-          if (!v) setEditingTask(null);
-        }}
-      >
-        <DialogContent className="max-w-[92vw] rounded-3xl sm:max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Editar tarefa</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            {editingTask?.objective_title ? (
-              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 text-sm">
-                <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contexto</div>
-                <div className="mt-1 font-semibold text-[color:var(--sinaxys-ink)]">{editingTask.objective_title}</div>
-              </div>
-            ) : null}
-
-            <div className="grid gap-2">
-              <Label>Título</Label>
-              <Input className="h-11 rounded-xl" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Descrição</Label>
-              <Textarea className="min-h-[88px] rounded-2xl" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} />
-            </div>
-            <div className="grid gap-2">
-              <Label>Prazo (YYYY-MM-DD)</Label>
-              <Input className="h-11 rounded-xl" value={editDue} onChange={(e) => setEditDue(e.target.value)} placeholder="2026-02-14" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Estimativa (min)</Label>
-              <Input className="h-11 rounded-xl" value={editEstimate} onChange={(e) => setEditEstimate(e.target.value)} placeholder="30" />
-            </div>
-          </div>
-
-          <DialogFooter className="mt-2 gap-2 sm:gap-0">
-            <Button variant="outline" className="h-11 rounded-xl" onClick={() => setEditOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!editingTask || editSaving}
-              onClick={async () => {
-                if (!editingTask) return;
-                try {
-                  setEditSaving(true);
-                  await updateTask(editingTask.id, {
-                    title: editTitle,
-                    description: editDesc,
-                    due_date: editDue || null,
-                    estimate_minutes: editEstimate ? Number(editEstimate) : null,
-                  });
-                  await qc.invalidateQueries({ queryKey: ["okr-my-tasks-v2", cid, user.id, weekFrom, weekTo] });
-                  setEditOpen(false);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível salvar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setEditSaving(false);
-                }
-              }}
-            >
-              Salvar
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
+      {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent className="rounded-3xl">
           <AlertDialogHeader>
@@ -484,8 +410,8 @@ export default function OkrToday() {
               onClick={async () => {
                 if (!deleteId) return;
                 try {
-                  await deleteTask(deleteId);
-                  await qc.invalidateQueries({ queryKey: ["okr-my-tasks-v2", cid, user.id, weekFrom, weekTo] });
+                  await deleteWorkItem(deleteId);
+                  await qc.invalidateQueries({ queryKey: ["work-items-with-okr-context", cid, user.id, weekFrom, weekTo] });
                 } catch (e) {
                   toast({
                     title: "Não foi possível excluir",
@@ -503,6 +429,19 @@ export default function OkrToday() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Redirect to canonical edit page */}
+      {editingTaskProjectId && editingTaskId && (
+        <Link
+          to={`/app/projetos/${editingTaskProjectId}/tarefas/${editingTaskId}/editar`}
+          className="hidden"
+          ref={(el) => {
+            if (el) el.click();
+            setEditingTaskProjectId(null);
+            setEditingTaskId(null);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -1,0 +1,1 @@
+SELECT proname FROM pg_proc WHERE proname ILIKE '%work_item%' OR proname ILIKE '%okr_task%' LIMIT 20;

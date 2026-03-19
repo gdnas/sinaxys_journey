@@ -1001,94 +1001,140 @@ export async function listTasksForUserWithContextV2(userId: string, opts?: { fro
   return (data ?? []) as unknown as DbTaskWithContextV2[];
 }
 
-// --- Long-term KRs (Strategy) ---
+// --- Work Items with OKR Context (Replacement for okr_tasks) ---
 
-export type StrategyKrKind = "METRIC" | "DELIVERABLE";
-
-export type DbStrategyKeyResult = {
+export type WorkItemWithOkrContext = {
   id: string;
-  objective_id: string;
   title: string;
-  kind: StrategyKrKind;
-  metric_unit: string | null;
-  start_value: number | null;
-  target_value: number | null;
-  current_value: number | null;
-  due_at: string | null;
-  achieved: boolean;
-  achieved_at: string | null;
-  owner_user_id: string | null;
-  confidence: "ON_TRACK" | "AT_RISK" | "OFF_TRACK";
+  description: string | null;
+  status: string;
+  priority: string;
+  assignee_user_id: string | null;
+  due_date: string | null;
+  start_date: string | null;
+  estimate_minutes: number | null;
+  completed_at: string | null;
   created_at: string | null;
-  updated_at: string | null;
+  // OKR Context
+  key_result_id: string | null;
+  deliverable_id: string | null;
+  project_id: string | null;
+  // Denormalized context
+  key_result_title: string | null;
+  deliverable_title: string | null;
+  objective_id: string | null;
+  objective_title: string | null;
+  cycle_type: string | null;
+  cycle_year: number | null;
+  cycle_quarter: number | null;
 };
 
-const strategyKrSelect =
-  "id,objective_id,title,kind,metric_unit,start_value,target_value,current_value,due_at,achieved,achieved_at,owner_user_id,confidence,created_at,updated_at";
+export async function listWorkItemsForUserWithContext(
+  userId: string,
+  opts?: { from?: string; to?: string }
+): Promise<WorkItemWithOkrContext[]> {
+  const { data, error } = await supabase.rpc("work_items_for_user_with_okr_context", {
+    p_user_id: userId,
+    p_from: opts?.from ?? null,
+    p_to: opts?.to ?? null,
+  });
 
-export async function listStrategyKeyResults(objectiveId: string) {
-  const { data, error } = await supabase
-    .from("strategy_key_results")
-    .select(strategyKrSelect)
-    .eq("objective_id", objectiveId)
-    .order("created_at", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as DbStrategyKeyResult[];
+  if (error) {
+    console.error("Error listing work items for user:", error);
+    // Fallback to simple query if RPC doesn't exist
+    const { data: fallbackData, error: fallbackError } = await supabase
+      .from('work_items')
+      .select(`
+        id,
+        title,
+        description,
+        status,
+        priority,
+        assignee_user_id,
+        due_date,
+        start_date,
+        estimate_minutes,
+        completed_at,
+        created_at,
+        key_result_id,
+        deliverable_id,
+        project_id,
+        key_results!inner (
+          id,
+          title,
+          objective_id,
+          objectives!inner (
+            id,
+            title,
+            cycle_type,
+            cycle_year,
+            cycle_quarter
+          )
+        ),
+        okr_deliverables (
+          id,
+          title
+        )
+      `)
+      .eq('assignee_user_id', userId)
+      .order('due_date', { ascending: true });
+
+    if (fallbackError) throw fallbackError;
+
+    return (fallbackData ?? []).map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      status: item.status,
+      priority: item.priority,
+      assignee_user_id: item.assignee_user_id,
+      due_date: item.due_date,
+      start_date: item.start_date,
+      estimate_minutes: item.estimate_minutes,
+      completed_at: item.completed_at,
+      created_at: item.created_at,
+      key_result_id: item.key_result_id,
+      deliverable_id: item.deliverable_id,
+      project_id: item.project_id,
+      key_result_title: item.key_results?.title ?? null,
+      deliverable_title: item.okr_deliverables?.title ?? null,
+      objective_id: item.key_results?.objective_id ?? null,
+      objective_title: item.key_results?.objectives?.title ?? null,
+      cycle_type: item.key_results?.objectives?.cycle_type ?? null,
+      cycle_year: item.key_results?.objectives?.cycle_year ?? null,
+      cycle_quarter: item.key_results?.objectives?.cycle_quarter ?? null,
+    }));
+  }
+
+  return (data ?? []) as unknown as WorkItemWithOkrContext[];
 }
 
-export async function createStrategyKeyResult(
-  payload: Omit<DbStrategyKeyResult, "id" | "created_at" | "updated_at" | "achieved_at">,
-) {
-  const { data, error } = await supabase
-    .from("strategy_key_results")
-    .insert({
-      objective_id: payload.objective_id,
-      title: payload.title.trim(),
-      kind: payload.kind,
-      metric_unit: payload.metric_unit ?? null,
-      start_value: payload.start_value ?? null,
-      target_value: payload.target_value ?? null,
-      current_value: payload.current_value ?? null,
-      due_at: payload.due_at ?? null,
-      achieved: payload.achieved ?? false,
-      owner_user_id: payload.owner_user_id ?? null,
-      confidence: payload.confidence,
-    })
-    .select(strategyKrSelect)
-    .single();
+export async function updateWorkItem(
+  workItemId: string,
+  patch: Partial<Pick<WorkItemWithOkrContext, 'title' | 'description' | 'due_date' | 'estimate_minutes' | 'status'>>
+): Promise<void> {
+  const updatePayload: Record<string, any> = {};
+  
+  if (patch.title !== undefined) updatePayload.title = patch.title;
+  if (patch.description !== undefined) updatePayload.description = patch.description;
+  if (patch.due_date !== undefined) updatePayload.due_date = patch.due_date;
+  if (patch.estimate_minutes !== undefined) updatePayload.estimate_minutes = patch.estimate_minutes;
+  if (patch.status !== undefined) updatePayload.status = patch.status;
+
+  const { error } = await supabase
+    .from('work_items')
+    .update(updatePayload)
+    .eq('id', workItemId);
+
   if (error) throw error;
-  return data as DbStrategyKeyResult;
 }
 
-export async function updateStrategyKeyResult(
-  id: string,
-  patch: Partial<Pick<DbStrategyKeyResult, "title" | "metric_unit" | "start_value" | "target_value" | "current_value" | "due_at" | "achieved" | "achieved_at" | "owner_user_id" | "confidence" | "kind">>,
-) {
-  const update: Record<string, any> = {};
-  if ("title" in patch) update.title = patch.title?.trim();
-  if ("kind" in patch) update.kind = patch.kind;
-  if ("metric_unit" in patch) update.metric_unit = patch.metric_unit ?? null;
-  if ("start_value" in patch) update.start_value = patch.start_value ?? null;
-  if ("target_value" in patch) update.target_value = patch.target_value ?? null;
-  if ("current_value" in patch) update.current_value = patch.current_value ?? null;
-  if ("due_at" in patch) update.due_at = patch.due_at ?? null;
-  if ("achieved" in patch) update.achieved = !!patch.achieved;
-  if ("achieved_at" in patch) update.achieved_at = patch.achieved_at ?? null;
-  if ("owner_user_id" in patch) update.owner_user_id = patch.owner_user_id ?? null;
-  if ("confidence" in patch) update.confidence = patch.confidence;
+export async function deleteWorkItem(workItemId: string): Promise<void> {
+  const { error } = await supabase
+    .from('work_items')
+    .delete()
+    .eq('id', workItemId);
 
-  const { data, error } = await supabase
-    .from("strategy_key_results")
-    .update(update)
-    .eq("id", id)
-    .select(strategyKrSelect)
-    .maybeSingle();
-  if (error) throw error;
-  return (data ?? null) as DbStrategyKeyResult | null;
-}
-
-export async function deleteStrategyKeyResult(id: string) {
-  const { error } = await supabase.from("strategy_key_results").delete().eq("id", id);
   if (error) throw error;
 }
 
@@ -1539,5 +1585,96 @@ export async function deleteDeliverableComment(commentId: string): Promise<void>
     .delete()
     .eq("id", commentId);
   
+  if (error) throw error;
+}
+
+// --- Long-term KRs (Strategy) ---
+
+export type StrategyKrKind = "METRIC" | "DELIVERABLE";
+
+export type DbStrategyKeyResult = {
+  id: string;
+  objective_id: string;
+  title: string;
+  kind: StrategyKrKind;
+  metric_unit: string | null;
+  start_value: number | null;
+  target_value: number | null;
+  current_value: number | null;
+  due_at: string | null;
+  achieved: boolean;
+  achieved_at: string | null;
+  owner_user_id: string | null;
+  confidence: "ON_TRACK" | "AT_RISK" | "OFF_TRACK";
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+const strategyKrSelect =
+  "id,objective_id,title,kind,metric_unit,start_value,target_value,current_value,due_at,achieved,achieved_at,owner_user_id,confidence,created_at,updated_at";
+
+export async function listStrategyKeyResults(objectiveId: string) {
+  const { data, error } = await supabase
+    .from("strategy_key_results")
+    .select(strategyKrSelect)
+    .eq("objective_id", objectiveId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as DbStrategyKeyResult[];
+}
+
+export async function createStrategyKeyResult(
+  payload: Omit<DbStrategyKeyResult, "id" | "created_at" | "updated_at" | "achieved_at">,
+) {
+  const { data, error } = await supabase
+    .from("strategy_key_results")
+    .insert({
+      objective_id: payload.objective_id,
+      title: payload.title.trim(),
+      kind: payload.kind,
+      metric_unit: payload.metric_unit ?? null,
+      start_value: payload.start_value ?? null,
+      target_value: payload.target_value ?? null,
+      current_value: payload.current_value ?? null,
+      due_at: payload.due_at ?? null,
+      achieved: payload.achieved ?? false,
+      owner_user_id: payload.owner_user_id ?? null,
+      confidence: payload.confidence,
+    })
+    .select(strategyKrSelect)
+    .single();
+  if (error) throw error;
+  return data as DbStrategyKeyResult;
+}
+
+export async function updateStrategyKeyResult(
+  id: string,
+  patch: Partial<Pick<DbStrategyKeyResult, "title" | "metric_unit" | "start_value" | "target_value" | "current_value" | "due_at" | "achieved" | "achieved_at" | "owner_user_id" | "confidence" | "kind">>,
+) {
+  const update: Record<string, any> = {};
+  if ("title" in patch) update.title = patch.title?.trim();
+  if ("kind" in patch) update.kind = patch.kind;
+  if ("metric_unit" in patch) update.metric_unit = patch.metric_unit ?? null;
+  if ("start_value" in patch) update.start_value = patch.start_value ?? null;
+  if ("target_value" in patch) update.target_value = patch.target_value ?? null;
+  if ("current_value" in patch) update.current_value = patch.current_value ?? null;
+  if ("due_at" in patch) update.due_at = patch.due_at ?? null;
+  if ("achieved" in patch) update.achieved = !!patch.achieved;
+  if ("achieved_at" in patch) update.achieved_at = patch.achieved_at ?? null;
+  if ("owner_user_id" in patch) update.owner_user_id = patch.owner_user_id ?? null;
+  if ("confidence" in patch) update.confidence = patch.confidence;
+
+  const { data, error } = await supabase
+    .from("strategy_key_results")
+    .update(update)
+    .eq("id", id)
+    .select(strategyKrSelect)
+    .maybeSingle();
+  if (error) throw error;
+  return (data ?? null) as DbStrategyKeyResult | null;
+}
+
+export async function deleteStrategyKeyResult(id: string) {
+  const { error } = await supabase.from("strategy_key_results").delete().eq("id", id);
   if (error) throw error;
 }
