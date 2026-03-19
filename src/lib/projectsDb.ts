@@ -8,7 +8,8 @@
  * - project_members
  * - work_items (execução real do projeto)
  *
- * NOTA: A tabela real no banco é "work_items", que é usada para execução de projetos.
+ * NOTA: Embora este arquivo use o termo "ProjectWorkItem" nos tipos,
+ * a tabela real no banco é "work_items", que é usada para execução de projetos.
  */
 
 // =====================
@@ -52,7 +53,7 @@ export type ProjectMemberRole = "member" | "owner" | "viewer" | "editor";
 /**
  * Linha da tabela projects
  */
-export type DbProject = {
+export interface DbProject {
   id: string;
   tenant_id: string;
   name: string;
@@ -63,14 +64,14 @@ export type DbProject = {
   deliverable_id?: string | null;
   owner_user_id: string;
   created_by_user_id: string;
-  visibility: string;
-  admin_private_mode: string | null;
-  status: string;
+  visibility: ProjectVisibility;
+  admin_private_mode: ProjectAdminPrivateMode;
+  status: ProjectStatus;
   start_date: string | null;
   due_date: string | null;
   created_at: string;
   updated_at: string;
-};
+}
 
 /**
  * Linha da tabela project_members
@@ -82,7 +83,7 @@ export interface DbProjectMember {
   user_id: string;
   role_in_project: ProjectMemberRole;
   created_at: string;
-};
+}
 
 /**
  * Linha da tabela work_items (execução de projetos)
@@ -161,7 +162,7 @@ export interface CreateProjectMemberInput {
 /**
  * Input para criação de work item de projeto
  *
- * NOTA: A tabela real no banco é "work_items", não "tasks".
+ * NOTA: A tabela real no banco é "work_items".
  */
 export interface CreateProjectWorkItemInput {
   tenant_id: string;
@@ -179,7 +180,7 @@ export interface CreateProjectWorkItemInput {
 /**
  * Input para atualização de work item de projeto
  *
- * NOTA: A tabela real no banco é "work_items", não "tasks".
+ * NOTA: A tabela real no banco é "work_items".
  */
 export interface UpdateProjectWorkItemInput {
   title?: string;
@@ -208,6 +209,8 @@ export interface ProjectWithDetails extends DbProject {
 
 /**
  * Work item de projeto com dados expandidos
+ *
+ * NOTA: A tabela real no banco é "work_items".
  */
 export interface ProjectWorkItemWithDetails extends DbProjectWorkItem {
   project?: DbProject;
@@ -241,6 +244,7 @@ export interface ProjectStats {
 export interface ProjectFilters {
   status?: ProjectStatus[];
   visibility?: ProjectVisibility[];
+  // department_id filter can match primary id or any department in department_ids
   department_id?: string[];
   owner_user_id?: string;
   search?: string;
@@ -249,7 +253,7 @@ export interface ProjectFilters {
 /**
  * Filtros para listagem de work items de projeto
  *
- * NOTA: A tabela real no banco é "work_items", não "tasks".
+ * NOTA: A tabela real no banco é "work_items".
  */
 export interface ProjectWorkItemFilters {
   status?: ProjectWorkItemStatus[];
@@ -276,7 +280,7 @@ export type ProjectSortBy =
 /**
  * Opções de ordenação para work items de projeto
  *
- * NOTA: A tabela real no banco é "work_items", não "tasks".
+ * NOTA: A tabela real no banco é "work_items".
  */
 export type ProjectWorkItemSortBy =
   | "title_asc"
@@ -287,304 +291,3 @@ export type ProjectWorkItemSortBy =
   | "due_date_desc"
   | "priority"
   | "status";
-
-// =====================
-// DATABASE FUNCTIONS
-// =====================
-
-/**
- * Busca work_items de uma empresa para o dashboard
- *
- * @param companyId ID da empresa
- * @param opts Opções de filtro e ordenação
- * @returns Array de work_items com contexto
- */
-export async function listWorkItemsForDashboard(
-  companyId: string,
-  opts?: {
-    status?: string[];
-    assignee_user_id?: string;
-    from?: string;
-    to?: string;
-  }
-) {
-  const { data, error } = await supabase
-    .from("work_items")
-    .select(`
-      id,
-      tenant_id,
-      project_id,
-      title,
-      description,
-      assignee_user_id,
-      created_by_user_id,
-      priority,
-      status,
-      due_date,
-      start_date,
-      completed_at,
-      created_at,
-      updated_at
-    `)
-    .eq("tenant_id", companyId)
-    .order("due_date", { ascending: true, nullsFirst: false });
-
-  if (error) throw error;
-  return (data ?? []) as unknown;
-}
-
-/**
- * Busca work_items de um departamento para o dashboard
- *
- * @param companyId ID da empresa
- * @param departmentId ID do departamento
- * @param opts Opções de filtro e ordenação
- * @returns Array de work_items com contexto
- */
-export async function listWorkItemsForDepartment(
-  companyId: string,
-  departmentId: string,
-  opts?: {
-    status?: string[];
-    assignee_user_id?: string;
-    from?: string;
-    to?: string;
-  }
-) {
-  const { data, error } = await supabase
-    .from("work_items wi")
-    .select(`
-      wi.id,
-      wi.tenant_id,
-      wi.project_id,
-      wi.title,
-      wi.description,
-      wi.assignee_user_id,
-      wi.created_by_user_id,
-      wi.priority,
-      wi.status,
-      wi.due_date,
-      wi.start_date,
-      wi.completed_at,
-      wi.created_at,
-      wi.updated_at
-    `)
-    .eq("wi.tenant_id", companyId)
-    .innerJoin(
-      "projects p",
-      "p.id",
-      "p.tenant_id",
-      "p.department_id"
-    )
-    .eq("p.tenant_id", companyId)
-    .eq("p.department_id", departmentId)
-    .order("wi.due_date", { ascending: true, nullsFirst: false });
-
-  if (error) throw error;
-  return (data ?? []) as unknown;
-}
-
-/**
- * Busca work_items de um usuário para o dashboard
- *
- * @param companyId ID da empresa
- * @param userId ID do usuário
- * @param opts Opções de filtro e ordenação
- * @returns Array de work_items com contexto
- */
-export async function listWorkItemsForUser(
-  companyId: string,
-  userId: string,
-  opts?: {
-    status?: string[];
-    from?: string;
-    to?: string;
-  }
-) {
-  const { data, error } = await supabase
-    .from("work_items")
-    .select(`
-      id,
-      tenant_id,
-      project_id,
-      title,
-      description,
-      assignee_user_id,
-      created_by_user_id,
-      priority,
-      status,
-      due_date,
-      start_date,
-      completed_at,
-      created_at,
-      updated_at
-    `)
-    .eq("tenant_id", companyId)
-    .or("assignee_user_id", userId)
-    .order("due_date", { ascending: true, nullsFirst: false });
-
-  if (error) throw error;
-  return (data ?? []) as unknown;
-}
-
-/**
- * Busca work_items de um projeto para o dashboard
- *
- * @param companyId ID da empresa
- * @param projectId ID do projeto
- * @param opts Opções de filtro e ordenação
- * @returns Array de work_items com contexto
- */
-export async function listWorkItemsByProject(
-  companyId: string,
-  projectId: string,
-  opts?: {
-    status?: string[];
-    assignee_user_id?: string;
-    from?: string;
-    to?: string;
-  }
-) {
-  const { data, error } = await supabase
-    .from("work_items")
-    .select(`
-      id,
-      tenant_id,
-      project_id,
-      title,
-      description,
-      assignee_user_id,
-      created_by_user_id,
-      priority,
-      status,
-      due_date,
-      start_date,
-      completed_at,
-      created_at,
-      updated_at
-    `)
-    .eq("tenant_id", companyId)
-    .eq("project_id", projectId)
-    .order("due_date", { ascending: true, nullsFirst: false });
-
-  if (error) throw error;
-  return (data ?? []) as unknown;
-}
-
-/**
- * Busca work_items ativos de uma empresa para o dashboard
- *
- * @param companyId ID da empresa
- * @returns Contagem de work_items por status
- */
-export async function getWorkItemsStats(companyId: string) {
-  const { data, error } = await supabase
-    .from("work_items")
-    .select("status", { count: "exact" })
-    .eq("tenant_id", companyId)
-    .group("status");
-
-  if (error) throw error;
-
-  const stats: Record<string, number> = {};
-  data.forEach((row: any) => {
-    stats[row.status] = row.count;
-  });
-
-  return {
-    total_work_items: stats["todo"] + stats["in_progress"] + stats["done"] || 0,
-    open_work_items: stats["todo"] + stats["in_progress"] || 0,
-    completed_work_items: stats["done"] || 0,
-    in_progress_work_items: stats["in_progress"] || 0,
-    overdue_work_items: 0, // Será calculado no frontend
-  };
-}
-
-// =====================
-// HELPER FUNCTIONS
-// =====================
-
-/**
- * Formata data para exibição
- */
-function formatDate(dateString: string | null): string {
-  if (!dateString) return "Sem data";
-  return new Date(dateString).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
-}
-
-/**
- * Formata prioridade para exibição
- */
-function getPriorityLabel(priority: string): string {
-  const labels: Record<string, string> = {
-    "critical": "Crítico",
-    "high": "Alta",
-    "medium": "Média",
-    "low": "Baixa",
-  };
-  return labels[priority] ?? priority;
-}
-
-/**
- * Formata status para exibição
- */
-function getStatusLabel(status: string): string {
-  const labels: Record<string, string> = {
-    "backlog": "Backlog",
-    "todo": "A fazer",
-    "in_progress": "Em andamento",
-    "review": "Em revisão",
-    "done": "Concluído",
-  };
-  return labels[status] ?? status;
-}
-
-/**
- * Calcula se uma tarefa está atrasada
- */
-function isTaskOverdue(dueDate: string | null, status: string): boolean {
-  if (!dueDate) return false;
-  return new Date(dueDate) < new Date() && status !== "done";
-}
-
-/**
- * Formata data com data de hoje
- */
-function formatDateWithToday(dueDate: string | null): string {
-  if (!dueDate) return "Sem prazo";
-  
-  const due = new Date(dueDate);
-  const today = new Date();
-  const diff = Math.ceil((today.getTime() - due.getTime()) / (1000 * 60 * 24)); // dias de diferença arredondado
-  const isLate = isTaskOverdue(dueDate, null, "done");
-  
-  return `${formatDate(dueDate)}${isLate ? ' (atrasado)' : ''}`;
-}
-
-/**
- * Calcula progresso percentual
- */
-function calculateProgress(completed: number, total: number): number {
-  if (!total || total === 0) return 0;
-  return Math.round((completed / total) * 100);
-}
-
-/**
- * Calcula progresso percentual agrupado por status
- */
-export function calculateStatusProgress(stats: Record<string, number>): Record<string, number> {
-  const done = stats["done"] ?? 0;
-  const in_progress = stats["in_progress"] ?? 0;
-  const todo = stats["todo"] ?? 0;
-  const total = done + in_progress + todo;
-  
-  return {
-    total,
-    done: total > 0 ? Math.round((done / total) * 100) : 0,
-    in_progress: total > 0 ? Math.round((in_progress / total) * 100) : 0,
-  };
-}
