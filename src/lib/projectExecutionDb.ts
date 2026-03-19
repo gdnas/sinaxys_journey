@@ -174,7 +174,7 @@ export async function listProjectExecutionSummaries(
 
   return {
     rows: (data ?? []) as DbProjectExecutionSummary[],
-    total: typeof count === "number" ? count : (data ?? []).length,
+    total: typeof count === "number" ? count : ((data ?? []) as DbProjectExecutionSummary[]).length,
   };
 }
 
