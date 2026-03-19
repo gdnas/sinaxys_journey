@@ -100,23 +100,211 @@ const nav: NavItem[] = [
     roles: ["MASTERADMIN"],
   },
 
-  // Jornada
-  {
-    type: "link",
-    to: "/app",
-    label: "nav.journey",
-    icon: <LayoutDashboard className="h-4 w-4" />,
-    roles: ["COLABORADOR", "HEAD"],
-  },
+  // === HOME ===
   {
     type: "link",
     to: "/app",
     label: "nav.home",
     icon: <LayoutDashboard className="h-4 w-4" />,
-    roles: ["ADMIN"],
+    roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
   },
 
-  // PDI & Performance
+  // === ESTRATÉGIA ===
+  {
+    type: "group",
+    label: "nav.strategy.group",
+    icon: <Target className="h-4 w-4" />,
+    moduleKey: "OKR",
+    children: [
+      {
+        type: "link",
+        to: "/okr/fundamentals",
+        label: "nav.strategy.fundamentals",
+        icon: <BookOpen className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "OKR",
+      },
+      {
+        type: "link",
+        to: "/okr/long-term",
+        label: "nav.strategy.longterm",
+        icon: <Target className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "OKR",
+      },
+      {
+        type: "link",
+        to: "/okr",
+        label: "nav.strategy.okr",
+        icon: <Target className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "OKR",
+      },
+      {
+        type: "link",
+        to: "/okr/map",
+        label: "nav.strategy.map",
+        icon: <Network className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "OKR",
+      },
+    ],
+  },
+
+  // === EXECUÇÃO ===
+  {
+    type: "group",
+    label: "nav.execution.group",
+    icon: <CalendarClock className="h-4 w-4" />,
+    moduleKey: "PROJECTS",
+    children: [
+      {
+        type: "link",
+        to: "/app/projetos/dashboard",
+        label: "nav.execution.projects",
+        icon: <Layers className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "PROJECTS",
+      },
+      {
+        type: "link",
+        to: "/app/projetos/lista",
+        label: "nav.execution.projectslist",
+        icon: <Layers className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "PROJECTS",
+      },
+      {
+        type: "link",
+        to: "/app/projetos/tarefas",
+        label: "nav.execution.tasks",
+        icon: <CheckCircle2 className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "PROJECTS",
+      },
+    ],
+  },
+
+  // === PESSOAS ===
+  {
+    type: "group",
+    label: "nav.people.group",
+    icon: <Users className="h-4 w-4" />,
+    moduleKey: "ORG",
+    children: [
+      {
+        type: "link",
+        to: "/org",
+        label: "nav.people.orgchart",
+        icon: <Network className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "ORG",
+      },
+      {
+        type: "link",
+        to: "/admin/users",
+        label: "nav.people.users",
+        icon: <UserIcon className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD"],
+      },
+      {
+        type: "link",
+        to: "/admin/departments",
+        label: "nav.people.departments",
+        icon: <Layers className="h-4 w-4" />,
+        roles: ["ADMIN"],
+      },
+    ],
+  },
+
+  // === EVOLUÇÃO ===
+  {
+    type: "group",
+    label: "nav.evolution.group",
+    icon: <GraduationCap className="h-4 w-4" />,
+    moduleKey: "TRACKS",
+    children: [
+      {
+        type: "link",
+        to: "/tracks",
+        label: "nav.evolution.tracks",
+        icon: <GraduationCap className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "TRACKS",
+      },
+      {
+        type: "link",
+        to: "/app/certificates",
+        label: "nav.evolution.certificates",
+        icon: <Award className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "TRACKS",
+      },
+      {
+        type: "link",
+        to: "/videos",
+        label: "nav.evolution.videos",
+        icon: <Video className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "TRACKS",
+      },
+      {
+        type: "link",
+        to: "/rankings",
+        label: "nav.evolution.points",
+        icon: <Trophy className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "POINTS",
+      },
+    ],
+  },
+
+  // === EMPRESA ===
+  {
+    type: "group",
+    label: "nav.company.group",
+    icon: <Building2 className="h-4 w-4" />,
+    children: [
+      {
+        type: "link",
+        to: "/admin/brand",
+        label: "nav.company.brand",
+        icon: <Palette className="h-4 w-4" />,
+        roles: ["ADMIN", "MASTERADMIN"],
+      },
+      {
+        type: "link",
+        to: "/admin/email",
+        label: "nav.company.email",
+        icon: <Wrench className="h-4 w-4" />,
+        roles: ["ADMIN", "MASTERADMIN"],
+      },
+      {
+        type: "link",
+        to: "/admin/costs",
+        label: "nav.company.costs",
+        icon: <Wallet className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD"],
+        moduleKey: "COSTS",
+      },
+      {
+        type: "link",
+        to: "/admin/import",
+        label: "nav.company.import",
+        icon: <UploadCloud className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD"],
+      },
+      {
+        type: "link",
+        to: "/settings",
+        label: "nav.company.settings",
+        icon: <Palette className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+      },
+    ],
+  },
+
+  // Outros itens (PDI, Knowledge, etc.)
   {
     type: "link",
     to: "/pdi-performance",
@@ -126,69 +314,6 @@ const nav: NavItem[] = [
     moduleKey: "PDI_PERFORMANCE",
   },
 
-  // Points
-  {
-    type: "group",
-    label: "nav.points.group",
-    icon: <Trophy className="h-4 w-4" />,
-    moduleKey: "POINTS",
-    children: [
-      {
-        type: "link",
-        to: "/rankings",
-        label: "nav.points.ranking",
-        icon: <Trophy className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "POINTS",
-      },
-    ],
-  },
-
-  // OKRs
-  {
-    type: "link",
-    to: "/okr",
-    label: "nav.okr",
-    icon: <Target className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR"],
-    moduleKey: "OKR",
-  },
-
-  // Gestão de Projetos
-  {
-    type: "group",
-    label: "nav.projects.group",
-    icon: <CalendarClock className="h-4 w-4" />,
-    moduleKey: "PROJECTS",
-    children: [
-      {
-        type: "link",
-        to: "/app/projetos/dashboard",
-        label: "nav.projects.home",
-        icon: <LayoutDashboard className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "PROJECTS",
-      },
-      {
-        type: "link",
-        to: "/app/projetos/lista",
-        label: "nav.projects.list",
-        icon: <Layers className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "PROJECTS",
-      },
-      {
-        type: "link",
-        to: "/app/projetos/tarefas",
-        label: "nav.projects.tasks",
-        icon: <CheckCircle2 className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "PROJECTS",
-      },
-    ],
-  },
-
-  // Knowledge Base
   {
     type: "link",
     to: "/knowledge",
@@ -198,102 +323,7 @@ const nav: NavItem[] = [
     moduleKey: "KNOWLEDGE",
   },
 
-  // Empresa
-  {
-    type: "group",
-    label: "nav.company.group",
-    icon: <Building2 className="h-4 w-4" />,
-    children: [
-      {
-        type: "link",
-        to: "/org",
-        label: "nav.company.orgchart",
-        icon: <Network className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "ORG",
-      },
-      {
-        type: "link",
-        to: "/admin/users",
-        label: "nav.company.users",
-        icon: <Shield className="h-4 w-4" />,
-        roles: ["ADMIN"],
-      },
-      {
-        type: "link",
-        to: "/admin/import-users",
-        label: "nav.company.import",
-        icon: <UploadCloud className="h-4 w-4" />,
-        roles: ["ADMIN"],
-      },
-      {
-        type: "link",
-        to: "/admin/departments",
-        label: "nav.company.departments",
-        icon: <Layers className="h-4 w-4" />,
-        roles: ["ADMIN"],
-      },
-      {
-        type: "link",
-        to: "/admin/costs",
-        label: "nav.company.costs",
-        icon: <Wallet className="h-4 w-4" />,
-        roles: ["ADMIN"],
-        moduleKey: "COSTS",
-      },
-      {
-        type: "link",
-        to: "/admin/brand",
-        label: "nav.company.brand",
-        icon: <Palette className="h-4 w-4" />,
-        roles: ["ADMIN"],
-      },
-    ],
-  },
-
-  // Trilhas
-  {
-    type: "group",
-    label: "nav.tracks.group",
-    icon: <GraduationCap className="h-4 w-4" />,
-    moduleKey: "TRACKS",
-    children: [
-      {
-        type: "link",
-        to: "/tracks",
-        label: "nav.tracks.list",
-        icon: <GraduationCap className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "TRACKS",
-      },
-      {
-        type: "link",
-        to: "/app/certificates",
-        label: "nav.tracks.certificates",
-        icon: <Award className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "TRACKS",
-      },
-      {
-        type: "link",
-        to: "/videos",
-        label: "nav.tracks.videos",
-        icon: <Video className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "TRACKS",
-      },
-      {
-        type: "link",
-        to: "/admin/tracks",
-        label: "nav.tracks.build",
-        icon: <GraduationCap className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "TRACKS",
-      }
-    ],
-  },
-
-  // Head
+  // Head specific
   {
     type: "link",
     to: "/head/users",
@@ -310,34 +340,30 @@ const nav: NavItem[] = [
     moduleKey: "COSTS",
   },
 
+  // Trilhas para Head
+  {
+    type: "link",
+    to: "/admin/tracks",
+    label: "nav.tracks.build",
+    icon: <GraduationCap className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD"],
+    moduleKey: "TRACKS",
+  },
+
   // Minha área
   {
-    type: "group",
-    label: "nav.myarea",
+    type: "link",
+    to: "/profile",
+    label: "nav.profile",
     icon: <UserIcon className="h-4 w-4" />,
-    children: [
-      {
-        type: "link",
-        to: "/profile",
-        label: "nav.profile",
-        icon: <UserIcon className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-      },
-      {
-        type: "link",
-        to: "/integrations",
-        label: "nav.integrations",
-        icon: <Wrench className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-      },
-      {
-        type: "link",
-        to: "/settings",
-        label: "nav.settings",
-        icon: <Palette className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-      },
-    ],
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
+  },
+  {
+    type: "link",
+    to: "/integrations",
+    label: "nav.integrations",
+    icon: <Wrench className="h-4 w-4" />,
+    roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
 ];
 
