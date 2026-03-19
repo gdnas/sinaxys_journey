@@ -10,6 +10,8 @@ import ProjectMembersSection from "@/components/projects/ProjectMembersSection";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { getProjectExecutionSummary } from "@/lib/projectExecutionDb";
+import { getWorkItemStatusLabel, normalizeWorkItemStatus } from "@/lib/projectsDomain";
 
 export default function ProjetoDetail() {
   const { projectId } = useParams();
@@ -18,6 +20,7 @@ export default function ProjetoDetail() {
   const { canView, canEdit, canManageMembers, isLoading } = useProjectAccess(String(projectId ?? ""));
 
   const [project, setProject] = useState<any>(null);
+  const [executionSummary, setExecutionSummary] = useState<any>(null);
   const [tasks, setTasks] = useState<any[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(true);
 
@@ -110,6 +113,10 @@ export default function ProjetoDetail() {
           objective,
         });
 
+        // Buscar execution summary derivado
+        const summary = await getProjectExecutionSummary(projectId);
+        setExecutionSummary(summary);
+
         setTasks(
           ((tasksResult.data ?? []) as any[]).map((task) => ({
             ...task,
@@ -132,6 +139,18 @@ export default function ProjetoDetail() {
 
   const tasksCount = tasks.length;
   const memberCount = useMemo(() => (Array.isArray(project?.project_members) ? project.project_members.length : 0), [project]);
+  
+  // Usar derived_status se disponível, senão usa status legado
+  const displayedStatus = executionSummary?.derived_status || project?.status;
+  
+  // Métricas derivadas
+  const totalWorkItems = executionSummary?.total_work_items ?? 0;
+  const doneWorkItems = executionSummary?.done_work_items ?? 0;
+  const inProgressWorkItems = executionSummary?.in_progress_work_items ?? 0;
+  const todoWorkItems = executionSummary?.todo_work_items ?? 0;
+  const blockedWorkItems = executionSummary?.blocked_work_items ?? 0;
+  const overdueWorkItems = executionSummary?.overdue_work_items ?? 0;
+  const progressPct = executionSummary?.progress_pct ?? 0;
 
   if (isLoading || loadingDetails) return <div className="p-6">Carregando...</div>;
   if (!canView) return <AccessDenied />;
@@ -155,7 +174,7 @@ export default function ProjetoDetail() {
               </Button>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-3xl font-bold text-[color:var(--sinaxys-ink)]">{project.name}</h1>
-                <Badge variant="outline">{statusLabel(project.status)}</Badge>
+                <Badge variant="outline">{statusLabel(displayedStatus)}</Badge>
                 {project.objective?.okr_level ? (
                   <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
                     {project.objective.okr_level === "strategic" ? "OKR estratégico" : "OKR tático"}
@@ -201,6 +220,33 @@ export default function ProjetoDetail() {
       {canManageMembers ? <ProjectMembersSection projectId={String(projectId)} /> : null}
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+        <div className="mb-4">
+          <h2 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Execução do projeto</h2>
+          <p className="text-sm text-muted-foreground">Métricas derivadas dos work_items associados.</p>
+        </div>
+        
+        {/* Métricas derivadas */}
+        {totalWorkItems > 0 ? (
+          <div className="mb-4 grid gap-4 md:grid-cols-4">
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)]/15 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Progresso</div>
+              <div className="mt-1 text-2xl font-bold text-[color:var(--sinaxys-ink)]">{progressPct}%</div>
+            </div>
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)]/15 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total</div>
+              <div className="mt-1 text-2xl font-bold text-[color:var(--sinaxys-ink)]">{totalWorkItems}</div>
+            </div>
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)]/15 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Concluídas</div>
+              <div className="mt-1 text-2xl font-bold text-green-600">{doneWorkItems}</div>
+            </div>
+            <div className="rounded-2xl bg-[color:var(--sinaxys-tint)]/15 p-3">
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Em andamento</div>
+              <div className="mt-1 text-2xl font-bold text-blue-600">{inProgressWorkItems}</div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="mb-4 flex items-center justify-between gap-4">
           <div>
             <h2 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Tarefas associadas</h2>
@@ -265,23 +311,21 @@ function InfoCard({
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = {
+    // Status legados de projects
     not_started: "Não iniciado",
     on_track: "No prazo",
     at_risk: "Em risco",
     delayed: "Atrasado",
     completed: "Concluído",
+    // Status derivados de work_items
+    todo: "A fazer",
+    in_progress: "Em andamento",
+    blocked: "Bloqueado",
+    done: "Concluído",
   };
   return labels[status] ?? status;
 }
 
 function taskStatusLabel(status: string) {
-  const labels: Record<string, string> = {
-    backlog: "Backlog",
-    todo: "A fazer",
-    in_progress: "Em andamento",
-    review: "Em revisão",
-    done: "Concluído",
-    blocked: "Bloqueado",
-  };
-  return labels[status] ?? status;
+  return getWorkItemStatusLabel(normalizeWorkItemStatus(status as any));
 }

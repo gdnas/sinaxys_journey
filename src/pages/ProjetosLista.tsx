@@ -10,6 +10,7 @@ import ProjectCard from "@/components/projects/ProjectCard";
 import ProjectForm from "@/components/projects/ProjectForm";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useCompany } from "@/lib/company";
+import { getProjectExecutionSummariesByProjectIds } from "@/lib/projectExecutionDb";
 
 export default function ProjetosLista() {
   const { t } = useTranslation();
@@ -77,6 +78,15 @@ export default function ProjetosLista() {
       const deliverableMap = new Map(((deliverablesResult.data ?? []) as any[]).map((item) => [item.id, item]));
       const objectiveMap = new Map((objectives ?? []).map((item: any) => [item.id, item]));
 
+      // Buscar execution summaries para todos os projetos
+      const projectIds = rows.map((row) => row.id);
+      const executionSummariesMap = new Map(
+        (await getProjectExecutionSummariesByProjectIds(projectIds)).map((summary) => [
+          summary.project_id,
+          summary,
+        ])
+      );
+
       const mappedProjects = rows.map((row) => {
         const departmentNames = Array.isArray(row.department_ids) && row.department_ids.length
           ? row.department_ids.map((id: string) => departmentMap.get(id)).filter(Boolean)
@@ -88,6 +98,7 @@ export default function ProjetosLista() {
         const deliverable = row.deliverable_id ? deliverableMap.get(row.deliverable_id) : null;
         const objective = keyResult?.objective_id ? objectiveMap.get(keyResult.objective_id) : null;
         const owner = profileMap.get(row.owner_user_id);
+        const executionSummary = executionSummariesMap.get(row.id);
 
         return {
           ...row,
@@ -100,6 +111,15 @@ export default function ProjetosLista() {
           deliverable_title: deliverable?.title ?? null,
           okr_title: objective?.title ?? null,
           okr_level: objective?.okr_level ?? null,
+          // Execution summary derivado
+          derived_status: executionSummary?.derived_status ?? null,
+          progress_pct: executionSummary?.progress_pct ?? null,
+          total_work_items: executionSummary?.total_work_items ?? 0,
+          done_work_items: executionSummary?.done_work_items ?? 0,
+          in_progress_work_items: executionSummary?.in_progress_work_items ?? 0,
+          todo_work_items: executionSummary?.todo_work_items ?? 0,
+          blocked_work_items: executionSummary?.blocked_work_items ?? 0,
+          overdue_work_items: executionSummary?.overdue_work_items ?? 0,
         };
       });
 
