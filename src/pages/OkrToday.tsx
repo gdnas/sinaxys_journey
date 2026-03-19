@@ -27,6 +27,40 @@ import { OkrSubnav } from "@/components/OkrSubnav";
 import WorkItemStatusBadge from "@/components/work/WorkItemStatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 
+// ============================================================================
+// Helper seguro para parsing de datas
+// ============================================================================
+function safeFormatDate(dateValue: string | null | undefined, formatStr: string, fallback = ""): string {
+  if (!dateValue) return fallback;
+  
+  try {
+    const date = new Date(dateValue);
+    // Verifica se a data é válida
+    if (isNaN(date.getTime())) return fallback;
+    
+    return format(date, formatStr as any, { locale: ptBR });
+  } catch (error) {
+    console.warn("[OkrToday] Invalid date value:", dateValue, error);
+    return fallback;
+  }
+}
+
+// Helper seguro para extrair parte de data para comparação (YYYY-MM-DD)
+function safeToISODate(dateValue: string | null | undefined): string | null {
+  if (!dateValue) return null;
+  
+  try {
+    const date = new Date(dateValue);
+    // Verifica se a data é válida
+    if (isNaN(date.getTime())) return null;
+    
+    return format(date, "yyyy-MM-dd");
+  } catch (error) {
+    console.warn("[OkrToday] Invalid date value for comparison:", dateValue, error);
+    return null;
+  }
+}
+
 function TaskRow({
   task,
   onToggleDone,
@@ -96,10 +130,9 @@ function TaskRow({
                   </Link>
                 </span>
               ) : null}
-
-              {task.cycle_type ? (
+              {task.cycle_label ? (
                 <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                  {task.cycle_type === "QUARTERLY" ? `Q${task.cycle_quarter ?? "?"}/${task.cycle_year}` : `${task.cycle_year}`}
+                  {task.cycle_label}
                 </Badge>
               ) : null}
             </div>
@@ -108,7 +141,7 @@ function TaskRow({
           <div className="flex items-center gap-2">
             {task.due_date ? (
               <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                {format(new Date(task.due_date + "T00:00:00"), "dd/MM", { locale: ptBR })}
+                {safeFormatDate(task.due_date, "dd/MM")}
               </Badge>
             ) : null}
             {typeof task.estimate_minutes === "number" ? (
@@ -206,7 +239,7 @@ export default function OkrToday() {
         continue;
       }
 
-      const due = t.due_date;
+      const due = safeToISODate(t.due_date);
       if (due && due < todayIso) overdue.push(t);
       else if (due === todayIso) todayList.push(t);
       else week.push(t);

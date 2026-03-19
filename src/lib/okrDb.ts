@@ -1027,6 +1027,7 @@ export type WorkItemWithOkrContext = {
   cycle_type: string | null;
   cycle_year: number | null;
   cycle_quarter: number | null;
+  cycle_label: string | null;
 };
 
 export async function listWorkItemsForUserWithContext(
@@ -1081,29 +1082,40 @@ export async function listWorkItemsForUserWithContext(
 
     if (fallbackError) throw fallbackError;
 
-    return (fallbackData ?? []).map((item: any) => ({
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      status: item.status,
-      priority: item.priority,
-      assignee_user_id: item.assignee_user_id,
-      due_date: item.due_date,
-      start_date: item.start_date,
-      estimate_minutes: item.estimate_minutes,
-      completed_at: item.completed_at,
-      created_at: item.created_at,
-      key_result_id: item.key_result_id,
-      deliverable_id: item.deliverable_id,
-      project_id: item.project_id,
-      key_result_title: item.key_results?.title ?? null,
-      deliverable_title: item.okr_deliverables?.title ?? null,
-      objective_id: item.key_results?.objective_id ?? null,
-      objective_title: item.key_results?.objectives?.title ?? null,
-      cycle_type: item.key_results?.objectives?.cycle_type ?? null,
-      cycle_year: item.key_results?.objectives?.cycle_year ?? null,
-      cycle_quarter: item.key_results?.objectives?.cycle_quarter ?? null,
-    }));
+    return (fallbackData ?? []).map((item: any) => {
+      const cycleType = item.key_results?.objectives?.cycle_type ?? null;
+      const cycleYear = item.key_results?.objectives?.cycle_year ?? null;
+      const cycleQuarter = item.key_results?.objectives?.cycle_quarter ?? null;
+      
+      return {
+        id: item.id,
+        title: item.title,
+        description: item.description,
+        status: item.status,
+        priority: item.priority,
+        assignee_user_id: item.assignee_user_id,
+        due_date: item.due_date,
+        start_date: item.start_date,
+        estimate_minutes: item.estimate_minutes,
+        completed_at: item.completed_at,
+        created_at: item.created_at,
+        key_result_id: item.key_result_id,
+        deliverable_id: item.deliverable_id,
+        project_id: item.project_id,
+        key_result_title: item.key_results?.title ?? null,
+        deliverable_title: item.okr_deliverables?.title ?? null,
+        objective_id: item.key_results?.objective_id ?? null,
+        objective_title: item.key_results?.objectives?.title ?? null,
+        cycle_type: cycleType,
+        cycle_year: cycleYear,
+        cycle_quarter: cycleQuarter,
+        cycle_label: cycleType && cycleYear
+          ? cycleType === 'QUARTERLY'
+            ? `Q${cycleQuarter ?? "?"}/${cycleYear}`
+            : `${cycleYear}`
+          : null,
+      };
+    });
   }
 
   return (data ?? []) as unknown as WorkItemWithOkrContext[];
