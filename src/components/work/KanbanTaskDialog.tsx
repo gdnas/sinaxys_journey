@@ -233,8 +233,8 @@ export default function KanbanTaskDialog({ taskId, projectId, open, onClose, onR
                     <SelectContent>
                       <SelectItem value="backlog">Backlog</SelectItem>
                       <SelectItem value="todo">A fazer</SelectItem>
-                      <SelectItem value="in_progress">Em progresso</SelectItem>
-                      <SelectItem value="review">Em revisão</SelectItem>
+                      <SelectItem value="in_progress">Em andamento</SelectItem>
+                      <SelectItem value="blocked">Bloqueado</SelectItem>
                       <SelectItem value="done">Concluído</SelectItem>
                     </SelectContent>
                   </Select>

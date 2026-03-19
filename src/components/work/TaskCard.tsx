@@ -45,8 +45,7 @@ export function TaskStatusBadge({ status }: { status: string }) {
   const statusMap: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
     backlog: { label: 'Backlog', variant: 'secondary' },
     todo: { label: 'A fazer', variant: 'default' },
-    in_progress: { label: 'Em progresso', variant: 'default' },
-    review: { label: 'Em revisão', variant: 'secondary' },
+    in_progress: { label: 'Em andamento', variant: 'default' },
     done: { label: 'Concluído', variant: 'default' },
     blocked: { label: 'Bloqueado', variant: 'destructive' },
   };

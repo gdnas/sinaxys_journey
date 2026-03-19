@@ -55,8 +55,10 @@ export default function ProjetosTasks() {
 
   const taskCounts = {
     all: tasksWithNames.length,
+    backlog: tasksWithNames.filter(t => t.status === 'backlog').length,
     todo: tasksWithNames.filter(t => t.status === 'todo').length,
     in_progress: tasksWithNames.filter(t => t.status === 'in_progress').length,
+    blocked: tasksWithNames.filter(t => t.status === 'blocked').length,
     done: tasksWithNames.filter(t => t.status === 'done').length,
   };
 
@@ -225,8 +227,10 @@ export default function ProjetosTasks() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas ({taskCounts.all})</SelectItem>
+                  <SelectItem value="backlog">Backlog ({taskCounts.backlog})</SelectItem>
                   <SelectItem value="todo">A fazer ({taskCounts.todo})</SelectItem>
-                  <SelectItem value="in_progress">Em progresso ({taskCounts.in_progress})</SelectItem>
+                  <SelectItem value="in_progress">Em andamento ({taskCounts.in_progress})</SelectItem>
+                  <SelectItem value="blocked">Bloqueado ({taskCounts.blocked})</SelectItem>
                   <SelectItem value="done">Concluídas ({taskCounts.done})</SelectItem>
                 </SelectContent>
               </Select>

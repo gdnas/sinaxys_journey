@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { WORK_ITEM_STATUS, WORK_ITEM_STATUS_LABELS, WORK_ITEM_STATUS_ORDER, WorkItemStatus } from '@/lib/workItemConstants';
 
 export interface KanbanTask {
   id: string;
@@ -18,9 +19,9 @@ export interface KanbanTask {
   } | null;
 }
 
-export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done' | 'blocked';
+export type TaskStatus = WorkItemStatus;
 
-const STATUS_ORDER: TaskStatus[] = ['backlog', 'todo', 'in_progress', 'review', 'done', 'blocked'];
+const STATUS_ORDER: TaskStatus[] = WORK_ITEM_STATUS_ORDER;
 
 export function useKanban(projectId: string) {
   const { toast } = useToast();
@@ -98,15 +99,7 @@ export function useKanban(projectId: string) {
   };
 
   const getStatusLabel = (status: TaskStatus): string => {
-    const labels: Record<TaskStatus, string> = {
-      backlog: 'Backlog',
-      todo: 'A fazer',
-      in_progress: 'Em progresso',
-      review: 'Em revisão',
-      done: 'Concluído',
-      blocked: 'Bloqueado',
-    };
-    return labels[status] || status;
+    return WORK_ITEM_STATUS_LABELS[status] || status;
   };
 
   const groupTasksByStatus = (tasks: KanbanTask[]): Record<TaskStatus, KanbanTask[]> => {
