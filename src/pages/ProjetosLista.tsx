@@ -141,7 +141,7 @@ export default function ProjetosLista() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-3xl font-bold text-[color:var(--sinaxys-ink)]">{t("nav.projects.list")}</h1>
-            <p className="mt-2 text-muted-foreground">Projetos conectados a OKRs, entregáveis e execução em work_items.</p>
+            <p className="mt-2 text-muted-foreground">Projetos traduzem objetivos em execução prática via work_items.</p>
           </div>
           <Button className="rounded-2xl bg-[color:var(--sinaxys-primary)] text-white" onClick={() => setShowCreate(true)}>
             <Plus className="mr-2 h-4 w-4" />

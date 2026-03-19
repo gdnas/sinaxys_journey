@@ -24,6 +24,7 @@ import { useCompany } from "@/lib/company";
 import { listWorkItemsForUserWithContext, updateWorkItem, deleteWorkItem, type WorkItemWithOkrContext } from "@/lib/okrDb";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { OkrSubnav } from "@/components/OkrSubnav";
+import { MentalModelRibbon } from "@/components/okr/MentalModelRibbon";
 import WorkItemStatusBadge from "@/components/work/WorkItemStatusBadge";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -279,7 +280,7 @@ export default function OkrToday() {
     <div className="grid gap-6">
       <OkrPageHeader
         title="Rotina diária"
-        subtitle="Prioridades do dia e da semana — com contexto do objetivo, sem caça ao tesouro."
+        subtitle="Prioridades do dia derivadas dos seus objetivos e projetos."
         icon={<ListChecks className="h-5 w-5" />}
         help={{
           title: "O que é isso?",
@@ -302,6 +303,8 @@ export default function OkrToday() {
       />
 
       <OkrSubnav />
+
+      <MentalModelRibbon />
 
       <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
         <div className="grid gap-6">

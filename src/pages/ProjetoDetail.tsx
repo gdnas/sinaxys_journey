@@ -181,7 +181,10 @@ export default function ProjetoDetail() {
                   </Badge>
                 ) : null}
               </div>
-              {project.description ? <p className="mt-3 max-w-3xl text-sm text-muted-foreground">{project.description}</p> : null}
+              {project.description ? (
+                <p className="mt-3 max-w-3xl text-sm text-muted-foreground">{project.description}</p>
+              ) : null}
+              <p className="text-xs text-muted-foreground">Este projeto organiza a execução vinculada ao contexto estratégico.</p>
             </div>
 
             <div className="flex flex-col gap-2">
