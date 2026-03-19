@@ -2984,5 +2984,3 @@ export default function OkrAssistant() {
                         </div>
                       );
                     }
-
-}
