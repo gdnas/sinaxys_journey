@@ -230,6 +230,42 @@ export async function addComment(workItemId: string, userId: string, content: st
   return { comment, notifErrors, mentionedUserIds, mentionTokens, resolvedProfiles };
 }
 
+export async function addCommentWithNotify(workItemId: string, userId: string, content: string) {
+  const result = await addComment(workItemId, userId, content);
+  
+  // EVENTO 4: Comentário em work_item com assignee → notificar responsável
+  try {
+    const { data: workItem } = await supabase
+      .from("work_items")
+      .select("id, title, assignee_user_id")
+      .eq("id", workItemId)
+      .maybeSingle();
+    
+    if (workItem && workItem.assignee_user_id && workItem.assignee_user_id !== userId) {
+      const title = "Novo comentário em tarefa atribuída a você";
+      const snippet = content.length > 200 ? `${content.slice(0, 200)}…` : content;
+      const href = `/app/projetos/${result.comment.work_item_id || ''}/tarefas?taskId=${workItemId}&commentId=${result.comment.id}`;
+      
+      try {
+        await notificationsDb.createNotification({
+          userId: workItem.assignee_user_id,
+          actorUserId: userId,
+          title,
+          content: workItem.title ? `${workItem.title}: ${snippet}` : snippet,
+          href,
+          notifType: "work_item_comment",
+        });
+      } catch (notificationError) {
+        console.error("[workItemCommentsDb] Error notifying assignee:", notificationError);
+      }
+    }
+  } catch (workItemError) {
+    console.error("[workItemCommentsDb] Error fetching work item for notification:", workItemError);
+  }
+  
+  return result;
+}
+
 export async function updateComment(commentId: string, userId: string, content: string) {
   const { data: existingComment } = await supabase
     .from("work_item_comments")
@@ -321,4 +357,31 @@ export async function deleteComment(commentId: string, userId: string) {
 
   if (error) throw error;
   return { ok: true };
+}
+
+export async function getCommentNotifications(workItemId: string, userId: string, content: string, commentId: string) {
+  try {
+    const { data: workItem } = await supabase
+      .from("work_items")
+      .select("id, title, assignee_user_id, project_id")
+      .eq("id", workItemId)
+      .maybeSingle();
+    
+    if (workItem && workItem.assignee_user_id && workItem.assignee_user_id !== userId) {
+      const title = "Novo comentário em tarefa atribuída a você";
+      const snippet = content.length > 200 ? `${content.slice(0, 200)}…` : content;
+      const href = `/app/projetos/${workItem.project_id}/tarefas?taskId=${workItemId}&commentId=${commentId}`;
+      
+      await notificationsDb.createNotification({
+        userId: workItem.assignee_user_id,
+        actorUserId: userId,
+        title,
+        content: workItem.title ? `${workItem.title}: ${snippet}` : snippet,
+        href,
+        notifType: "work_item_comment",
+      });
+    }
+  } catch (notificationError) {
+    console.error("[workItemCommentsDb] Error notifying assignee:", notificationError);
+  }
 }

@@ -254,7 +254,7 @@ export function WorkItemComments({ workItemId, highlightCommentId, onUpdate }: W
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user) throw new Error('Not authenticated');
 
-      const result = await workItemCommentsDb.addComment(workItemId, userData.user.id, newComment.trim());
+      const result = await workItemCommentsDb.addCommentWithNotify(workItemId, userData.user.id, newComment.trim());
 
       setNewComment('');
       await fetchComments();

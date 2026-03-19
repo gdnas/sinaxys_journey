@@ -1,0 +1,9 @@
+
+-- 3. Verificar se há triggers em comments
+SELECT 
+    trigger_name,
+    event_object_table,
+    action_statement
+FROM information_schema.triggers 
+WHERE event_object_schema = 'public' 
+  AND event_object_table = 'comments';
