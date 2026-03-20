@@ -20,6 +20,7 @@ import AdminUsers from "./pages/AdminUsers";
 import AdminUserCard from "./pages/AdminUserCard";
 import AdminDepartments from "./pages/AdminDepartments";
 import AdminBrand from "./pages/AdminBrand";
+import AdminModules from "./pages/AdminModules";
 import AdminOrgChart from "./pages/AdminOrgChart";
 import AdminCosts from "./pages/AdminCosts";
 import AdminImportUsers from "./pages/AdminImportUsers";
@@ -722,6 +723,14 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "MASTERADMIN"]}>
                         <AdminBrand />
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/admin/modules"
+                    element={
+                      <RequireAuth roles={["ADMIN", "MASTERADMIN"]}>
+                        <AdminModules />
                       </RequireAuth>
                     }
                   />

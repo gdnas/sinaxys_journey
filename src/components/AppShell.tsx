@@ -128,7 +128,7 @@ const nav: NavItem[] = [
         type: "link",
         to: "/okr/long-term",
         label: "nav.strategy.longterm",
-        icon: <Target className="h-4 w-4" />,
+        icon: <Crown className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "OKR",
       },
@@ -185,38 +185,6 @@ const nav: NavItem[] = [
     ],
   },
 
-  // === PESSOAS ===
-  {
-    type: "group",
-    label: "nav.people.group",
-    icon: <Users className="h-4 w-4" />,
-    moduleKey: "ORG",
-    children: [
-      {
-        type: "link",
-        to: "/org",
-        label: "nav.people.orgchart",
-        icon: <Network className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "ORG",
-      },
-      {
-        type: "link",
-        to: "/admin/users",
-        label: "nav.people.users",
-        icon: <UserIcon className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD"],
-      },
-      {
-        type: "link",
-        to: "/admin/departments",
-        label: "nav.people.departments",
-        icon: <Layers className="h-4 w-4" />,
-        roles: ["ADMIN"],
-      },
-    ],
-  },
-
   // === EVOLUÇÃO ===
   {
     type: "group",
@@ -256,6 +224,23 @@ const nav: NavItem[] = [
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "POINTS",
       },
+      // move Conhecimento and Montar trilhas into Evolução
+      {
+        type: "link",
+        to: "/knowledge",
+        label: "nav.knowledge",
+        icon: <BookOpen className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "KNOWLEDGE",
+      },
+      {
+        type: "link",
+        to: "/admin/tracks",
+        label: "nav.tracks.build",
+        icon: <GraduationCap className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD"],
+        moduleKey: "TRACKS",
+      },
     ],
   },
 
@@ -270,6 +255,13 @@ const nav: NavItem[] = [
         to: "/admin/brand",
         label: "nav.company.brand",
         icon: <Palette className="h-4 w-4" />,
+        roles: ["ADMIN", "MASTERADMIN"],
+      },
+      {
+        type: "link",
+        to: "/admin/modules",
+        label: "nav.company.modules",
+        icon: <Layers className="h-4 w-4" />,
         roles: ["ADMIN", "MASTERADMIN"],
       },
       {
@@ -293,6 +285,29 @@ const nav: NavItem[] = [
         label: "nav.company.import",
         icon: <UploadCloud className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD"],
+      },
+      // moved items from People into Company
+      {
+        type: "link",
+        to: "/org",
+        label: "nav.people.orgchart",
+        icon: <Network className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "ORG",
+      },
+      {
+        type: "link",
+        to: "/admin/users",
+        label: "nav.people.users",
+        icon: <UserIcon className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD"],
+      },
+      {
+        type: "link",
+        to: "/admin/departments",
+        label: "nav.people.departments",
+        icon: <Layers className="h-4 w-4" />,
+        roles: ["ADMIN"],
       },
       {
         type: "link",
