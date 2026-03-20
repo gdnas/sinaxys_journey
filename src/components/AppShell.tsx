@@ -715,7 +715,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
-      <header className="sticky top-0 z-30 border-b bg-white/90 backdrop-blur dark:bg-[hsl(var(--background))]/85">
+      <header className="fixed inset-x-0 top-0 z-40 border-b bg-white/90 backdrop-blur dark:bg-[hsl(var(--background))]/85">
           <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
             <div className="flex items-center gap-3">
               <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
@@ -803,7 +803,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-      <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-20 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 items-start gap-6">
           <main className="min-w-0 max-w-full">{children}</main>
         </div>
@@ -811,3 +811,5 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+export default AppShell;
