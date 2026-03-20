@@ -15,6 +15,8 @@ import { roleLabel } from "@/lib/sinaxys";
 import { objectiveLevelLabel, objectiveTypeBadgeClass, objectiveTypeLabel } from "@/lib/okrUi";
 import { listOkrCycles, listOkrObjectives, listOkrObjectivesByIds, listOkrObjectivesForOwner, listTasksForUserWithContext } from "@/lib/okrDb";
 import { PersonFeedbackCard } from "@/components/PersonFeedbackCard";
+import { getAssignmentsForUser } from "@/lib/journeyDb";
+import { getSharedFeedbacksForUser } from "@/lib/feedbackSharesDb";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -88,6 +90,18 @@ export default function Person() {
   const qTasks = useQuery({
     queryKey: ["okr", "tasks", "user", userId],
     queryFn: () => listTasksForUserWithContext(userId),
+    enabled: !!userId,
+  });
+
+  const qAssignments = useQuery({
+    queryKey: ["assignments-for-person", userId],
+    queryFn: () => getAssignmentsForUser(userId),
+    enabled: !!userId,
+  });
+
+  const qSharedFeedbacks = useQuery({
+    queryKey: ["shared-feedbacks", userId],
+    queryFn: () => getSharedFeedbacksForUser(userId),
     enabled: !!userId,
   });
 
@@ -222,8 +236,12 @@ export default function Person() {
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
-              <span className="text-xs font-bold">{initials(title)}</span>
+            <div className="grid h-20 w-20 place-items-center overflow-hidden rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt={title} className="h-full w-full object-cover rounded-full" />
+              ) : (
+                <span className="text-sm font-bold">{initials(title)}</span>
+              )}
             </div>
             <div className="min-w-0">
               <div className="truncate text-lg font-semibold text-[color:var(--sinaxys-ink)]">{title}</div>
@@ -284,108 +302,134 @@ export default function Person() {
 
         <Separator className="my-5" />
 
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">OKRs em que está envolvido</div>
-                <p className="mt-1 text-sm text-muted-foreground">Dono do objetivo ou com tarefas atribuídas.</p>
-              </div>
-              <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                <Target className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-              </div>
-            </div>
-
-            <Separator className="my-5" />
-
-            {qOwnedObjectives.isLoading || qTasks.isLoading || qObjectivesFromTasks.isLoading || qCycles.isLoading ? (
-              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando OKRs…</div>
-            ) : null}
-
-            {okrInvolvement.length === 0 && !(qOwnedObjectives.isLoading || qTasks.isLoading) ? (
-              <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum OKR encontrado para esta pessoa.</div>
-            ) : null}
-
-            <div className="grid gap-2">
-              {okrInvolvement.map((row) => {
-                const o = row.objective;
-                const isOwner = row.kinds.includes("dono");
-                const hasTasks = row.kinds.includes("tarefas");
-                const nTasks = tasksByObjectiveId.get(o.id) ?? 0;
-
-                return (
-                  <Link
-                    key={o.id}
-                    to={`/okr/objetivos/${o.id}`}
-                    className="block rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 transition hover:bg-[color:var(--sinaxys-tint)]/40"
-                    title="Abrir OKR"
-                  >
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge className={"rounded-full " + objectiveTypeBadgeClass(o.level)}>{objectiveLevelLabel(o.level)}</Badge>
-                          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white ring-1 ring-[color:var(--sinaxys-border)]">
-                            {row.cycleLabel}{row.isActiveCycle ? " • ativo" : ""}
-                          </Badge>
-                          {isOwner ? (
-                            <Badge className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">dono</Badge>
-                          ) : null}
-                          {hasTasks ? (
-                            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                              {nTasks} tarefa{nTasks === 1 ? "" : "s"}
-                            </Badge>
-                          ) : null}
-                        </div>
-                        <div className="mt-2 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span>{objectiveTypeLabel(o.level)}</span>
-                          {shortDate(o.due_at) ? (
-                            <span className="inline-flex items-center gap-1">
-                              <CalendarClock className="h-3.5 w-3.5" /> {shortDate(o.due_at)}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="text-xs font-semibold text-[color:var(--sinaxys-primary)]">Abrir</div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          </Card>
-
-          <div className="grid gap-6">
-            <PersonFeedbackCard tenantId={companyId} fromUserId={user.id} toUserId={profile.id} toUserLabel={title} />
-
+        <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+          <div>
             <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Atalhos</div>
-                  <p className="mt-1 text-sm text-muted-foreground">Ações rápidas relacionadas à pessoa.</p>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">OKRs em que está envolvido</div>
+                  <p className="mt-1 text-sm text-muted-foreground">Dono do objetivo ou com tarefas atribuídas.</p>
                 </div>
                 <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-                  <MessageSquareText className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+                  <Target className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
                 </div>
               </div>
 
               <Separator className="my-5" />
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-                  <Link to="/pdi-performance">Ver histórico (PDI)</Link>
-                </Button>
-                <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
-                  <Link to="/okr/hoje">OKRs</Link>
-                </Button>
-              </div>
+              {qOwnedObjectives.isLoading || qTasks.isLoading || qObjectivesFromTasks.isLoading || qCycles.isLoading ? (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Carregando OKRs…</div>
+              ) : null}
 
-              <div className="mt-3 text-xs text-muted-foreground">
-                Dica: feedbacks ficam visíveis para quem escreveu, para o destinatário e para gestão (conforme as regras do PDI).
+              {okrInvolvement.length === 0 && !(qOwnedObjectives.isLoading || qTasks.isLoading) ? (
+                <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum OKR encontrado para esta pessoa.</div>
+              ) : null}
+
+              <div className="grid gap-2">
+                {okrInvolvement.map((row) => {
+                  const o = row.objective;
+                  const isOwner = row.kinds.includes("dono");
+                  const hasTasks = row.kinds.includes("tarefas");
+                  const nTasks = tasksByObjectiveId.get(o.id) ?? 0;
+
+                  return (
+                    <Link
+                      key={o.id}
+                      to={`/okr/objetivos/${o.id}`}
+                      className="block rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4 transition hover:bg-[color:var(--sinaxys-tint)]/40"
+                      title="Abrir OKR"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge className={"rounded-full " + objectiveTypeBadgeClass(o.level)}>{objectiveLevelLabel(o.level)}</Badge>
+                            <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white ring-1 ring-[color:var(--sinaxys-border)]">
+                              {row.cycleLabel}{row.isActiveCycle ? " • ativo" : ""}
+                            </Badge>
+                            {isOwner ? (
+                              <Badge className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]">dono</Badge>
+                            ) : null}
+                            {hasTasks ? (
+                              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                                {nTasks} tarefa{nTasks === 1 ? "" : "s"}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <div className="mt-2 truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{o.title}</div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>{objectiveTypeLabel(o.level)}</span>
+                            {shortDate(o.due_at) ? (
+                              <span className="inline-flex items-center gap-1">
+                                <CalendarClock className="h-3.5 w-3.5" /> {shortDate(o.due_at)}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="text-xs font-semibold text-[color:var(--sinaxys-primary)]">Abrir</div>
+                      </div>
+                    </Link>
+                  );
+                })}
               </div>
             </Card>
           </div>
+
+          <aside className="grid gap-6">
+            <div>
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilhas</div>
+                <p className="mt-1 text-sm text-muted-foreground">Trilhas que essa pessoa está envolvida (atribuições e em andamento).</p>
+                <Separator className="my-4" />
+                <div className="grid gap-2">
+                  {qAssignments.data?.map((a: any) => (
+                    <div key={a.assignment.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-3">
+                      <div className="text-sm font-semibold">{a.track.title}</div>
+                      <div className="text-xs text-muted-foreground">Progresso: {a.progressPct}% — {a.completedModules}/{a.totalModules}</div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+
+            <div>
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Feedbacks públicos</div>
+                <p className="mt-1 text-sm text-muted-foreground">Feedbacks que a pessoa optou por compartilhar publicamente.</p>
+                <Separator className="my-4" />
+                <div className="grid gap-3">
+                  {qSharedFeedbacks.data?.length ? (
+                    qSharedFeedbacks.data.map((s: any) => (
+                      <div key={s.feedback_id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-3">
+                        <div className="text-sm font-semibold">{s.feedbacks?.message}</div>
+                        <div className="text-xs text-muted-foreground">{new Date(s.feedbacks?.created_at).toLocaleString()}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-muted-foreground">Nenhum feedback público.</div>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            <div>
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Atalhos</div>
+                <Separator className="my-4" />
+                <div className="grid gap-2">
+                  <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
+                    <Link to="/pdi-performance">Ver histórico (PDI)</Link>
+                  </Button>
+                  <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
+                    <Link to="/okr/hoje">OKRs</Link>
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          </aside>
         </div>
       </Card>
+
+      <PersonFeedbackCard tenantId={companyId} fromUserId={user.id} toUserId={profile.id} toUserLabel={title} />
     </div>
   );
 }

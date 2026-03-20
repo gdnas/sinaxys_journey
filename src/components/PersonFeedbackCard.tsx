@@ -39,6 +39,7 @@ export function PersonFeedbackCard({
 
   const [kind, setKind] = useState<FeedbackKind>("RECONHECIMENTO");
   const [message, setMessage] = useState("");
+  const [sharePublic, setSharePublic] = useState(false);
 
   const badge = useMemo(() => kindBadge(kind), [kind]);
 
@@ -52,6 +53,9 @@ export function PersonFeedbackCard({
       kind,
       message,
     });
+
+    // If the creator wants to suggest public sharing (positive feedback), we do nothing here.
+    // The recipient can choose to share publicly from their profile.
 
     setMessage("");
     await qc.invalidateQueries({ queryKey: ["pdi", "feedbacks", tenantId, toUserId] });
