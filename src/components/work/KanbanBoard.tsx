@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { getProjectWorkflowStatuses, TemplateWorkflowStatus } from '@/lib/templateWorkflowDb';
 
 interface KanbanBoardProps {
   projectId: string;
@@ -44,7 +45,6 @@ export default function KanbanBoard({
     getStatusLabel,
     groupTasksByStatus,
     movingTaskId,
-    STATUS_ORDER,
   } = useKanban(projectId);
 
   const [showCreate, setShowCreate] = useState(false);
@@ -52,10 +52,66 @@ export default function KanbanBoard({
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
   const [localTasks, setLocalTasks] = useState<KanbanTask[]>(tasks);
 
+  // KAIROOS 2.0 Fase 1: Load workflow statuses from database (FONTE DA VERDADE)
+  const [workflowStatuses, setWorkflowStatuses] = useState<TemplateWorkflowStatus[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
+
   // Sync local tasks with prop tasks
   useEffect(() => {
     setLocalTasks(tasks);
   }, [tasks]);
+
+  // KAIROOS 2.0 Fase 1: Load workflow statuses on mount and when projectId changes
+  useEffect(() => {
+    async function loadWorkflowStatuses() {
+      try {
+        setLoadingStatuses(true);
+        const statuses = await getProjectWorkflowStatuses(projectId);
+        setWorkflowStatuses(statuses);
+      } catch (error) {
+        console.error('Error loading workflow statuses:', error);
+        toast({
+          title: 'Erro',
+          description: 'Não foi possível carregar os status do projeto',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoadingStatuses(false);
+      }
+    }
+    loadWorkflowStatuses();
+  }, [projectId, toast]);
+
+  // KAIROOS 2.0 Fase 1: Override getStatusLabel to use workflow statuses
+  const getWorkflowStatusLabel = (statusKey: string): string => {
+    const status = workflowStatuses.find(s => s.status_key === statusKey);
+    return status?.display_name || statusKey;
+  };
+
+  // KAIROOS 2.0 Fase 1: Group tasks by workflow statuses from database
+  const groupTasksByWorkflowStatus = (tasks: KanbanTask[]): Record<string, KanbanTask[]> => {
+    const grouped: Record<string, KanbanTask[]> = {};
+    
+    // Initialize empty arrays for all workflow statuses
+    workflowStatuses.forEach(status => {
+      grouped[status.status_key] = [];
+    });
+    
+    // Add tasks to their respective status columns
+    tasks.forEach((task) => {
+      if (task.status && grouped[task.status]) {
+        grouped[task.status].push(task);
+      } else {
+        // Handle tasks with status not in workflow (fallback to first status)
+        const firstStatus = workflowStatuses[0];
+        if (firstStatus) {
+          grouped[firstStatus.status_key].push(task);
+        }
+      }
+    });
+    
+    return grouped;
+  };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -154,9 +210,10 @@ export default function KanbanBoard({
     }
   }, [toast, onRefresh]);
 
-  const groupedTasks = groupTasksByStatus(localTasks);
+  // KAIROOS 2.0 Fase 1: Use workflow statuses for grouping
+  const groupedTasks = groupTasksByWorkflowStatus(localTasks);
 
-  if (loading) {
+  if (loading || loadingStatuses) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="text-muted-foreground">Carregando board...</div>
@@ -174,14 +231,14 @@ export default function KanbanBoard({
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-6 min-w-max items-start pb-4">
-            {STATUS_ORDER.map((status) => (
+            {workflowStatuses.map((status) => (
               <KanbanColumn
-                key={status}
-                status={status}
-                label={getStatusLabel(status)}
-                tasks={groupedTasks[status]}
+                key={status.status_key}
+                status={status.status_key as unknown as TaskStatus}
+                label={status.display_name}
+                tasks={groupedTasks[status.status_key] || []}
                 projectId={projectId}
-                taskCount={groupedTasks[status].length}
+                taskCount={groupedTasks[status.status_key]?.length || 0}
                 onTaskClick={handleTaskClick}
                 onEdit={canEdit ? handleEditTask : undefined}
                 onChangeAssignee={canEdit ? handleChangeAssignee : undefined}

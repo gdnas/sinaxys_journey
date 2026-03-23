@@ -13,6 +13,12 @@
  */
 
 // =====================
+// IMPORTS
+// =====================
+
+import type { TemplateType } from '@/lib/templateWorkflowDb';
+
+// =====================
 // ENUMS
 // =====================
 
@@ -69,8 +75,22 @@ export interface DbProject {
   status: ProjectStatus;
   start_date: string | null;
   due_date: string | null;
+  template_type: TemplateType; // NOVO - KAIROOS 2.0 Fase 1: OBRIGATÓRIO e IMUTÁVEL
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Linha da tabela project_workflow_status (KAIROOS 2.0 Fase 1)
+ */
+export interface DbProjectWorkflowStatus {
+  id: string;
+  project_id: string;
+  status_key: string;
+  display_name: string;
+  display_order: number;
+  color: string;
+  created_at: string;
 }
 
 /**
@@ -130,6 +150,7 @@ export interface CreateProjectInput {
   status?: ProjectStatus;
   start_date?: string;
   due_date?: string;
+  template_type?: TemplateType; // NOVO - KAIROOS 2.0 Fase 1
 }
 
 /**
@@ -203,6 +224,7 @@ export interface UpdateProjectWorkItemInput {
 export interface ProjectWithDetails extends DbProject {
   members?: DbProjectMember[];
   work_items?: DbProjectWorkItem[];
+  workflow_statuses?: DbProjectWorkflowStatus[]; // NOVO - KAIROOS 2.0 Fase 1
   member_count?: number;
   work_item_count?: number;
 }
@@ -244,6 +266,7 @@ export interface ProjectStats {
 export interface ProjectFilters {
   status?: ProjectStatus[];
   visibility?: ProjectVisibility[];
+  template_type?: TemplateType[]; // NOVO - KAIROOS 2.0 Fase 1
   // department_id filter can match primary id or any department in department_ids
   department_id?: string[];
   owner_user_id?: string;

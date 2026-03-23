@@ -8,6 +8,9 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCompany } from "@/lib/company";
 import { useAuth } from "@/lib/auth";
+import { TemplateType, TEMPLATE_WORKFLOWS } from "@/lib/templateWorkflowDb";
+import TemplateSelector from "@/components/projects/TemplateSelector";
+import TemplateBadge from "@/components/projects/TemplateBadge";
 
 const NONE_VALUE = "__none__";
 
@@ -54,6 +57,10 @@ export default function ProjectForm({
   const [visibility, setVisibility] = useState(project?.visibility ?? "public");
   const [loading, setLoading] = useState(false);
 
+  // KAIROOS 2.0 Fase 1: Template type state (required for new projects, immutable for existing)
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateType | null>(project?.template_type ?? null);
+  const [showTemplateSelector, setShowTemplateSelector] = useState(!project?.template_type);
+
   const [users, setUsers] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [members, setMembers] = useState<string[]>(() => project?.project_members?.map((m: any) => m.user_id) ?? []);
@@ -78,6 +85,9 @@ export default function ProjectForm({
     setMembers(project?.project_members?.map((m: any) => m.user_id) ?? []);
     setSelectedKeyResultId(project?.key_result_id ?? NONE_VALUE);
     setSelectedDeliverableId(project?.deliverable_id ?? NONE_VALUE);
+    // KAIROOS 2.0 Fase 1: Update template state when project prop changes
+    setSelectedTemplate(project?.template_type ?? null);
+    setShowTemplateSelector(!project?.template_type);
   }, [project]);
 
   useEffect(() => {
@@ -215,6 +225,11 @@ export default function ProjectForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
+    // KAIROOS 2.0 Fase 1: Validate template type for new projects
+    if (!project && !selectedTemplate) {
+      return toast({ title: "Template é obrigatório", description: "Selecione um template para criar o projeto.", variant: "destructive" });
+    }
+
     if (!name.trim()) {
       return toast({ title: "Nome é obrigatório", variant: "destructive" });
     }
@@ -245,6 +260,8 @@ export default function ProjectForm({
         department_ids: departmentIds.length ? departmentIds : null,
         key_result_id: selectedKeyResultId === NONE_VALUE ? null : selectedKeyResultId,
         deliverable_id: selectedDeliverableId === NONE_VALUE ? null : selectedDeliverableId,
+        // KAIROOS 2.0 Fase 1: Include template_type (only for new projects, immutable for existing)
+        template_type: !project ? selectedTemplate : undefined,
         members: finalMemberSet,
       };
 
@@ -267,6 +284,55 @@ export default function ProjectForm({
 
   return (
     <form onSubmit={handleSubmit} className="grid gap-5">
+      {/* KAIROOS 2.0 Fase 1: Template Selection (only for new projects) */}
+      {!project && (
+        <>
+          {showTemplateSelector && !selectedTemplate ? (
+            <TemplateSelector onSelect={(templateType) => {
+              setSelectedTemplate(templateType);
+              setShowTemplateSelector(false);
+            }} />
+          ) : selectedTemplate ? (
+            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/20 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Template selecionado</div>
+                  <div className="mt-1">
+                    <TemplateBadge templateType={selectedTemplate} />
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {TEMPLATE_WORKFLOWS[selectedTemplate] ? Object.values(TEMPLATE_WORKFLOWS[selectedTemplate]).map(s => s.display_name).join(', ') : ''}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedTemplate(null);
+                    setShowTemplateSelector(true);
+                  }}
+                  disabled={loading}
+                >
+                  Alterar
+                </Button>
+              </div>
+            </div>
+          ) : null}
+        </>
+      )}
+
+      {/* KAIROOS 2.0 Fase 1: Show template for existing projects (read-only) */}
+      {project && project.template_type && (
+        <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/20 p-4">
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)] mb-2">Template do Projeto</div>
+          <TemplateBadge templateType={project.template_type} />
+          <p className="mt-2 text-xs text-muted-foreground">
+            O template define o fluxo de status do projeto e não pode ser alterado após a criação.
+          </p>
+        </div>
+      )}
+
       <div className="grid gap-2">
         <Label>Nome</Label>
         <Input value={name} onChange={(e) => setName(e.target.value)} required className="rounded-2xl" />
