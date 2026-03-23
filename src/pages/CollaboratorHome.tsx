@@ -213,7 +213,7 @@ export default function CollaboratorHome() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <ShortcutCard title="Minhas tarefas" desc="Rotina diária ligada aos OKRs." to="/okr/hoje" icon={<Target className="h-5 w-5" />} />
-        <ShortcutCard title="Férias" desc="Crie e acompanhe seus pedidos." to="/vacation" icon={<CalendarDays className="h-5 w-5" />} />
+        <ShortcutCard title="Indisponibilidade" desc="Crie e acompanhe suas solicitações." to="/vacation" icon={<CalendarDays className="h-5 w-5" />} />
         <ShortcutCard title="Ranking" desc="Acompanhe Points e suba no ranking." to="/rankings" icon={<Trophy className="h-5 w-5" />} />
         <ShortcutCard title="Trilha atual" desc={next ? "Voltar para onde você parou." : "Comece uma trilha agora."} to={heroPrimaryTo} icon={<ArrowRight className="h-5 w-5" />} />
       </div>

@@ -192,7 +192,7 @@ const App = () => (
                     }
                   />
 
-                  {/* Férias */}
+                  {/* Indisponibilidade */}
                   <Route
                     path="/vacation"
                     element={

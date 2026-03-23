@@ -168,7 +168,7 @@ export default function HeadHome() {
             </Button>
             <Button asChild variant="outline" className="h-11 rounded-xl bg-white">
               <Link to="/vacation/approvals">
-                Aprovar férias
+                Aprovar indisponibilidade
                 <CalendarCheck2 className="ml-2 h-4 w-4" />
               </Link>
             </Button>
@@ -193,7 +193,7 @@ export default function HeadHome() {
             to="/okr/hoje"
           />
           <StatCard
-            label="Férias — pendentes"
+            label="Indisponibilidade — pendentes"
             value={String(vacationPending)}
             hint="no fluxo de aprovações"
             icon={<CalendarCheck2 className="h-5 w-5" />}

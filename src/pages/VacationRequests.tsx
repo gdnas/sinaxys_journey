@@ -72,7 +72,7 @@ export default function VacationRequests() {
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Indisponibilidade</div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)]">Minhas solicitações</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Regstre períodos em que você estará indisponível e acompanhe aprovações. Você pode cancelar enquanto estiver <span className="font-medium">pendente</span>.
+            Registre períodos em que você estará indisponível e acompanhe aprovações. Você pode cancelar enquanto estiver <span className="font-medium">pendente</span>.
           </p>
         </div>
 

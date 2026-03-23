@@ -29,9 +29,9 @@ export function VacationSummaryCard() {
       <Link to="/vacation/approvals" className="block">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Férias</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Indisponibilidade</div>
             <div className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)]">{pending}</div>
-            <div className="mt-1 text-xs text-muted-foreground">Pedidos pendentes para revisar</div>
+            <div className="mt-1 text-xs text-muted-foreground">Solicitações pendentes para revisar</div>
           </div>
           <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
             <CalendarCheck2 className="h-5 w-5" />

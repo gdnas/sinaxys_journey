@@ -33,6 +33,15 @@ function prettyDate(iso: string) {
   return format(new Date(iso + "T00:00:00"), "dd/MM/yyyy", { locale: ptBR });
 }
 
+function prettyDateRange(startDate: string, days: number) {
+  const start = new Date(startDate + "T00:00:00");
+  const end = new Date(start);
+  end.setDate(end.getDate() + days - 1);
+  const startStr = format(start, "dd/MM/yyyy", { locale: ptBR });
+  const endStr = format(end, "dd/MM/yyyy", { locale: ptBR });
+  return startStr === endStr ? startStr : `${startStr} → ${endStr}`;
+}
+
 export default function VacationApprovals() {
   const { user } = useAuth();
   const { companyId } = useCompany();
@@ -85,7 +94,7 @@ export default function VacationApprovals() {
       <div className="mx-auto max-w-3xl">
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Acesso restrito</div>
-          <p className="mt-1 text-sm text-muted-foreground">Apenas Admin e Head podem acessar aprovações de férias.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Apenas Admin e Head podem acessar aprovações de indisponibilidade.</p>
         </Card>
       </div>
     );
@@ -95,7 +104,7 @@ export default function VacationApprovals() {
     return (
       <div className="mx-auto max-w-3xl">
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Férias • Aprovações</div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Indisponibilidade • Aprovações</div>
           <p className="mt-1 text-sm text-muted-foreground">Carregando contexto da empresa…</p>
         </Card>
       </div>
@@ -106,9 +115,9 @@ export default function VacationApprovals() {
     <div className="mx-auto max-w-6xl">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Férias</div>
+          <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Indisponibilidade</div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)]">Aprovações</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Admin e Head podem aprovar/recusar pedidos do time/empresa (conforme permissões).</p>
+          <p className="mt-1 text-sm text-muted-foreground">Admin e Head podem aprovar/recusar solicitações do time/empresa (conforme permissões).</p>
         </div>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-4">
@@ -170,7 +179,7 @@ export default function VacationApprovals() {
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-0">
           <div className="px-5 py-4">
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Pedidos</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Solicitações</div>
             <div className="text-xs text-muted-foreground">Clique em aprovar/recusar para registrar a decisão.</div>
           </div>
           <Separator />
@@ -195,11 +204,11 @@ export default function VacationApprovals() {
                       </div>
 
                       <div className="mt-1 text-sm text-[color:var(--sinaxys-ink)]">
-                        Início {prettyDate(r.start_date)} • {r.days} dia(s)
+                        {prettyDateRange(r.start_date, r.days)}
                       </div>
 
                       <div className="mt-1 text-xs text-muted-foreground">
-                        Pedido em {format(new Date(r.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
+                        Solicitação em {format(new Date(r.created_at), "dd/MM 'às' HH:mm", { locale: ptBR })}
                         {person?.job ? ` • ${person.job}` : ""}
                         {r.decided_at
                           ? ` • Decisão em ${format(new Date(r.decided_at), "dd/MM 'às' HH:mm", { locale: ptBR })}`
@@ -244,7 +253,7 @@ export default function VacationApprovals() {
                 );
               })
             ) : (
-              <div className="p-6 text-sm text-muted-foreground">Nenhum pedido encontrado para os filtros atuais.</div>
+              <div className="p-6 text-sm text-muted-foreground">Nenhuma solicitação encontrada para os filtros atuais.</div>
             )}
           </div>
         </Card>
@@ -261,7 +270,7 @@ export default function VacationApprovals() {
           <div className="rounded-3xl bg-white p-6">
             <DialogHeader>
               <DialogTitle className="text-[color:var(--sinaxys-ink)]">
-                {decisionKind === "APPROVED" ? "Aprovar pedido" : "Recusar pedido"}
+                {decisionKind === "APPROVED" ? "Aprovar solicitação" : "Recusar solicitação"}
               </DialogTitle>
             </DialogHeader>
 
@@ -269,7 +278,7 @@ export default function VacationApprovals() {
               <div className="text-sm text-muted-foreground">
                 {decisionTarget ? (
                   <>
-                    {peopleById.get(decisionTarget.user_id)?.name ?? "Pessoa"} — início {prettyDate(decisionTarget.start_date)} • {decisionTarget.days} dia(s)
+                    {peopleById.get(decisionTarget.user_id)?.name ?? "Pessoa"} — {prettyDateRange(decisionTarget.start_date, decisionTarget.days)}
                   </>
                 ) : null}
               </div>
@@ -299,7 +308,7 @@ export default function VacationApprovals() {
                       decisionNote,
                     });
                     toast({
-                      title: decisionKind === "APPROVED" ? "Pedido aprovado" : "Pedido recusado",
+                      title: decisionKind === "APPROVED" ? "Solicitação aprovada" : "Solicitação recusada",
                     });
                     setDecisionOpen(false);
                     await qc.invalidateQueries({ queryKey: ["vacation", "approver", companyId] });

@@ -170,7 +170,7 @@ export default function AdminHome() {
 
         <div className="grid gap-4 lg:grid-cols-3">
           <StatCard
-            label="Férias — pendentes"
+            label="Indisponibilidade — pendentes"
             value={enabled ? String(vacationPending) : "…"}
             hint="aprovações aguardando"
             icon={<CalendarCheck2 className="h-5 w-5" />}
