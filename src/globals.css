@@ -42,17 +42,18 @@
     --radius: 0.9rem;
 
     /* Sinaxys brand variables (active tokens map to light/dark variants) */
-    --sinaxys-ink-light: #20105b;
-    --sinaxys-primary-light: #542aef;
-    --sinaxys-bg-light: #f6f4ff;
-    --sinaxys-tint-light: #efeaff;
-    --sinaxys-border-light: #e6e1ff;
+    /* Improved values for better contrast and cohesion */
+    --sinaxys-ink-light: #262033; /* deep charcoal with a purple hint for legibility on light surfaces */
+    --sinaxys-primary-light: #5e3cff; /* lively purple for primary actions */
+    --sinaxys-bg-light: #f7f6ff; /* very light lavender background */
+    --sinaxys-tint-light: #f2f0ff; /* subtle tint for cards and highlights */
+    --sinaxys-border-light: #e9e6ff; /* soft border to separate surfaces */
 
-    --sinaxys-ink-dark: #f2efff;
-    --sinaxys-primary-dark: #8b6cff;
-    --sinaxys-bg-dark: #09081a;
-    --sinaxys-tint-dark: #141336;
-    --sinaxys-border-dark: #2a2854;
+    --sinaxys-ink-dark: #f3f2ff; /* light text on dark surfaces */
+    --sinaxys-primary-dark: #a892ff; /* brighter purple on dark for better emphasis */
+    --sinaxys-bg-dark: #0b0a1a; /* dark background with slight purple undertone */
+    --sinaxys-tint-dark: #141226; /* tinted dark card surface */
+    --sinaxys-border-dark: #2b2846; /* distinct dark border */
 
     --sinaxys-ink: var(--sinaxys-ink-light);
     --sinaxys-primary: var(--sinaxys-primary-light);
