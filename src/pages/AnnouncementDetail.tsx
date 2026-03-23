@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
@@ -6,22 +6,36 @@ import {
   getAnnouncementById,
   enrichAnnouncementsWithAuthors,
   markAnnouncementAsRead,
-  getAnnouncementAttachments,
+  deleteAnnouncement,
 } from "@/lib/internalCommunicationDb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Download, FileIcon } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { AnnouncementComposer } from "@/components/AnnouncementComposer";
 
 export default function AnnouncementDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const { data: enrichedAnnouncement, isLoading } = useQuery({
+  const { data: enrichedAnnouncement, isLoading, refetch } = useQuery({
     queryKey: ["announcement", id],
     queryFn: async () => {
       const announcement = await getAnnouncementById(id!);
@@ -32,12 +46,6 @@ export default function AnnouncementDetailPage() {
     enabled: !!id,
   });
 
-  const { data: attachments } = useQuery({
-    queryKey: ["announcement-attachments", id],
-    queryFn: () => getAnnouncementAttachments(id!),
-    enabled: !!id,
-  });
-
   const markAsReadMutation = useMutation({
     mutationFn: () => markAnnouncementAsRead(id!, user!.id),
     onSuccess: () => {
@@ -45,6 +53,41 @@ export default function AnnouncementDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["announcements"] });
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      await deleteAnnouncement(id!);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["announcements"] });
+      toast({
+        title: "Recado excluído",
+        description: "O recado foi excluído com sucesso.",
+      });
+      navigate("/announcements");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao excluir",
+        description: error.message || "Não foi possível excluir o recado.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDelete = () => {
+    deleteMutation.mutate();
+    setDeleteDialogOpen(false);
+  };
+
+  const canEditOrDelete = () => {
+    if (!user || !enrichedAnnouncement) return false;
+    // Admin and MASTERADMIN can edit/delete any announcement in their company
+    if (user.role === "ADMIN" || user.role === "MASTERADMIN") return true;
+    // Head can only edit/delete their own team announcements
+    if (user.role === "HEAD" && enrichedAnnouncement.created_by === user.id) return true;
+    return false;
+  };
 
   React.useEffect(() => {
     if (enrichedAnnouncement && !enrichedAnnouncement.is_read && user) {
@@ -107,18 +150,81 @@ export default function AnnouncementDetailPage() {
     );
   }
 
+  if (isEditing && canEditOrDelete()) {
+    return (
+      <div className="max-w-4xl mx-auto space-y-6 p-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setIsEditing(false);
+              refetch();
+            }}
+            className="rounded-xl"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Cancelar edição
+          </Button>
+        </div>
+        <AnnouncementComposer
+          editMode={true}
+          announcementId={enrichedAnnouncement.id}
+          initialData={{
+            title: enrichedAnnouncement.title,
+            content: enrichedAnnouncement.content,
+            scope: enrichedAnnouncement.scope,
+            teamId: enrichedAnnouncement.team_id,
+          }}
+          onSuccess={() => {
+            setIsEditing(false);
+            refetch();
+          }}
+          onCancel={() => {
+            setIsEditing(false);
+            refetch();
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-6">
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate("/announcements")}
-          className="rounded-xl"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Voltar
-        </Button>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/announcements")}
+            className="rounded-xl"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Voltar
+          </Button>
+        </div>
+        {canEditOrDelete() && (
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditing(true)}
+              className="rounded-xl"
+            >
+              <Pencil className="mr-2 h-4 w-4" />
+              Editar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => setDeleteDialogOpen(true)}
+              className="rounded-xl"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Excluir
+            </Button>
+          </div>
+        )}
       </div>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-8">
@@ -171,42 +277,29 @@ export default function AnnouncementDetailPage() {
           <div className="prose prose-slate max-w-none">
             <div className="whitespace-pre-wrap text-gray-700">{enrichedAnnouncement.content}</div>
           </div>
-
-          {/* Attachments */}
-          {attachments && attachments.length > 0 && (
-            <div className="space-y-3 pt-4 border-t">
-              <h3 className="text-sm font-semibold text-muted-foreground">
-                Anexos ({attachments.length})
-              </h3>
-              <div className="space-y-2">
-                {attachments.map((attachment) => (
-                  <a
-                    key={attachment.id}
-                    href={attachment.file_url}
-                    download={attachment.title}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 transition-colors hover:bg-gray-100"
-                  >
-                    <div className="flex items-center gap-3">
-                      <FileIcon className="h-5 w-5 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{attachment.title}</p>
-                        {attachment.file_size && (
-                          <p className="text-xs text-muted-foreground">
-                            {(attachment.file_size / 1024).toFixed(1)} KB
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <Download className="h-4 w-4 text-muted-foreground" />
-                  </a>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       </Card>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir recado</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este recado? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

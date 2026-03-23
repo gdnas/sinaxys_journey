@@ -193,7 +193,7 @@ export async function updateAnnouncement(
 export async function deleteAnnouncement(announcementId: string): Promise<void> {
   const { error } = await supabase
     .from("company_announcements")
-    .delete()
+    .update({ status: "archived" })
     .eq("id", announcementId);
 
   if (error) throw error;

@@ -7,7 +7,7 @@ import { useCompany } from "@/lib/company";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { setCompanyModuleEnabled } from "@/lib/modulesDb";
 import { toast } from "@/hooks/use-toast";
-import { MessageSquare, Cake } from "lucide-react";
+import { Megaphone } from "lucide-react";
 
 export function InternalCommunicationModuleCard() {
   const { t } = useTranslation();
@@ -22,7 +22,7 @@ export function InternalCommunicationModuleCard() {
       queryClient.invalidateQueries({ queryKey: ["company-module", companyId, "INTERNAL_COMMUNICATION"] });
       toast({
         title: "Módulo atualizado",
-        description: `Comunicação Interna foi ${moduleEnabled ? "desativado" : "ativado"} com sucesso.`,
+        description: `Recados foi ${moduleEnabled ? "desativado" : "ativado"} com sucesso.`,
       });
     },
     onError: (error: any) => {
@@ -43,21 +43,17 @@ export function InternalCommunicationModuleCard() {
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-4">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 text-white">
-            <MessageSquare className="h-6 w-6" />
+            <Megaphone className="h-6 w-6" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold">Comunicação Interna</h3>
+            <h3 className="text-lg font-semibold">Recados</h3>
             <p className="mt-1 text-sm text-muted-foreground">
-              Mural de recados corporativos e celebração de aniversários dos colaboradores
+              Mural de recados corporativos para comunicados internos da empresa
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3">
               <span className="inline-flex items-center gap-1 rounded-full bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700">
-                <MessageSquare className="h-3 w-3" />
+                <Megaphone className="h-3 w-3" />
                 Mural de Recados
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full bg-pink-50 px-2.5 py-1 text-xs font-medium text-pink-700">
-                <Cake className="h-3 w-3" />
-                Aniversários
               </span>
             </div>
           </div>
