@@ -84,8 +84,8 @@ export default function AnnouncementDetailPage() {
     if (!user || !enrichedAnnouncement) return false;
     // Admin and MASTERADMIN can edit/delete any announcement in their company
     if (user.role === "ADMIN" || user.role === "MASTERADMIN") return true;
-    // Head can only edit/delete their own team announcements
-    if (user.role === "HEAD" && enrichedAnnouncement.created_by === user.id) return true;
+    // Head and COLABORADOR can only edit/delete their own announcements
+    if ((user.role === "HEAD" || user.role === "COLABORADOR") && enrichedAnnouncement.created_by === user.id) return true;
     return false;
   };
 

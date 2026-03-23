@@ -711,7 +711,7 @@ const App = () => (
                   <Route
                     path="/announcements/create"
                     element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}>
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="INTERNAL_COMMUNICATION">
                           <AnnouncementCreate />
                         </RequireCompanyModule>
@@ -731,7 +731,7 @@ const App = () => (
                   <Route
                     path="/announcements/:id/edit"
                     element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}>
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="INTERNAL_COMMUNICATION">
                           <AnnouncementEdit />
                         </RequireCompanyModule>

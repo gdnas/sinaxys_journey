@@ -89,8 +89,8 @@ export function AnnouncementList({ limit, showViewAll = true }: AnnouncementList
     if (!user) return false;
     // Admin and MASTERADMIN can edit/delete any announcement in their company
     if (user.role === "ADMIN" || user.role === "MASTERADMIN") return true;
-    // Head can only edit/delete their own team announcements
-    if (user.role === "HEAD" && announcement.created_by === user.id) return true;
+    // Head and COLLABORADOR can only edit/delete their own announcements
+    if ((user.role === "HEAD" || user.role === "COLABORADOR") && announcement.created_by === user.id) return true;
     return false;
   };
 

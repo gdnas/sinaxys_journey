@@ -10,7 +10,8 @@ export default function AnnouncementsPage() {
   const { enabled } = useCompanyModuleEnabled("INTERNAL_COMMUNICATION");
   const { user } = useAuth();
   const [showComposer, setShowComposer] = useState(false);
-  const canPublish = user?.role === "ADMIN" || user?.role === "HEAD" || user?.role === "MASTERADMIN";
+  // Admin, MASTERADMIN, HEAD, and COLLABORADOR can create announcements
+  const canPublish = user?.role === "ADMIN" || user?.role === "HEAD" || user?.role === "MASTERADMIN" || user?.role === "COLABORADOR";
 
   return (
     <RequireCompanyModule moduleKey="INTERNAL_COMMUNICATION">

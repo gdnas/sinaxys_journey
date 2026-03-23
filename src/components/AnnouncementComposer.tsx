@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,6 +59,14 @@ export function AnnouncementComposer({
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
+
+  // Auto-select user's team for COLLABORATOR role
+  React.useEffect(() => {
+    const isCollaborator = user?.role === "COLABORADOR" as any;
+    if (isCollaborator && user?.departmentId && scope === "team" && !teamId) {
+      setTeamId(user.departmentId);
+    }
+  }, [user, scope, teamId]);
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -166,8 +174,8 @@ export function AnnouncementComposer({
     }
   };
 
-  const canPublishToCompany = user?.role === "ADMIN" || user?.role === "MASTERADMIN";
-  const canPublishToTeam = user?.role === "HEAD" || user?.role === "ADMIN" || user?.role === "MASTERADMIN";
+  const canPublishToCompany = user?.role === "ADMIN" || user?.role === "MASTERADMIN" || user?.role === "HEAD";
+  const canPublishToTeam = user?.role === "HEAD" || user?.role === "ADMIN" || user?.role === "MASTERADMIN" || user?.role === "COLABORADOR";
 
   return (
     <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
@@ -201,7 +209,7 @@ export function AnnouncementComposer({
                 <SelectValue placeholder="Selecione o alcance" />
               </SelectTrigger>
               <SelectContent>
-                {canPublishToCompany && (
+                {(canPublishToCompany && !editMode) && (
                   <SelectItem value="company">Empresa inteira</SelectItem>
                 )}
                 {canPublishToTeam && (
@@ -215,18 +223,24 @@ export function AnnouncementComposer({
         {!editMode && scope === "team" && (
           <div className="space-y-2">
             <Label htmlFor="team">Time</Label>
-            <Select value={teamId} onValueChange={setTeamId}>
-              <SelectTrigger id="team" className="rounded-xl">
-                <SelectValue placeholder="Selecione o time" />
-              </SelectTrigger>
-              <SelectContent>
-                {departments?.map((dept: any) => (
-                  <SelectItem key={dept.id} value={dept.id}>
-                    {dept.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {user?.role === "COLABORADOR" as any ? (
+              <div className="rounded-xl border bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                Seu time (automático)
+              </div>
+            ) : (
+              <Select value={teamId} onValueChange={setTeamId}>
+                <SelectTrigger id="team" className="rounded-xl">
+                  <SelectValue placeholder="Selecione o time" />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments?.map((dept: any) => (
+                    <SelectItem key={dept.id} value={dept.id}>
+                      {dept.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
         )}
 

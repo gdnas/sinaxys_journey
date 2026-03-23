@@ -26,8 +26,10 @@ export default function AnnouncementEditPage() {
 
   const canEdit = () => {
     if (!user || !enrichedAnnouncement) return false;
+    // Admin and MASTERADMIN can edit any announcement in their company
     if (user.role === "ADMIN" || user.role === "MASTERADMIN") return true;
-    if (user.role === "HEAD" && enrichedAnnouncement.created_by === user.id) return true;
+    // Head and COLLABORADOR can only edit their own announcements
+    if ((user.role === "HEAD" || user.role === "COLABORADOR") && enrichedAnnouncement.created_by === user.id) return true;
     return false;
   };
 
