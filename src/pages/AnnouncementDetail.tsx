@@ -2,12 +2,17 @@ import React from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
-import { getAnnouncementById, enrichAnnouncementsWithAuthors, markAnnouncementAsRead } from "@/lib/internalCommunicationDb";
+import {
+  getAnnouncementById,
+  enrichAnnouncementsWithAuthors,
+  markAnnouncementAsRead,
+  getAnnouncementAttachments,
+} from "@/lib/internalCommunicationDb";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download, FileIcon } from "lucide-react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 export default function AnnouncementDetailPage() {
@@ -24,6 +29,12 @@ export default function AnnouncementDetailPage() {
       const enriched = await enrichAnnouncementsWithAuthors([announcement], user?.id);
       return enriched[0];
     },
+    enabled: !!id,
+  });
+
+  const { data: attachments } = useQuery({
+    queryKey: ["announcement-attachments", id],
+    queryFn: () => getAnnouncementAttachments(id!),
     enabled: !!id,
   });
 
@@ -160,6 +171,40 @@ export default function AnnouncementDetailPage() {
           <div className="prose prose-slate max-w-none">
             <div className="whitespace-pre-wrap text-gray-700">{enrichedAnnouncement.content}</div>
           </div>
+
+          {/* Attachments */}
+          {attachments && attachments.length > 0 && (
+            <div className="space-y-3 pt-4 border-t">
+              <h3 className="text-sm font-semibold text-muted-foreground">
+                Anexos ({attachments.length})
+              </h3>
+              <div className="space-y-2">
+                {attachments.map((attachment) => (
+                  <a
+                    key={attachment.id}
+                    href={attachment.file_url}
+                    download={attachment.title}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 p-3 transition-colors hover:bg-gray-100"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileIcon className="h-5 w-5 text-muted-foreground" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{attachment.title}</p>
+                        {attachment.file_size && (
+                          <p className="text-xs text-muted-foreground">
+                            {(attachment.file_size / 1024).toFixed(1)} KB
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <Download className="h-4 w-4 text-muted-foreground" />
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </Card>
     </div>

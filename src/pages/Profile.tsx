@@ -110,6 +110,7 @@ export default function Profile() {
   const [name, setName] = useState(user.name);
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
+  const [birthDate, setBirthDate] = useState("");
 
   // Address (keep compact)
   const [addressZip, setAddressZip] = useState("");
@@ -132,6 +133,7 @@ export default function Profile() {
     setName(me.name ?? user.name);
     setAvatarUrl(me.avatar_url ?? "");
     setPhone(me.phone ?? "");
+    setBirthDate(me.birth_date ?? "");
 
     setAddressZip(me.address_zip ?? "");
     setAddressLine1(me.address_line1 ?? "");
@@ -157,6 +159,7 @@ export default function Profile() {
     const baseName = me?.name ?? user.name;
     const baseAvatar = me?.avatar_url ?? "";
     const basePhone = me?.phone ?? "";
+    const baseBirthDate = me?.birth_date ?? "";
 
     const baseZip = me?.address_zip ?? "";
     const baseL1 = me?.address_line1 ?? "";
@@ -170,6 +173,7 @@ export default function Profile() {
       name.trim() !== baseName ||
       avatarUrl.trim() !== baseAvatar ||
       phone.trim() !== basePhone ||
+      birthDate.trim() !== baseBirthDate ||
       addressZip.trim() !== baseZip ||
       addressLine1.trim() !== baseL1 ||
       addressLine2.trim() !== baseL2 ||
@@ -182,6 +186,7 @@ export default function Profile() {
     name,
     avatarUrl,
     phone,
+    birthDate,
     addressZip,
     addressLine1,
     addressLine2,
@@ -316,6 +321,19 @@ export default function Profile() {
               </div>
 
               <div className="grid gap-2">
+                <Label>Data de Nascimento</Label>
+                <Input 
+                  className="h-11 rounded-xl" 
+                  type="date" 
+                  value={birthDate} 
+                  onChange={(e) => setBirthDate(e.target.value)} 
+                />
+                <div className="text-xs text-muted-foreground">
+                  Usada para exibição de aniversários no mural de comunicação interna
+                </div>
+              </div>
+
+              <div className="grid gap-2">
                 <Label>{t('profile.avatar_url')}</Label>
                 <Input className="h-11 rounded-xl" value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://..." />
               </div>
@@ -402,6 +420,7 @@ export default function Profile() {
                         name: name.trim(),
                         phone: phone.trim() || null,
                         avatar_url: avatarUrl.trim() || null,
+                        birth_date: birthDate.trim() || null,
 
                         address_zip: addressZip.trim() || null,
                         address_line1: addressLine1.trim() || null,

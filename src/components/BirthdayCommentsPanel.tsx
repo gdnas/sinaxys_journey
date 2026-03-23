@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Trash2 } from "lucide-react";
+import { Trash2, Heart } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import {
@@ -12,6 +12,9 @@ import {
   updateBirthdayComment,
   deleteBirthdayComment,
   enrichBirthdayCommentsWithAuthors,
+  getBirthdayCommentLikes,
+  toggleBirthdayCommentLike,
+  isCommentLikedByUser,
 } from "@/lib/internalCommunicationDb";
 import { formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -32,7 +35,25 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
     queryKey: ["birthday-comments", birthdayEvent.id],
     queryFn: async () => {
       const raw = await getBirthdayComments(birthdayEvent.id);
-      return enrichBirthdayCommentsWithAuthors(raw);
+      const enriched = await enrichBirthdayCommentsWithAuthors(raw);
+      
+      // Fetch likes for each comment
+      const commentsWithLikes = await Promise.all(
+        enriched.map(async (comment) => {
+          const [likes, isLiked] = await Promise.all([
+            getBirthdayCommentLikes(comment.id),
+            user ? isCommentLikedByUser(comment.id, user.id) : Promise.resolve(false),
+          ]);
+          return {
+            ...comment,
+            likes,
+            isLiked,
+            likeCount: likes.length,
+          };
+        })
+      );
+      
+      return commentsWithLikes;
     },
     enabled: !!birthdayEvent.id,
     staleTime: 30_000,
@@ -57,7 +78,6 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
         });
       } catch (error) {
         console.error("[BirthdayCommentsPanel] Failed to send notification:", error);
-        // Don't block comment creation on notification error
       }
 
       return comment;
@@ -84,6 +104,14 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
     },
   });
 
+  const likeMutation = useMutation({
+    mutationFn: (commentId: string) =>
+      toggleBirthdayCommentLike(commentId, user!.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["birthday-comments", birthdayEvent.id] });
+    },
+  });
+
   const handleSubmit = () => {
     if (newComment.trim()) {
       createMutation.mutate(newComment.trim());
@@ -97,6 +125,11 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
         content: editingComment.content.trim(),
       });
     }
+  };
+
+  const handleLike = (commentId: string) => {
+    if (!user) return;
+    likeMutation.mutate(commentId);
   };
 
   const getInitials = (name?: string) => {
@@ -186,7 +219,7 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
             </div>
           ) : comments && comments.length > 0 ? (
             <div className="space-y-4 p-4">
-              {comments.map((comment) => (
+              {comments.map((comment: any) => (
                 <div key={comment.id} className="flex gap-3">
                   {comment.author_avatar ? (
                     <Avatar className="h-8 w-8">
@@ -238,39 +271,62 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
                     ) : (
                       <div className="group relative">
                         <p className="text-sm text-gray-700">{comment.content}</p>
-                        {(comment.author_user_id === user?.id || user?.role === "ADMIN" || user?.role === "MASTERADMIN") && (
+                        
+                        {/* Actions */}
+                        <div className="mt-2 flex items-center gap-2">
+                          {/* Like button */}
                           <button
-                            onClick={() => {
-                              if (comment.author_user_id === user?.id) {
-                                setEditingComment({ id: comment.id, content: comment.content });
-                              } else {
-                                if (window.confirm("Deseja excluir este comentário?")) {
-                                  deleteMutation.mutate(comment.id);
-                                }
-                              }
-                            }}
-                            className="absolute -top-1 -right-1 hidden h-6 w-6 rounded-full bg-gray-200 text-gray-600 transition-opacity group-hover:block hover:bg-red-100 hover:text-red-600"
+                            onClick={() => handleLike(comment.id)}
+                            disabled={!user || likeMutation.isPending}
+                            className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors ${
+                              comment.isLiked
+                                ? "bg-pink-100 text-pink-600"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                            }`}
                           >
-                            {comment.author_user_id === user?.id ? (
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="12"
-                                height="12"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              >
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                              </svg>
-                            ) : (
-                              <Trash2 className="h-3 w-3" />
+                            <Heart
+                              className={`h-3.5 w-3.5 ${comment.isLiked ? "fill-pink-600" : ""}`}
+                            />
+                            {comment.likeCount > 0 && (
+                              <span className="font-medium">{comment.likeCount}</span>
                             )}
                           </button>
-                        )}
+
+                          {/* Edit/Delete buttons */}
+                          {(comment.author_user_id === user?.id || user?.role === "ADMIN" || user?.role === "MASTERADMIN") && (
+                            <button
+                              onClick={() => {
+                                if (comment.author_user_id === user?.id) {
+                                  setEditingComment({ id: comment.id, content: comment.content });
+                                } else {
+                                  if (window.confirm("Deseja excluir este comentário?")) {
+                                    deleteMutation.mutate(comment.id);
+                                  }
+                                }
+                              }}
+                              className="h-6 w-6 rounded-full bg-gray-200 text-gray-600 transition-opacity group-hover:block hover:bg-red-100 hover:text-red-600"
+                            >
+                              {comment.author_user_id === user?.id ? (
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="12"
+                                  height="12"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                >
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                </svg>
+                              ) : (
+                                <Trash2 className="h-3 w-3" />
+                              )}
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
                   </div>

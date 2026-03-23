@@ -43,6 +43,23 @@ export interface DbBirthdayComment {
   deleted_at: string | null;
 }
 
+export interface DbAnnouncementAttachment {
+  id: string;
+  announcement_id: string;
+  title: string;
+  file_url: string;
+  file_type: string;
+  file_size: number | null;
+  created_at: string;
+}
+
+export interface DbBirthdayCommentLike {
+  id: string;
+  birthday_comment_id: string;
+  user_id: string;
+  created_at: string;
+}
+
 // ============================================================================
 // ANNOUNCEMENTS
 // ============================================================================
@@ -77,6 +94,55 @@ export async function getAnnouncementById(
 
   if (error) throw error;
   return data as DbCompanyAnnouncement | null;
+}
+
+export async function getAnnouncementAttachments(
+  announcementId: string
+): Promise<DbAnnouncementAttachment[]> {
+  const { data, error } = await supabase
+    .from("company_announcement_attachments")
+    .select("*")
+    .eq("announcement_id", announcementId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as DbAnnouncementAttachment[];
+}
+
+export async function addAnnouncementAttachment(
+  announcementId: string,
+  attachment: {
+    title: string;
+    fileUrl: string;
+    fileType: string;
+    fileSize?: number;
+  }
+): Promise<DbAnnouncementAttachment> {
+  const { data, error } = await supabase
+    .from("company_announcement_attachments")
+    .insert({
+      announcement_id: announcementId,
+      title: attachment.title,
+      file_url: attachment.fileUrl,
+      file_type: attachment.fileType,
+      file_size: attachment.fileSize ?? null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data as DbAnnouncementAttachment;
+}
+
+export async function deleteAnnouncementAttachment(
+  attachmentId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("company_announcement_attachments")
+    .delete()
+    .eq("id", attachmentId);
+
+  if (error) throw error;
 }
 
 export async function publishAnnouncement(payload: {
@@ -273,6 +339,67 @@ export async function getBirthdayComments(
 
   if (error) throw error;
   return (data ?? []) as DbBirthdayComment[];
+}
+
+export async function getBirthdayCommentLikes(
+  commentId: string
+): Promise<DbBirthdayCommentLike[]> {
+  const { data, error } = await supabase
+    .from("birthday_comment_likes")
+    .select("*")
+    .eq("birthday_comment_id", commentId);
+
+  if (error) throw error;
+  return (data ?? []) as DbBirthdayCommentLike[];
+}
+
+export async function toggleBirthdayCommentLike(
+  commentId: string,
+  userId: string
+): Promise<boolean> {
+  // Check if already liked
+  const { data: existing } = await supabase
+    .from("birthday_comment_likes")
+    .select("id")
+    .eq("birthday_comment_id", commentId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (existing) {
+    // Unlike
+    const { error } = await supabase
+      .from("birthday_comment_likes")
+      .delete()
+      .eq("id", existing.id);
+
+    if (error) throw error;
+    return false;
+  } else {
+    // Like
+    const { error } = await supabase
+      .from("birthday_comment_likes")
+      .insert({
+        birthday_comment_id: commentId,
+        user_id: userId,
+      });
+
+    if (error) throw error;
+    return true;
+  }
+}
+
+export async function isCommentLikedByUser(
+  commentId: string,
+  userId: string
+): Promise<boolean> {
+  const { data } = await supabase
+    .from("birthday_comment_likes")
+    .select("id")
+    .eq("birthday_comment_id", commentId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  return !!data;
 }
 
 export async function createBirthdayComment(
