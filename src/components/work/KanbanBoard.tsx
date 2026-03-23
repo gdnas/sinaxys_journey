@@ -17,7 +17,7 @@ import { Card } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { getProjectWorkflowStatuses, TemplateWorkflowStatus } from '@/lib/templateWorkflowDb';
+import { getProjectWorkflowStatusesWithFallback, TemplateWorkflowStatus } from '@/lib/templateWorkflowDb';
 import { AlertTriangle } from 'lucide-react';
 
 interface KanbanBoardProps {
@@ -55,6 +55,7 @@ export default function KanbanBoard({
   // Load workflow statuses from database (FONTE DA VERDADE)
   const [workflowStatuses, setWorkflowStatuses] = useState<TemplateWorkflowStatus[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [loadError, setLoadError] = useState<boolean>(false);
 
   // Sync local tasks with prop tasks
   useEffect(() => {
@@ -62,18 +63,29 @@ export default function KanbanBoard({
   }, [tasks]);
 
   // Load workflow statuses on mount and when projectId changes
+  // KAIROOS 2.0 Fase 1.5A Hardening #3: Usar getProjectWorkflowStatusesWithFallback
+  // para garantir que o board NUNCA quebre, mesmo se query falhar
   useEffect(() => {
     async function loadWorkflowStatuses() {
       try {
         setLoadingStatuses(true);
-        const statuses = await getProjectWorkflowStatuses(projectId);
+        setLoadError(false);
+        
+        // Usar função com fallback robusto
+        const statuses = await getProjectWorkflowStatusesWithFallback(projectId);
         setWorkflowStatuses(statuses);
       } catch (error) {
-        console.error('Error loading workflow statuses:', error);
+        console.error({
+          context: 'workflow_load_failed_in_board',
+          project_id: projectId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+        
+        setLoadError(true);
         toast({
-          title: 'Erro',
-          description: 'Não foi possível carregar os status do projeto',
-          variant: 'destructive',
+          title: 'Aviso',
+          description: 'Usando fluxo padrão do template. Carregamento do fluxo personalizado falhou.',
+          variant: 'default',
         });
       } finally {
         setLoadingStatuses(false);
@@ -83,6 +95,7 @@ export default function KanbanBoard({
   }, [projectId, toast]);
 
   // KAIROOS 0.0 Fase 1 Hardening #2: Agrupar tasks por workflow statuses com fallback explícito para inválidos
+  // KAIROOS 2.0 Fase 1.5A Hardening #4: Diferenciar erro de carregamento vs erro de dado
   const groupTasksByWorkflowStatus = (tasks: KanbanTask[]): Record<string, KanbanTask[]> => {
     const grouped: Record<string, KanbanTask[]> = {};
     
@@ -91,35 +104,60 @@ export default function KanbanBoard({
       grouped[status.status_key] = [];
     });
     
-    // Initialize array for invalid statuses
-    grouped[INVALID_STATUS_KEY] = [];
+    // KAIROOS 2.0 Fase 1.5A Hardening #4:
+    // Se houve erro de carregamento (sistema), NÃO validar status - usar fallback
+    // Se workflow carregou corretamente, validar status e marcar inválidos
+    const shouldValidateStatus = !loadError;
     
-    // Track tasks with invalid statuses
+    // Initialize array for invalid statuses (apenas se devemos validar)
+    if (shouldValidateStatus) {
+      grouped[INVALID_STATUS_KEY] = [];
+    }
+    
+    // Track tasks with invalid statuses (apenas se devemos validar)
     const invalidTaskIds: string[] = [];
     
     // Add tasks to their respective status columns
     tasks.forEach((task) => {
       if (!task.status || task.status === '') {
-        // Task with empty/null status - treat as invalid
-        grouped[INVALID_STATUS_KEY].push(task);
-        invalidTaskIds.push(task.id);
+        // Task com status vazio/null
+        if (shouldValidateStatus) {
+          grouped[INVALID_STATUS_KEY].push(task);
+          invalidTaskIds.push(task.id);
+        } else {
+          // Erro de carregamento: colocar na primeira coluna disponível
+          const firstStatus = workflowStatuses[0];
+          if (firstStatus) {
+            grouped[firstStatus.status_key].push(task);
+          }
+        }
       } else if (grouped[task.status]) {
-        // Valid status in workflow
+        // Status existe no workflow
         grouped[task.status].push(task);
       } else {
-        // Status not in workflow - invalid
-        grouped[INVALID_STATUS_KEY].push(task);
-        invalidTaskIds.push(task.id);
+        // Status não existe no workflow
+        if (shouldValidateStatus) {
+          grouped[INVALID_STATUS_KEY].push(task);
+          invalidTaskIds.push(task.id);
+        } else {
+          // Erro de carregamento: colocar na primeira coluna disponível
+          const firstStatus = workflowStatuses[0];
+          if (firstStatus) {
+            grouped[firstStatus.status_key].push(task);
+          }
+        }
       }
     });
     
-    // Log warning if there are invalid tasks
-    if (invalidTaskIds.length > 0) {
-      console.warn(
-        `[KanbanBoard] Found ${invalidTaskIds.length} tasks with invalid status for project ${projectId}. ` +
-        `Invalid task IDs: ${invalidTaskIds.join(', ')}. ` +
-        `Valid status keys: ${workflowStatuses.map(s => s.status_key).join(', ')}.`
-      );
+    // Log warning se há invalid tasks (apenas se estamos validando)
+    if (shouldValidateStatus && invalidTaskIds.length > 0) {
+      console.warn({
+        context: 'tasks_with_invalid_status',
+        project_id: projectId,
+        count: invalidTaskIds.length,
+        task_ids: invalidTaskIds,
+        valid_status_keys: workflowStatuses.map(s => s.status_key)
+      });
     }
     
     return grouped;
@@ -236,11 +274,14 @@ export default function KanbanBoard({
   const groupedTasks = groupTasksByWorkflowStatus(localTasks);
   
   // KAIROOS 2.0 Fase 1 Hardening #2: Determinar quais colunas mostrar
+  // KAIROOS 2.0 Fase 1.5A Hardening #4: Coluna __invalid__ apenas se há erro de DADO (não erro de sistema)
   const columnStatuses = [...workflowStatuses];
   const invalidTaskCount = groupedTasks[INVALID_STATUS_KEY]?.length ?? 0;
   
-  // KAIROOS 0.0 Fase 1 Hardening #2: Adicionar coluna de status inválido apenas se houver itens
-  if (invalidTaskCount > 0) {
+  // KAIROOS 0.0 Fase 1 Hardening #2: Adicionar coluna de status inválido apenas se:
+  // - há itens inválidos
+  // - E NÃO houve erro de carregamento (loadError == false)
+  if (!loadError && invalidTaskCount > 0) {
     columnStatuses.push({
       status_key: INVALID_STATUS_KEY,
       display_name: INVALID_STATUS_LABEL,

@@ -65,6 +65,92 @@ export const TEMPLATE_WORKFLOWS: Record<TemplateType, TemplateWorkflow> = {
 // =====================
 
 /**
+ * Buscar workflow statuses de um projeto com FALLBACK ROBUSTO
+ *
+ * Tenta carregar de project_workflow_status (FONTE DA VERDADE).
+ * Se falhar OU retornar vazio, usa TEMPLATE_WORKFLOWS como fallback.
+ *
+ * Garante que o board NUNCA quebre, mesmo se:
+ * - project_workflow_status estiver vazio
+ * - query falhar
+ * - RLS bloquear leitura
+ *
+ * @param projectId - ID do projeto
+ * @returns Array de status do projeto ordenados por display_order
+ */
+export async function getProjectWorkflowStatusesWithFallback(projectId: string): Promise<TemplateWorkflowStatus[]> {
+  try {
+    // TENTATIVA 1: Carregar do banco (FONTE DA VERDADE)
+    const { data, error } = await supabase
+      .from('project_workflow_status')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+
+    // Se encontrou dados, retorna (sucesso)
+    if (data && data.length > 0) {
+      console.log(`[getProjectWorkflowStatusesWithFallback] Loaded ${data.length} statuses from DB for project ${projectId}`);
+      return data.map(row => ({
+        status_key: row.status_key,
+        display_name: row.display_name,
+        display_order: row.display_order,
+        color: row.color,
+      }));
+    }
+
+    // Fallback: workflow vazio no banco
+    console.warn({
+      context: 'workflow_empty_in_db',
+      project_id: projectId,
+      message: 'project_workflow_status is empty in database, using template fallback'
+    });
+
+  } catch (error) {
+    // Erro de query/RLS - usar fallback
+    console.error({
+      context: 'workflow_load_failed',
+      project_id: projectId,
+      error: error instanceof Error ? error.message : String(error)
+    });
+  }
+
+  // Fallback: Buscar template_type do projeto e usar TEMPLATE_WORKFLOWS
+  try {
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('template_type')
+      .eq('id', projectId)
+      .single();
+
+    if (projectError) throw projectError;
+
+    const templateType: TemplateType = (project.template_type as TemplateType) || 'PROCESS';
+    const workflow = TEMPLATE_WORKFLOWS[templateType];
+
+    console.log({
+      context: 'using_template_fallback',
+      project_id: projectId,
+      template_type: templateType,
+      statuses: Object.values(workflow).map(s => s.status_key)
+    });
+
+    return Object.values(workflow);
+  } catch (error) {
+    // Se falhar até para buscar template_type, usar PROCESS como fallback final
+    console.error({
+      context: 'template_type_load_failed',
+      project_id: projectId,
+      error: error instanceof Error ? error.message : String(error),
+      fallback: 'PROCESS template'
+    });
+
+    return Object.values(TEMPLATE_WORKFLOWS.PROCESS);
+  }
+}
+
+/**
  * Buscar workflow statuses de um projeto (FONTE DA VERDADE)
  *
  * Sempre lê de project_workflow_status (tabela)
