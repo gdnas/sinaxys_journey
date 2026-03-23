@@ -57,6 +57,8 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
     },
     enabled: !!birthdayEvent.id,
     staleTime: 30_000,
+    gcTime: 2 * 60 * 1000, // 2 minutes cache
+    refetchOnWindowFocus: false,
   });
 
   const createMutation = useMutation({
@@ -158,20 +160,20 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
       {/* Header */}
       <div className="flex items-center gap-3 border-b pb-4">
         {birthdayEvent.employee_avatar ? (
-          <Avatar className="h-16 w-16 border-4 border-pink-200">
+          <Avatar className="h-16 w-16 border-4 border-pink-200 dark:border-pink-800">
             <AvatarImage src={birthdayEvent.employee_avatar} alt={birthdayEvent.employee_name} />
             <AvatarFallback className="bg-gradient-to-br from-pink-500 to-rose-500 text-xl text-white">
               {getInitials(birthdayEvent.employee_name)}
             </AvatarFallback>
           </Avatar>
         ) : (
-          <Avatar className="h-16 w-16 border-4 border-pink-200 bg-gradient-to-br from-pink-500 to-rose-500 text-white">
+          <Avatar className="h-16 w-16 border-4 border-pink-200 dark:border-pink-800 bg-gradient-to-br from-pink-500 to-rose-500 text-white">
             <AvatarFallback className="text-xl">{getInitials(birthdayEvent.employee_name)}</AvatarFallback>
           </Avatar>
         )}
         <div>
-          <h3 className="text-xl font-bold text-gray-900">Parabéns, {birthdayEvent.employee_name}! 🎉</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Parabéns, {birthdayEvent.employee_name}! 🎉</h3>
+          <p className="text-sm text-muted-foreground dark:text-gray-400">
             {birthdayEvent.employee_job_title && <span>{birthdayEvent.employee_job_title}</span>}
             {birthdayEvent.employee_job_title && birthdayEvent.employee_department_name && <span> • </span>}
             {birthdayEvent.employee_department_name && <span>{birthdayEvent.employee_department_name}</span>}
@@ -191,7 +193,7 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
               handleSubmit();
             }
           }}
-          className="min-h-[80px] resize-none rounded-xl"
+          className="min-h-[80px] resize-none rounded-xl bg-white dark:bg-gray-800"
         />
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={onClose} className="rounded-xl">
@@ -209,13 +211,13 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
 
       {/* Comments List */}
       <div className="space-y-2">
-        <h4 className="text-sm font-semibold text-muted-foreground">
+        <h4 className="text-sm font-semibold text-muted-foreground dark:text-gray-400">
           Mensagens ({comments?.length ?? 0})
         </h4>
-        <ScrollArea className="h-[300px] rounded-xl border">
+        <ScrollArea className="h-[300px] rounded-xl border dark:border-gray-700">
           {isLoading ? (
             <div className="flex items-center justify-center p-8">
-              <div className="text-sm text-muted-foreground">Carregando mensagens...</div>
+              <div className="text-sm text-muted-foreground dark:text-gray-400">Carregando mensagens...</div>
             </div>
           ) : comments && comments.length > 0 ? (
             <div className="space-y-4 p-4">
@@ -229,16 +231,16 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
                       </AvatarFallback>
                     </Avatar>
                   ) : (
-                    <Avatar className="h-8 w-8 bg-gray-200">
-                      <AvatarFallback className="text-xs">
+                    <Avatar className="h-8 w-8 bg-gray-200 dark:bg-gray-700">
+                      <AvatarFallback className="text-xs dark:text-gray-300">
                         {getInitials(comment.author_name)}
                       </AvatarFallback>
                     </Avatar>
                   )}
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold">{comment.author_name}</span>
-                      <span className="text-xs text-muted-foreground">{formatDate(comment.created_at)}</span>
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">{comment.author_name}</span>
+                      <span className="text-xs text-muted-foreground dark:text-gray-400">{formatDate(comment.created_at)}</span>
                     </div>
                     {editingComment?.id === comment.id ? (
                       <div className="space-y-2">
@@ -247,7 +249,7 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
                           onChange={(e) =>
                             setEditingComment({ ...editingComment, content: e.target.value })
                           }
-                          className="min-h-[60px] resize-none rounded-lg text-sm"
+                          className="min-h-[60px] resize-none rounded-lg text-sm bg-white dark:bg-gray-800"
                         />
                         <div className="flex gap-2">
                           <Button
@@ -270,7 +272,7 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
                       </div>
                     ) : (
                       <div className="group relative">
-                        <p className="text-sm text-gray-700">{comment.content}</p>
+                        <p className="text-sm text-gray-700 dark:text-gray-300">{comment.content}</p>
                         
                         {/* Actions */}
                         <div className="mt-2 flex items-center gap-2">
@@ -280,12 +282,12 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
                             disabled={!user || likeMutation.isPending}
                             className={`flex items-center gap-1 rounded-full px-2 py-1 text-xs transition-colors ${
                               comment.isLiked
-                                ? "bg-pink-100 text-pink-600"
-                                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                                ? "bg-pink-100 text-pink-600 dark:bg-pink-950/30 dark:text-pink-400"
+                                : "bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-gray-600"
                             }`}
                           >
                             <Heart
-                              className={`h-3.5 w-3.5 ${comment.isLiked ? "fill-pink-600" : ""}`}
+                              className={`h-3.5 w-3.5 ${comment.isLiked ? "fill-pink-600 dark:fill-pink-400" : ""}`}
                             />
                             {comment.likeCount > 0 && (
                               <span className="font-medium">{comment.likeCount}</span>
@@ -304,7 +306,7 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
                                   }
                                 }
                               }}
-                              className="h-6 w-6 rounded-full bg-gray-200 text-gray-600 transition-opacity group-hover:block hover:bg-red-100 hover:text-red-600"
+                              className="h-6 w-6 rounded-full bg-gray-200 text-gray-600 transition-opacity group-hover:block hover:bg-red-100 hover:text-red-600 dark:bg-gray-700 dark:text-gray-400 dark:hover:bg-red-950/30 dark:hover:text-red-400"
                             >
                               {comment.author_user_id === user?.id ? (
                                 <svg
@@ -336,7 +338,7 @@ export function BirthdayCommentsPanel({ birthdayEvent, onClose }: BirthdayCommen
           ) : (
             <div className="flex flex-col items-center justify-center p-8 text-center">
               <div className="mb-3 text-4xl">💬</div>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground dark:text-gray-400">
                 Nenhuma mensagem ainda. Seja o primeiro a parabenizar!
               </p>
             </div>

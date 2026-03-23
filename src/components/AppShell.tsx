@@ -17,6 +17,7 @@ import {
   Layers,
   LogOut,
   Menu,
+  Megaphone,
   Network,
   Palette,
   Shield,
@@ -250,6 +251,13 @@ const nav: NavItem[] = [
     label: "nav.company.group",
     icon: <Building2 className="h-4 w-4" />,
     children: [
+      {
+        type: "link",
+        to: "/announcements/create",
+        label: "Criar Recado",
+        icon: <Megaphone className="h-4 w-4" />,
+        roles: ["ADMIN", "HEAD", "MASTERADMIN"],
+      },
       {
         type: "link",
         to: "/admin/brand",

@@ -29,7 +29,10 @@ export function AnnouncementList({ limit, showViewAll = true }: AnnouncementList
       return enrichAnnouncementsWithAuthors(raw, user?.id);
     },
     enabled: !!user && !!companyId,
-    staleTime: 30_000,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    gcTime: 5 * 60 * 1000, // 5 minutes cache
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const getInitials = (name?: string) => {

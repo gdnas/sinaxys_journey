@@ -47,7 +47,11 @@ export function AnnouncementComposer({ onSuccess, onCancel }: AnnouncementCompos
       if (error) throw error;
       return data ?? [];
     },
-    enabled: !!companyId,
+    enabled: !!companyId && scope === "team",
+    staleTime: 10 * 60 * 1000, // 10 minutes - departments don't change often
+    gcTime: 15 * 60 * 1000, // 15 minutes cache
+    refetchOnWindowFocus: false,
+    refetchOnMount: false,
   });
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
