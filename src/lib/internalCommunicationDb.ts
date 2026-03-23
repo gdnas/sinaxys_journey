@@ -70,14 +70,24 @@ export async function getVisibleAnnouncements(
   teamId: string | null,
   limit: number = 10
 ): Promise<DbCompanyAnnouncement[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from("company_announcements")
     .select("*")
     .eq("company_id", companyId)
     .eq("status", "published")
-    .or(`scope.eq.company,AND(scope.eq.team,team_id.eq.${teamId})`)
     .order("published_at", { ascending: false })
     .limit(limit);
+
+  // If we have a team id, include both company-scoped and team-scoped announcements
+  if (teamId) {
+    // Use PostgREST OR to combine company scope and team-scoped for the specific team
+    query = query.or(`scope.eq.company,AND(scope.eq.team,team_id.eq.${teamId})`);
+  } else {
+    // No team -> only company-scoped announcements
+    query = query.eq("scope", "company");
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data ?? []) as DbCompanyAnnouncement[];
