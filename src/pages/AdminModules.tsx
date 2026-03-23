@@ -1,7 +1,6 @@
 import React from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
+import { InternalCommunicationModuleCard } from "@/components/InternalCommunicationModuleCard";
 
 export default function AdminModules() {
   const { t } = useTranslation();
@@ -16,12 +15,9 @@ export default function AdminModules() {
         <div />
       </div>
 
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="text-sm text-muted-foreground">Aqui você encontrará controles para ativar/desativar módulos e configurar políticas específicas. Essa é uma página administrativa separada de Marca.</div>
-        <div className="mt-4">
-          <Button className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white">Ir para módulos</Button>
-        </div>
-      </Card>
+      <div className="grid gap-4">
+        <InternalCommunicationModuleCard />
+      </div>
     </div>
   );
 }

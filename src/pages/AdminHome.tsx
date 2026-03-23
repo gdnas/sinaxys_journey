@@ -21,8 +21,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useCompany } from "@/lib/company";
+import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { listTasksForCompany } from "@/lib/okrDb";
 import { listVacationRequestsForApprover } from "@/lib/vacationDb";
+import { AnnouncementsHomeWidget } from "@/components/AnnouncementsHomeWidget";
+import { BirthdayHomeWidget } from "@/components/BirthdayHomeWidget";
 
 function StatCard({
   label,
@@ -99,6 +102,7 @@ function ActionCard({
 
 export default function AdminHome() {
   const { company, companyId } = useCompany();
+  const { enabled: internalCommunicationEnabled } = useCompanyModuleEnabled("INTERNAL_COMMUNICATION");
 
   const today = new Date();
   const todayLabel = format(today, "EEEE, d 'de' MMMM", { locale: ptBR });
@@ -188,6 +192,13 @@ export default function AdminHome() {
           />
         </div>
       </Card>
+
+      {internalCommunicationEnabled && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AnnouncementsHomeWidget />
+          <BirthdayHomeWidget />
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ActionCard

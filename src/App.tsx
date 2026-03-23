@@ -77,6 +77,8 @@ import KnowledgePage from "./pages/KnowledgePage";
 import KnowledgeNewSpace from "./pages/KnowledgeNewSpace";
 import KnowledgeNewPage from "./pages/KnowledgeNewPage";
 import NotificationsPage from "./pages/NotificationsPage";
+import Announcements from "./pages/Announcements";
+import AnnouncementDetail from "./pages/AnnouncementDetail";
 import Settings from "./pages/Settings";
 import ProjetosHome from "./pages/ProjetosHome";
 import ProjetosDashboard from "./pages/ProjetosDashboard";
@@ -689,6 +691,28 @@ const App = () => (
                     element={
                       <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                         <NotificationsPage />
+                      </RequireAuth>
+                    }
+                  />
+
+                  {/* Comunicação Interna */}
+                  <Route
+                    path="/announcements"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="INTERNAL_COMMUNICATION">
+                          <Announcements />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/announcements/:id"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="INTERNAL_COMMUNICATION">
+                          <AnnouncementDetail />
+                        </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />

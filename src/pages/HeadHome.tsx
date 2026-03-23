@@ -20,8 +20,11 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { listTasksForDepartment } from "@/lib/okrDb";
 import { listVacationRequestsForApprover } from "@/lib/vacationDb";
+import { AnnouncementsHomeWidget } from "@/components/AnnouncementsHomeWidget";
+import { BirthdayHomeWidget } from "@/components/BirthdayHomeWidget";
 
 function StatCard({
   label,
@@ -99,6 +102,7 @@ function ActionCard({
 export default function HeadHome() {
   const { user } = useAuth();
   const { company, companyId } = useCompany();
+  const { enabled: internalCommunicationEnabled } = useCompanyModuleEnabled("INTERNAL_COMMUNICATION");
 
   if (!user) return null;
 
@@ -197,6 +201,13 @@ export default function HeadHome() {
           />
         </div>
       </Card>
+
+      {internalCommunicationEnabled && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AnnouncementsHomeWidget />
+          <BirthdayHomeWidget />
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ActionCard

@@ -20,8 +20,11 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { getAssignmentsForUser } from "@/lib/journeyDb";
 import { listTasksForUser } from "@/lib/okrDb";
+import { AnnouncementsHomeWidget } from "@/components/AnnouncementsHomeWidget";
+import { BirthdayHomeWidget } from "@/components/BirthdayHomeWidget";
 
 function formatPts(n: number) {
   return new Intl.NumberFormat("pt-BR").format(Math.round(n));
@@ -103,6 +106,7 @@ function ShortcutCard({
 export default function CollaboratorHome() {
   const { user } = useAuth();
   const { company, companyId } = useCompany();
+  const { enabled: internalCommunicationEnabled } = useCompanyModuleEnabled("INTERNAL_COMMUNICATION");
 
   if (!user) return null;
 
@@ -194,6 +198,13 @@ export default function CollaboratorHome() {
           </div>
         ) : null}
       </Card>
+
+      {internalCommunicationEnabled && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <AnnouncementsHomeWidget />
+          <BirthdayHomeWidget />
+        </div>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <ShortcutCard title="Trilhas" desc="Continue ou encontre novas trilhas para evoluir." to="/tracks" icon={<BookOpen className="h-5 w-5" />} />
