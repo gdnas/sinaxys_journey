@@ -3,9 +3,9 @@
 
 -- Para cada projeto legado, primeiro verificar status REAIS usados pelos work_items
 -- Depois popular project_workflow_status preservando esses status
--- MICROAJUSTE FINAL 2: Filtra work_items com status IS NOT NULL AND status != ''
+-- KAIROOS 2.0 Fase 1 Hardening #3: Filtros explícitos para garantir robustez
 
--- CTE para identificar status únicos por projeto (filtrando nulo/vazio)
+-- CTE para identificar status únicos por projeto (filtrando nulo/vazio com btrim)
 WITH project_real_statuses AS (
   SELECT DISTINCT
     p.id AS project_id,
@@ -15,8 +15,10 @@ WITH project_real_statuses AS (
   WHERE p.id NOT IN (
     SELECT project_id FROM project_workflow_status
   )
+  -- KAIROOS 2.0 Fase 1 Hardening #3: Filtros explícitos para segurança
+  AND wi.project_id IS NOT NULL
   AND wi.status IS NOT NULL
-  AND wi.status != ''
+  AND btrim(wi.status) <> ''
 ),
 -- Mapear status reais para display_name e cor
 status_mapping AS (
@@ -106,6 +108,7 @@ ON CONFLICT (project_id, status_key) DO NOTHING;
 
 -- Para projetos que não têm work_items ou work_items com status nulo/vazio, 
 -- popular com status padrão PROCESS
+-- KAIROOS 2.0 Fase 1 Hardening #3: Apenas se não tiver workflow status ainda
 INSERT INTO project_workflow_status (project_id, status_key, display_name, display_order, color)
 SELECT 
   p.id,

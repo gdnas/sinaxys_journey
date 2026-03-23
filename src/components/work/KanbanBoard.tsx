@@ -8,7 +8,7 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import { useKanban, KanbanTask, TaskStatus } from '@/hooks/useKanban';
+import { useKanban, KanbanTask } from '@/hooks/useKanban';
 import KanbanColumn from './KanbanColumn';
 import KanbanTaskCard from './KanbanTaskCard';
 import WorkItemForm from './WorkItemForm';
@@ -18,6 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { getProjectWorkflowStatuses, TemplateWorkflowStatus } from '@/lib/templateWorkflowDb';
+import { AlertTriangle } from 'lucide-react';
 
 interface KanbanBoardProps {
   projectId: string;
@@ -28,6 +29,10 @@ interface KanbanBoardProps {
   onRefresh?: () => void;
   onCreateTask?: () => void;
 }
+
+// KAIROOS 2.0 Fase 1 Hardening #2: Constante para coluna de fallback de status inválido
+const INVALID_STATUS_KEY = '__invalid__';
+const INVALID_STATUS_LABEL = 'Status inválido';
 
 export default function KanbanBoard({
   projectId,
@@ -40,19 +45,14 @@ export default function KanbanBoard({
 }: KanbanBoardProps) {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const {
-    moveTask,
-    getStatusLabel,
-    groupTasksByStatus,
-    movingTaskId,
-  } = useKanban(projectId);
+  const { moveTask, movingTaskId } = useKanban(projectId);
 
   const [showCreate, setShowCreate] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeTask, setActiveTask] = useState<KanbanTask | null>(null);
   const [localTasks, setLocalTasks] = useState<KanbanTask[]>(tasks);
 
-  // KAIROOS 2.0 Fase 1: Load workflow statuses from database (FONTE DA VERDADE)
+  // Load workflow statuses from database (FONTE DA VERDADE)
   const [workflowStatuses, setWorkflowStatuses] = useState<TemplateWorkflowStatus[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
 
@@ -61,7 +61,7 @@ export default function KanbanBoard({
     setLocalTasks(tasks);
   }, [tasks]);
 
-  // KAIROOS 2.0 Fase 1: Load workflow statuses on mount and when projectId changes
+  // Load workflow statuses on mount and when projectId changes
   useEffect(() => {
     async function loadWorkflowStatuses() {
       try {
@@ -82,13 +82,7 @@ export default function KanbanBoard({
     loadWorkflowStatuses();
   }, [projectId, toast]);
 
-  // KAIROOS 2.0 Fase 1: Override getStatusLabel to use workflow statuses
-  const getWorkflowStatusLabel = (statusKey: string): string => {
-    const status = workflowStatuses.find(s => s.status_key === statusKey);
-    return status?.display_name || statusKey;
-  };
-
-  // KAIROOS 2.0 Fase 1: Group tasks by workflow statuses from database
+  // KAIROOS 0.0 Fase 1 Hardening #2: Agrupar tasks por workflow statuses com fallback explícito para inválidos
   const groupTasksByWorkflowStatus = (tasks: KanbanTask[]): Record<string, KanbanTask[]> => {
     const grouped: Record<string, KanbanTask[]> = {};
     
@@ -97,18 +91,36 @@ export default function KanbanBoard({
       grouped[status.status_key] = [];
     });
     
+    // Initialize array for invalid statuses
+    grouped[INVALID_STATUS_KEY] = [];
+    
+    // Track tasks with invalid statuses
+    const invalidTaskIds: string[] = [];
+    
     // Add tasks to their respective status columns
     tasks.forEach((task) => {
-      if (task.status && grouped[task.status]) {
+      if (!task.status || task.status === '') {
+        // Task with empty/null status - treat as invalid
+        grouped[INVALID_STATUS_KEY].push(task);
+        invalidTaskIds.push(task.id);
+      } else if (grouped[task.status]) {
+        // Valid status in workflow
         grouped[task.status].push(task);
       } else {
-        // Handle tasks with status not in workflow (fallback to first status)
-        const firstStatus = workflowStatuses[0];
-        if (firstStatus) {
-          grouped[firstStatus.status_key].push(task);
-        }
+        // Status not in workflow - invalid
+        grouped[INVALID_STATUS_KEY].push(task);
+        invalidTaskIds.push(task.id);
       }
     });
+    
+    // Log warning if there are invalid tasks
+    if (invalidTaskIds.length > 0) {
+      console.warn(
+        `[KanbanBoard] Found ${invalidTaskIds.length} tasks with invalid status for project ${projectId}. ` +
+        `Invalid task IDs: ${invalidTaskIds.join(', ')}. ` +
+        `Valid status keys: ${workflowStatuses.map(s => s.status_key).join(', ')}.`
+      );
+    }
     
     return grouped;
   };
@@ -135,12 +147,22 @@ export default function KanbanBoard({
       if (!over) return;
 
       const taskId = active.id as string;
-      const newStatus = over.id as TaskStatus;
+      const newStatus = over.id as string;
 
       if (taskId === newStatus) return;
 
+      // KAIROOS 2.0 Fase 1 Hardening #2: Impedir arrastar para coluna de status inválido
+      if (newStatus === INVALID_STATUS_KEY) {
+        toast({
+          title: 'Operação não permitida',
+          description: 'Não é possível mover tarefas para a coluna de status inválido',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // Optimistic update
-      const optimisticUpdate = (taskId: string, newStatus: TaskStatus) => {
+      const optimisticUpdate = (taskId: string, newStatus: string) => {
         setLocalTasks((prev) =>
           prev.map((task) =>
             task.id === taskId ? { ...task, status: newStatus } : task
@@ -149,7 +171,7 @@ export default function KanbanBoard({
       };
 
       // Rollback update
-      const rollbackUpdate = (taskId: string, oldStatus: TaskStatus) => {
+      const rollbackUpdate = (taskId: string, oldStatus: string) => {
         setLocalTasks((prev) =>
           prev.map((task) =>
             task.id === taskId ? { ...task, status: oldStatus } : task
@@ -163,7 +185,7 @@ export default function KanbanBoard({
         onRefresh();
       }
     },
-    [localTasks, moveTask, onRefresh]
+    [localTasks, moveTask, onRefresh, toast]
   );
 
   const handleTaskClick = useCallback((taskId: string) => {
@@ -210,8 +232,22 @@ export default function KanbanBoard({
     }
   }, [toast, onRefresh]);
 
-  // KAIROOS 2.0 Fase 1: Use workflow statuses for grouping
+  // Use workflow statuses for grouping
   const groupedTasks = groupTasksByWorkflowStatus(localTasks);
+  
+  // KAIROOS 2.0 Fase 1 Hardening #2: Determinar quais colunas mostrar
+  const columnStatuses = [...workflowStatuses];
+  const invalidTaskCount = groupedTasks[INVALID_STATUS_KEY]?.length ?? 0;
+  
+  // KAIROOS 0.0 Fase 1 Hardening #2: Adicionar coluna de status inválido apenas se houver itens
+  if (invalidTaskCount > 0) {
+    columnStatuses.push({
+      status_key: INVALID_STATUS_KEY,
+      display_name: INVALID_STATUS_LABEL,
+      display_order: 999,
+      color: 'bg-red-100',
+    });
+  }
 
   if (loading || loadingStatuses) {
     return (
@@ -231,19 +267,20 @@ export default function KanbanBoard({
           onDragEnd={handleDragEnd}
         >
           <div className="flex gap-6 min-w-max items-start pb-4">
-            {workflowStatuses.map((status) => (
+            {columnStatuses.map((status) => (
               <KanbanColumn
                 key={status.status_key}
-                status={status.status_key as unknown as TaskStatus}
+                status={status.status_key}
                 label={status.display_name}
                 tasks={groupedTasks[status.status_key] || []}
                 projectId={projectId}
                 taskCount={groupedTasks[status.status_key]?.length || 0}
+                isInvalidStatus={status.status_key === INVALID_STATUS_KEY}
                 onTaskClick={handleTaskClick}
-                onEdit={canEdit ? handleEditTask : undefined}
-                onChangeAssignee={canEdit ? handleChangeAssignee : undefined}
-                onCreateSubtask={canEdit ? handleCreateSubtask : undefined}
-                onDelete={canEdit ? handleDeleteTask : undefined}
+                onEdit={canEdit && status.status_key !== INVALID_STATUS_KEY ? handleEditTask : undefined}
+                onChangeAssignee={canEdit && status.status_key !== INVALID_STATUS_KEY ? handleChangeAssignee : undefined}
+                onCreateSubtask={canEdit && status.status_key !== INVALID_STATUS_KEY ? handleCreateSubtask : undefined}
+                onDelete={canEdit && status.status_key !== INVALID_STATUS_KEY ? handleDeleteTask : undefined}
               />
             ))}
           </div>

@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { WORK_ITEM_STATUS, WORK_ITEM_STATUS_LABELS, WORK_ITEM_STATUS_ORDER, WorkItemStatus } from '@/lib/workItemConstants';
 
 export interface KanbanTask {
   id: string;
@@ -19,9 +18,8 @@ export interface KanbanTask {
   } | null;
 }
 
-export type TaskStatus = WorkItemStatus;
-
-const STATUS_ORDER: TaskStatus[] = WORK_ITEM_STATUS_ORDER;
+// KAIROOS 2.0 Fase 1 Hardening #1: Status dinâmico, não mais union type fixo
+export type TaskStatus = string;
 
 export function useKanban(projectId: string) {
   const { toast } = useToast();
@@ -29,9 +27,9 @@ export function useKanban(projectId: string) {
 
   const moveTask = async (
     taskId: string,
-    newStatus: TaskStatus,
-    optimisticUpdate: (taskId: string, newStatus: TaskStatus) => void,
-    rollbackUpdate: (taskId: string, oldStatus: TaskStatus) => void
+    newStatus: string,
+    optimisticUpdate: (taskId: string, newStatus: string) => void,
+    rollbackUpdate: (taskId: string, oldStatus: string) => void
   ) => {
     // Prevent multiple simultaneous updates on the same card
     if (movingTaskId === taskId) {
@@ -74,7 +72,7 @@ export function useKanban(projectId: string) {
       return true;
     } catch (err: any) {
       // Rollback on error
-      rollbackUpdate(taskId, currentStatus as TaskStatus);
+      rollbackUpdate(taskId, currentStatus);
 
       toast({
         title: 'Erro ao mover tarefa',
@@ -98,30 +96,15 @@ export function useKanban(projectId: string) {
     return data?.status ?? null;
   };
 
-  const getStatusLabel = (status: TaskStatus): string => {
-    return WORK_ITEM_STATUS_LABELS[status] || status;
-  };
-
-  const groupTasksByStatus = (tasks: KanbanTask[]): Record<TaskStatus, KanbanTask[]> => {
-    const grouped = STATUS_ORDER.reduce((acc, status) => {
-      acc[status] = [];
-      return acc;
-    }, {} as Record<TaskStatus, KanbanTask[]>);
-
-    tasks.forEach((task) => {
-      if (task.status && grouped[task.status as TaskStatus]) {
-        grouped[task.status as TaskStatus].push(task);
-      }
-    });
-
-    return grouped;
+  // KAIROOS 2.0 Fase 1 Hardening #1: getStatusLabel agora aceita string genérico
+  // A label deve ser fornecida pelo componente que carrega do banco
+  const getStatusLabel = (status: string): string => {
+    return status; // Simplificado - o caller deve fornecer a label
   };
 
   return {
     moveTask,
     getStatusLabel,
-    groupTasksByStatus,
     movingTaskId,
-    STATUS_ORDER,
   };
 }
