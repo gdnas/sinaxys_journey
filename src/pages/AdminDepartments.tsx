@@ -152,7 +152,7 @@ export default function AdminDepartments() {
                 <TableRow>
                   <TableHead>Departamento</TableHead>
                   <TableHead className="text-right">Pessoas</TableHead>
-                  <TableHead className="text-right">Trilhas</TableHead>
+                  <TableHead className="text-right">Trilhas de Conhecimento</TableHead>
                   <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
               </TableHeader>

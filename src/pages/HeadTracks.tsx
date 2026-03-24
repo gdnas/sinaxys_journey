@@ -54,7 +54,7 @@ export default function HeadTracks() {
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilhas (Head)</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilhas de Conhecimento (Head)</div>
             <p className="mt-1 text-sm text-muted-foreground">
               Crie e publique trilhas do seu departamento.
             </p>

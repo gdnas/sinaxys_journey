@@ -208,7 +208,7 @@ export default function AdminHome() {
           icon={<Building2 className="h-5 w-5" />}
         />
         <ActionCard
-          title="Trilhas"
+          title="Trilhas de Conhecimento"
           desc="Monte trilhas e publique para acelerar a evolução do time."
           to="/admin/tracks"
           icon={<GraduationCap className="h-5 w-5" />}

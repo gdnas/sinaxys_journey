@@ -359,7 +359,7 @@ export default function AppDashboard() {
                 to="/rankings"
               />
               <StatPill
-                label="Trilhas"
+                label="Trilhas de Conhecimento"
                 value={loadingAssignments ? "…" : `${inProgress.length}`}
                 hint={loadingAssignments ? "carregando" : inProgress.length ? "em andamento" : `${completed.length} concluídas`}
                 icon={<CheckCircle2 className="h-5 w-5" />}
@@ -441,7 +441,7 @@ export default function AppDashboard() {
             tourId="dash-okr"
           />
           <ShortcutCard
-            title="Trilhas"
+            title="Trilhas de Conhecimento"
             desc={isHead ? "Acompanhe trilhas do time e delegações." : "Aprendizado em sequência: onboarding e trilhas estratégicas."}
             icon={<BookOpen className="h-5 w-5" />}
             to={isHead ? "/head/tracks" : "/tracks"}

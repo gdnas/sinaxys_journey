@@ -329,7 +329,7 @@ const nav: NavItem[] = [
         to: "/integrations",
         label: "nav.integrations",
         icon: <Wrench className="h-4 w-4" />,
-        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+        roles: ["MASTERADMIN", "ADMIN"],
       },
     ],
   },

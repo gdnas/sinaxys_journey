@@ -345,7 +345,7 @@ export default function HeadTrackEdit() {
         <Button asChild variant="outline" className="rounded-xl">
           <Link to={backPath}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Trilhas
+            Trilhas de Conhecimento
           </Link>
         </Button>
 

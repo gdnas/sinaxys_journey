@@ -115,7 +115,7 @@ export default function AdminModules() {
 
           <ModuleToggle
             icon={<GraduationCap className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-            title="Trilhas"
+            title="Trilhas de Conhecimento"
             description="Onboarding e aprendizagem contínua em sequência (conteúdo, checkpoints e quiz)."
             checked={tracksEnabled}
             onChange={async (v) => {

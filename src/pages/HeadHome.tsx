@@ -217,7 +217,7 @@ export default function HeadHome() {
           icon={<Network className="h-5 w-5" />}
         />
         <ActionCard
-          title="Trilhas do time"
+          title="Trilhas de Conhecimento do time"
           desc="Publique e acompanhe trilhas do seu departamento."
           to="/head/tracks"
           icon={<GraduationCap className="h-5 w-5" />}

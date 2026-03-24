@@ -72,7 +72,7 @@ export default function PermissionsPanel() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Gerenciar Permissões</div>
-            <p className="mt-1 text-sm text-muted-foreground">Configure quem pode ver e editar trilhas e páginas.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Configure quem pode ver e editar Trilhas de Conhecimento e páginas.</p>
           </div>
           <Button
             className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"

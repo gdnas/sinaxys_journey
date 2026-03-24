@@ -377,8 +377,8 @@ export default function Person() {
           <aside className="grid gap-6">
             <div>
               <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilhas</div>
-                <p className="mt-1 text-sm text-muted-foreground">Trilhas que essa pessoa está envolvida (atribuições e em andamento).</p>
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilhas de Conhecimento</div>
+                <p className="mt-1 text-sm text-muted-foreground">Trilhas de Conhecimento que essa pessoa está envolvida (atribuições e em andamento).</p>
                 <Separator className="my-4" />
                 <div className="grid gap-2">
                   {qAssignments.data?.map((a: any) => (

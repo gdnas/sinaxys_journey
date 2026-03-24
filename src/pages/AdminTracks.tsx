@@ -139,7 +139,7 @@ export default function AdminTracks() {
       <div className="rounded-3xl border bg-white p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Trilhas</div>
+            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Admin — Trilhas de Conhecimento</div>
             <p className="mt-1 text-sm text-muted-foreground">Monte trilhas para qualquer departamento — ou para a empresa toda — e publique quando estiver pronto.</p>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">

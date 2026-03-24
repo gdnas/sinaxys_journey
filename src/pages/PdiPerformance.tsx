@@ -1500,7 +1500,7 @@ export default function PdiPerformance() {
       </Tabs>
 
       <div className="text-xs text-muted-foreground">
-        Dica: o módulo é independente de OKRs e Trilhas — mas quando existirem, marcos como "meta atingida" e "trilha concluída" entram automaticamente no histórico.
+        Dica: o módulo é independente de OKRs e Trilhas de Conhecimento — mas quando existirem, marcos como "meta atingida" e "trilha concluída" entram automaticamente no histórico.
       </div>
     </div>
   );

@@ -174,7 +174,7 @@ export default function CollaboratorHome() {
 
         <div className="grid gap-4 lg:grid-cols-3">
           <StatCard label="Tarefas abertas" value={String(openTasks)} hint="para você" icon={<Target className="h-5 w-5" />} to="/okr/hoje" />
-          <StatCard label="Trilhas" value={loadingAssignments ? "…" : String(inProgress.length)} hint={inProgress.length ? "em andamento" : `${completed.length} concluídas`} icon={<CheckCircle2 className="h-5 w-5" />} to={inProgress.length ? "/app" : "/tracks"} />
+          <StatCard label="Trilhas de Conhecimento" value={loadingAssignments ? "…" : String(inProgress.length)} hint={inProgress.length ? "em andamento" : `${completed.length} concluídas`} icon={<CheckCircle2 className="h-5 w-5" />} to={inProgress.length ? "/app" : "/tracks"} />
           <StatCard label="Points" value={formatPts(0)} hint="veja o ranking" icon={<Trophy className="h-5 w-5" />} to="/rankings" />
         </div>
 
@@ -207,7 +207,7 @@ export default function CollaboratorHome() {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ShortcutCard title="Trilhas" desc="Continue ou encontre novas trilhas para evoluir." to="/tracks" icon={<BookOpen className="h-5 w-5" />} />
+        <ShortcutCard title="Trilhas de Conhecimento" desc="Continue ou encontre novas trilhas para evoluir." to="/tracks" icon={<BookOpen className="h-5 w-5" />} />
         <ShortcutCard title="Certificados" desc="Veja certificados e compartilhe conquistas." to="/app/certificates" icon={<Award className="h-5 w-5" />} />
       </div>
 

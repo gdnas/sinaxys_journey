@@ -73,8 +73,8 @@ export default function TrailVideos() {
     <div className="mx-auto w-full max-w-6xl px-4 pb-10 pt-6 sm:px-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilhas</div>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-3xl">Vídeos de Trilhas</h1>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Trilhas de Conhecimento</div>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-3xl">Vídeos de Trilhas de Conhecimento</h1>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Publique vídeos diretamente no YouTube (upload do seu navegador → YouTube), sem armazenar arquivo na Kairoos.
           </p>
