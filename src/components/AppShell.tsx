@@ -5,6 +5,7 @@ import {
   BadgeCheck,
   BarChart3,
   BookOpen,
+  Box,
   Building2,
   CalendarClock,
   CheckCircle2,
@@ -737,6 +738,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return allowKnowledge;
       case "PROJECTS":
         return allowProjects;
+      case "ASSETS":
+        return allowAssets;
       default:
         return true;
     }
