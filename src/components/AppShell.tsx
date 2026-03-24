@@ -20,6 +20,8 @@ import {
   Megaphone,
   Network,
   Palette,
+  Search,
+  Settings,
   Shield,
   Target,
   TestTube,
@@ -251,77 +253,82 @@ const nav: NavItem[] = [
     label: "nav.company.group",
     icon: <Building2 className="h-4 w-4" />,
     children: [
-      {
-        type: "link",
-        to: "/announcements/create",
-        label: "Criar Recado",
-        icon: <Megaphone className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "MASTERADMIN"],
-      },
-      {
-        type: "link",
-        to: "/admin/brand",
-        label: "nav.company.brand",
-        icon: <Palette className="h-4 w-4" />,
-        roles: ["ADMIN", "MASTERADMIN"],
-      },
-      {
-        type: "link",
-        to: "/admin/modules",
-        label: "nav.company.modules",
-        icon: <Layers className="h-4 w-4" />,
-        roles: ["ADMIN", "MASTERADMIN"],
-      },
-      {
-        type: "link",
-        to: "/admin/email",
-        label: "nav.company.email",
-        icon: <Wrench className="h-4 w-4" />,
-        roles: ["ADMIN", "MASTERADMIN"],
-      },
-      {
-        type: "link",
-        to: "/admin/costs",
-        label: "nav.company.costs",
-        icon: <Wallet className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD"],
-        moduleKey: "COSTS",
-      },
-      {
-        type: "link",
-        to: "/admin/import",
-        label: "nav.company.import",
-        icon: <UploadCloud className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD"],
-      },
-      // moved items from People into Company
+      // Estrutura subgroup
       {
         type: "link",
         to: "/org",
         label: "nav.people.orgchart",
         icon: <Network className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "ORG",
-      },
-      {
-        type: "link",
-        to: "/admin/users",
-        label: "nav.people.users",
-        icon: <UserIcon className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD"],
       },
       {
         type: "link",
         to: "/admin/departments",
         label: "nav.people.departments",
         icon: <Layers className="h-4 w-4" />,
-        roles: ["ADMIN"],
+        roles: ["MASTERADMIN", "ADMIN"],
       },
       {
         type: "link",
-        to: "/settings",
-        label: "nav.company.settings",
+        to: "/admin/users",
+        label: "nav.people.users",
+        icon: <UserIcon className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD"],
+      },
+      // Comunicação Interna subgroup
+      {
+        type: "link",
+        to: "/announcements",
+        label: "nav.announcements.title",
+        icon: <Megaphone className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+      },
+      // Financeiro subgroup
+      {
+        type: "link",
+        to: "/admin/costs",
+        label: "Custos e Despesas",
+        icon: <Wallet className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD"],
+        moduleKey: "COSTS",
+      },
+      // Settings moved to Configurações group
+    ],
+  },
+
+  // === CONFIGURAÇÕES ===
+  {
+    type: "group",
+    label: "Configurações",
+    icon: <Settings className="h-4 w-4" />,
+    children: [
+      {
+        type: "link",
+        to: "/admin/brand",
+        label: "nav.company.brand",
         icon: <Palette className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN"],
+      },
+      {
+        type: "link",
+        to: "/admin/modules",
+        label: "nav.company.modules",
+        icon: <Layers className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN"],
+      },
+      {
+        type: "link",
+        to: "/admin/email",
+        label: "nav.company.email",
+        icon: <Wrench className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN"],
+      },
+      {
+        type: "link",
+        to: "/integrations",
+        label: "nav.integrations",
+        icon: <Wrench className="h-4 w-4" />,
         roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
       },
     ],
@@ -373,19 +380,21 @@ const nav: NavItem[] = [
     moduleKey: "TRACKS",
   },
 
+  // Settings (legacy - keep for now)
+  {
+    type: "link",
+    to: "/settings",
+    label: "nav.company.settings",
+    icon: <Palette className="h-4 w-4" />,
+    roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+  },
+
   // Minha área
   {
     type: "link",
     to: "/profile",
     label: "nav.profile",
     icon: <UserIcon className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD", "COLABORADOR"],
-  },
-  {
-    type: "link",
-    to: "/integrations",
-    label: "nav.integrations",
-    icon: <Wrench className="h-4 w-4" />,
     roles: ["ADMIN", "HEAD", "COLABORADOR"],
   },
 ];
