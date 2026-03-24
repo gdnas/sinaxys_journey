@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { BookOpen, Plus, Search, Star, Clock, Folder } from "lucide-react";
+import { BookOpen, Plus, Search, Star, Clock, Folder, GraduationCap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,12 +77,22 @@ export default function KnowledgeHome() {
             Documente, organize e compartilhe conhecimento da sua empresa
           </p>
         </div>
-        <Button asChild className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-          <Link to="/knowledge/new-space">
-            <Plus className="mr-2 h-4 w-4" />
-            Novo Espaço
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+            <Link to="/knowledge/new-space">
+              <Plus className="mr-2 h-4 w-4" />
+              Novo Espaço
+            </Link>
+          </Button>
+
+          {/* Button to open "Montar trilha de conhecimento" (Admin Tracks). Visible only to ADMIN and HEAD */}
+          {(user.role === "ADMIN" || user.role === "HEAD") && (
+            <Link to="/admin/tracks" className="h-11 rounded-xl border px-4 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]/70 inline-flex items-center gap-2">
+              <GraduationCap className="h-4 w-4" />
+              Montar Trilha de Conhecimento
+            </Link>
+          )}
+        </div>
       </div>
 
       {/* Search */}

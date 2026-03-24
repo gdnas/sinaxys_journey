@@ -188,6 +188,32 @@ const nav: NavItem[] = [
     ],
   },
 
+  // === ATIVOS ===
+  {
+    type: "group",
+    label: "Ativos",
+    icon: <Box className="h-4 w-4" />,
+    moduleKey: "ASSETS",
+    children: [
+      {
+        type: "link",
+        to: "/app/ativos",
+        label: "Dashboard",
+        icon: <LayoutDashboard className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "ASSETS",
+      },
+      {
+        type: "link",
+        to: "/app/ativos/lista",
+        label: "Lista de Ativos",
+        icon: <CheckCircle2 className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "ASSETS",
+      },
+    ],
+  },
+
   // === EVOLUÇÃO ===
   {
     type: "group",
@@ -227,7 +253,7 @@ const nav: NavItem[] = [
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "POINTS",
       },
-      // move Conhecimento and Montar trilhas into Evolução
+      // move Conhecimento into Evolução (Admin tracks removed from menu)
       {
         type: "link",
         to: "/knowledge",
@@ -235,14 +261,6 @@ const nav: NavItem[] = [
         icon: <BookOpen className="h-4 w-4" />,
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "KNOWLEDGE",
-      },
-      {
-        type: "link",
-        to: "/admin/tracks",
-        label: "nav.tracks.build",
-        icon: <GraduationCap className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD"],
-        moduleKey: "TRACKS",
       },
     ],
   },
@@ -378,15 +396,7 @@ const nav: NavItem[] = [
     moduleKey: "COSTS",
   },
 
-  // Trilhas para Head
-  {
-    type: "link",
-    to: "/admin/tracks",
-    label: "nav.tracks.build",
-    icon: <GraduationCap className="h-4 w-4" />,
-    roles: ["ADMIN", "HEAD"],
-    moduleKey: "TRACKS",
-  },
+  // Admin "montar trilhas" page is accessible from Knowledge — removed from global menu.
 
   // NOTE: The standalone settings link was moved into the "Configurações" group as "Ajustes".
 
@@ -690,6 +700,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => isCompanyModuleEnabled(String(companyId), "PROJECTS"),
     enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
   });
+  const { data: assetsEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "ASSETS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "ASSETS"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
 
   if (!user) return <>{children}</>;
 
@@ -701,6 +716,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const allowOrg = user.role === "MASTERADMIN" ? true : !!orgEnabled;
   const allowKnowledge = user.role === "MASTERADMIN" ? true : !!knowledgeEnabled;
   const allowProjects = user.role === "MASTERADMIN" ? true : !!projectsEnabled;
+  const allowAssets = user.role === "MASTERADMIN" ? true : !!assetsEnabled;
 
   const moduleAllowed = (key?: string) => {
     if (!key) return true;

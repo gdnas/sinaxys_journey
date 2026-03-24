@@ -92,6 +92,14 @@ import ProjetosTasks from "./pages/ProjetosTasks";
 import TaskCreate from "./pages/TaskCreate";
 import TaskEdit from "./pages/TaskEdit";
 import ProjetosKanban from "./pages/ProjetosKanban";
+import AssetsHome from "./pages/AssetsHome";
+import AssetsRedirect from "./pages/AssetsRedirect";
+import AssetsList from "./pages/AssetsList";
+import AssetForm from "./pages/AssetForm";
+import AssetDetail from "./pages/AssetDetail";
+import AssetAssignForm from "./pages/AssetAssignForm";
+import AssetReturnForm from "./pages/AssetReturnForm";
+import AssetIncidentForm from "./pages/AssetIncidentForm";
 
 const queryClient = new QueryClient();
 
@@ -648,6 +656,98 @@ const App = () => (
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="POINTS">
                           <Rankings />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+
+                  {/* Gestão de Ativos */}
+                  <Route
+                    path="/app/ativos"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="ASSETS">
+                          <AssetsRedirect />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/ativos"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="ASSETS">
+                          <AssetsRedirect />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/ativos/lista"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="ASSETS">
+                          <AssetsList />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/ativos/novo"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
+                        <RequireCompanyModule moduleKey="ASSETS">
+                          <AssetForm />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/ativos/:assetId"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="ASSETS">
+                          <AssetDetail />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/ativos/:assetId/editar"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
+                        <RequireCompanyModule moduleKey="ASSETS">
+                          <AssetForm />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/ativos/:assetId/entregar"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
+                        <RequireCompanyModule moduleKey="ASSETS">
+                          <AssetAssignForm />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/ativos/:assetId/devolver"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
+                        <RequireCompanyModule moduleKey="ASSETS">
+                          <AssetReturnForm />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/app/ativos/:assetId/ocorrencia"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN"]}>
+                        <RequireCompanyModule moduleKey="ASSETS">
+                          <AssetIncidentForm />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
