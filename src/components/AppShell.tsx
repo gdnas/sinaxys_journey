@@ -331,6 +331,14 @@ const nav: NavItem[] = [
         icon: <Wrench className="h-4 w-4" />,
         roles: ["MASTERADMIN", "ADMIN"],
       },
+      // New: move Settings into this group as 'Ajustes'
+      {
+        type: "link",
+        to: "/settings",
+        label: "Ajustes",
+        icon: <Settings className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+      },
     ],
   },
 
@@ -380,14 +388,7 @@ const nav: NavItem[] = [
     moduleKey: "TRACKS",
   },
 
-  // Settings (legacy - keep for now)
-  {
-    type: "link",
-    to: "/settings",
-    label: "nav.company.settings",
-    icon: <Palette className="h-4 w-4" />,
-    roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
-  },
+  // NOTE: The standalone settings link was moved into the "Configurações" group as "Ajustes".
 
   // Minha área
   {

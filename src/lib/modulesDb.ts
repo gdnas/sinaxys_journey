@@ -18,6 +18,8 @@ export type ModuleKey =
   | "MASTER"
   | "KNOWLEDGE"
   | "INTERNAL_COMMUNICATION"
+  | "PROJECTS"
+  | "ASSETS"
   | (string & {});
 
 const DEFAULT_ENABLED: Record<string, boolean> = {
@@ -33,6 +35,8 @@ const DEFAULT_ENABLED: Record<string, boolean> = {
   PDI_PERFORMANCE: false,
   KNOWLEDGE: false,
   INTERNAL_COMMUNICATION: false,
+  PROJECTS: false,
+  ASSETS: false,
 
   // Core areas (not sold as modules for now)
   PROFILE: true,

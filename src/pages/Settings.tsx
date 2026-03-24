@@ -79,8 +79,8 @@ export default function Settings() {
 
   return (
     <div className="mx-auto w-full max-w-3xl">
-      <h1 className="text-2xl font-semibold">{t('settings.title')}</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{t('settings.description')}</p>
+      <h1 className="text-2xl font-semibold">Ajustes</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Ajuste preferências de idioma, tema e notificações.</p>
 
       <div className="mt-6 grid gap-4">
         <Card className="p-4">
