@@ -7,8 +7,44 @@ import { useToast } from "@/hooks/use-toast";
 import { useCompany } from "@/lib/company";
 import { isCompanyModuleEnabled, setCompanyModuleEnabled } from "@/lib/modulesDb";
 import ModuleToggle from "@/components/ModuleToggle";
-import { InternalCommunicationModuleCard } from "@/components/InternalCommunicationModuleCard";
-import { Target, Handshake, GraduationCap, CalendarClock, Trophy, Wallet, Network, BarChart3 } from "lucide-react";
+import {
+  Target,
+  Handshake,
+  GraduationCap,
+  CalendarClock,
+  Trophy,
+  Wallet,
+  Network,
+  Building2,
+  Megaphone,
+} from "lucide-react";
+
+interface ModuleSectionProps {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  children: React.ReactNode;
+}
+
+function ModuleSection({ icon, title, description, children }: ModuleSectionProps) {
+  return (
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+      <div className="flex items-start gap-4 mb-5">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+          {icon}
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold">{title}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+        </div>
+      </div>
+      <Separator className="mb-5" />
+      <div className="grid gap-3">
+        {children}
+      </div>
+    </Card>
+  );
+}
 
 export default function AdminModules() {
   const { t } = useTranslation();
@@ -65,137 +101,164 @@ export default function AdminModules() {
     enabled: queryEnabled,
   });
 
+  const { data: internalCommEnabled = true, refetch: refetchInternalComm } = useQuery({
+    queryKey: ["company-module", companyId, "INTERNAL_COMMUNICATION"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "INTERNAL_COMMUNICATION"),
+    enabled: queryEnabled,
+  });
+
   return (
     <div className="grid gap-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">{t('nav.company.modules')}</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Gerencie a visibilidade de módulos da empresa.</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Configure os módulos disponíveis por área funcional.
+          </p>
         </div>
-        <div />
       </div>
 
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Módulos (visibilidade por empresa)</div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              OKRs é o módulo primário. Os demais podem ser ocultados conforme a estratégia da empresa.
-            </p>
-          </div>
-          <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
-            <BarChart3 className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
-          </div>
-        </div>
+      {/* ESTRATÉGIA */}
+      <ModuleSection
+        icon={<Target className="h-6 w-6 text-[color:var(--sinaxys-primary)]" />}
+        title="Estratégia"
+        description="Definição de direção, objetivos e resultados-chave da empresa."
+      >
+        <ModuleToggle
+          icon={<Target className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="OKRs (primário)"
+          description="Módulo primário e essencial. Define direção estratégica, objetivos, resultados-chave e conecta toda a execução da empresa."
+          checked={okrEnabled}
+          locked
+          onChange={() => null}
+        />
 
-        <Separator className="my-5" />
+        <ModuleToggle
+          icon={<Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="ROI dentro de OKR"
+          description="Controle de impacto financeiro. Calcule e acompanhe o retorno sobre investimentos de objetivos e tarefas específicas."
+          checked={okrRoiEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "OKR_ROI", v);
+            await refetchOkrRoi();
+            toast({ title: v ? "ROI ativado" : "ROI ocultado", description: "As telas de OKR serão atualizadas automaticamente." });
+          }}
+        />
+      </ModuleSection>
 
-        <div className="grid gap-3">
-          <ModuleToggle
-            icon={<Target className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-            title="OKRs (primário)"
-            description="Foco e execução: ciclos, objetivos, KRs, entregáveis e tarefas."
-            checked={okrEnabled}
-            locked
-            onChange={() => null}
-          />
+      {/* EXECUÇÃO */}
+      <ModuleSection
+        icon={<CalendarClock className="h-6 w-6 text-[color:var(--sinaxys-primary)]" />}
+        title="Execução"
+        description="Gestão operacional de projetos e tarefas."
+      >
+        <ModuleToggle
+          icon={<CalendarClock className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="Gestão de Projetos"
+          description="Gestão operacional de projetos e tarefas. Acompanhe entregáveis, dependências e progresso das iniciativas."
+          checked={projectsEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "PROJECTS", v);
+            await refetchProjects();
+            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
+      </ModuleSection>
 
-          <ModuleToggle
-            icon={<Handshake className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-            title="PDI & Performance"
-            description="Check-ins, 1:1, feedback contínuo e histórico profissional."
-            checked={pdiEnabled}
-            onChange={async (v) => {
-              if (!companyId) return;
-              await setCompanyModuleEnabled(companyId, "PDI_PERFORMANCE", v);
-              await refetchPdi();
-              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
-            }}
-          />
+      {/* EVOLUÇÃO */}
+      <ModuleSection
+        icon={<GraduationCap className="h-6 w-6 text-[color:var(--sinaxys-primary)]" />}
+        title="Evolução"
+        description="Desenvolvimento do time, conhecimento e engajamento."
+      >
+        <ModuleToggle
+          icon={<Handshake className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="PDI & Performance"
+          description="Cultura de feedback contínuo. Check-ins, 1:1, histórico profissional e acompanhamento de evolução das pessoas."
+          checked={pdiEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "PDI_PERFORMANCE", v);
+            await refetchPdi();
+            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
 
-          <ModuleToggle
-            icon={<GraduationCap className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-            title="Trilhas de Conhecimento"
-            description="Onboarding e aprendizagem contínua em sequência (conteúdo, checkpoints e quiz)."
-            checked={tracksEnabled}
-            onChange={async (v) => {
-              if (!companyId) return;
-              await setCompanyModuleEnabled(companyId, "TRACKS", v);
-              await refetchTracks();
-              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
-            }}
-          />
+        <ModuleToggle
+          icon={<GraduationCap className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="Trilhas de Conhecimento"
+          description="Estruturação de conhecimento e onboarding. Crie trilhas sequenciais com vídeos, checkpoints e quiz para evolução do time."
+          checked={tracksEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "TRACKS", v);
+            await refetchTracks();
+            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
 
-          <ModuleToggle
-            icon={<CalendarClock className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-            title="Gestão de Projetos"
-            description="Gerencie projetos, tarefas e acompanhe o progresso operacional da empresa."
-            checked={projectsEnabled}
-            onChange={async (v) => {
-              if (!companyId) return;
-              await setCompanyModuleEnabled(companyId, "PROJECTS", v);
-              await refetchProjects();
-              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
-            }}
-          />
+        <ModuleToggle
+          icon={<Trophy className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="Points"
+          description="Sistema de reconhecimento e engajamento. Ranking, prêmios e gamificação para motivar e celebrar conquistas da equipe."
+          checked={pointsEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "POINTS", v);
+            await refetchPoints();
+            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
+      </ModuleSection>
 
-          <ModuleToggle
-            icon={<Trophy className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-            title="Points"
-            description="Reconhecimento: ranking, regras, prêmios e recompensas."
-            checked={pointsEnabled}
-            onChange={async (v) => {
-              if (!companyId) return;
-              await setCompanyModuleEnabled(companyId, "POINTS", v);
-              await refetchPoints();
-              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
-            }}
-          />
+      {/* EMPRESA */}
+      <ModuleSection
+        icon={<Building2 className="h-6 w-6 text-[color:var(--sinaxys-primary)]" />}
+        title="Empresa"
+        description="Estrutura organizacional, finanças e comunicação interna."
+      >
+        <ModuleToggle
+          icon={<Network className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="Organograma"
+          description="Estrutura organizacional e contexto. Visualize hierarquia, reporting lines e informações das pessoas da empresa."
+          checked={orgEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "ORG", v);
+            await refetchOrg();
+            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
 
-          <ModuleToggle
-            icon={<Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-            title="Custos e Despesas"
-            description="Custos mensais por pessoa para apoiar decisões e (opcionalmente) cálculos de ROI."
-            checked={costsEnabled}
-            onChange={async (v) => {
-              if (!companyId) return;
-              await setCompanyModuleEnabled(companyId, "COSTS", v);
-              await refetchCosts();
-              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
-            }}
-          />
+        <ModuleToggle
+          icon={<Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="Custos e Despesas"
+          description="Gestão financeira por pessoa e projeto. Apoie decisões estratégicas com dados de custo e, opcionalmente, cálculo de ROI."
+          checked={costsEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "COSTS", v);
+            await refetchCosts();
+            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
 
-          <ModuleToggle
-            icon={<Network className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-            title="Organograma"
-            description="Organograma e contexto da organização (pessoas e reporting lines)."
-            checked={orgEnabled}
-            onChange={async (v) => {
-              if (!companyId) return;
-              await setCompanyModuleEnabled(companyId, "ORG", v);
-              await refetchOrg();
-              toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
-            }}
-          />
-
-          <ModuleToggle
-            icon={<Target className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-            title="ROI dentro de OKR (opcional)"
-            description="Habilita a seção de impacto financeiro e ROI em objetivos/tarefas."
-            checked={okrRoiEnabled}
-            onChange={async (v) => {
-              if (!companyId) return;
-              await setCompanyModuleEnabled(companyId, "OKR_ROI", v);
-              await refetchOkrRoi();
-              toast({ title: v ? "ROI ativado" : "ROI ocultado", description: "As telas de OKR serão atualizadas automaticamente." });
-            }}
-          />
-        </div>
-      </Card>
-
-      <div className="grid gap-4">
-        <InternalCommunicationModuleCard />
-      </div>
+        <ModuleToggle
+          icon={<Megaphone className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="Recados"
+          description="Mural de comunicados internos. Publique avisos corporativos ou de time para manter todos alinhados e informados."
+          checked={internalCommEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "INTERNAL_COMMUNICATION", v);
+            await refetchInternalComm();
+            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
+      </ModuleSection>
     </div>
   );
 }
