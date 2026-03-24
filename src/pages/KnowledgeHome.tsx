@@ -1,5 +1,5 @@
-import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { Link, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { BookOpen, Plus, Search, Star, Clock, Folder, GraduationCap } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,13 +16,24 @@ import {
   type DbKnowledgeSpace,
   type DbKnowledgePage,
 } from "@/lib/knowledgeDb";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { listDepartments } from "@/lib/departmentsDb";
+import { COMPANY_WIDE_DEPARTMENT_NAME, getOrCreateCompanyWideDepartment } from "@/lib/companyWideDepartment";
+import { createTrack } from "@/lib/journeyDb";
 
 export default function KnowledgeHome() {
   const { user } = useAuth();
   const { companyId } = useCompany();
   const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const { toast } = useToast();
 
   if (!user) return null;
 
@@ -57,6 +68,58 @@ export default function KnowledgeHome() {
     page.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Departments for creating tracks
+  const { data: companyWideDept } = useQuery({
+    queryKey: ["company-wide-dept", companyId],
+    queryFn: () => getOrCreateCompanyWideDepartment(companyId ?? ""),
+    enabled: hasCompany,
+  });
+
+  const { data: departmentsRaw = [] } = useQuery({
+    queryKey: ["departments", companyId],
+    queryFn: () => listDepartments(companyId ?? ""),
+    enabled: hasCompany,
+  });
+
+  const departments = (companyWideDept ? [companyWideDept, ...departmentsRaw.filter(d => d.id !== companyWideDept.id)] : departmentsRaw) as any[];
+
+  // Create modal state
+  const [openCreate, setOpenCreate] = useState(false);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [departmentId, setDepartmentId] = useState<string>("");
+
+  useEffect(() => {
+    if (!openCreate) return;
+    if (!departmentId && companyWideDept?.id) setDepartmentId(companyWideDept.id);
+  }, [openCreate, companyWideDept?.id, departmentId]);
+
+  const createMutation = useMutation({
+    mutationFn: () =>
+      createTrack({
+        companyId: companyId ?? "",
+        departmentId,
+        title,
+        description,
+        createdByUserId: user.id,
+      }),
+    onSuccess: async (t) => {
+      await qc.invalidateQueries({ queryKey: ["tracks", companyId] });
+      setOpenCreate(false);
+      setTitle("");
+      setDescription("");
+      setDepartmentId("");
+      navigate(`/admin/tracks/${t.id}/edit`);
+    },
+    onError: (e) => {
+      toast({
+        title: "Não foi possível criar",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    },
+  });
+
   if (!hasCompany) {
     return (
       <div className="grid gap-6">
@@ -70,13 +133,10 @@ export default function KnowledgeHome() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[color:var(--sinaxys-ink)]">
-            Base de Conhecimento
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Documente, organize e compartilhe conhecimento da sua empresa
-          </p>
+          <h1 className="text-3xl font-bold text-[color:var(--sinaxys-ink)]">Base de Conhecimento</h1>
+          <p className="text-muted-foreground mt-1">Documente, organize e compartilhe conhecimento da sua empresa</p>
         </div>
+
         <div className="flex gap-2">
           <Button asChild className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
             <Link to="/knowledge/new-space">
@@ -85,15 +145,72 @@ export default function KnowledgeHome() {
             </Link>
           </Button>
 
-          {/* Button to open "Montar trilha de conhecimento" (Admin Tracks). Visible only to ADMIN and HEAD */}
+          {/* Button to open "Montar trilha de conhecimento" modal. Visible only to ADMIN and HEAD */}
           {(user.role === "ADMIN" || user.role === "HEAD") && (
-            <Link to="/admin/tracks" className="h-11 rounded-xl border px-4 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]/70 inline-flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setOpenCreate(true)}
+              className="h-11 rounded-xl border px-4 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]/70 inline-flex items-center gap-2"
+            >
               <GraduationCap className="h-4 w-4" />
               Montar Trilha de Conhecimento
-            </Link>
+            </button>
           )}
         </div>
       </div>
+
+      {/* Create Track Dialog */}
+      <Dialog open={openCreate} onOpenChange={setOpenCreate}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Criar trilha</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div className="grid gap-2">
+              <Label>Departamento</Label>
+              <Select value={departmentId} onValueChange={setDepartmentId}>
+                <SelectTrigger className="h-11 rounded-xl">
+                  <SelectValue placeholder={COMPANY_WIDE_DEPARTMENT_NAME} />
+                </SelectTrigger>
+                <SelectContent>
+                  {departments.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-muted-foreground">Dica: selecione "{COMPANY_WIDE_DEPARTMENT_NAME}" para criar para a empresa toda.</div>
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} className="h-11 rounded-xl" placeholder="Ex.: Onboarding — Comercial" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Descrição</Label>
+              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-28 rounded-2xl" placeholder="(opcional)" />
+            </div>
+
+            <div className="text-xs text-muted-foreground">Depois de criar, você poderá adicionar módulos (vídeo, material, checkpoint e quiz).</div>
+          </div>
+
+          <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+            <Button variant="outline" className="rounded-xl" onClick={() => setOpenCreate(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={!departmentId || !title.trim() || createMutation.isPending}
+              onClick={() => createMutation.mutate()}
+            >
+              Criar e editar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Search */}
       <div className="relative">
@@ -121,14 +238,10 @@ export default function KnowledgeHome() {
                 <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6 hover:shadow-lg hover:border-[color:var(--sinaxys-primary)]/30 transition-all cursor-pointer h-full">
                   <div className="flex items-start justify-between mb-3">
                     <div className="text-4xl">{space.icon}</div>
-                    <Badge variant="outline" className="rounded-full text-xs">
-                      {countPagesInSpace(space.id, allPages)} páginas
-                    </Badge>
+                    <Badge variant="outline" className="rounded-full text-xs">{countPagesInSpace(space.id, allPages)} páginas</Badge>
                   </div>
                   <h3 className="font-bold text-[color:var(--sinaxys-ink)] mb-2">{space.name}</h3>
-                  {space.description && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">{space.description}</p>
-                  )}
+                  {space.description && <p className="text-sm text-muted-foreground line-clamp-2">{space.description}</p>}
                 </Card>
               </Link>
             ))}
@@ -137,9 +250,7 @@ export default function KnowledgeHome() {
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-8 text-center">
             <Folder className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="font-bold text-[color:var(--sinaxys-ink)] mb-2">Nenhum espaço encontrado</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              {searchQuery ? "Tente uma busca diferente" : "Crie seu primeiro espaço para começar"}
-            </p>
+            <p className="text-sm text-muted-foreground mb-4">{searchQuery ? "Tente uma busca diferente" : "Crie seu primeiro espaço para começar"}</p>
             {!searchQuery && (
               <Button asChild className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white">
                 <Link to="/knowledge/new-space">
@@ -169,9 +280,7 @@ export default function KnowledgeHome() {
                     <div className="text-2xl shrink-0">{page.icon}</div>
                     <div className="min-w-0 flex-1">
                       <h3 className="font-semibold text-[color:var(--sinaxys-ink)] truncate">{page.title}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Atualizado {new Date(page.updated_at || "").toLocaleDateString('pt-BR')}
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Atualizado {new Date(page.updated_at || "").toLocaleDateString('pt-BR')}</p>
                     </div>
                   </div>
                 </Card>
@@ -198,9 +307,7 @@ export default function KnowledgeHome() {
                     <div className="text-2xl shrink-0">{page.icon}</div>
                     <div className="min-w-0 flex-1">
                       <h3 className="font-semibold text-[color:var(--sinaxys-ink)] truncate">{page.title}</h3>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Atualizado {new Date(page.updated_at || "").toLocaleDateString('pt-BR')}
-                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">Atualizado {new Date(page.updated_at || "").toLocaleDateString('pt-BR')}</p>
                     </div>
                     <Star className="h-4 w-4 text-amber-500 shrink-0 fill-amber-500" />
                   </div>
@@ -215,12 +322,8 @@ export default function KnowledgeHome() {
       {spaces.length === 0 && !searchQuery && (
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-12 text-center">
           <BookOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-[color:var(--sinaxys-ink)] mb-2">
-            Comece sua Base de Conhecimento
-          </h2>
-          <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-            Crie espaços para organizar sua documentação e adicione páginas para compartilhar conhecimento com sua equipe.
-          </p>
+          <h2 className="text-2xl font-bold text-[color:var(--sinaxys-ink)] mb-2">Comece sua Base de Conhecimento</h2>
+          <p className="text-muted-foreground mb-6 max-w-md mx-auto">Crie espaços para organizar sua documentação e adicione páginas para compartilhar conhecimento com sua equipe.</p>
           <Button asChild className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
             <Link to="/knowledge/new-space">
               <Plus className="mr-2 h-4 w-4" />

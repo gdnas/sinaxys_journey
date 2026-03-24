@@ -885,7 +885,7 @@ export async function getAssetWithDetails(id: string): Promise<AssetWithDetails 
     .from("asset_assignments")
     .select(`
       ${ASSIGNMENTS_BASE_SELECT},
-      profile:profiles(id,name,email),
+      profile:profiles(id,name,email,job_title,department_id),
       contractor_company:contractor_companies(${CONTRACTOR_COMPANIES_BASE_SELECT})
     `)
     .eq("asset_id", id)
