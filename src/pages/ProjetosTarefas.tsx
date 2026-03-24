@@ -112,22 +112,6 @@ export default function ProjetosTarefas() {
         </div>
       </Card>
 
-      {/* Placeholder Info */}
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-amber-50 dark:bg-amber-950/20 p-6">
-        <div className="flex gap-4">
-          <div className="h-10 w-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
-            <CheckSquare className="h-5 w-5 text-amber-600 dark:text-amber-400" />
-          </div>
-          <div className="flex-1">
-            <h4 className="font-semibold text-[color:var(--sinaxys-ink)]">
-              Fase 1 - Módulo em desenvolvimento
-            </h4>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Esta é uma página placeholder. A funcionalidade de criação e gerenciamento de tarefas será implementada nas próximas fases.
-            </p>
-          </div>
-        </div>
-      </Card>
     </div>
   );
 }
