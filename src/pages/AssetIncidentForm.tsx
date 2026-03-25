@@ -2,15 +2,21 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, X, AlertTriangle } from "lucide-react";
 import { useCompany } from "@/lib/company";
-import { getAsset, getAssetWithDetails, createIncident } from "@/lib/assetsDb";
+import { getAsset, createIncident } from "@/lib/assetsDb";
 import { RequireAuth } from "@/components/RequireAuth";
 import { RequireCompanyModule } from "@/components/RequireCompanyModule";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AssetIncidentForm() {
@@ -19,7 +25,6 @@ export default function AssetIncidentForm() {
   const { companyId } = useCompany();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [asset, setAsset] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     incident_type: "damage",
@@ -28,22 +33,25 @@ export default function AssetIncidentForm() {
     police_report_url: "",
     resolution_status: "in_analysis",
     resolution_notes: "",
+    final_decision_amount: "",
   });
 
   useEffect(() => {
-    async function loadAsset() {
+    async function loadData() {
       if (!assetId) return;
 
       try {
-        const data = await getAssetWithDetails(assetId);
-        setAsset(data);
+        const asset = await getAsset(assetId);
+        setAsset(asset);
       } catch (error) {
         console.error("Error loading asset:", error);
       }
     }
 
-    loadAsset();
+    loadData();
   }, [assetId]);
+
+  const [asset, setAsset] = useState<any>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -57,14 +65,15 @@ export default function AssetIncidentForm() {
       await createIncident({
         tenant_id: companyId!,
         asset_id: assetId!,
-        assignment_id: asset?.current_assignment?.id,
         incident_type: formData.incident_type as any,
         description: formData.description,
         incident_date: formData.incident_date,
         residual_value_at_incident: asset?.residual_value_current || 0,
-        police_report_url: formData.police_report_url || undefined,
+        police_report_url: formData.police_report_url || null,
+        other_document_urls: [],
         resolution_status: formData.resolution_status as any,
-        resolution_notes: formData.resolution_notes || undefined,
+        resolution_notes: formData.resolution_notes || null,
+        final_decision_amount: formData.final_decision_amount ? parseFloat(formData.final_decision_amount) : null,
       });
 
       toast({ title: "Ocorrência registrada com sucesso" });
@@ -98,11 +107,14 @@ export default function AssetIncidentForm() {
             </div>
           </div>
 
-          <Card className="rounded-3xl border-red-200 bg-red-50 p-4">
+          <Card className="rounded-3xl border-red-200 bg-red-50 p-6">
             <div className="flex items-start gap-3">
               <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
-              <div className="text-sm text-red-800">
-                Você está registrando uma ocorrência para este ativo. Certifique-se de ter todas as informações necessárias, incluindo boletim de ocorrência se for o caso.
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-red-800">Registro de Ocorrência</div>
+                <p className="mt-1 text-sm text-red-800">
+                  Você está registrando uma ocorrência para este ativo. Certifique-se de ter todas as informações necessárias, incluindo boletim de ocorrência se for o caso.
+                </p>
               </div>
             </div>
           </Card>
@@ -134,30 +146,34 @@ export default function AssetIncidentForm() {
                     className="rounded-2xl"
                   />
                 </div>
+              </div>
 
+              <div className="grid gap-4">
+                <div className="grid gap-2 md:grid-cols-2">
+                  <Label className="md:col-span-2">Descrição *</Label>
+                </div>
+                <Textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Descreva detalhadamente o que aconteceu..."
+                  className="rounded-2xl min-h-24 md:col-span-2"
+                  required
+                />
+              </div>
+
+              {(formData.incident_type === "theft" || formData.incident_type === "robbery") && (
                 <div className="grid gap-2">
-                  <Label>Descrição *</Label>
-                  <Textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Descreva detalhadamente o que aconteceu..."
-                    className="rounded-2xl min-h-24"
-                    required
+                  <Label>Boletim de ocorrência (URL)</Label>
+                  <Input
+                    value={formData.police_report_url}
+                    onChange={(e) => setFormData({ ...formData, police_report_url: e.target.value })}
+                    placeholder="https://..."
+                    className="rounded-2xl"
                   />
                 </div>
+              )}
 
-                {(formData.incident_type === "theft" || formData.incident_type === "robbery") && (
-                  <div className="grid gap-2">
-                    <Label>Boletim de ocorrência (URL)</Label>
-                    <Input
-                      value={formData.police_report_url}
-                      onChange={(e) => setFormData({ ...formData, police_report_url: e.target.value })}
-                      placeholder="https://..."
-                      className="rounded-2xl"
-                    />
-                  </div>
-                )}
-
+              <div className="grid gap-4">
                 <div className="grid gap-2">
                   <Label>Status da resolução</Label>
                   <Select value={formData.resolution_status} onValueChange={(v) => setFormData({ ...formData, resolution_status: v })}>
@@ -173,10 +189,24 @@ export default function AssetIncidentForm() {
                   </Select>
                 </div>
 
+                {formData.resolution_status === "charged" && (
+                  <div className="grid gap-2">
+                    <Label>Valor final (R$)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={formData.final_decision_amount}
+                      onChange={(e) => setFormData({ ...formData, final_decision_amount: e.target.value })}
+                      placeholder="0,00"
+                      className="rounded-2xl"
+                    />
+                  </div>
+                )}
+
                 <div className="grid gap-2">
                   <Label>Notas de resolução</Label>
                   <Textarea
-                    value={formData.resolution_notes}
+                    value={formData.resolution_notes || ""}
                     onChange={(e) => setFormData({ ...formData, resolution_notes: e.target.value })}
                     placeholder="Detalhes sobre a resolução da ocorrência..."
                     className="rounded-2xl min-h-24"
@@ -185,11 +215,16 @@ export default function AssetIncidentForm() {
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-[color:var(--sinaxys-border)]">
-                <Button type="button" variant="outline" className="rounded-2xl" onClick={() => navigate(-1)}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="rounded-2xl"
+                  onClick={() => navigate(-1)}
+                >
                   <X className="mr-2 h-4 w-4" />
                   Cancelar
                 </Button>
-                <Button type="submit" className="rounded-2xl bg-[color:var(--sinaxys-primary)] text-white" disabled={loading}>
+                <Button type="submit" className="rounded-2xl bg-red-600 text-white hover:bg-red-700" disabled={loading}>
                   <Save className="mr-2 h-4 w-4" />
                   {loading ? "Salvando..." : "Registrar ocorrência"}
                 </Button>

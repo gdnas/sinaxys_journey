@@ -1,24 +1,13 @@
-/**
- * Gestão de Ativos - Database Types and Interfaces
- *
- * Este arquivo define os tipos TypeScript para as tabelas do banco de dados
- * do módulo de controle patrimonial (Ativos).
- *
- * O módulo permite controle completo do ciclo de vida de equipamentos
- * disponibilizados a colaboradores PJ, incluindo:
- * - Cadastro de ativos
- * - Cessão (comodato, onerosa, com opção de aquisição)
- * - Devolução
- * - Ocorrências (dano, perda, furto, roubo)
- * - Depreciação e valor residual
- * - Histórico auditável
- */
+// BACKUP do assetsDb.ts original
+// Se algo der errado, este arquivo contém o código antes da implementação
+
+import { supabase } from "@/integrations/supabase/client";
 
 // =====================
 // IMPORTS
 // =====================
 
-import { supabase } from "@/integrations/supabase/client";
+import type { TemplateType } from "@/lib/templateWorkflowDb";
 
 // =====================
 // ENUMS
@@ -35,7 +24,7 @@ export type AssetCategory =
   | "vehicles"           // Veículos
   | "tools"              // Ferramentas
   | "licenses"           // Licenças de software
-  | "other";            // Outros
+  | "other";            // Outros;
 
 /**
  * Status do ativo
@@ -49,10 +38,10 @@ export type AssetStatus =
   | "in_maintenance"     // Em manutenção
   | "acquired_by_user"   // Adquirido pelo colaborador
   | "lost"               // Extraviado
-  | "discarded";         // Descartado
+  | "discarded";         // Descartado;
 
 /**
- * Método de depreciação
+ * Método de de depreciação
  */
 export type DepreciationMethod =
   | "linear"             // Linear (proporcional ao tempo)
@@ -82,8 +71,8 @@ export type AssignmentModality =
  */
 export type AssignmentStatus =
   | "active"             // Ativa
-  | "completed"          // Completada (devolvida ou adquirida)
-  | "cancelled";         // Cancelada
+  | "completed"          // Completada
+  | "cancelled";          // Cancelada
 
 /**
  * Tipo de evento de ativo
@@ -116,7 +105,7 @@ export type IncidentResolutionStatus =
   | "in_analysis"        // Em análise
   | "charged"            // Cobrado
   | "waived"             // Abonado
-  | "resolved";          // Resolvido
+  | "resolved";           // Resolvido
 
 /**
  * Tipo de documento de ativo
@@ -126,11 +115,11 @@ export type AssetDocumentType =
   | "warranty"           // Garantia
   | "manual"             // Manual
   | "photo"              // Foto
-  | "contract"           // Contrato/termo
-  | "return_receipt"     // Recibo de devolução
+  | "contract"            // Contrato/termo
+  | "return_receipt"      // Recibo de devolução
   | "incident_report"     // Laudo de ocorrência
   | "acquisition_document" // Documento de aquisição
-  | "other";             // Outro
+  | "other";             // Outro;
 
 // =====================
 // DATABASE ROWS
@@ -162,24 +151,36 @@ export interface DbContractorCompany {
 export interface DbAsset {
   id: string;
   tenant_id: string;
+  
+  // Identificação
   asset_code: string;
-  category: string;
+  category: AssetCategory;
   asset_type: string;
   brand: string | null;
   model: string | null;
   serial_number: string | null;
-  condition_initial: string;
-  purchase_date: string;
-  purchase_value: number;
+  
+  // Estado inicial
+  condition_initial: AssetCondition;
+  
+  // Dados financeiros
+  purchase_date: string; // DATE
+  purchase_value: number; // NUMERIC(15, 2)
   supplier: string | null;
-  useful_life_months: number;
-  depreciation_method: string;
-  monthly_depreciation_value: number | null;
-  residual_value_current: number;
-  accumulated_depreciation: number;
-  status: string;
+  
+  // Depreciação
+  useful_life_months: number; // INTEGER
+  depreciation_method: DepreciationMethod;
+  monthly_depreciation_value: number | null; // NUMERIC(15, 2) - GENERATED
+  residual_value_current: number; // NUMERIC(15, 2)
+  accumulated_depreciation: number; // NUMERIC(15, 2)
+  
+  // Status e localização
+  status: AssetStatus;
   current_location: string | null;
   notes: string | null;
+  
+  // Auditoria
   created_at: string;
   updated_at: string;
 }
@@ -190,22 +191,40 @@ export interface DbAsset {
 export interface DbAssetAssignment {
   id: string;
   tenant_id: string;
+  
+  // Vínculo com ativo
   asset_id: string;
+  
+  // Vínculo com colaborador
   profile_id: string;
+  
+  // Empresa PJ (opcional - para colaboradores PJ)
   contractor_company_id: string | null;
-  modality: string;
-  monthly_amount: number | null;
-  assigned_at: string;
+  
+  // Modalidade e valores
+  modality: AssignmentModality;
+  monthly_amount: number | null; // NUMERIC(15, 2)
+  
+  // Período
+  assigned_at: string; // DATE
   expected_until_contract_end: boolean;
-  expected_return_date: string | null;
+  expected_return_date: string | null; // DATE
+  
+  // Documento
   signed_document_url: string | null;
-  status: string;
-  returned_at: string | null;
-  return_condition: string | null;
+  
+  // Status
+  status: AssignmentStatus;
+  returned_at: string | null; // DATE
+  return_condition: AssetCondition | null;
   return_notes: string | null;
-  acquired_at: string | null;
-  acquired_value: number | null;
+  
+  // Aquisição pelo colaborador (se aplicável)
+  acquired_at: string | null; // DATE
+  acquired_value: number | null; // NUMERIC(15, 2)
   acquisition_document_url: string | null;
+  
+  // Auditoria
   created_at: string;
   updated_at: string;
 }
@@ -216,14 +235,28 @@ export interface DbAssetAssignment {
 export interface DbAssetEvent {
   id: string;
   tenant_id: string;
+  
+  // Vínculos
   asset_id: string;
   assignment_id: string | null;
-  event_type: string;
+  
+  // Tipo de evento
+  event_type: AssetEventType;
+  
+  // Descrição
   title: string | null;
   description: string | null;
-  metadata: any;
+  
+  // Metadados (JSON flexível para detalhes específicos)
+  metadata: any; // JSONB
+  
+  // Quem realizou a ação
   actor_user_id: string | null;
+  
+  // Quando ocorreu
   event_date: string;
+  
+  // Auditoria
   created_at: string;
 }
 
@@ -233,17 +266,31 @@ export interface DbAssetEvent {
 export interface DbAssetIncident {
   id: string;
   tenant_id: string;
+  
+  // Vínculos
   asset_id: string;
   assignment_id: string | null;
-  incident_type: string;
+  
+  // Tipo e descrição
+  incident_type: IncidentType;
   description: string;
-  incident_date: string;
-  residual_value_at_incident: number;
+  
+  // Data do incidente
+  incident_date: string; // DATE
+  
+  // Valor residual na data
+  residual_value_at_incident: number; // NUMERIC(15, 2)
+  
+  // Documentos
   police_report_url: string | null;
-  other_document_urls: any;
-  resolution_status: string;
+  other_document_urls: any; // JSONB array
+  
+  // Resolução
+  resolution_status: IncidentResolutionStatus;
   resolution_notes: string | null;
-  final_decision_amount: number | null;
+  final_decision_amount: number | null; // NUMERIC(15, 2)
+  
+  // Auditoria
   created_at: string;
   updated_at: string;
 }
@@ -254,16 +301,24 @@ export interface DbAssetIncident {
 export interface DbAssetDocument {
   id: string;
   tenant_id: string;
+  
+  // Vínculos
   asset_id: string;
   assignment_id: string | null;
   incident_id: string | null;
-  document_type: string;
+  
+  // Tipo e arquivo
+  document_type: AssetDocumentType;
   title: string;
   file_url: string;
   file_name: string | null;
   file_size_bytes: number | null;
   mime_type: string | null;
+  
+  // Upload por
   uploaded_by: string | null;
+  
+  // Auditoria
   created_at: string;
 }
 
@@ -278,7 +333,7 @@ export interface CreateContractorCompanyInput {
   tenant_id: string;
   cnpj: string;
   legal_name: string;
-  trade_name?: string;
+  trade_name: string;
   email?: string;
   phone?: string;
   address?: string;
@@ -438,10 +493,17 @@ export interface CreateAssetDocumentInput {
 // =====================
 
 /**
- * Ativo com dados expandidos (cálculo manual das relações)
+ * Ativo com dados expandidos
  */
 export interface AssetWithDetails extends DbAsset {
-  current_assignment?: AssignmentWithDetails;
+  current_assignment?: DbAssetAssignment & {
+    profile: {
+      id: string;
+      name: string;
+      email: string;
+    };
+    contractor_company?: DbContractorCompany;
+  };
   documents?: DbAssetDocument[];
   events?: DbAssetEvent[];
   incidents?: DbAssetIncident[];
@@ -449,71 +511,36 @@ export interface AssetWithDetails extends DbAsset {
 }
 
 /**
- * Cessão com dados expandidos (incluindo ativo e empresa PJ)
+ * Cessão com dados expandidos
  */
 export interface AssignmentWithDetails extends DbAssetAssignment {
-  // Dados expandidos do ativo
-  asset_code: string;
-  asset_type: string;
-  brand: string | null;
-  model: string | null;
-  serial_number: string | null;
-  category: string;
-  purchase_date: string;
-  purchase_value: number;
-  useful_life_months: number;
-  depreciation_method: string;
-  monthly_depreciation_value: number | null;
-  residual_value_current: number;
-  accumulated_depreciation: number;
-  status: string;
-  current_location: string | null;
-  
-  // Dados do colaborador
+  asset: DbAsset;
   profile: {
     id: string;
     name: string;
-    email: string | null;
-    job_title: string | null;
-    department_id: string | null;
+    email: string;
   };
-  
-  // Dados da empresa PJ (se aplicável)
   contractor_company?: DbContractorCompany;
-  
-  // Documentos e ocorrências vinculados
   documents?: DbAssetDocument[];
   incidents?: DbAssetIncident[];
 }
 
 /**
- * Ocorrência com dados expandidos (incluindo ativo e cessão)
+ * Ocorrência com dados expandidos
  */
 export interface IncidentWithDetails extends DbAssetIncident {
-  // Dados do ativo
-  asset_code: string;
-  asset_type: string;
-  brand: string | null;
-  model: string | null;
-  serial_number: string | null;
-  category: string;
-  purchase_value: number;
-  residual_value_current: number;
-  
-  // Cessão vinculada
-  assignment?: AssignmentWithDetails;
-  
-  // Documentos vinculados
+  asset: DbAsset;
+  assignment?: DbAssetAssignment;
   documents?: DbAssetDocument[];
 }
 
 /**
- * Documento com dados expandidos (incluindo uploader)
+ * Documento com dados expandidos
  */
 export interface AssetDocumentWithDetails extends DbAssetDocument {
-  asset: AssetWithDetails;  // Simplificado - apenas código do ativo
-  assignment?: AssignmentWithDetails;
-  incident?: IncidentWithDetails;
+  asset: DbAsset;
+  assignment?: DbAssetAssignment;
+  incident?: DbAssetIncident;
   uploader?: {
     id: string;
     name: string;
@@ -612,10 +639,11 @@ export interface AssetsDashboardStats {
  * Alerta operacional
  */
 export interface OperationalAlert {
-  type: "contract_ended_with_assets" 
-       | "asset_without_document" 
-       | "incident_without_resolution"
-       | "asset_idle_long";
+  type:
+    | "contract_ended_with_assets_in_use" 
+    | "asset_without_document" 
+    | "incident_without_resolution"
+    | "asset_idle_long";
   asset_id: string;
   asset_code: string;
   message: string;
@@ -623,12 +651,8 @@ export interface OperationalAlert {
   details?: any;
 }
 
-// =====================
-// MISC TYPES
-// =====================
-
 /**
- * Resumo de depreciação
+ * Resumo de de depreciação
  */
 export interface DepreciationSummary {
   purchase_value: number;
@@ -663,9 +687,9 @@ const DOCUMENTS_BASE_SELECT =
 const EVENTS_BASE_SELECT = 
   "id,tenant_id,asset_id,assignment_id,event_type,title,description,metadata,actor_user_id,event_date,created_at";
 
-// =====================================================
+// =====================
 // CONTRACTOR COMPANIES
-// =====================================================
+// =====================
 
 export async function listContractorCompanies(tenantId: string) {
   const { data, error } = await supabase
@@ -782,23 +806,23 @@ export async function listAssets(tenantId: string, filters?: AssetFilters) {
   if (filters?.with_pending_return || filters?.profile_id) {
     const assetIds = assets.map(a => a.id);
     if (assetIds.length === 0) return [];
-    
+
     let assignmentsQuery = supabase
       .from("asset_assignments")
-      .select("asset_id,profile_id,status,expected_return_date")
+      .select("asset_id,profile_id,expected_return_date,signed_document_url")
       .in("asset_id", assetIds)
       .eq("status", "active");
-    
-    if (filters.profile_id) {
+
+    if (filters?.profile_id) {
       assignmentsQuery = assignmentsQuery.eq("profile_id", filters.profile_id);
     }
-    
+
     const { data: assignments } = await assignmentsQuery;
-    
+
     if (assignments && assignments.length > 0) {
       const activeAssetIds = new Set(assignments.map(a => a.asset_id));
-      
-      if (filters.with_pending_return) {
+
+      if (filters?.with_pending_return) {
         // Filtrar ativos com cessões ativas e data esperada expirada
         const pendingAssetIds = new Set(
           assignments
@@ -810,9 +834,6 @@ export async function listAssets(tenantId: string, filters?: AssetFilters) {
         // Filtrar ativos do perfil
         assets = assets.filter(a => activeAssetIds.has(a.id));
       }
-    } else if (filters.profile_id) {
-      // Nenhum assignment encontrado para o perfil
-      return [];
     }
   }
 
@@ -845,7 +866,7 @@ export async function getAssetWithDetails(id: string): Promise<AssetWithDetails 
     .from("asset_assignments")
     .select(`
       ${ASSIGNMENTS_BASE_SELECT},
-      profile:profiles(id,name,email,job_title,department_id),
+      profile:profiles(id,name,email),
       contractor_company:contractor_companies(${CONTRACTOR_COMPANIES_BASE_SELECT})
     `)
     .eq("asset_id", id)
@@ -941,7 +962,7 @@ export async function listAssignments(tenantId: string, filters?: AssignmentFilt
     .select(`
       ${ASSIGNMENTS_BASE_SELECT},
       asset:assets(${ASSETS_BASE_SELECT}),
-      profile:profiles(id,name,email,job_title,department_id),
+      profile:profiles(id,name,email),
       contractor_company:contractor_companies(${CONTRACTOR_COMPANIES_BASE_SELECT})
     `)
     .eq("tenant_id", tenantId);
@@ -971,14 +992,13 @@ export async function listAssignments(tenantId: string, filters?: AssignmentFilt
   const { data, error } = await query.order("assigned_at", { ascending: false });
 
   if (error) throw error;
-
   let assignments = (data ?? []) as AssignmentWithDetails[];
-  
+
   // Filtrar por devolução pendente (data esperada expirada)
   if (filters?.pending_return) {
     assignments = assignments.filter(
-      a => a.status === "active" 
-        && a.expected_return_date 
+      a => a.status === "active"
+        && a.expected_return_date
         && new Date(a.expected_return_date) < new Date()
     );
   }
@@ -992,7 +1012,7 @@ export async function getAssignment(id: string): Promise<AssignmentWithDetails |
     .select(`
       ${ASSIGNMENTS_BASE_SELECT},
       asset:assets(${ASSETS_BASE_SELECT}),
-      profile:profiles(id,name,email,job_title,department_id),
+      profile:profiles(id,name,email),
       contractor_company:contractor_companies(${CONTRACTOR_COMPANIES_BASE_SELECT})
     `)
     .eq("id", id)
@@ -1101,7 +1121,6 @@ export async function listIncidents(tenantId: string, filters?: IncidentFilters)
   const { data, error } = await query.order("incident_date", { ascending: false });
 
   if (error) throw error;
-
   let incidents = (data ?? []) as IncidentWithDetails[];
 
   // Filtrar por perfil (precisa buscar via assignments)

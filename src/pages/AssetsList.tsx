@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { Search, Plus, Filter, Box, MoreHorizontal, ArrowLeft } from "lucide-react";
 import { useCompany } from "@/lib/company";
@@ -11,19 +10,9 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Link } from "react-router-dom";
 
 type AssetStatus = "in_stock" | "reserved" | "in_use" | "in_return" | "returned" | "in_maintenance" | "acquired_by_user" | "lost" | "discarded";
 type AssetCategory = "it_equipment" | "office_equipment" | "mobile_devices" | "furniture" | "vehicles" | "tools" | "licenses" | "other";
@@ -299,22 +288,6 @@ export default function AssetsList() {
   );
 }
 
-function AssetsListWrapper() {
-  return (
-    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-      <RequireCompanyModule moduleKey="ASSETS">
-        <AssetsList />
-      </RequireCompanyModule>
-    </RequireAuth>
-  );
-}
-
-export default AssetsListWrapper;
-
-// =====================
-// SUBCOMPONENTS
-// =====================
-
 function StatusBadge({ status }: { status: string }) {
   const statusColors: Record<string, string> = {
     in_stock: "bg-green-100 text-green-700 hover:bg-green-100",
@@ -334,3 +307,16 @@ function StatusBadge({ status }: { status: string }) {
     </Badge>
   );
 }
+
+// Wrapper com verificação de autenticação e módulo
+function AssetsListWrapper() {
+  return (
+    <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+      <RequireCompanyModule moduleKey="ASSETS">
+        <AssetsList />
+      </RequireCompanyModule>
+    </RequireAuth>
+  );
+}
+
+export default AssetsListWrapper;
