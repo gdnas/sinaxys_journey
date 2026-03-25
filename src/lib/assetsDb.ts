@@ -876,7 +876,7 @@ export async function getAssetWithDetails(id: string): Promise<AssetWithDetails 
 
   return {
     ...asset,
-    current_assignment: (assignments as AssignmentWithDetails | null) || undefined,
+    current_assignment: ((assignments as unknown) as AssignmentWithDetails | null) || undefined,
     documents: documents || [],
     events: events || [],
     incidents: incidents || [],
@@ -972,7 +972,7 @@ export async function listAssignments(tenantId: string, filters?: AssignmentFilt
 
   if (error) throw error;
 
-  let assignments = (data ?? []) as AssignmentWithDetails[];
+  let assignments = ((data ?? []) as unknown) as AssignmentWithDetails[];
   
   // Filtrar por devolução pendente (data esperada expirada)
   if (filters?.pending_return) {
@@ -999,7 +999,7 @@ export async function getAssignment(id: string): Promise<AssignmentWithDetails |
     .maybeSingle();
 
   if (error) throw error;
-  return (data ?? null) as AssignmentWithDetails | null;
+  return ((data ?? null) as unknown) as AssignmentWithDetails | null;
 }
 
 export async function createAssignment(input: CreateAssignmentInput) {
