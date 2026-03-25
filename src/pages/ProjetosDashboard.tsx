@@ -12,13 +12,13 @@ export default function ProjetosDashboard() {
       {/* Header */}
       <div className="flex flex-col gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-[color:var(--sinaxys-ink)]">
-            {t("nav.projects.group")}
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            Gerencie projetos, tarefas e acompanhe o progresso da sua equipe
-          </p>
-        </div>
+                  <h1 className="text-3xl font-bold text-[color:var(--sinaxys-ink)]">
+                    Projetos
+                  </h1>
+                  <p className="mt-2 text-muted-foreground">
+                    Gerencie projetos, tarefas e acompanhe o progresso da sua equipe
+                  </p>
+                </div>
       </div>
 
       {/* Breadcrumb */}
