@@ -189,32 +189,6 @@ const nav: NavItem[] = [
     ],
   },
 
-  // === ATIVOS ===
-  {
-    type: "group",
-    label: "Ativos",
-    icon: <Box className="h-4 w-4" />,
-    moduleKey: "ASSETS",
-    children: [
-      {
-        type: "link",
-        to: "/app/ativos",
-        label: "Dashboard",
-        icon: <LayoutDashboard className="h-4 w-4" />,
-        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "ASSETS",
-      },
-      {
-        type: "link",
-        to: "/app/ativos/lista",
-        label: "Lista de Ativos",
-        icon: <CheckCircle2 className="h-4 w-4" />,
-        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "ASSETS",
-      },
-    ],
-  },
-
   // === EVOLUÇÃO ===
   {
     type: "group",
