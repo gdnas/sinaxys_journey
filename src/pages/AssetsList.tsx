@@ -49,5 +49,7 @@ function AssetsListWrapper() {
   );
 }
 
-// Default export para o módulo (importante wrapper)
+// Named exports
+export { AssetsList };
+// Default export for module (importante wrapper)
 export default AssetsListWrapper;

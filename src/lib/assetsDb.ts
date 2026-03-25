@@ -471,11 +471,8 @@ export interface AssignmentWithDetails extends DbAssetAssignment {
   monthly_depreciation_value: number | null;
   residual_value_current: number;
   accumulated_depreciation: number;
-  status: AssetStatus;
   current_location: string | null;
   notes: string | null;
-  created_at: string;
-  updated_at: string;
   
   // Dados do perfil (vindo de query `profile:profiles(...)`)
   profile: {
@@ -560,7 +557,6 @@ export interface AssignmentExpanded extends DbAssetAssignment {
   monthly_depreciation_value: number | null;
   residual_value_current: number;
   accumulated_depreciation: number;
-  status: AssetStatus;
   current_location: string | null;
   notes: string | null;
   created_at: string;
