@@ -442,6 +442,8 @@ export interface AssetWithDetails extends DbAsset {
       id: string;
       name: string;
       email: string | null;
+      job_title: string | null;
+      department_id: string | null;
     };
     contractor_company?: DbContractorCompany;
   };
@@ -473,7 +475,7 @@ export interface AssignmentWithDetails extends DbAssetAssignment {
   accumulated_depreciation: number;
   current_location: string | null;
   notes: string | null;
-  
+
   // Dados do perfil (vindo de query `profile:profiles(...)`)
   profile: {
     id: string;
@@ -482,10 +484,10 @@ export interface AssignmentWithDetails extends DbAssetAssignment {
     job_title: string | null;
     department_id: string | null;
   };
-  
+
   // Dados da empresa PJ
   contractor_company?: DbContractorCompany;
-  
+
   // Documentos e ocorrências vinculados
   documents?: DbAssetDocument[];
   incidents?: DbAssetIncident[];
@@ -503,7 +505,7 @@ export interface IncidentWithDetails extends DbAssetIncident {
   category: AssetCategory;
   purchase_value: number;
   residual_value_current: number;
-  
+
   // Cessão vinculada
   assignment?: AssignmentWithDetails;
   documents?: DbAssetDocument[];
@@ -922,46 +924,53 @@ export async function getAssetWithDetails(id: string): Promise<AssetWithDetails 
   if (!asset) return null;
 
   // Buscar cessão ativa
-  const { data: assignments } = await supabase
-    .from("asset_assignments")
-    .select(`
-      ${ASSIGNMENTS_BASE_SELECT},
-      profile:profiles(id,name,email,job_title,department_id),
-      contractor_company:contractor_companies(${CONTRACTOR_COMPANIES_BASE_SELECT})
-    `)
-    .eq("asset_id", id)
-    .eq("status", "active")
-    .maybeSingle();
-
-  // Buscar documentos
-  const { data: documents } = await supabase
-    .from("asset_documents")
-    .select(DOCUMENTS_BASE_SELECT)
-    .eq("asset_id", id)
-    .order("created_at", { ascending: false });
-
-  // Buscar eventos
-  const { data: events } = await supabase
-    .from("asset_events")
-    .select(EVENTS_BASE_SELECT)
-    .eq("asset_id", id)
-    .order("event_date", { ascending: false })
-    .limit(50);
-
-  // Buscar ocorrências
-  const { data: incidents } = await supabase
-    .from("asset_incidents")
-    .select(INCIDENTS_BASE_SELECT)
-    .eq("asset_id", id)
-    .order("created_at", { ascending: false });
-
-  return {
-    ...asset,
-    current_assignment: assignments || undefined,
-    documents: documents || [],
-    events: events || [],
-    incidents: incidents || [],
-  };
+    const { data: assignments } = await supabase
+      .from("asset_assignments")
+      .select(`
+        ${ASSIGNMENTS_BASE_SELECT},
+        profile:profiles(id,name,email,job_title,department_id),
+        contractor_company:contractor_companies(${CONTRACTOR_COMPANIES_BASE_SELECT})
+      `)
+      .eq("asset_id", id)
+      .eq("status", "active")
+      .maybeSingle();
+  
+    // Buscar documentos
+    const { data: documents } = await supabase
+      .from("asset_documents")
+      .select(DOCUMENTS_BASE_SELECT)
+      .eq("asset_id", id)
+      .order("created_at", { ascending: false });
+  
+    // Buscar eventos
+    const { data: events } = await supabase
+      .from("asset_events")
+      .select(EVENTS_BASE_SELECT)
+      .eq("asset_id", id)
+      .order("event_date", { ascending: false })
+      .limit(50);
+  
+    // Buscar ocorrências
+    const { data: incidents } = await supabase
+      .from("asset_incidents")
+      .select(INCIDENTS_BASE_SELECT)
+      .eq("asset_id", id)
+      .order("created_at", { ascending: false });
+  
+    // Transformar assignments para extrair arrays
+    const transformedAssignment = assignments ? {
+      ...assignments,
+      profile: Array.isArray(assignments.profile) ? assignments.profile[0] : assignments.profile,
+      contractor_company: Array.isArray(assignments.contractor_company) ? assignments.contractor_company[0] : assignments.contractor_company,
+    } : undefined;
+  
+    return {
+      ...asset,
+      current_assignment: transformedAssignment,
+      documents: documents || [],
+      events: events || [],
+      incidents: incidents || [],
+    };
 }
 
 export async function createAsset(input: CreateAssetInput) {
@@ -1050,37 +1059,54 @@ export async function listAssignments(tenantId: string, filters?: AssignmentFilt
   }
 
   const { data, error } = await query.order("assigned_at", { ascending: false });
-
-  if (error) throw error;
   
-  let assignments = (data ?? []) as AssignmentWithDetails[];
+    if (error) throw error;
   
-  // Filtrar por devolução pendente (data esperada expirada)
-  if (filters?.pending_return) {
-    assignments = assignments.filter(
-      a => a.status === "active" 
-        && a.expected_return_date 
-        && new Date(a.expected_return_date) < new Date()
-    );
-  }
-
-  return assignments;
+    let assignments = (data ?? []) as any[];
+  
+    // Transformar arrays para objetos únicos
+    assignments = assignments.map(a => ({
+      ...a,
+      profile: Array.isArray(a.profile) ? a.profile[0] : a.profile,
+      contractor_company: Array.isArray(a.contractor_company) ? a.contractor_company[0] : a.contractor_company,
+    }));
+  
+    // Filtrar por devolução pendente (data esperada expirada)
+    if (filters?.pending_return) {
+      assignments = assignments.filter(
+        a => a.status === "active"
+          && a.expected_return_date
+          && new Date(a.expected_return_date) < new Date()
+      );
+    }
+  
+    return assignments as AssignmentWithDetails[];
 }
 
 export async function getAssignment(id: string): Promise<AssignmentWithDetails | null> {
   const { data, error } = await supabase
-    .from("asset_assignments")
-    .select(`
-      ${ASSIGNMENTS_BASE_SELECT},
-      asset:assets(${ASSETS_BASE_SELECT}),
-      profile:profiles(id,name,email,job_title,department_id),
-      contractor_company:contractor_companies(${CONTRACTOR_COMPANIES_BASE_SELECT})
-    `)
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) throw error;
-  return (data ?? null) as AssignmentWithDetails | null;
+      .from("asset_assignments")
+      .select(`
+        ${ASSIGNMENTS_BASE_SELECT},
+        asset:assets(${ASSETS_BASE_SELECT}),
+        profile:profiles(id,name,email,job_title,department_id),
+        contractor_company:contractor_companies(${CONTRACTOR_COMPANIES_BASE_SELECT})
+      `)
+      .eq("id", id)
+      .maybeSingle();
+  
+    if (error) throw error;
+  
+    if (!data) return null;
+  
+    // Transformar arrays para objetos únicos
+    const transformed: any = {
+      ...data,
+      profile: Array.isArray(data.profile) ? data.profile[0] : data.profile,
+      contractor_company: Array.isArray(data.contractor_company) ? data.contractor_company[0] : data.contractor_company,
+    };
+  
+    return transformed as AssignmentWithDetails | null;
 }
 
 export async function createAssignment(input: CreateAssignmentInput) {
@@ -1180,35 +1206,50 @@ export async function listIncidents(tenantId: string, filters?: IncidentFilters)
   }
 
   const { data, error } = await query.order("incident_date", { ascending: false });
-
-  if (error) throw error;
-
-  let incidents = (data ?? []) as IncidentWithDetails[];
-
-  // Filtrar por perfil (precisa buscar via assignments)
-  if (filters?.profile_id) {
-    const assignmentIds = incidents
-      .filter(i => i.assignment?.profile_id === filters.profile_id)
-      .map(i => i.assignment_id);
-    incidents = incidents.filter(i => assignmentIds.includes(i.assignment_id!));
-  }
-
-  return incidents;
+  
+    if (error) throw error;
+  
+    let incidents = (data ?? []) as any[];
+  
+    // Transformar arrays para objetos únicos
+    incidents = incidents.map(i => ({
+      ...i,
+      assignment: Array.isArray(i.assignment) ? i.assignment[0] : i.assignment,
+    }));
+  
+    // Filtrar por perfil (precisa buscar via assignments)
+    if (filters?.profile_id) {
+      const assignmentIds = incidents
+        .filter(i => i.assignment?.profile_id === filters.profile_id)
+        .map(i => i.assignment_id);
+      incidents = incidents.filter(i => assignmentIds.includes(i.assignment_id!));
+    }
+  
+    return incidents as IncidentWithDetails[];
 }
 
 export async function getIncident(id: string): Promise<IncidentWithDetails | null> {
   const { data, error } = await supabase
-    .from("asset_incidents")
-    .select(`
-      ${INCIDENTS_BASE_SELECT},
-      asset:assets(${ASSETS_BASE_SELECT}),
-      assignment:asset_assignments(${ASSIGNMENTS_BASE_SELECT})
-    `)
-    .eq("id", id)
-    .maybeSingle();
-
-  if (error) throw error;
-  return (data ?? null) as IncidentWithDetails | null;
+      .from("asset_incidents")
+      .select(`
+        ${INCIDENTS_BASE_SELECT},
+        asset:assets(${ASSETS_BASE_SELECT}),
+        assignment:asset_assignments(${ASSIGNMENTS_BASE_SELECT})
+      `)
+      .eq("id", id)
+      .maybeSingle();
+  
+    if (error) throw error;
+  
+    if (!data) return null;
+  
+    // Transformar arrays para objetos únicos
+    const transformed: any = {
+      ...data,
+      assignment: Array.isArray(data.assignment) ? data.assignment[0] : data.assignment,
+    };
+  
+    return transformed as IncidentWithDetails | null;
 }
 
 export async function createIncident(input: CreateIncidentInput) {
@@ -1373,14 +1414,14 @@ export async function listAssetEvents(assetId: string, limit: number = 50) {
 
 export async function getAssetsDashboardStats(tenantId: string): Promise<AssetsDashboardStats> {
   // Buscar todos os ativos do tenant
-  const { data: assets, error: assetsError } = await supabase
-    .from("assets")
-    .select("status,category,purchase_value,residual_value_current,purchase_date,created_at")
-    .eq("tenant_id", tenantId);
-
-  if (assetsError) throw assetsError;
-
-  const assetsData = assets || [];
+    const { data: assets, error: assetsError } = await supabase
+      .from("assets")
+      .select("id,status,category,purchase_value,residual_value_current,purchase_date,created_at")
+      .eq("tenant_id", tenantId);
+  
+    if (assetsError) throw assetsError;
+  
+    const assetsData = assets || [];
 
   // Calcular estatísticas básicas
   const stats: AssetsDashboardStats = {
