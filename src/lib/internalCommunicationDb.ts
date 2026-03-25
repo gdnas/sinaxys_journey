@@ -163,6 +163,13 @@ export async function publishAnnouncement(payload: {
   content: string;
   createdById: string;
 }): Promise<DbCompanyAnnouncement> {
+  // Basic validation to surface clearer errors when RLS blocks or missing data
+  if (!payload?.companyId) throw new Error("companyId is required to publish an announcement");
+  if (!payload?.createdById) throw new Error("createdById is required to publish an announcement");
+  if (!payload.title || !payload.title.trim()) throw new Error("title is required");
+  if (!payload.content || !payload.content.trim()) throw new Error("content is required");
+  if (payload.scope === "team" && !payload.teamId) throw new Error("teamId is required when scope is 'team'");
+
   const { data, error } = await supabase
     .from("company_announcements")
     .insert({
@@ -177,7 +184,12 @@ export async function publishAnnouncement(payload: {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // Attach PostgREST details if available
+    const errMsg = error?.message ? `${error.message}` : "Unknown error publishing announcement";
+    throw new Error(errMsg);
+  }
+
   return data as DbCompanyAnnouncement;
 }
 

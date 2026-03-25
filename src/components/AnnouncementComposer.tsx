@@ -119,6 +119,7 @@ export function AnnouncementComposer({
         description: error.message || "Não foi possível " + (editMode ? "atualizar" : "publicar") + " o recado.",
         variant: "destructive",
       });
+      console.error('[AnnouncementComposer] publish error', error);
     },
   });
 
