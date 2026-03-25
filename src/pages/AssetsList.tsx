@@ -38,6 +38,104 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+// Main AssetsList component
+function AssetsList() {
+  const { companyId } = useCompany();
+  const { user } = useAuth();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [assets, setAssets] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    loadAssets();
+  }, [companyId]);
+
+  async function loadAssets() {
+    if (!companyId) return;
+    try {
+      setLoading(true);
+      const filters: any = {};
+      if (statusFilter !== "all") filters.status = [statusFilter];
+      if (categoryFilter !== "all") filters.category = [categoryFilter];
+      if (searchTerm) filters.search = searchTerm;
+      
+      const data = await listAssets(companyId, filters);
+      setAssets(data);
+    } catch (error) {
+      console.error("Error loading assets:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="container mx-auto p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold">Gestão de Ativos</h1>
+        <Button>
+          <Plus className="mr-2 h-4 w-4" />
+          Novo Ativo
+        </Button>
+      </div>
+
+      <Card className="p-6">
+        <div className="flex gap-4 mb-6">
+          <Input
+            placeholder="Buscar ativos..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="max-w-sm"
+          />
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os status</SelectItem>
+              <SelectItem value="in_stock">Em estoque</SelectItem>
+              <SelectItem value="in_use">Em uso</SelectItem>
+              <SelectItem value="in_maintenance">Em manutenção</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as categorias</SelectItem>
+              <SelectItem value="it_equipment">Equipamento de TI</SelectItem>
+              <SelectItem value="office_equipment">Equipamento de escritório</SelectItem>
+              <SelectItem value="mobile_devices">Dispositivo móvel</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8">Carregando...</div>
+        ) : assets.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            Nenhum ativo encontrado
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {assets.map((asset) => (
+              <div key={asset.id} className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <div className="font-semibold">{asset.asset_code}</div>
+                  <div className="text-sm text-gray-500">{asset.asset_type}</div>
+                </div>
+                <StatusBadge status={asset.status} />
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
 // Wrapper com verificação de autenticação e módulo
 function AssetsListWrapper() {
   return (

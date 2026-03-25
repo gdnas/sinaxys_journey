@@ -501,8 +501,8 @@ export interface AssetWithDetails extends DbAsset {
       id: string;
       name: string;
       email: string;
-    };
-    contractor_company?: DbContractorCompany;
+    }[];
+    contractor_company?: DbContractorCompany[];
   };
   documents?: DbAssetDocument[];
   events?: DbAssetEvent[];
@@ -514,13 +514,13 @@ export interface AssetWithDetails extends DbAsset {
  * Cessão com dados expandidos
  */
 export interface AssignmentWithDetails extends DbAssetAssignment {
-  asset: DbAsset;
+  asset: DbAsset[];
   profile: {
     id: string;
     name: string;
     email: string;
-  };
-  contractor_company?: DbContractorCompany;
+  }[];
+  contractor_company?: DbContractorCompany[];
   documents?: DbAssetDocument[];
   incidents?: DbAssetIncident[];
 }
@@ -529,8 +529,8 @@ export interface AssignmentWithDetails extends DbAssetAssignment {
  * Ocorrência com dados expandidos
  */
 export interface IncidentWithDetails extends DbAssetIncident {
-  asset: DbAsset;
-  assignment?: DbAssetAssignment;
+  asset: DbAsset[];
+  assignment?: DbAssetAssignment[];
   documents?: DbAssetDocument[];
 }
 
@@ -992,7 +992,7 @@ export async function listAssignments(tenantId: string, filters?: AssignmentFilt
   const { data, error } = await query.order("assigned_at", { ascending: false });
 
   if (error) throw error;
-  let assignments = (data ?? []) as AssignmentWithDetails[];
+  let assignments = (data ?? []) as unknown as AssignmentWithDetails[];
 
   // Filtrar por devolução pendente (data esperada expirada)
   if (filters?.pending_return) {
@@ -1019,7 +1019,7 @@ export async function getAssignment(id: string): Promise<AssignmentWithDetails |
     .maybeSingle();
 
   if (error) throw error;
-  return (data ?? null) as AssignmentWithDetails | null;
+  return (data ?? null) as unknown as AssignmentWithDetails | null;
 }
 
 export async function createAssignment(input: CreateAssignmentInput) {
@@ -1121,12 +1121,12 @@ export async function listIncidents(tenantId: string, filters?: IncidentFilters)
   const { data, error } = await query.order("incident_date", { ascending: false });
 
   if (error) throw error;
-  let incidents = (data ?? []) as IncidentWithDetails[];
+  let incidents = (data ?? []) as unknown as IncidentWithDetails[];
 
   // Filtrar por perfil (precisa buscar via assignments)
   if (filters?.profile_id) {
     const assignmentIds = incidents
-      .filter(i => i.assignment?.profile_id === filters.profile_id)
+      .filter(i => i.assignment && Array.isArray(i.assignment) && i.assignment.length > 0 && i.assignment[0]?.profile_id === filters.profile_id)
       .map(i => i.assignment_id);
     incidents = incidents.filter(i => assignmentIds.includes(i.assignment_id!));
   }
@@ -1146,7 +1146,7 @@ export async function getIncident(id: string): Promise<IncidentWithDetails | nul
     .maybeSingle();
 
   if (error) throw error;
-  return (data ?? null) as IncidentWithDetails | null;
+  return (data ?? null) as unknown as IncidentWithDetails | null;
 }
 
 export async function createIncident(input: CreateIncidentInput) {
@@ -1313,7 +1313,7 @@ export async function getAssetsDashboardStats(tenantId: string): Promise<AssetsD
   // Buscar todos os ativos do tenant
   const { data: assets, error: assetsError } = await supabase
     .from("assets")
-    .select("status,category,purchase_value,residual_value_current,purchase_date,created_at")
+    .select("id,status,category,purchase_value,residual_value_current,purchase_date,created_at")
     .eq("tenant_id", tenantId);
 
   if (assetsError) throw assetsError;

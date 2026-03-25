@@ -445,7 +445,7 @@ export interface AssetWithAssignment {
 /**
  * Cessão com dados expandidos
  */
-export interface AssignmentExpanded extends DbAssetAssignment {
+export interface AssignmentExpanded extends Omit<DbAssetAssignment, 'status'> {
   // Dados do ativo (vindo da query `asset:assets(...)`)
   asset_code: string;
   category: AssetCategory;
@@ -462,7 +462,6 @@ export interface AssignmentExpanded extends DbAssetAssignment {
   monthly_depreciation_value: number | null;
   residual_value_current: number;
   accumulated_depreciation: number;
-  status: AssetStatus;
   current_location: string | null;
   notes: string | null;
   created_at: string;
