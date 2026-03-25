@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { format } from "date-fns";
 import { Search, Plus, Filter, Box, MoreHorizontal, ArrowLeft } from "lucide-react";
 import { useCompany } from "@/lib/company";
@@ -42,6 +42,7 @@ function StatusBadge({ status }: { status: string }) {
 function AssetsList() {
   const { companyId } = useCompany();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -84,7 +85,7 @@ function AssetsList() {
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Gestão de Ativos</h1>
-        <Button onClick={() => {/* TODO: Implementar criação de ativo */}} disabled={!canEdit}>
+        <Button onClick={() => navigate("/app/ativos/novo")} disabled={!canEdit}>
           <Plus className="mr-2 h-4 w-4" />
           Novo Ativo
         </Button>
