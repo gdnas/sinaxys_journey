@@ -25,7 +25,7 @@ export default function Settings() {
   const { setTheme } = useApplyUserTheme();
   const [profile, setProfile] = useState<any | null>(null);
   const [language, setLanguage] = useState<string>(i18n.language || 'pt');
-  const [themePref, setThemePref] = useState<string>("light");
+  const [themePref, setThemePref] = useState<string>("system");
   const [notifPrefs, setNotifPrefs] = useState<any>({ mentions: true, comments: true, follows: true });
   const [saving, setSaving] = useState(false);
 
@@ -37,16 +37,20 @@ export default function Settings() {
       if (!mounted) return;
       setProfile(p);
       setLanguage(p?.preferred_language ?? i18n.language ?? "pt");
-      setThemePref(p?.theme_preference ?? "light");
+      
+      // Only set theme preference if user has one saved, otherwise don't change current theme
+      if (p?.theme_preference) {
+        setThemePref(p.theme_preference);
+        try { setTheme(p.theme_preference); } catch {}
+      } else {
+        // Don't force light theme - keep current theme
+        setThemePref("system");
+      }
+      
       try {
         setNotifPrefs(p?.notification_preferences ?? { mentions: true, comments: true, follows: true });
       } catch {
         setNotifPrefs({ mentions: true, comments: true, follows: true });
-      }
-
-      // apply theme immediately when loading
-      if (p?.theme_preference) {
-        try { setTheme(p.theme_preference); } catch {}
       }
     }
     void load();
