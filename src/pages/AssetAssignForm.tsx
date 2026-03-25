@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, X } from "lucide-react";
 import { useCompany } from "@/lib/company";
-import { listProfilesByCompany, getAsset, createAssignment } from "@/lib/assetsDb";
+import { getAsset, createAssignment } from "@/lib/assetsDb";
 import { RequireAuth } from "@/components/RequireAuth";
 import { RequireCompanyModule } from "@/components/RequireCompanyModule";
 import { Card } from "@/components/ui/card";

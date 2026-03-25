@@ -1,20 +1,18 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { Search, Plus, Filter, Box, MoreHorizontal, ArrowLeft } from "lucide-react";
 import { useCompany } from "@/lib/company";
 import { useAuth } from "@/lib/auth";
 import { listAssets, getAssetStatusLabel, getAssetCategoryLabel, type AssetFilters } from "@/lib/assetsDb";
-import {
-  Card,
-  Badge,
-  Button,
-  Input,
-  Select,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui";
+import { RequireAuth } from "@/components/RequireAuth";
+import { RequireCompanyModule } from "@/components/RequireCompanyModule";
+import { Card } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 // =====================
 // SUBCOMPONENTS

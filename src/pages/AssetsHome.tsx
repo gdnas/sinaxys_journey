@@ -11,6 +11,7 @@ import {
   Wrench,
   CheckCircle,
   TrendingDown,
+  Percent,
 } from "lucide-react";
 import { useCompany } from "@/lib/company";
 import { useAuth } from "@/lib/auth";

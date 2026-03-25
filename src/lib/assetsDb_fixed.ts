@@ -83,7 +83,7 @@ export type IncidentType =
 export type IncidentResolutionStatus =
   | "in_analysis"
   | "charged"
-  | " waived"
+  | "waived"
   | "resolved";
 
 export type AssetDocumentType =
