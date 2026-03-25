@@ -254,15 +254,7 @@ const nav: NavItem[] = [
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "POINTS",
       },
-      // move Conhecimento into Evolução (Admin tracks removed from menu)
-      {
-        type: "link",
-        to: "/knowledge",
-        label: "nav.knowledge",
-        icon: <BookOpen className="h-4 w-4" />,
-        roles: ["ADMIN", "HEAD", "COLABORADOR"],
-        moduleKey: "KNOWLEDGE",
-      },
+      // NOTE: 'Conhecimento' removed from Evolução - it should appear only under Empresa as 'Base de Conhecimento'
     ],
   },
 
@@ -383,7 +375,7 @@ const nav: NavItem[] = [
   {
     type: "link",
     to: "/knowledge",
-    label: "nav.knowledge",
+    label: "Base de Conhecimento",
     icon: <BookOpen className="h-4 w-4" />,
     roles: ["ADMIN", "HEAD", "COLABORADOR"],
     moduleKey: "KNOWLEDGE",
