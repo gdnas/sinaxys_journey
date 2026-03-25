@@ -1,22 +1,6 @@
 /**
  * Gestão de Ativos - Database Types and Interfaces
- *
- * Este arquivo define os tipos TypeScript para as tabelas do banco de dados
- * do módulo de controle patrimonial (Ativos).
- *
- * O módulo permite controle completo do ciclo de vida de equipamentos
- * disponibilizados a colaboradores PJ, incluindo:
- * - Cadastro de ativos
- * - Cessão (comodato, onerosa, com opção de aquisição)
- * - Devolução
- * - Ocorrências (dano, perda, furto, roubo)
- * - Depreciação e valor residual
- * - Histórico auditável
  */
-
-// =====================
-// IMPORTS
-// =====================
 
 import { supabase } from "@/integrations/supabase/client";
 
@@ -24,113 +8,83 @@ import { supabase } from "@/integrations/supabase/client";
 // ENUMS
 // =====================
 
-/**
- * Categoria do ativo
- */
 export type AssetCategory =
-  | "it_equipment"       // Equipamentos de TI (notebooks, monitores, etc.)
-  | "office_equipment"   // Equipamentos de escritório (mesas, cadeiras)
-  | "mobile_devices"     // Dispositivos móveis (celulares, tablets)
-  | "furniture"          // Móveis
-  | "vehicles"           // Veículos
-  | "tools"              // Ferramentas
-  | "licenses"           // Licenças de software
-  | "other";            // Outros
+  | "it_equipment"
+  | "office_equipment"
+  | "mobile_devices"
+  | "furniture"
+  | "vehicles"
+  | "tools"
+  | "licenses"
+  | "other";
 
-/**
- * Status do ativo
- */
 export type AssetStatus =
-  | "in_stock"           // Em estoque
-  | "reserved"           // Reservado
-  | "in_use"             // Em uso
-  | "in_return"          // Em devolução
-  | "returned"           // Devolvido
-  | "in_maintenance"     // Em manutenção
-  | "acquired_by_user"   // Adquirido pelo colaborador
-  | "lost"               // Extraviado
-  | "discarded";         // Descartado
+  | "in_stock"
+  | "reserved"
+  | "in_use"
+  | "in_return"
+  | "returned"
+  | "in_maintenance"
+  | "acquired_by_user"
+  | "lost"
+  | "discarded";
 
-/**
- * Método de depreciação
- */
 export type DepreciationMethod =
-  | "linear"             // Linear (proporcional ao tempo)
-  | "declining_balance"  // Saldo decrescente
-  | "units_of_production"; // Unidades produzidas
+  | "linear"
+  | "declining_balance"
+  | "units_of_production";
 
-/**
- * Estado de conservação do ativo
- */
 export type AssetCondition =
-  | "new"                // Novo
-  | "good"               // Bom
-  | "fair"               // Regular
-  | "poor"               // Ruim
-  | "damaged";           // Danificado
+  | "new"
+  | "good"
+  | "fair"
+  | "poor"
+  | "damaged";
 
-/**
- * Modalidade de cessão
- */
 export type AssignmentModality =
-  | "commodatum"         // Comodato (gratuito)
-  | "paid_lease"         // Cessão onerosa
-  | "purchase_option";   // Cessão com opção de aquisição
+  | "commodatum"
+  | "paid_lease"
+  | "purchase_option";
 
-/**
- * Status da cessão
- */
 export type AssignmentStatus =
-  | "active"             // Ativa
-  | "completed"          // Completada (devolvida ou adquirida)
-  | "cancelled";         // Cancelada
+  | "active"
+  | "completed"
+  | "cancelled";
 
-/**
- * Tipo de evento de ativo
- */
 export type AssetEventType =
-  | "asset_created"      // Ativo cadastrado
-  | "asset_updated"      // Ativo atualizado
-  | "asset_reserved"     // Ativo reservado
-  | "asset_delivered"    // Ativo entregue
-  | "document_attached"  // Documento anexado
-  | "incident_opened"    // Ocorrência aberta
-  | "return_registered"  // Devolução registrada
-  | "acquisition_exercised" // Aquisição exercida
-  | "asset_discarded"    // Baixa patrimonial
-  | "status_changed";    // Status alterado
+  | "asset_created"
+  | "asset_updated"
+  | "asset_reserved"
+  | "asset_delivered"
+  | "document_attached"
+  | "incident_opened"
+  | "return_registered"
+  | "acquisition_exercised"
+  | "asset_discarded"
+  | "status_changed";
 
-/**
- * Tipo de ocorrência
- */
 export type IncidentType =
-  | "damage"             // Dano
-  | "loss"               // Perda
-  | "theft"              // Furto
-  | "robbery";           // Roubo
+  | "damage"
+  | "loss"
+  | "theft"
+  | "robbery";
 
-/**
- * Status de resolução da ocorrência
- */
 export type IncidentResolutionStatus =
-  | "in_analysis"        // Em análise
-  | "charged"            // Cobrado
-  | "waived"             // Abonado
-  | "resolved";          // Resolvido
+  | "in_analysis"
+  | "charged"
+  | "waived"
+  | "resolved";
 
-/**
- * Tipo de documento de ativo
- */
 export type AssetDocumentType =
-  | "invoice"            // Nota fiscal
-  | "warranty"           // Garantia
-  | "manual"             // Manual
-  | "photo"              // Foto
-  | "contract"           // Contrato/termo
-  | "return_receipt"     // Recibo de devolução
-  | "incident_report"     // Laudo de ocorrência
-  | "acquisition_document" // Documento de aquisição
-  | "other";             // Outro
+  | "invoice"
+  | "warranty"
+  | "manual"
+  | "photo"
+  | "contract"
+  | "return_receipt"
+  | "incident_report"
+  | "acquisition_document"
+  | "other";
 
 // =====================
 // DATABASE ROWS
@@ -163,21 +117,21 @@ export interface DbAsset {
   id: string;
   tenant_id: string;
   asset_code: string;
-  category: string;
+  category: AssetCategory;
   asset_type: string;
   brand: string | null;
   model: string | null;
   serial_number: string | null;
-  condition_initial: string;
-  purchase_date: string;
+  condition_initial: AssetCondition;
+  purchase_date: string; // DATE
   purchase_value: number;
   supplier: string | null;
   useful_life_months: number;
-  depreciation_method: string;
+  depreciation_method: DepreciationMethod;
   monthly_depreciation_value: number | null;
   residual_value_current: number;
   accumulated_depreciation: number;
-  status: string;
+  status: AssetStatus;
   current_location: string | null;
   notes: string | null;
   created_at: string;
@@ -190,22 +144,40 @@ export interface DbAsset {
 export interface DbAssetAssignment {
   id: string;
   tenant_id: string;
+  
+  // Vínculo com ativo
   asset_id: string;
+  
+  // Vínculo com colaborador
   profile_id: string;
+  
+  // Empresa PJ (opcional - para colaboradores PJ)
   contractor_company_id: string | null;
-  modality: string;
+  
+  // Modalidade e valores
+  modality: AssignmentModality;
   monthly_amount: number | null;
-  assigned_at: string;
+  
+  // Período
+  assigned_at: string; // DATE
   expected_until_contract_end: boolean;
-  expected_return_date: string | null;
+  expected_return_date: string | null; // DATE
+  
+  // Documento
   signed_document_url: string | null;
-  status: string;
-  returned_at: string | null;
-  return_condition: string | null;
+  
+  // Status
+  status: AssignmentStatus;
+  returned_at: string | null; // DATE
+  return_condition: AssetCondition | null;
   return_notes: string | null;
-  acquired_at: string | null;
+  
+  // Aquisição pelo colaborador (se aplicável)
+  acquired_at: string | null; // DATE
   acquired_value: number | null;
   acquisition_document_url: string | null;
+  
+  // Auditoria
   created_at: string;
   updated_at: string;
 }
@@ -218,12 +190,22 @@ export interface DbAssetEvent {
   tenant_id: string;
   asset_id: string;
   assignment_id: string | null;
-  event_type: string;
+  
+  // Tipo de evento
+  event_type: AssetEventType;
   title: string | null;
   description: string | null;
-  metadata: any;
+  
+  // Metadados (JSON flexível para detalhes específicos)
+  metadata: any; // JSONB
+  
+  // Quem realizou a ação
   actor_user_id: string | null;
+  
+  // Quando ocorreu
   event_date: string;
+  
+  // Auditoria
   created_at: string;
 }
 
@@ -233,17 +215,29 @@ export interface DbAssetEvent {
 export interface DbAssetIncident {
   id: string;
   tenant_id: string;
+  
+  // Vínculos
   asset_id: string;
   assignment_id: string | null;
-  incident_type: string;
+  
+  // Tipo e descrição
+  incident_type: IncidentType;
   description: string;
-  incident_date: string;
-  residual_value_at_incident: number;
+  
+  // Data do incidente
+  incident_date: string; // DATE
+  residual_value_at_incident: number; // NUMERIC(15, 2)
+  
+  // Documentos
   police_report_url: string | null;
-  other_document_urls: any;
-  resolution_status: string;
+  other_document_urls: any; // JSONB array
+  
+  // Resolução
+  resolution_status: IncidentResolutionStatus;
   resolution_notes: string | null;
-  final_decision_amount: number | null;
+  final_decision_amount: number | null; // NUMERIC(15, 2)
+  
+  // Auditoria
   created_at: string;
   updated_at: string;
 }
@@ -254,16 +248,24 @@ export interface DbAssetIncident {
 export interface DbAssetDocument {
   id: string;
   tenant_id: string;
+  
+  // Vínculos
   asset_id: string;
   assignment_id: string | null;
   incident_id: string | null;
-  document_type: string;
+  
+  // Tipo e arquivo
+  document_type: AssetDocumentType;
   title: string;
   file_url: string;
   file_name: string | null;
   file_size_bytes: number | null;
   mime_type: string | null;
+  
+  // Upload por
   uploaded_by: string | null;
+  
+  // Auditoria
   created_at: string;
 }
 
@@ -288,9 +290,6 @@ export interface CreateContractorCompanyInput {
   notes?: string;
 }
 
-/**
- * Input para atualização de empresa PJ
- */
 export interface UpdateContractorCompanyInput {
   legal_name?: string;
   trade_name?: string | null;
@@ -324,9 +323,6 @@ export interface CreateAssetInput {
   notes?: string;
 }
 
-/**
- * Input para atualização de ativo
- */
 export interface UpdateAssetInput {
   asset_code?: string;
   category?: AssetCategory;
@@ -409,11 +405,11 @@ export interface UpdateIncidentInput {
   incident_type?: IncidentType;
   description?: string;
   incident_date?: string;
-  police_report_url?: string | null;
+  police_report_url?: string;
   other_document_urls?: any;
   resolution_status?: IncidentResolutionStatus;
-  resolution_notes?: string | null;
-  final_decision_amount?: number | null;
+  resolution_notes?: string;
+  final_decision_amount?: number;
 }
 
 /**
@@ -438,10 +434,17 @@ export interface CreateAssetDocumentInput {
 // =====================
 
 /**
- * Ativo com dados expandidos (cálculo manual das relações)
+ * Ativo com dados expandido
  */
 export interface AssetWithDetails extends DbAsset {
-  current_assignment?: AssignmentWithDetails;
+  current_assignment?: DbAssetAssignment & {
+    profile: {
+      id: string;
+      name: string;
+      email: string | null;
+    };
+    contractor_company?: DbContractorCompany;
+  };
   documents?: DbAssetDocument[];
   events?: DbAssetEvent[];
   incidents?: DbAssetIncident[];
@@ -452,24 +455,29 @@ export interface AssetWithDetails extends DbAsset {
  * Cessão com dados expandidos (incluindo ativo e empresa PJ)
  */
 export interface AssignmentWithDetails extends DbAssetAssignment {
-  // Dados expandidos do ativo
+  // Dados do ativo (vindo da query `asset:assets(...)`)
   asset_code: string;
+  category: AssetCategory;
   asset_type: string;
   brand: string | null;
   model: string | null;
   serial_number: string | null;
-  category: string;
+  condition_initial: AssetCondition;
   purchase_date: string;
   purchase_value: number;
+  supplier: string | null;
   useful_life_months: number;
-  depreciation_method: string;
+  depreciation_method: DepreciationMethod;
   monthly_depreciation_value: number | null;
   residual_value_current: number;
   accumulated_depreciation: number;
-  status: string;
+  status: AssetStatus;
   current_location: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
   
-  // Dados do colaborador
+  // Dados do perfil (vindo de query `profile:profiles(...)`)
   profile: {
     id: string;
     name: string;
@@ -478,7 +486,7 @@ export interface AssignmentWithDetails extends DbAssetAssignment {
     department_id: string | null;
   };
   
-  // Dados da empresa PJ (se aplicável)
+  // Dados da empresa PJ
   contractor_company?: DbContractorCompany;
   
   // Documentos e ocorrências vinculados
@@ -487,37 +495,120 @@ export interface AssignmentWithDetails extends DbAssetAssignment {
 }
 
 /**
- * Ocorrência com dados expandidos (incluindo ativo e cessão)
+ * Ocorrência expandida com dados do ativo e cessão
  */
 export interface IncidentWithDetails extends DbAssetIncident {
-  // Dados do ativo
   asset_code: string;
   asset_type: string;
   brand: string | null;
   model: string | null;
   serial_number: string | null;
-  category: string;
+  category: AssetCategory;
   purchase_value: number;
   residual_value_current: number;
   
   // Cessão vinculada
   assignment?: AssignmentWithDetails;
-  
-  // Documentos vinculados
   documents?: DbAssetDocument[];
 }
 
 /**
- * Documento com dados expandidos (incluindo uploader)
+ * Documento expandido com dados do ativo
  */
 export interface AssetDocumentWithDetails extends DbAssetDocument {
-  asset: AssetWithDetails;  // Simplificado - apenas código do ativo
-  assignment?: AssignmentWithDetails;
-  incident?: IncidentWithDetails;
-  uploader?: {
+  // Dados do ativo (vindo da query `asset:assets(...)`)
+  asset_code: string;
+  asset_type: string;
+  category: AssetCategory;
+  brand: string | null;
+  model: string | null;
+  serial_number: string | null;
+  purchase_date: string;
+  purchase_value: number;
+  supplier: string | null;
+  useful_life_months: number;
+  depreciation_method: DepreciationMethod;
+  residual_value_current: number;
+  accumulated_depreciation: number;
+  status: AssetStatus;
+  current_location: string | null;
+  notes: string | null;
+  
+  // Vínculo com cessão expandido
+  assignment?: AssignmentExpanded;
+  incident?: DbAssetIncident[];
+  documents?: DbAssetDocument[];
+}
+
+/**
+ * Cessão expandida com dados do ativo
+ */
+export interface AssignmentExpanded extends DbAssetAssignment {
+  // Dados do ativo (vindo de query `asset:assets(...)`)
+  asset_code: string;
+  category: AssetCategory;
+  asset_type: string;
+  brand: string | null;
+  model: string | null;
+  serial_number: string | null;
+  condition_initial: AssetCondition;
+  purchase_date: string;
+  purchase_value: number;
+  supplier: string | null;
+  useful_life_months: number;
+  depreciation_method: DepreciationMethod;
+  monthly_depreciation_value: number | null;
+  residual_value_current: number;
+  accumulated_depreciation: number;
+  status: AssetStatus;
+  current_location: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  
+  // Dados do perfil (vindo de query `profile:profiles(...)`)
+  profile: {
     id: string;
     name: string;
+    email: string | null;
+    job_title: string | null;
+    department_id: string | null;
   };
+  
+  // Dados da empresa PJ
+  contractor_company?: DbContractorCompany;
+  
+  // Documentos vinculados
+  documents?: DbAssetDocument[];
+  incidents?: DbAssetIncident[];
+}
+
+/**
+ * Cessão expandida com dados do ativo
+ */
+export interface AssignmentExpandedWithDetails extends AssignmentExpanded {
+  asset: DbAsset;
+}
+
+/**
+ * Ocorrência expandida com dados do ativo e cessão
+ */
+export interface IncidentExpanded extends DbAssetIncident {
+  // Dados do ativo
+  asset_code: string;
+  category: AssetCategory;
+  asset_type: string;
+  brand: string | null;
+  model: string | null;
+  serial_number: string | null;
+  purchase_date: string;
+  purchase_value: number;
+  residual_value_current: number;
+  
+  // Cessão
+  assignment?: AssignmentExpanded;
+  documents?: DbAssetDocument[];
+  incidents?: DbAssetIncident[];
 }
 
 // =====================
@@ -592,8 +683,6 @@ export interface AssetsDashboardStats {
   total_lost: number;
   total_in_maintenance: number;
   total_acquired_by_user: number;
-  
-  // Valores
   total_purchase_value: number;
   total_residual_value: number;
   
@@ -612,8 +701,8 @@ export interface AssetsDashboardStats {
  * Alerta operacional
  */
 export interface OperationalAlert {
-  type: "contract_ended_with_assets" 
-       | "asset_without_document" 
+  type: "contract_ended_with_assets_in_use"
+       | "asset_without_document"
        | "incident_without_resolution"
        | "asset_idle_long";
   asset_id: string;
@@ -623,12 +712,8 @@ export interface OperationalAlert {
   details?: any;
 }
 
-// =====================
-// MISC TYPES
-// =====================
-
 /**
- * Resumo de depreciação
+ * Resumo de de depreciação
  */
 export interface DepreciationSummary {
   purchase_value: number;
@@ -776,29 +861,29 @@ export async function listAssets(tenantId: string, filters?: AssetFilters) {
 
   if (error) throw error;
 
-  // Filtrar ativos com devolução pendente (precisa buscar assignments)
   let assets = (data ?? []) as DbAsset[];
-  
+
+  // Filtrar ativos com devolução pendente (precisa buscar assignments)
   if (filters?.with_pending_return || filters?.profile_id) {
     const assetIds = assets.map(a => a.id);
     if (assetIds.length === 0) return [];
     
     let assignmentsQuery = supabase
       .from("asset_assignments")
-      .select("asset_id,profile_id,status,expected_return_date")
+      .select("asset_id,profile_id,expected_return_date,signed_document_url")
       .in("asset_id", assetIds)
       .eq("status", "active");
-    
-    if (filters.profile_id) {
+
+    if (filters?.profile_id) {
       assignmentsQuery = assignmentsQuery.eq("profile_id", filters.profile_id);
     }
     
     const { data: assignments } = await assignmentsQuery;
-    
+
     if (assignments && assignments.length > 0) {
       const activeAssetIds = new Set(assignments.map(a => a.asset_id));
       
-      if (filters.with_pending_return) {
+      if (filters?.with_pending_return) {
         // Filtrar ativos com cessões ativas e data esperada expirada
         const pendingAssetIds = new Set(
           assignments
@@ -806,13 +891,13 @@ export async function listAssets(tenantId: string, filters?: AssetFilters) {
             .map(a => a.asset_id)
         );
         assets = assets.filter(a => pendingAssetIds.has(a.id));
-      } else if (filters.profile_id) {
+      } else if (filters?.profile_id) {
         // Filtrar ativos do perfil
         assets = assets.filter(a => activeAssetIds.has(a.id));
+      } else if (filters.profile_id) {
+        // Nenhum assignment encontrado para o perfil
+        return [];
       }
-    } else if (filters.profile_id) {
-      // Nenhum assignment encontrado para o perfil
-      return [];
     }
   }
 
@@ -876,7 +961,7 @@ export async function getAssetWithDetails(id: string): Promise<AssetWithDetails 
 
   return {
     ...asset,
-    current_assignment: ((assignments as unknown) as AssignmentWithDetails | null) || undefined,
+    current_assignment: assignments || undefined,
     documents: documents || [],
     events: events || [],
     incidents: incidents || [],
@@ -971,8 +1056,8 @@ export async function listAssignments(tenantId: string, filters?: AssignmentFilt
   const { data, error } = await query.order("assigned_at", { ascending: false });
 
   if (error) throw error;
-
-  let assignments = ((data ?? []) as unknown) as AssignmentWithDetails[];
+  
+  let assignments = (data ?? []) as AssignmentWithDetails[];
   
   // Filtrar por devolução pendente (data esperada expirada)
   if (filters?.pending_return) {
@@ -999,7 +1084,7 @@ export async function getAssignment(id: string): Promise<AssignmentWithDetails |
     .maybeSingle();
 
   if (error) throw error;
-  return ((data ?? null) as unknown) as AssignmentWithDetails | null;
+  return (data ?? null) as AssignmentWithDetails | null;
 }
 
 export async function createAssignment(input: CreateAssignmentInput) {
@@ -1306,7 +1391,7 @@ export async function getAssetsDashboardStats(tenantId: string): Promise<AssetsD
     total_assets: assetsData.length,
     total_in_stock: assetsData.filter(a => a.status === "in_stock").length,
     total_in_use: assetsData.filter(a => a.status === "in_use").length,
-    total_pending_documentation: 0, // calcular depois
+    total_pending_documentation: 0,
     total_lost: assetsData.filter(a => a.status === "lost").length,
     total_in_maintenance: assetsData.filter(a => a.status === "in_maintenance").length,
     total_acquired_by_user: assetsData.filter(a => a.status === "acquired_by_user").length,
@@ -1314,13 +1399,15 @@ export async function getAssetsDashboardStats(tenantId: string): Promise<AssetsD
     total_purchase_value: assetsData.reduce((sum, a) => sum + (a.purchase_value || 0), 0),
     total_residual_value: assetsData.reduce((sum, a) => sum + (a.residual_value_current || 0), 0),
     
-    assets_without_assignee: 0, // calcular depois
-    assets_pending_return: 0, // calcular depois
-    assets_with_incidents_without_resolution: 0, // calcular depois
+    // Pendências
+    assets_without_assignee: 0,
+    assets_pending_return: 0,
+    assets_with_incidents_without_resolution: 0,
     
-    contracts_ended_with_assets_in_use: 0, // calcular depois - precisa integrar com contratos
-    assets_without_signed_document: 0, // calcular depois
-    assets_idle_in_stock_over_30_days: 0, // calcular depois
+    // Alertas operacionais
+    contracts_ended_with_assets_in_use: 0,
+    assets_without_signed_document: 0,
+    assets_idle_in_stock_over_30_days: 0,
   };
 
   // Buscar assignments ativos para cálculos adicionais
@@ -1331,7 +1418,6 @@ export async function getAssetsDashboardStats(tenantId: string): Promise<AssetsD
     .eq("status", "active");
 
   if (assignmentsError) throw assignmentsError;
-
   const activeAssignments = assignments || [];
   const activeAssetIds = new Set(activeAssignments.map(a => a.asset_id));
 
@@ -1362,7 +1448,6 @@ export async function getAssetsDashboardStats(tenantId: string): Promise<AssetsD
   const { data: incidents, error: incidentsError } = await supabase
     .from("asset_incidents")
     .select("asset_id")
-    .eq("tenant_id", tenantId)
     .in("resolution_status", ["in_analysis"]);
 
   if (!incidentsError && incidents) {
