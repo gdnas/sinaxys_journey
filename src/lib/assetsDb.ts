@@ -1576,17 +1576,36 @@ export async function uploadAssetDocumentFile({
     .from(ASSET_DOCUMENTS_BUCKET)
     .upload(filePath, file, {
       contentType: file.type || undefined,
-      upsert: false,
+      // Allow upsert so uploads don't fail if the generated filename collides.
+      // Overwriting is acceptable here because filenames are timestamp-based and collisions are unlikely,
+      // but upsert prevents 400 errors when the storage already contains the same path.
+      upsert: true,
     });
 
   if (uploadError) {
-    // Se o bucket não existir, tentar criar uma mensagem mais clara
-    if (uploadError.message.includes("Bucket not found")) {
+    // Normalize error information and throw a helpful message
+    const errInfo: any = {};
+    if (typeof uploadError === 'string') {
+      errInfo.message = uploadError;
+    } else if (uploadError && typeof uploadError === 'object') {
+      // Copy common fields
+      errInfo.message = uploadError.message || JSON.stringify(uploadError);
+      if (uploadError.status) errInfo.status = uploadError.status;
+      if (uploadError.statusCode) errInfo.statusCode = uploadError.statusCode;
+      if (uploadError.details) errInfo.details = uploadError.details;
+    }
+
+    // If the bucket wasn't found, provide a clearer action message
+    const messageLower = (errInfo.message || "").toLowerCase();
+    if (messageLower.includes("bucket not found") || messageLower.includes("not found")) {
       throw new Error(
-        "Bucket de armazenamento 'asset-documents' não encontrado. Por favor, crie o bucket via Supabase Console."
+        "Bucket de armazenamento 'asset-documents' não encontrado. Por favor, crie o bucket via Supabase Console. Detalhes: " + (errInfo.message || JSON.stringify(errInfo))
       );
     }
-    throw uploadError;
+
+    // Otherwise throw a composed error with status/details if available
+    const composed = `Erro no upload do arquivo: ${errInfo.message || JSON.stringify(errInfo)}${errInfo.status ? ` (status: ${errInfo.status})` : ''}${errInfo.statusCode ? ` (statusCode: ${errInfo.statusCode})` : ''}${errInfo.details ? ` - ${JSON.stringify(errInfo.details)}` : ''}`;
+    throw new Error(composed);
   }
 
   return {

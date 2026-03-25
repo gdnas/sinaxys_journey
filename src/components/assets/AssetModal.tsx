@@ -40,6 +40,7 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
         const a = await getAssetWithDetails(assetId);
         setAsset(a);
       } catch (e: any) {
+        console.error("AssetModal: failed to load asset", e);
         toast({ title: "Erro ao carregar ativo", description: e?.message ?? String(e), variant: "destructive" });
       } finally {
         setLoading(false);
@@ -103,7 +104,10 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
       setAsset(a);
       onUpdated?.();
     } catch (e: any) {
-      toast({ title: "Erro ao anexar documento", description: e?.message ?? String(e), variant: "destructive" });
+      console.error("AssetModal: upload error", e);
+      // Show detailed message when available
+      const detail = e?.message ?? (typeof e === 'string' ? e : JSON.stringify(e));
+      toast({ title: "Erro ao anexar documento", description: detail, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -130,6 +134,7 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
           const signed = await createAssetDocumentSignedUrl(url, 60);
           url = signed;
         } catch (e) {
+          console.warn("AssetModal: failed to create signed url", e);
           // fallback - proceed with original url
         }
       }
@@ -154,12 +159,24 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
           </BlurDialogHeader>
 
           <div className="mt-4">
-            <div className="flex items-center justify-between gap-4">
-              <div>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
                 <div className="text-sm text-muted-foreground">{asset?.asset_type}</div>
-                <div className="text-xs text-muted-foreground">{asset?.brand} {asset?.model}</div>
+                <div className="text-xs text-muted-foreground">{asset?.brand} {asset?.model} {asset?.serial_number ? `• S/N: ${asset.serial_number}` : ''}</div>
+                <div className="mt-2 text-sm">
+                  <div><span className="font-medium">Localização:</span> {asset?.current_location ?? '—'}</div>
+                  <div><span className="font-medium">Fornecedor:</span> {asset?.supplier ?? '—'}</div>
+                  <div><span className="font-medium">Data compra:</span> {asset?.purchase_date ? new Date(asset.purchase_date).toLocaleDateString() : '—'}</div>
+                  <div><span className="font-medium">Valor compra:</span> {asset?.purchase_value ? `R$ ${Number(asset.purchase_value).toLocaleString()` : '—'}</div>
+                  <div><span className="font-medium">Valor residual:</span> {asset?.residual_value_current ? `R$ ${Number(asset.residual_value_current).toLocaleString()` : '—'}</div>
+                  <div><span className="font-medium">Vida útil (meses):</span> {asset?.useful_life_months ?? '—'}</div>
+                </div>
+                {asset?.notes && (
+                  <div className="mt-3 text-sm text-[color:var(--sinaxys-ink)]/80">{asset.notes}</div>
+                )}
               </div>
-              <div className="flex items-center gap-2">
+
+              <div className="flex items-start gap-2">
                 <Button asChild size="sm" variant="outline"><a href={`/app/ativos/${assetId}/editar`}><Edit3 className="mr-2 h-4 w-4"/>Editar</a></Button>
                 <Button size="sm" variant="destructive" onClick={handleDelete}><Trash2 className="mr-2 h-4 w-4"/>Excluir</Button>
               </div>
@@ -192,9 +209,9 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
                         <div className="font-medium text-[color:var(--sinaxys-ink)]">
                           <button className="underline" onClick={() => openDocument(d)}>{d.title}</button>
                         </div>
-                        <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/70">{d.document_type}</div>
+                        <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/70">{d.document_type} • {d.file_name ?? ''}</div>
                       </div>
-                      <div className="text-xs text-[color:var(--sinaxys-ink)]/70">{new Date(d.created_at).toLocaleDateString()}</div>
+                      <div className="text-xs text-[color:var(--sinaxys-ink)]/70">{d.created_at ? new Date(d.created_at).toLocaleDateString() : ''}</div>
                     </div>
                   ))}
                   {(!asset?.documents || asset.documents.length === 0) && (
@@ -214,6 +231,7 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
                     <div>
                       <Label>Arquivo (arraste ou selecione)</Label>
                       <input type="file" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+                      {file && <div className="text-xs mt-1">Arquivo selecionado: {file.name} — {(file.size / 1024).toFixed(0)} KB</div>}
                     </div>
                     <div>
                       <Label>ou Link do contrato</Label>
