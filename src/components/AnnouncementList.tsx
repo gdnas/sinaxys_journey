@@ -137,7 +137,7 @@ export function AnnouncementList({ limit, showViewAll = true }: AnnouncementList
 
   if (!announcements || announcements.length === 0) {
     return (
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-6">
         <div className="flex flex-col items-center justify-center py-12 text-center">
           <div className="mb-4 text-5xl">📢</div>
           <h3 className="text-lg font-semibold">Nenhum recado</h3>
@@ -151,7 +151,7 @@ export function AnnouncementList({ limit, showViewAll = true }: AnnouncementList
 
   return (
     <>
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-4">
             <h3 className="text-lg font-semibold">Todos os Recados</h3>
@@ -203,21 +203,21 @@ export function AnnouncementList({ limit, showViewAll = true }: AnnouncementList
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-2">
                         {!announcement.is_read && (
-                          <div className="h-2 w-2 rounded-full bg-purple-600" />
+                          <div className="h-2 w-2 rounded-full bg-[color:var(--sinaxys-primary)]" />
                         )}
-                        <h4 className="font-semibold text-gray-900">{announcement.title}</h4>
+                        <h4 className="font-semibold text-[color:var(--sinaxys-ink)]">{announcement.title}</h4>
                         {announcement.scope === "company" ? (
-                          <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-100">
+                          <Badge variant="secondary" className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]">
                             Empresa
                           </Badge>
                         ) : (
-                          <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100">
+                          <Badge variant="secondary" className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]">
                             Meu time
                           </Badge>
                         )}
                       </div>
-                      <p className="line-clamp-3 text-sm text-gray-600">{announcement.content}</p>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <p className="line-clamp-3 text-sm text-[color:var(--sinaxys-ink)]/70">{announcement.content}</p>
+                      <div className="flex items-center gap-2 text-xs text-[color:var(--sinaxys-ink)]/70">
                         {announcement.author_avatar ? (
                           <Avatar className="h-5 w-5">
                             <AvatarImage src={announcement.author_avatar} alt={announcement.author_name} />
@@ -226,17 +226,17 @@ export function AnnouncementList({ limit, showViewAll = true }: AnnouncementList
                             </AvatarFallback>
                           </Avatar>
                         ) : (
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-gray-200 text-[10px] font-medium text-gray-600">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[color:var(--sinaxys-tint)] text-[10px] font-medium text-[color:var(--sinaxys-ink)]">
                             {getInitials(announcement.author_name)}
                           </span>
                         )}
-                        <span className="font-medium">{announcement.author_name}</span>
+                        <span className="font-medium text-[color:var(--sinaxys-ink)]">{announcement.author_name}</span>
                         <span>•</span>
-                        <span>{formatDate(announcement.published_at)}</span>
+                        <span className="text-[color:var(--sinaxys-ink)]/70">{formatDate(announcement.published_at)}</span>
                         {announcement.team_name && (
                           <>
                             <span>•</span>
-                            <span>{announcement.team_name}</span>
+                            <span className="text-[color:var(--sinaxys-ink)]/70">{announcement.team_name}</span>
                           </>
                         )}
                       </div>

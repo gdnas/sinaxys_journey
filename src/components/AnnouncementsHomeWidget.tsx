@@ -65,7 +65,7 @@ export function AnnouncementsHomeWidget({ limit = 3 }: AnnouncementsHomeWidgetPr
 
   if (isLoading) {
     return (
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-6">
         <div className="animate-pulse">
           <div className="h-6 w-1/3 rounded bg-gray-200" />
           <div className="mt-4 space-y-3">
@@ -80,15 +80,15 @@ export function AnnouncementsHomeWidget({ limit = 3 }: AnnouncementsHomeWidgetPr
 
   if (!announcements || announcements.length === 0) {
     return (
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 text-white">
               <Megaphone className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold">Mural de Recados</h3>
-              <p className="text-sm text-muted-foreground">Nenhum recado publicado</p>
+              <h3 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Mural de Recados</h3>
+              <p className="text-sm text-[color:var(--sinaxys-ink)]/70">Nenhum recado publicado</p>
             </div>
           </div>
         </div>
@@ -97,15 +97,15 @@ export function AnnouncementsHomeWidget({ limit = 3 }: AnnouncementsHomeWidgetPr
   }
 
   return (
-    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-6">
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500 to-pink-500 text-white">
             <Megaphone className="h-5 w-5" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold">Mural de Recados</h3>
-            <p className="text-sm text-muted-foreground">
+            <h3 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Mural de Recados</h3>
+            <p className="text-sm text-[color:var(--sinaxys-ink)]/70">
               {announcements.length} recado{announcements.length !== 1 ? "s" : ""} disponível{announcements.length !== 1 ? "is" : ""}
             </p>
           </div>
