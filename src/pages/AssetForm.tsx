@@ -140,7 +140,8 @@ export default function AssetForm() {
         await createAsset(input);
         toast({ title: "Ativo cadastrado com sucesso" });
       }
-      navigate("/app/ativos");
+      // Redirect back to the assets management list
+      navigate("/app/ativos/lista");
     } catch (error) {
       toast({
         title: "Erro",
