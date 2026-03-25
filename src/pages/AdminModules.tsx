@@ -17,6 +17,7 @@ import {
   Network,
   Building2,
   Megaphone,
+  Box,
 } from "lucide-react";
 
 interface ModuleSectionProps {
@@ -104,6 +105,12 @@ export default function AdminModules() {
   const { data: internalCommEnabled = true, refetch: refetchInternalComm } = useQuery({
     queryKey: ["company-module", companyId, "INTERNAL_COMMUNICATION"],
     queryFn: () => isCompanyModuleEnabled(String(companyId), "INTERNAL_COMMUNICATION"),
+    enabled: queryEnabled,
+  });
+
+  const { data: assetsEnabled = true, refetch: refetchAssets } = useQuery({
+    queryKey: ["company-module", companyId, "ASSETS"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "ASSETS"),
     enabled: queryEnabled,
   });
 
@@ -255,6 +262,19 @@ export default function AdminModules() {
             if (!companyId) return;
             await setCompanyModuleEnabled(companyId, "INTERNAL_COMMUNICATION", v);
             await refetchInternalComm();
+            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
+
+        <ModuleToggle
+          icon={<Box className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="Gestão de Ativos"
+          description="Controle completo do patrimônio da empresa. Acompanhe ativos, cessões, depreciação e ocorrências."
+          checked={assetsEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "ASSETS", v);
+            await refetchAssets();
             toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
           }}
         />

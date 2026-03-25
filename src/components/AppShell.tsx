@@ -312,6 +312,15 @@ const nav: NavItem[] = [
         roles: ["MASTERADMIN", "ADMIN", "HEAD"],
         moduleKey: "COSTS",
       },
+      // Gestão de Ativos
+      {
+        type: "link",
+        to: "/app/ativos/lista",
+        label: "Gestão de Ativos",
+        icon: <Box className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "ASSETS",
+      },
       // Settings moved to Configurações group
     ],
   },

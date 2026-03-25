@@ -61,6 +61,13 @@ function AssetsList() {
       if (categoryFilter !== "all") filters.category = [categoryFilter];
       if (searchTerm) filters.search = searchTerm;
       
+      // Adicionar filtros de permissão
+      if (user) {
+        filters.user_role = user.role;
+        filters.user_department_id = user.departmentId || undefined;
+        filters.user_id = user.id;
+      }
+      
       const data = await listAssets(companyId, filters);
       setAssets(data);
     } catch (error) {
@@ -70,11 +77,14 @@ function AssetsList() {
     }
   }
 
+  // Verificar se usuário pode editar (não colaborador)
+  const canEdit = user?.role !== "COLABORADOR";
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Gestão de Ativos</h1>
-        <Button>
+        <Button onClick={() => {/* TODO: Implementar criação de ativo */}} disabled={!canEdit}>
           <Plus className="mr-2 h-4 w-4" />
           Novo Ativo
         </Button>

@@ -627,6 +627,9 @@ export interface AssetFilters {
   profile_id?: string; // ativos de um colaborador específico
   date_from?: string; // data de aquisição a partir de
   date_to?: string; // data de aquisição até
+  user_role?: string; // papel do usuário para filtros de permissão
+  user_department_id?: string; // departamento do usuário para filtros de permissão
+  user_id?: string; // ID do usuário para filtros de permissão
 }
 
 /**
@@ -860,6 +863,48 @@ export async function listAssets(tenantId: string, filters?: AssetFilters) {
   if (error) throw error;
 
   let assets = (data ?? []) as DbAsset[];
+
+  // Aplicar filtros de permissão por departamento (necessário fazer query separada para assignments)
+  if (filters && (filters.user_role === "HEAD" || filters.user_role === "COLABORADOR")) {
+    const assetIds = assets.map(a => a.id);
+    if (assetIds.length === 0) return [];
+
+    let assignmentsQuery = supabase
+      .from("asset_assignments")
+      .select("asset_id,profile_id,expected_return_date,signed_document_url")
+      .in("asset_id", assetIds)
+      .eq("status", "active");
+
+    if (filters.user_role === "COLABORADOR" && filters.user_id) {
+      // Colaborador: ver apenas seus próprios ativos
+      assignmentsQuery = assignmentsQuery.eq("profile_id", filters.user_id);
+    } else if (filters.user_role === "HEAD" && filters.user_department_id) {
+      // Head: ver ativos do seu departamento
+      const { data: departmentProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("department_id", filters.user_department_id);
+
+      if (departmentProfiles && departmentProfiles.length > 0) {
+        const profileIds = departmentProfiles.map(p => p.id);
+        assignmentsQuery = assignmentsQuery.in("profile_id", profileIds);
+      }
+    }
+
+    const { data: assignments } = await assignmentsQuery;
+
+    if (assignments && assignments.length > 0) {
+      const activeAssetIds = new Set(assignments.map(a => a.asset_id));
+
+      // Colaboradores e Heads veem apenas ativos com cessões ativas
+      if (filters.user_role === "COLABORADOR" || filters.user_role === "HEAD") {
+        assets = assets.filter(a => activeAssetIds.has(a.id));
+      }
+    } else if (filters.user_role === "COLABORADOR") {
+      // Colaborador sem assignments: não ver nada
+      return [];
+    }
+  }
 
   // Filtrar ativos com devolução pendente (precisa buscar assignments)
   if (filters?.with_pending_return || filters?.profile_id) {
