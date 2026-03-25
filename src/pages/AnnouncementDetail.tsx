@@ -137,9 +137,9 @@ export default function AnnouncementDetailPage() {
   if (!enrichedAnnouncement) {
     return (
       <div className="max-w-4xl mx-auto p-6">
-        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-12 text-center">
-          <h3 className="text-lg font-semibold">Recado não encontrado</h3>
-          <p className="mt-2 text-sm text-muted-foreground">
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-12 text-center">
+          <h3 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Recado não encontrado</h3>
+          <p className="mt-2 text-sm text-[color:var(--sinaxys-ink)]/70">
             Este recado pode ter sido removido ou você não tem permissão para visualizá-lo.
           </p>
           <Button onClick={() => navigate("/announcements")} className="mt-4 rounded-xl">
@@ -227,25 +227,25 @@ export default function AnnouncementDetailPage() {
         )}
       </div>
 
-      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-8">
+      <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-8">
         <div className="space-y-6">
           {/* Header */}
           <div className="space-y-4">
             <div className="flex items-start justify-between gap-4">
               <div className="flex-1">
-                <h1 className="text-2xl font-bold text-gray-900">{enrichedAnnouncement.title}</h1>
+                <h1 className="text-2xl font-bold text-[color:var(--sinaxys-ink)]">{enrichedAnnouncement.title}</h1>
                 <div className="mt-3 flex flex-wrap items-center gap-3">
                   {enrichedAnnouncement.scope === "company" ? (
-                    <Badge className="bg-blue-100 text-blue-700">Empresa</Badge>
+                    <Badge className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]">Empresa</Badge>
                   ) : (
-                    <Badge className="bg-green-100 text-green-700">Meu time</Badge>
+                    <Badge className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)]">Meu time</Badge>
                   )}
                   {enrichedAnnouncement.team_name && (
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-[color:var(--sinaxys-ink)]/70">
                       • {enrichedAnnouncement.team_name}
                     </span>
                   )}
-                  <span className="text-sm text-muted-foreground">
+                  <span className="text-sm text-[color:var(--sinaxys-ink)]/70">
                     • {formatDate(enrichedAnnouncement.published_at)}
                   </span>
                 </div>
@@ -253,29 +253,29 @@ export default function AnnouncementDetailPage() {
             </div>
 
             {/* Author */}
-            <div className="flex items-center gap-3 rounded-xl bg-gray-50 p-4">
+            <div className="flex items-center gap-3 rounded-xl bg-[color:var(--sinaxys-tint)] p-4">
               {enrichedAnnouncement.author_avatar ? (
                 <Avatar className="h-12 w-12">
                   <AvatarImage src={enrichedAnnouncement.author_avatar} alt={enrichedAnnouncement.author_name} />
-                  <AvatarFallback className="bg-purple-100 text-purple-700">
+                  <AvatarFallback className="bg-[color:var(--sinaxys-primary)] text-white">
                     {getInitials(enrichedAnnouncement.author_name)}
                   </AvatarFallback>
                 </Avatar>
               ) : (
-                <Avatar className="h-12 w-12 bg-purple-100 text-purple-700">
+                <Avatar className="h-12 w-12 bg-[color:var(--sinaxys-primary)] text-white">
                   <AvatarFallback>{getInitials(enrichedAnnouncement.author_name)}</AvatarFallback>
                 </Avatar>
               )}
               <div>
-                <p className="font-medium text-gray-900">{enrichedAnnouncement.author_name}</p>
-                <p className="text-sm text-muted-foreground">Publicou este recado</p>
+                <p className="font-medium text-[color:var(--sinaxys-ink)]">{enrichedAnnouncement.author_name}</p>
+                <p className="text-sm text-[color:var(--sinaxys-ink)]/70">Publicou este recado</p>
               </div>
             </div>
           </div>
 
           {/* Content */}
           <div className="prose prose-slate max-w-none">
-            <div className="whitespace-pre-wrap text-gray-700">{enrichedAnnouncement.content}</div>
+            <div className="whitespace-pre-wrap text-[color:var(--sinaxys-ink)]/70">{enrichedAnnouncement.content}</div>
           </div>
         </div>
       </Card>
