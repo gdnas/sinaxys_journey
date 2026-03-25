@@ -81,7 +81,8 @@ export async function getVisibleAnnouncements(
   // If we have a team id, include both company-scoped and team-scoped announcements
   if (teamId) {
     // Use PostgREST OR to combine company scope and team-scoped for the specific team
-    query = query.or(`scope.eq.company,AND(scope.eq.team,team_id.eq.${teamId})`);
+    // Note: PostgREST expects lowercase 'and' inside the OR expression
+    query = query.or(`scope.eq.company,and(scope.eq.team,team_id.eq.${teamId})`);
   } else {
     // No team -> only company-scoped announcements
     query = query.eq("scope", "company");
