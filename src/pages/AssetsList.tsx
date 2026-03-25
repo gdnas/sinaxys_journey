@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import AssetModal from "@/components/assets/AssetModal";
 
 // =====================
 // SUBCOMPONENTS
@@ -48,6 +49,8 @@ function AssetsList() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [assets, setAssets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
 
   useEffect(() => {
     loadAssets();
@@ -137,12 +140,20 @@ function AssetsList() {
                   <div className="font-semibold">{asset.asset_code}</div>
                   <div className="text-sm text-gray-500">{asset.asset_type}</div>
                 </div>
-                <StatusBadge status={asset.status} />
+                <div className="flex items-center gap-2">
+                  <StatusBadge status={asset.status} />
+                  <Button variant="ghost" size="sm" onClick={() => { setSelectedAssetId(asset.id); setModalOpen(true); }}>
+                    Ver
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
         )}
       </Card>
+      {selectedAssetId && (
+        <AssetModal assetId={selectedAssetId} open={modalOpen} onOpenChange={(v) => setModalOpen(v)} onUpdated={() => loadAssets()} onDeleted={() => { setModalOpen(false); loadAssets(); }} />
+      )}
     </div>
   );
 }
