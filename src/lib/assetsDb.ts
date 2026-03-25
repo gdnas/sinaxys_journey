@@ -876,7 +876,7 @@ export async function getAssetWithDetails(id: string): Promise<AssetWithDetails 
 
   return {
     ...asset,
-    current_assignment: assignments || undefined,
+    current_assignment: (assignments as AssignmentWithDetails | null) || undefined,
     documents: documents || [],
     events: events || [],
     incidents: incidents || [],
