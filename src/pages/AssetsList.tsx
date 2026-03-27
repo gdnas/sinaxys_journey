@@ -142,6 +142,9 @@ function AssetsList() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={asset.status} />
+                  {canEdit && asset.status === 'in_stock' && (
+                    <Button asChild size="sm"><Link to={`/app/ativos/${asset.id}/entregar`}>Entregar</Link></Button>
+                  )}
                   <Button variant="ghost" size="sm" onClick={() => { setSelectedAssetId(asset.id); setModalOpen(true); }}>
                     Ver
                   </Button>

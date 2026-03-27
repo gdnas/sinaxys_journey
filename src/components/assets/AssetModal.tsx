@@ -150,6 +150,8 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
     }
   }
 
+  const canManage = user?.role === "MASTERADMIN" || user?.role === "ADMIN";
+
   return (
     <>
       <BlurDialog open={open} onOpenChange={onOpenChange}>
@@ -177,6 +179,9 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
               </div>
 
               <div className="flex items-start gap-2">
+                {canManage && asset?.status === 'in_stock' && (
+                  <Button asChild size="sm" variant="secondary"><a href={`/app/ativos/${assetId}/entregar`}>Entregar</a></Button>
+                )}
                 <Button asChild size="sm" variant="outline"><a href={`/app/ativos/${assetId}/editar`}><Edit3 className="mr-2 h-4 w-4"/>Editar</a></Button>
                 <Button size="sm" variant="destructive" onClick={handleDelete}><Trash2 className="mr-2 h-4 w-4"/>Excluir</Button>
               </div>
