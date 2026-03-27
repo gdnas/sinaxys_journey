@@ -82,7 +82,10 @@ function AssetsList() {
   }
 
   // Verificar se usuário pode editar (não colaborador)
-  const canEdit = user?.role !== "COLABORADOR";
+  const canEdit = (user?.role || "").toString().toUpperCase() !== "COLABORADOR";
+  // Verificar se pode gerenciar (mostrar ações como Entregar)
+  const roleValue = (user?.role || "").toString().toUpperCase();
+  const canManage = roleValue === "MASTERADMIN" || roleValue === "ADMIN";
 
   return (
     <div className="container mx-auto p-6">
@@ -142,7 +145,7 @@ function AssetsList() {
                 </div>
                 <div className="flex items-center gap-2">
                   <StatusBadge status={asset.status} />
-                  {canEdit && asset.status === 'in_stock' && (
+                  {canManage && asset.status === 'in_stock' && (
                     <Button asChild size="sm"><Link to={`/app/ativos/${asset.id}/entregar`}>Entregar</Link></Button>
                   )}
                   <Button variant="ghost" size="sm" onClick={() => { setSelectedAssetId(asset.id); setModalOpen(true); }}>

@@ -150,7 +150,8 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
     }
   }
 
-  const canManage = user?.role === "MASTERADMIN" || user?.role === "ADMIN";
+  const roleValue = (user?.role || "").toString().toUpperCase();
+  const canManage = roleValue === "MASTERADMIN" || roleValue === "ADMIN";
 
   return (
     <>
