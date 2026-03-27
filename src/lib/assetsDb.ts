@@ -1592,7 +1592,7 @@ export async function uploadAssetDocumentFile({
       errInfo.message = uploadError.message || JSON.stringify(uploadError);
       if ((uploadError as any).status) errInfo.status = (uploadError as any).status;
       if ((uploadError as any).statusCode) errInfo.statusCode = (uploadError as any).statusCode;
-      if (uploadError.details) errInfo.details = uploadError.details;
+      if ((uploadError as any).details) errInfo.details = (uploadError as any).details;
     }
 
     // If the bucket wasn't found, provide a clearer action message
