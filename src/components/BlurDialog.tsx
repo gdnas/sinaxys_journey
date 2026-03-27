@@ -19,7 +19,7 @@ export const BlurDialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-[92vw] max-w-[560px] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-6 shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+        "fixed left-[50%] top-[50%] z-50 grid w-[92vw] max-w-[560px] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-3xl border border-[color:var(--sinaxys-border)] bg-white p-6 shadow-xl duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 max-h-[90vh] overflow-auto",
         className,
       )}
       {...props}
