@@ -1591,7 +1591,7 @@ export async function uploadAssetDocumentFile({
       // Copy common fields
       errInfo.message = uploadError.message || JSON.stringify(uploadError);
       if ((uploadError as any).status) errInfo.status = (uploadError as any).status;
-      if (uploadError.statusCode) errInfo.statusCode = uploadError.statusCode;
+      if ((uploadError as any).statusCode) errInfo.statusCode = (uploadError as any).statusCode;
       if (uploadError.details) errInfo.details = uploadError.details;
     }
 
