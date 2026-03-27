@@ -167,8 +167,8 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
                   <div><span className="font-medium">Localização:</span> {asset?.current_location ?? '—'}</div>
                   <div><span className="font-medium">Fornecedor:</span> {asset?.supplier ?? '—'}</div>
                   <div><span className="font-medium">Data compra:</span> {asset?.purchase_date ? new Date(asset.purchase_date).toLocaleDateString() : '—'}</div>
-                  <div><span className="font-medium">Valor compra:</span> {asset?.purchase_value ? `R$ ${Number(asset.purchase_value).toLocaleString()` : '—'}</div>
-                  <div><span className="font-medium">Valor residual:</span> {asset?.residual_value_current ? `R$ ${Number(asset.residual_value_current).toLocaleString()` : '—'}</div>
+                  <div><span className="font-medium">Valor compra:</span> {asset?.purchase_value ? `R$ ${Number(asset.purchase_value).toLocaleString()}` : '—'}</div>
+                  <div><span className="font-medium">Valor residual:</span> {asset?.residual_value_current ? `R$ ${Number(asset.residual_value_current).toLocaleString()}` : '—'}</div>
                   <div><span className="font-medium">Vida útil (meses):</span> {asset?.useful_life_months ?? '—'}</div>
                 </div>
                 {asset?.notes && (
