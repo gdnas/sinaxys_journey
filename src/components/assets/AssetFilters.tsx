@@ -174,14 +174,14 @@ export function AssetFilters({
         <div className="space-y-2">
           <Label>Status</Label>
           <Select
-            value={filters.status?.[0] || ""}
-            onValueChange={(value) => updateFilter('status', value ? [value as AssetStatus] : undefined)}
+            value={filters.status?.[0] ?? "all"}
+            onValueChange={(value) => updateFilter('status', value === "all" ? undefined : [value as AssetStatus])}
           >
             <SelectTrigger className="rounded-xl">
               <SelectValue placeholder="Todos os status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todos os status</SelectItem>
+              <SelectItem value="all">Todos os status</SelectItem>
               {statusOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -195,14 +195,14 @@ export function AssetFilters({
         <div className="space-y-2">
           <Label>Categoria</Label>
           <Select
-            value={filters.category?.[0] || ""}
-            onValueChange={(value) => updateFilter('category', value ? [value as AssetCategory] : undefined)}
+            value={filters.category?.[0] ?? "all"}
+            onValueChange={(value) => updateFilter('category', value === "all" ? undefined : [value as AssetCategory])}
           >
             <SelectTrigger className="rounded-xl">
               <SelectValue placeholder="Todas as categorias" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Todas as categorias</SelectItem>
+              <SelectItem value="all">Todas as categorias</SelectItem>
               {categoryOptions.map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
