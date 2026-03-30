@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, ChevronRight, Wallet, Plus, Receipt, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -41,6 +41,13 @@ type CostPerson = {
   department_id: string | null;
   monthly_cost_brl: number | null;
   isHead?: boolean;
+};
+
+type DeptCostData = {
+  people_cost: number;
+  expense_cost: number;
+  people_count: number;
+  total_cost: number;
 };
 
 export default function AdminCosts() {
@@ -166,49 +173,85 @@ export default function AdminCosts() {
     return m;
   }, [activePeople, departments, headByDeptId]);
 
-  // Calculate department costs with expenses
-  const byDept = await Promise.all(
-    costItems.filter(item => item.active).map(async (costItem) => {
-      const allocations = await listCostAllocations(costItem.id);
-      const deptCosts = new Map<string, { people_cost: number; expense_cost: number; people_count: number; total_cost: number }>();
+  // State for department costs with expenses
+  const [byDept, setByDept] = useState<Array<[string, DeptCostData]>>([]);
 
-      for (const alloc of allocations) {
-        const deptId = alloc.department_id;
-        const deptCost = deptCosts.get(deptId) || { people_cost: 0, expense_cost: 0, people_count: 0, total_cost: 0, };
-        if (alloc.allocation_percentage) {
-          deptCost.expense_cost += (alloc.allocation_percentage / 100) * n(costItem.total_monthly_cost);
-        }
-        deptCosts.set(deptId, deptCost);
+  // Calculate department costs with expenses asynchronously
+  useEffect(() => {
+    let cancelled = false;
+
+    const calculateDeptCosts = async () => {
+      // First, initialize with people costs
+      const deptCostsMap = new Map<string, DeptCostData>();
+
+      for (const person of activePeople) {
+        const deptId = person.department_id ?? "__none__";
+        const existing = deptCostsMap.get(deptId) || {
+          people_cost: 0,
+          expense_cost: 0,
+          people_count: 0,
+          total_cost: 0,
+        };
+        existing.people_cost += Math.max(0, n(person.monthly_cost_brl));
+        existing.people_count += 1;
+        existing.total_cost = existing.people_cost + existing.expense_cost;
+        deptCostsMap.set(deptId, existing);
       }
 
-      return [deptId, deptCost];
-    })
-  );
+      // Then add expense costs from cost items
+      const activeCostItems = costItems.filter(item => item.active);
 
-  // Merge all department costs
-  const deptCostsMap = new Map<string, { people_cost: number; expense_cost: number; people_count: number; total_cost: number }>();
-  for (const [deptId, deptCost] of byDept) {
-    deptCostsMap.set(deptId, deptCost);
-  }
+      for (const costItem of activeCostItems) {
+        const allocations = await listCostAllocations(costItem.id);
+        for (const alloc of allocations) {
+          const deptId = alloc.department_id;
+          const existing = deptCostsMap.get(deptId) || {
+            people_cost: 0,
+            expense_cost: 0,
+            people_count: 0,
+            total_cost: 0,
+          };
+          if (alloc.allocation_percentage) {
+            existing.expense_cost += (alloc.allocation_percentage / 100) * n(costItem.total_monthly_cost);
+          }
+          existing.total_cost = existing.people_cost + existing.expense_cost;
+          deptCostsMap.set(deptId, existing);
+        }
+      }
+
+      if (!cancelled) {
+        // Convert to array of tuples
+        const result = Array.from(deptCostsMap.entries()).filter(([id]) => id !== "__none__");
+        setByDept(result);
+      }
+    };
+
+    calculateDeptCosts();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activePeople, costItems]);
 
   // Calculate totals
-  const companyMonthly = useMemo(async () => {
+  const companyMonthly = useMemo(() => {
     const peopleTotal = activeWithCost.reduce((acc, p) => acc + Math.max(0, n(p.monthly_cost_brl)), 0);
-    const expenseTotal = Array.from(deptCostsMap.values()).reduce((acc, [, dept]) => acc + dept.expense_cost, 0);
+    const expenseTotal = byDept.reduce((acc, [, dept]) => acc + dept.expense_cost, 0);
     return peopleTotal + expenseTotal;
-  }, [activeWithCost]);
+  }, [activeWithCost, byDept]);
 
   const companyPeopleCost = useMemo(() => {
     return activeWithCost.reduce((acc, p) => acc + Math.max(0, n(p.monthly_cost_brl)), 0);
   }, [activeWithCost]);
 
   const companyExpenseCost = useMemo(() => {
-    return Array.from(byDept.values()).reduce((acc, [, cost]) => acc + cost.expense_cost, 0);
+    return byDept.reduce((acc, [, cost]) => acc + cost.expense_cost, 0);
   }, [byDept]);
 
   const myDeptTotal = useMemo(() => {
     if (!user.departmentId) return 0;
-    return byDept.get(user.departmentId)?.total_cost ?? 0;
+    const dept = byDept.find(([id]) => id === user.departmentId);
+    return dept?.[1]?.total_cost ?? 0;
   }, [byDept, user.departmentId]);
 
   const [openDept, setOpenDept] = useState(false);
@@ -216,7 +259,7 @@ export default function AdminCosts() {
 
   const selectedDept = useMemo(() => {
     if (!selectedDeptId) return null;
-    return byDept.get(selectedDeptId) ?? null;
+    return byDept.find(([id]) => id === selectedDeptId)?.[1] ?? null;
   }, [byDept, selectedDeptId]);
 
   const selectedPeople = useMemo(() => {
