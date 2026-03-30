@@ -35,6 +35,7 @@ import { FinanceiroPanel } from "@/components/FinanceiroPanel";
 import VacationRequests from "@/pages/VacationRequests";
 import VacationApprovals from "@/pages/VacationApprovals";
 import { useTranslation } from "react-i18next";
+import { UserAssetsTab } from "@/components/assets/UserAssetsTab";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -304,6 +305,7 @@ export default function Profile() {
             <TabsTrigger value="perfil" className="shrink-0 rounded-xl">{t('profile.tab_perfil')}</TabsTrigger>
             <TabsTrigger value="trabalho" className="shrink-0 rounded-xl">{t('profile.tab_trabalho')}</TabsTrigger>
             <TabsTrigger value="docs" className="shrink-0 rounded-xl">{t('profile.tab_docs')}</TabsTrigger>
+            <TabsTrigger value="ativos" className="shrink-0 rounded-xl">Ativos</TabsTrigger>
             <TabsTrigger value="financeiro" className="shrink-0 rounded-xl">{t('profile.tab_financeiro')}</TabsTrigger>
             <TabsTrigger value="ferias" className="shrink-0 rounded-xl">{t('profile.tab_ferias')}</TabsTrigger>
           </ScrollableTabsList>
@@ -716,6 +718,15 @@ export default function Profile() {
                 )}
               </div>
             </div>
+          </TabsContent>
+
+          <TabsContent value="ativos" className="mt-5">
+            <UserAssetsTab
+              userId={user.id}
+              companyId={user.companyId ?? ''}
+              userRole={user.role}
+              currentUserId={user.id}
+            />
           </TabsContent>
 
           <TabsContent value="financeiro" className="mt-5">

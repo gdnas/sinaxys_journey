@@ -434,7 +434,52 @@ export interface CreateAssetDocumentInput {
 // =====================
 
 /**
- * Ativo com dados expandido
+ * Ativo com dados expandidos incluindo cessão atual
+ */
+export interface AssetWithAssignee extends DbAsset {
+  current_assignment?: {
+    id: string;
+    profile_id: string;
+    profile: {
+      id: string;
+      name: string;
+      job_title: string | null;
+      department_id: string | null;
+    } | null;
+    contractor_company?: {
+      id: string;
+      legal_name: string;
+    } | null;
+    assigned_at: string;
+    expected_return_date: string | null;
+    signed_document_url: string | null;
+    status: AssignmentStatus;
+  };
+}
+
+/**
+ * Ativo no perfil do usuário (formato simplificado)
+ */
+export interface UserAsset {
+  id: string;
+  asset_code: string;
+  asset_type: string;
+  category: AssetCategory;
+  brand: string | null;
+  model: string | null;
+  serial_number: string | null;
+  status: AssetStatus;
+  condition_initial: AssetCondition;
+  assigned_at: string;
+  expected_return_date: string | null;
+  signed_document_url: string | null;
+  modality: AssignmentModality;
+  returned_at: string | null;
+  return_condition: AssetCondition | null;
+}
+
+/**
+ * Ativo expandido
  */
 export interface AssetWithDetails extends DbAsset {
   current_assignment?: DbAssetAssignment & {
@@ -633,6 +678,16 @@ export interface AssetFilters {
 }
 
 /**
+ * Filtros expandidos para listagem de ativos (inclui novos filtros)
+ */
+export interface ExpandedAssetFilters extends AssetFilters {
+  assignee_id?: string;           // Filtrar por responsável específico
+  department_id?: string;          // Filtrar por departamento do responsável
+  has_assignee?: boolean;          // true=com responsável, false=sem responsável
+  has_contract?: boolean;          // true=com contrato, false=sem contrato
+}
+
+/**
  * Filtros para listagem de cessões
  */
 export interface AssignmentFilters {
@@ -822,6 +877,254 @@ export async function deleteContractorCompany(id: string) {
 // =====================================================
 // ASSETS
 // =====================================================
+
+/**
+ * Listar ativos com dados do responsável atual
+ */
+export async function listAssetsWithAssignee(
+  tenantId: string,
+  filters?: ExpandedAssetFilters
+): Promise<AssetWithAssignee[]> {
+  let query = supabase
+    .from("assets")
+    .select(`
+      ${ASSETS_BASE_SELECT},
+      current_assignment:asset_assignments(
+        id,
+        profile_id,
+        assigned_at,
+        expected_return_date,
+        signed_document_url,
+        status,
+        modality,
+        profile:profiles(id,name,job_title,department_id),
+        contractor_company:contractor_companies(id,legal_name)
+      )
+    `)
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false });
+
+  // Aplicar filtros básicos
+  if (filters) {
+    if (filters.status?.length) {
+      query = query.in("status", filters.status);
+    }
+    if (filters.category?.length) {
+      query = query.in("category", filters.category);
+    }
+    if (filters.available_only) {
+      query = query.eq("status", "in_stock");
+    }
+    if (filters.in_use_only) {
+      query = query.eq("status", "in_use");
+    }
+    if (filters.acquired_by_user) {
+      query = query.eq("status", "acquired_by_user");
+    }
+    if (filters.date_from) {
+      query = query.gte("purchase_date", filters.date_from);
+    }
+    if (filters.date_to) {
+      query = query.lte("purchase_date", filters.date_to);
+    }
+    if (filters.search) {
+      // Busca por código, marca, modelo, série
+      query = query.or(`asset_code.ilike.%${filters.search}%,brand.ilike.%${filters.search}%,model.ilike.%${filters.search}%,serial_number.ilike.%${filters.search}%`);
+    }
+  }
+
+  const { data, error } = await query;
+
+  if (error) throw error;
+
+  let assets = (data ?? []) as any[];
+
+  // Extrair assignment único (vem como array)
+  assets = assets.map((asset: any) => ({
+    ...asset,
+    current_assignment: Array.isArray(asset.current_assignment) && asset.current_assignment.length > 0 
+      ? {
+          id: asset.current_assignment[0].id,
+          profile_id: asset.current_assignment[0].profile_id,
+          profile: Array.isArray(asset.current_assignment[0].profile) 
+            ? asset.current_assignment[0].profile[0] 
+            : asset.current_assignment[0].profile,
+          contractor_company: Array.isArray(asset.current_assignment[0].contractor_company)
+            ? asset.current_assignment[0].contractor_company[0]
+            : asset.current_assignment[0].contractor_company,
+          assigned_at: asset.current_assignment[0].assigned_at,
+          expected_return_date: asset.current_assignment[0].expected_return_date,
+          signed_document_url: asset.current_assignment[0].signed_document_url,
+          status: asset.current_assignment[0].status,
+          modality: asset.current_assignment[0].modality,
+        }
+      : undefined,
+  }));
+
+  // Aplicar filtros de responsável
+  if (filters) {
+    if (filters.assignee_id) {
+      assets = assets.filter((a: any) => 
+        a.current_assignment?.profile_id === filters.assignee_id
+      );
+    }
+
+    if (filters.department_id) {
+      assets = assets.filter((a: any) => 
+        a.current_assignment?.profile?.department_id === filters.department_id
+      );
+    }
+
+    if (filters.has_assignee === true) {
+      assets = assets.filter((a: any) => a.current_assignment);
+    } else if (filters.has_assignee === false) {
+      assets = assets.filter((a: any) => !a.current_assignment);
+    }
+
+    if (filters.has_contract === true) {
+      assets = assets.filter((a: any) => 
+        a.current_assignment?.signed_document_url
+      );
+    } else if (filters.has_contract === false) {
+      assets = assets.filter((a: any) => 
+        !a.current_assignment?.signed_document_url
+      );
+    }
+  }
+
+  // Aplicar filtros de permissão por departamento
+  if (filters && (filters.user_role === "HEAD" || filters.user_role === "COLABORADOR")) {
+    let assignmentsQuery = supabase
+      .from("asset_assignments")
+      .select("asset_id,profile_id")
+      .eq("tenant_id", tenantId)
+      .eq("status", "active");
+
+    if (filters.user_role === "COLABORADOR" && filters.user_id) {
+      assignmentsQuery = assignmentsQuery.eq("profile_id", filters.user_id);
+    } else if (filters.user_role === "HEAD" && filters.user_department_id) {
+      const { data: departmentProfiles } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("department_id", filters.user_department_id);
+
+      if (departmentProfiles && departmentProfiles.length > 0) {
+        const profileIds = departmentProfiles.map(p => p.id);
+        assignmentsQuery = assignmentsQuery.in("profile_id", profileIds);
+      }
+    }
+
+    const { data: assignments } = await assignmentsQuery;
+
+    if (assignments && assignments.length > 0) {
+      const activeAssetIds = new Set(assignments.map(a => a.asset_id));
+      
+      // Colaboradores e Heads veem apenas ativos com cessões ativas
+      if (filters.user_role === "COLABORADOR" || filters.user_role === "HEAD") {
+        assets = assets.filter(a => activeAssetIds.has(a.id));
+      }
+    } else if (filters.user_role === "COLABORADOR") {
+      return [];
+    }
+  }
+
+  return assets;
+}
+
+/**
+ * Listar ativos atuais de um usuário
+ */
+export async function listUserAssets(
+  userId: string,
+  tenantId: string
+): Promise<UserAsset[]> {
+  const { data, error } = await supabase
+    .from("asset_assignments")
+    .select(`
+      asset_id,
+      assigned_at,
+      expected_return_date,
+      signed_document_url,
+      modality,
+      status,
+      asset:assets(${ASSETS_BASE_SELECT})
+    `)
+    .eq("profile_id", userId)
+    .eq("tenant_id", tenantId)
+    .eq("status", "active")
+    .order("assigned_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? []).map((item: any) => {
+    const asset = Array.isArray(item.asset) ? item.asset[0] : item.asset;
+    return {
+      id: asset.id,
+      asset_code: asset.asset_code,
+      asset_type: asset.asset_type,
+      category: asset.category,
+      brand: asset.brand,
+      model: asset.model,
+      serial_number: asset.serial_number,
+      status: asset.status,
+      condition_initial: asset.condition_initial,
+      assigned_at: item.assigned_at,
+      expected_return_date: item.expected_return_date,
+      signed_document_url: item.signed_document_url,
+      modality: item.modality,
+      returned_at: null,
+      return_condition: null,
+    };
+  });
+}
+
+/**
+ * Listar histórico de ativos de um usuário
+ */
+export async function listUserAssetHistory(
+  userId: string,
+  tenantId: string
+): Promise<UserAsset[]> {
+  const { data, error } = await supabase
+    .from("asset_assignments")
+    .select(`
+      asset_id,
+      assigned_at,
+      returned_at,
+      return_condition,
+      signed_document_url,
+      modality,
+      status,
+      asset:assets(${ASSETS_BASE_SELECT})
+    `)
+    .eq("profile_id", userId)
+    .eq("tenant_id", tenantId)
+    .eq("status", "completed")
+    .order("returned_at", { ascending: false });
+
+  if (error) throw error;
+
+  return (data ?? []).map((item: any) => {
+    const asset = Array.isArray(item.asset) ? item.asset[0] : item.asset;
+    return {
+      id: asset.id,
+      asset_code: asset.asset_code,
+      asset_type: asset.asset_type,
+      category: asset.category,
+      brand: asset.brand,
+      model: asset.model,
+      serial_number: asset.serial_number,
+      status: asset.status,
+      condition_initial: asset.condition_initial,
+      assigned_at: item.assigned_at,
+      expected_return_date: null,
+      signed_document_url: item.signed_document_url,
+      modality: item.modality,
+      returned_at: item.returned_at,
+      return_condition: item.return_condition,
+    };
+  });
+}
 
 export async function listAssets(tenantId: string, filters?: AssetFilters) {
   let query = supabase
