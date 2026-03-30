@@ -164,7 +164,7 @@ BEGIN
     wi.checklist,
     -- Contexto de projeto
     p.name AS project_name,
-    p.template_type AS project_template_type,
+    NULL::text AS project_template_type,
     -- Contexto de Key Result
     kr.title AS key_result_title,
     -- Contexto de Deliverable
