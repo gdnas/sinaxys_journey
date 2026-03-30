@@ -112,21 +112,16 @@ export async function createSquad(
     name: string;
   },
 ): Promise<Squad> {
-  // Normalize empty strings -> null to avoid invalid input syntax errors on DB
-  const payload = {
-    company_id: data.company_id,
-    name: data.name,
-    product: data.product ?? null,
-    // 'type' is a strict enum union; use nullish coalescing instead of comparing to "".
-    type: data.type ?? null,
-    owner_user_id:
-      data.owner_user_id && data.owner_user_id !== "" ? data.owner_user_id : null,
-    active: data.active !== undefined ? data.active : true,
-  };
-
   const { data: squad, error } = await supabase
     .from("squads")
-    .insert(payload)
+    .insert({
+      company_id: data.company_id,
+      name: data.name,
+      product: data.product,
+      type: data.type,
+      owner_user_id: data.owner_user_id,
+      active: data.active !== undefined ? data.active : true,
+    })
     .select()
     .single();
 
@@ -138,20 +133,15 @@ export async function updateSquad(
   id: string,
   data: Partial<Squad>,
 ): Promise<Squad> {
-  // Normalize empty strings -> null
-  const payload = {
-    name: data.name,
-    product: data.product ?? null,
-    // 'type' is a strict enum union; use nullish coalescing instead of comparing to "".
-    type: data.type ?? null,
-    owner_user_id:
-      data.owner_user_id && data.owner_user_id !== "" ? data.owner_user_id : null,
-    active: data.active,
-  };
-
   const { data: squad, error } = await supabase
     .from("squads")
-    .update(payload)
+    .update({
+      name: data.name,
+      product: data.product,
+      type: data.type,
+      owner_user_id: data.owner_user_id,
+      active: data.active,
+    })
     .eq("id", id)
     .select()
     .single();
@@ -273,9 +263,9 @@ export async function getUserSquads(userId: string): Promise<
   return (data || []).map((item: any) => ({
     squad_id: item.squad_id,
     squad_name: item.squads?.name || "Unknown",
-    allocation_percentage: item.allocation_percentage,
-    role: item.role,
-  }));
+      allocation_percentage: item.allocation_percentage,
+      role: item.role,
+    }));
 }
 
 export async function calculateSquadCost(squadId: string): Promise<number> {
