@@ -81,10 +81,17 @@ export function SquadForm({ open, onOpenChange, squad, companyId, onSave }: Squa
   const onSubmit = async (data: SquadFormData) => {
     try {
       setIsSubmitting(true);
-      await onSave({
+
+      // Normalize empty strings to null before sending to API
+      const payload = {
         ...data,
         company_id: companyId,
-      });
+        owner_user_id: data.owner_user_id && data.owner_user_id !== "" ? data.owner_user_id : null,
+        type: data.type && (data.type as any) !== "" ? data.type : null,
+        product: data.product && data.product !== "" ? data.product : null,
+      };
+
+      await onSave(payload);
       toast.success(squad ? "Squad atualizado com sucesso" : "Squad criado com sucesso");
       onOpenChange(false);
       form.reset();
