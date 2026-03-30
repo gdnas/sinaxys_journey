@@ -100,6 +100,8 @@ import AssetDetail from "./pages/AssetDetail";
 import AssetAssignForm from "./pages/AssetAssignForm";
 import AssetReturnForm from "./pages/AssetReturnForm";
 import AssetIncidentForm from "./pages/AssetIncidentForm";
+import SquadList from "./pages/SquadList";
+import SquadDetail from "./pages/SquadDetail";
 
 const queryClient = new QueryClient();
 
@@ -901,6 +903,26 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD"]}>
                         <AdminCosts />
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/admin/squads"
+                    element={
+                      <RequireAuth roles={["ADMIN"]}>
+                        <RequireCompanyModule moduleKey="SQUAD_INTELLIGENCE">
+                          <SquadList />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/admin/squads/:squadId"
+                    element={
+                      <RequireAuth roles={["ADMIN"]}>
+                        <RequireCompanyModule moduleKey="SQUAD_INTELLIGENCE">
+                          <SquadDetail />
+                        </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />

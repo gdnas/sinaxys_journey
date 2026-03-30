@@ -33,6 +33,7 @@ import {
   Wallet,
   Wrench,
   Users,
+  Users2,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -229,6 +230,24 @@ const nav: NavItem[] = [
         moduleKey: "POINTS",
       },
       // NOTE: 'Conhecimento' removed from Evolução - it should appear only under Empresa as 'Base de Conhecimento'
+    ],
+  },
+
+  // === SQUAD INTELLIGENCE ===
+  {
+    type: "group",
+    label: "Squad Intelligence",
+    icon: <Users2 className="h-4 w-4" />,
+    moduleKey: "SQUAD_INTELLIGENCE",
+    children: [
+      {
+        type: "link",
+        to: "/admin/squads",
+        label: "Squads",
+        icon: <Layers className="h-4 w-4" />,
+        roles: ["ADMIN"],
+        moduleKey: "SQUAD_INTELLIGENCE",
+      },
     ],
   },
 
@@ -681,6 +700,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => isCompanyModuleEnabled(String(companyId), "ASSETS"),
     enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
   });
+  const { data: squadIntelligenceEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "SQUAD_INTELLIGENCE"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "SQUAD_INTELLIGENCE"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
 
   if (!user) return <>{children}</>;
 
@@ -693,6 +717,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const allowKnowledge = user.role === "MASTERADMIN" ? true : !!knowledgeEnabled;
   const allowProjects = user.role === "MASTERADMIN" ? true : !!projectsEnabled;
   const allowAssets = user.role === "MASTERADMIN" ? true : !!assetsEnabled;
+  const allowSquadIntelligence = user.role === "MASTERADMIN" ? true : !!squadIntelligenceEnabled;
 
   const moduleAllowed = (key?: string) => {
     if (!key) return true;
@@ -715,6 +740,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return allowProjects;
       case "ASSETS":
         return allowAssets;
+      case "SQUAD_INTELLIGENCE":
+        return allowSquadIntelligence;
       default:
         return true;
     }

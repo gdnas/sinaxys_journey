@@ -20,6 +20,7 @@ export type ModuleKey =
   | "INTERNAL_COMMUNICATION"
   | "PROJECTS"
   | "ASSETS"
+  | "SQUAD_INTELLIGENCE"
   | (string & {});
 
 const DEFAULT_ENABLED: Record<string, boolean> = {
@@ -29,7 +30,7 @@ const DEFAULT_ENABLED: Record<string, boolean> = {
   // Paid add-ons (default locked)
   OKR_ROI: false,
   ORG: true,
-  COSTS: false,
+  COSTS: true,
   TRACKS: false,
   POINTS: false,
   PDI_PERFORMANCE: false,
@@ -37,6 +38,7 @@ const DEFAULT_ENABLED: Record<string, boolean> = {
   INTERNAL_COMMUNICATION: false,
   PROJECTS: false,
   ASSETS: false,
+  SQUAD_INTELLIGENCE: false,
 
   // Core areas (not sold as modules for now)
   PROFILE: true,

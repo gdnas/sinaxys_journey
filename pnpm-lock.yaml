@@ -105,7 +105,7 @@ importers:
         specifier: ^2.45.0
         version: 2.45.0
       '@tanstack/react-query':
-        specifier: ^5.56.2
+        specifier: ^5.74.4
         version: 5.74.4(react@18.3.1)
       '@tiptap/extension-image':
         specifier: ^3.20.1

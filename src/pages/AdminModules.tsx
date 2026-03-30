@@ -18,6 +18,7 @@ import {
   Building2,
   Megaphone,
   Box,
+  Users2,
 } from "lucide-react";
 
 interface ModuleSectionProps {
@@ -111,6 +112,12 @@ export default function AdminModules() {
   const { data: assetsEnabled = true, refetch: refetchAssets } = useQuery({
     queryKey: ["company-module", companyId, "ASSETS"],
     queryFn: () => isCompanyModuleEnabled(String(companyId), "ASSETS"),
+    enabled: queryEnabled,
+  });
+
+  const { data: squadIntelligenceEnabled = true, refetch: refetchSquadIntelligence } = useQuery({
+    queryKey: ["company-module", companyId, "SQUAD_INTELLIGENCE"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "SQUAD_INTELLIGENCE"),
     enabled: queryEnabled,
   });
 
@@ -275,6 +282,26 @@ export default function AdminModules() {
             if (!companyId) return;
             await setCompanyModuleEnabled(companyId, "ASSETS", v);
             await refetchAssets();
+            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
+      </ModuleSection>
+
+      {/* SQUAD INTELLIGENCE */}
+      <ModuleSection
+        icon={<Users2 className="h-6 w-6 text-[color:var(--sinaxys-primary)]" />}
+        title="Squad Intelligence"
+        description="Gestão de squads cross-functionais e alocação de pessoas."
+      >
+        <ModuleToggle
+          icon={<Users2 className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="Squads"
+          description="Gerencie squads cross-functionais, aloque pessoas em múltiplos squads e acompanhe os custos por squad."
+          checked={squadIntelligenceEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "SQUAD_INTELLIGENCE", v);
+            await refetchSquadIntelligence();
             toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
           }}
         />
