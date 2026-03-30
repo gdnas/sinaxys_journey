@@ -1,8 +1,6 @@
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth";
-import AdminExecutiveHome from "@/pages/AdminExecutiveHome";
-import HeadTacticalHome from "@/pages/HeadTacticalHome";
-import CollaboratorOperationalHome from "@/pages/CollaboratorOperationalHome";
+import UnifiedWorkItemsHome from "@/pages/UnifiedWorkItemsHome";
 
 export default function AppHome() {
   const { user } = useAuth();
@@ -10,7 +8,6 @@ export default function AppHome() {
 
   if (user.role === "MASTERADMIN") return <Navigate to="/master/overview" replace />;
   
-  if (user.role === "ADMIN") return <AdminExecutiveHome />;
-  if (user.role === "HEAD") return <HeadTacticalHome />;
-  return <CollaboratorOperationalHome />;
+  // Use unified home for all roles (ADMIN, HEAD, COLLABORADOR)
+  return <UnifiedWorkItemsHome />;
 }
