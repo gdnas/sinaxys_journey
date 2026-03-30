@@ -38,6 +38,8 @@ interface SquadFormProps {
   onSave: (data: any) => Promise<void>;
 }
 
+const NONE_VALUE = "__none";
+
 export function SquadForm({ open, onOpenChange, squad, companyId, onSave }: SquadFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -82,12 +84,12 @@ export function SquadForm({ open, onOpenChange, squad, companyId, onSave }: Squa
     try {
       setIsSubmitting(true);
 
-      // Normalize empty strings to null before sending to API
+      // Normalize empty / sentinel values to null before sending to API
       const payload = {
         ...data,
         company_id: companyId,
-        owner_user_id: data.owner_user_id && data.owner_user_id !== "" ? data.owner_user_id : null,
-        type: data.type && (data.type as any) !== "" ? data.type : null,
+        owner_user_id: data.owner_user_id ?? null,
+        type: data.type ?? null,
         product: data.product && data.product !== "" ? data.product : null,
       };
 
@@ -150,14 +152,14 @@ export function SquadForm({ open, onOpenChange, squad, companyId, onSave }: Squa
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Tipo</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                  <Select onValueChange={(v) => field.onChange(v === NONE_VALUE ? null : (v as any))} defaultValue={field.value ?? NONE_VALUE}>
                     <FormControl>
                       <SelectTrigger className="rounded-xl">
                         <SelectValue placeholder="Selecione o tipo" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value={NONE_VALUE}>Nenhum</SelectItem>
                       <SelectItem value="core">Core</SelectItem>
                       <SelectItem value="growth">Growth</SelectItem>
                       <SelectItem value="support">Support</SelectItem>
@@ -175,8 +177,8 @@ export function SquadForm({ open, onOpenChange, squad, companyId, onSave }: Squa
                 <FormItem>
                   <FormLabel>Owner</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value || ""}
+                    onValueChange={(v) => field.onChange(v === NONE_VALUE ? null : v)}
+                    defaultValue={field.value ?? NONE_VALUE}
                   >
                     <FormControl>
                       <SelectTrigger className="rounded-xl">
@@ -184,7 +186,7 @@ export function SquadForm({ open, onOpenChange, squad, companyId, onSave }: Squa
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Nenhum</SelectItem>
+                      <SelectItem value={NONE_VALUE}>Nenhum</SelectItem>
                       {profiles
                         .filter((p) => p.active)
                         .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""))
