@@ -167,85 +167,48 @@ export default function AdminCosts() {
   }, [activePeople, departments, headByDeptId]);
 
   // Calculate department costs with expenses
-  const byDept = useMemo(() => {
-    const m = new Map<string, DepartmentCost & { deptId: string; deptName: string }>();
-    const memberIds = new Map<string, Set<string>>();
-
-    for (const d of departments) {
-      m.set(d.id, {
-        deptId: d.id,
-        deptName: d.name,
-        department_id: d.id,
-        department_name: d.name,
-        people_cost: 0,
-        expense_cost: 0,
-        total_cost: 0,
-        people_count: 0,
-      });
-    }
-
-    for (const p of activePeople) {
-      const deptId = p.department_id ?? "__none__";
-      const deptName = p.department_id ? deptById.get(p.department_id)?.name ?? "(departamento)" : "Sem departamento";
-      const row = m.get(deptId) ?? {
-        deptId,
-        deptName,
-        department_id: deptId,
-        department_name: deptName,
-        people_cost: 0,
-        expense_cost: 0,
-        total_cost: 0,
-        people_count: 0,
-      };
-      row.people_cost += Math.max(0, n(p.monthly_cost_brl));
-      row.people_count += 1;
-      m.set(deptId, row);
-
-      const s = memberIds.get(deptId) ?? new Set<string>();
-      s.add(p.id);
-      memberIds.set(deptId, s);
-    }
-
-    // Add expenses by department
-    for (const costItem of costItems) {
-      if (!costItem.active) continue;
-
+  const byDept = await Promise.all(
+    costItems.filter(item => item.active).map(async (costItem) => {
       const allocations = await listCostAllocations(costItem.id);
+      const deptCosts = new Map<string, { people_cost: number; expense_cost: number; people_count: number; total_cost: number }>();
+
       for (const alloc of allocations) {
-        const row = m.get(alloc.department_id);
-        if (row) {
-          row.expense_cost += (alloc.allocation_percentage / 100) * n(costItem.total_monthly_cost);
+        const deptId = alloc.department_id;
+        const deptCost = deptCosts.get(deptId) || { people_cost: 0, expense_cost: 0, people_count: 0, total_cost: 0, };
+        if (alloc.allocation_percentage) {
+          deptCost.expense_cost += (alloc.allocation_percentage / 100) * n(costItem.total_monthly_cost);
         }
+        deptCosts.set(deptId, deptCost);
       }
-    }
 
-    // Calculate totals
-    for (const row of m.values()) {
-      row.total_cost = row.people_cost + row.expense_cost;
-    }
+      return [deptId, deptCost];
+    })
+  );
 
-    return Array.from(m.values())
-      .filter((r) => r.people_count > 0)
-      .sort((a, b) => b.total_cost - a.total_cost);
-  }, [activePeople, departments, deptById, costItems]);
+  // Merge all department costs
+  const deptCostsMap = new Map<string, { people_cost: number; expense_cost: number; people_count: number; total_cost: number }>();
+  for (const [deptId, deptCost] of byDept) {
+    deptCostsMap.set(deptId, deptCost);
+  }
 
-  const companyMonthly = useMemo(() => {
+  // Calculate totals
+  const companyMonthly = useMemo(async () => {
     const peopleTotal = activeWithCost.reduce((acc, p) => acc + Math.max(0, n(p.monthly_cost_brl)), 0);
-    const expenseTotal = byDept.reduce((acc, d) => acc + d.expense_cost, 0);
+    const expenseTotal = Array.from(deptCostsMap.values()).reduce((acc, [, dept]) => acc + dept.expense_cost, 0), 0);
     return peopleTotal + expenseTotal;
-  }, [activeWithCost, byDept]);
+  }, [activeWithCost]);
 
   const companyPeopleCost = useMemo(() => {
     return activeWithCost.reduce((acc, p) => acc + Math.max(0, n(p.monthly_cost_brl)), 0);
   }, [activeWithCost]);
 
   const companyExpenseCost = useMemo(() => {
-    return byDept.reduce((acc, d) => acc + d.expense_cost, 0);
+    return Array.from(byDept.values()).reduce((acc, [, cost]) => acc + cost.expense_cost, 0);
   }, [byDept]);
 
   const myDeptTotal = useMemo(() => {
     if (!user.departmentId) return 0;
-    return byDept.find((d) => d.deptId === user.departmentId)?.total_cost ?? 0;
+    return byDept.get(user.departmentId)?.total_cost ?? 0;
   }, [byDept, user.departmentId]);
 
   const [openDept, setOpenDept] = useState(false);
@@ -253,7 +216,7 @@ export default function AdminCosts() {
 
   const selectedDept = useMemo(() => {
     if (!selectedDeptId) return null;
-    return byDept.find((d) => d.deptId === selectedDeptId) ?? null;
+    return byDept.get(selectedDeptId) ?? null;
   }, [byDept, selectedDeptId]);
 
   const selectedPeople = useMemo(() => {
@@ -302,7 +265,7 @@ export default function AdminCosts() {
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pessoas com custo</div>
               <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{activeWithCost.length}</div>
-              <div className="mt-1 text-xs text-muted-foreground">Apenas perfis ativos com valor > 0.</div>
+              <div className="mt-1 text-xs text-muted-foreground">Apenas perfis ativos com valor {'>'} 0.</div>
             </div>
             <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
               <Users className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
@@ -351,28 +314,28 @@ export default function AdminCosts() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {byDept.map((d) => {
-                  const isMine = !!user.departmentId && d.deptId === user.departmentId;
+                {byDept.map(([deptId, cost]) => {
+                  const isMine = !!user.departmentId && deptId === user.departmentId;
                   return (
                     <TableRow
-                      key={d.deptId}
+                      key={deptId}
                       className={(isMine ? "bg-[color:var(--sinaxys-tint)]/50 " : "") + "cursor-pointer hover:bg-[color:var(--sinaxys-tint)]/40"}
                       onClick={() => {
-                        setSelectedDeptId(d.deptId);
+                        setSelectedDeptId(deptId);
                         setOpenDept(true);
                       }}
                     >
                       <TableCell className="font-medium text-[color:var(--sinaxys-ink)]">
                         <div className="flex items-center justify-between gap-3">
-                          <span>{d.deptName}</span>
+                          <span>{deptById.get(deptId)?.name ?? "(departamento)"}</span>
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </TableCell>
-                      <TableCell className="text-right text-muted-foreground">{d.people_count}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{d.people_cost > 0 ? brl(d.people_cost) : "—"}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{d.expense_cost > 0 ? brl(d.expense_cost) : "—"}</TableCell>
-                      <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{d.total_cost > 0 ? brl(d.total_cost) : "—"}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">{d.total_cost > 0 ? brlPerHourFromMonthly(d.total_cost) : "—"}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{cost.people_count}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{cost.people_cost > 0 ? brl(cost.people_cost) : "—"}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{cost.expense_cost > 0 ? brl(cost.expense_cost) : "—"}</TableCell>
+                      <TableCell className="text-right font-semibold text-[color:var(--sinaxys-ink)]">{cost.total_cost > 0 ? brl(cost.total_cost) : "—"}</TableCell>
+                      <TableCell className="text-right text-muted-foreground">{cost.total_cost > 0 ? brlPerHourFromMonthly(cost.total_cost) : "—"}</TableCell>
                     </TableRow>
                   );
                 })}
@@ -400,7 +363,7 @@ export default function AdminCosts() {
         <SheetContent className="w-full max-w-[92vw] rounded-l-3xl border-l-0 p-0 sm:max-w-xl">
           <div className="p-6">
             <SheetHeader>
-              <SheetTitle className="text-[color:var(--sinaxys-ink)]">{selectedDept?.deptName ?? "Departamento"}</SheetTitle>
+              <SheetTitle className="text-[color:var(--sinaxys-ink)]">{selectedDept?.people_count ?? 0} pessoa(s)</SheetTitle>
             </SheetHeader>
 
             <div className="mt-4 flex flex-wrap gap-2">

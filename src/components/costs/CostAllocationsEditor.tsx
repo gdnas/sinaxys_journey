@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -34,13 +34,12 @@ export function CostAllocationsEditor({
   const queryClient = useQueryClient();
   const [allocations, setAllocations] = useState<AllocationRow[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [open, setOpen] = useState(false);
 
   const { data: deptList = [] } = useQuery({
     queryKey: ["departments", companyId],
     queryFn: () => listDepartments(companyId),
-    onSuccess: (data) => {
-      setDepartments(data);
-    },
+    enabled: open,
   });
 
   const totalPercentage = allocations.reduce((sum, a) => sum + a.allocation_percentage, 0);

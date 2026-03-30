@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Building2, ChevronRight, Wallet } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
@@ -94,10 +94,13 @@ export default function HeadCosts() {
     return allocations;
   }, [costItems, myDeptId]);
 
-  const [expenseAllocations, setExpenseAllocations] = useMemo(() => {
-    // Return empty initially, will be populated
-    return [];
-  }, []);
+  const [expenseAllocations, setExpenseAllocations] = useState<Array<{
+    cost_item_id: string;
+    cost_item_name: string;
+    cost_item_type: string;
+    total_monthly_cost: number;
+    department_cost: number;
+  }>>([]);
 
   const deptMonthly = useMemo(() => people.reduce((acc, p) => acc + n(p.monthly_cost_brl), 0), [people]);
 
@@ -155,7 +158,7 @@ export default function HeadCosts() {
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pessoas com custo</div>
           <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{people.length}</div>
-          <div className="mt-1 text-xs text-muted-foreground">Apenas perfis ativos do seu dept. com valor > 0.</div>
+          <div className="mt-1 text-xs text-muted-foreground">Apenas perfis ativos do seu dept. com valor {'>'} 0.</div>
         </Card>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">

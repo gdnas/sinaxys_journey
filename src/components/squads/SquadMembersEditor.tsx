@@ -77,9 +77,11 @@ export function SquadMembersEditor({
         tempId: crypto.randomUUID(),
         company_id: companyId,
         squad_id: squadId,
-        user_id: "",
+        user_id: crypto.randomUUID(), // Temporary placeholder, will be set when saved
         allocation_percentage: 100,
         role: "",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       },
     ]);
   };
@@ -295,7 +297,7 @@ export function SquadMembersEditor({
           </Button>
           <Button
             type="button"
-            onClick={() => {
+            onClick={async () => {
               // Save all updates
               const savePromises = members
                 .filter((m) => m.id && !m.tempId)
