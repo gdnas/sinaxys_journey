@@ -194,7 +194,7 @@ export default function AdminCosts() {
   // Calculate totals
   const companyMonthly = useMemo(async () => {
     const peopleTotal = activeWithCost.reduce((acc, p) => acc + Math.max(0, n(p.monthly_cost_brl)), 0);
-    const expenseTotal = Array.from(deptCostsMap.values()).reduce((acc, [, dept]) => acc + dept.expense_cost, 0), 0);
+    const expenseTotal = Array.from(deptCostsMap.values()).reduce((acc, [, dept]) => acc + dept.expense_cost, 0);
     return peopleTotal + expenseTotal;
   }, [activeWithCost]);
 
