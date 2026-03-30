@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Users, Wallet, Building2, Trash2, Edit2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -10,14 +10,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { brl, brlPerHourFromMonthly } from "@/lib/costs";
-import { getSquadWithMembers, removeSquadMember, updateSquadMember } from "@/lib/squadsDb";
+import { getSquadWithMembers, removeSquadMember, updateSquadMember, createSquad } from "@/lib/squadsDb";
 import { toast } from "sonner";
+import { SquadForm } from "@/components/squads/SquadForm";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   const a = parts[0]?.[0] ?? "";
   const b = parts[1]?.[0] ?? parts[0]?.[1] ?? "";
   return (a + b).toUpperCase();
+}
+
+function isUUID(v?: string) {
+  return typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 }
 
 export default function SquadDetail() {
@@ -27,10 +32,56 @@ export default function SquadDetail() {
   const queryClient = useQueryClient();
 
   if (!squadId) return null;
+  if (!user || !user.companyId) return null;
+
+  const isNew = squadId === "new";
+  const validId = isUUID(squadId);
+
+  // If route is /admin/squads/new -> render create form
+  if (isNew) {
+    return (
+      <div className="grid gap-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-[color:var(--sinaxys-ink)]">Novo Squad</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Crie um novo squad cross-functional.</p>
+          </div>
+          <Button variant="outline" size="icon" className="h-9 w-9 rounded-xl" onClick={() => navigate("/admin/squads")}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+        </div>
+
+        <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+          <SquadForm
+            open={true}
+            onOpenChange={(open) => {
+              if (!open) navigate("/admin/squads");
+            }}
+            companyId={user.companyId}
+            onSave={async (data: any) => {
+              const squad = await createSquad(data as any);
+              // navigate to newly created squad
+              navigate(`/admin/squads/${squad.id}`);
+            }}
+          />
+        </Card>
+      </div>
+    );
+  }
+
+  // If id is not a valid UUID and not 'new', show not found
+  if (!validId) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center text-sm text-muted-foreground">
+        Squad não encontrado
+      </div>
+    );
+  }
 
   const { data: squad, isLoading } = useQuery({
     queryKey: ["squad", squadId],
     queryFn: () => getSquadWithMembers(squadId),
+    enabled: !!squadId && validId,
   });
 
   const removeMemberMutation = useMutation({
