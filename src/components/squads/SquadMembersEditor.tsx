@@ -117,7 +117,10 @@ export function SquadMembersEditor({
     },
     onSuccess: () => {
       toast.success("Membro adicionado com sucesso");
+      // Invalidate squad detail and global lists/costs so UI updates
       queryClient.invalidateQueries({ queryKey: ["squad", squadId] });
+      queryClient.invalidateQueries({ queryKey: ["squadCosts", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["squads", companyId] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Erro ao adicionar membro");
@@ -132,6 +135,8 @@ export function SquadMembersEditor({
     onSuccess: () => {
       toast.success("Membro removido com sucesso");
       queryClient.invalidateQueries({ queryKey: ["squad", squadId] });
+      queryClient.invalidateQueries({ queryKey: ["squadCosts", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["squads", companyId] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Erro ao remover membro");
@@ -145,6 +150,8 @@ export function SquadMembersEditor({
     onSuccess: () => {
       toast.success("Alocação atualizada com sucesso");
       queryClient.invalidateQueries({ queryKey: ["squad", squadId] });
+      queryClient.invalidateQueries({ queryKey: ["squadCosts", companyId] });
+      queryClient.invalidateQueries({ queryKey: ["squads", companyId] });
     },
     onError: (error: any) => {
       toast.error(error.message || "Erro ao atualizar alocação");
@@ -348,6 +355,8 @@ export function SquadMembersEditor({
                 await Promise.all(savePromises);
                 // Refresh and close
                 queryClient.invalidateQueries({ queryKey: ["squad", squadId] });
+                queryClient.invalidateQueries({ queryKey: ["squadCosts", companyId] });
+                queryClient.invalidateQueries({ queryKey: ["squads", companyId] });
                 onOpenChange(false);
               } catch (err: any) {
                 // Errors are handled by mutations but ensure dialog remains open on failure

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { useAuth } from "@/lib/auth";
 import { brl } from "@/lib/costs";
-import { listSquads } from "@/lib/squadsDb";
+import { listSquads, calculateAllSquadCosts } from "@/lib/squadsDb";
 
 export default function SquadList() {
   const nav = useNavigate();
@@ -30,6 +30,20 @@ export default function SquadList() {
     queryKey: ["squads", companyId, showInactive],
     queryFn: () => listSquads(companyId, showInactive),
   });
+
+  const { data: squadCosts = [] } = useQuery({
+    queryKey: ["squadCosts", companyId],
+    queryFn: () => calculateAllSquadCosts(companyId),
+    enabled: !!companyId,
+  });
+
+  const costsMap = useMemo(() => {
+    const m: Record<string, number> = {};
+    (squadCosts || []).forEach((c: any) => {
+      if (c && c.squad_id) m[c.squad_id] = c.total_cost || 0;
+    });
+    return m;
+  }, [squadCosts]);
 
   const filteredSquads = useMemo(() => {
     let filtered = squads;
@@ -184,7 +198,7 @@ export default function SquadList() {
                     {squad.active && (
                       <div>
                         <div className="text-xs text-muted-foreground">Custo mensal</div>
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Em breve</div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{(costsMap[squad.id] || 0) > 0 ? brl(costsMap[squad.id]) : "—"}</div>
                       </div>
                     )}
                   </div>
