@@ -13,6 +13,7 @@ import { brl, brlPerHourFromMonthly } from "@/lib/costs";
 import { getSquadWithMembers, removeSquadMember, updateSquadMember, createSquad } from "@/lib/squadsDb";
 import { toast } from "sonner";
 import { SquadForm } from "@/components/squads/SquadForm";
+import { SquadMembersEditor } from "@/components/squads/SquadMembersEditor";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -30,6 +31,7 @@ export default function SquadDetail() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const [membersEditorOpen, setMembersEditorOpen] = useState(false);
 
   if (!squadId) return null;
   if (!user || !user.companyId) return null;
@@ -184,7 +186,7 @@ export default function SquadDetail() {
             </p>
           </div>
           {isAdmin && (
-            <Button className="h-9 gap-2 rounded-xl" onClick={() => {/* TODO: Open add member dialog */}}>
+            <Button className="h-9 gap-2 rounded-xl" onClick={() => setMembersEditorOpen(true)}>
               <Plus className="h-4 w-4" />
               Adicionar Membro
             </Button>
@@ -290,7 +292,7 @@ export default function SquadDetail() {
                   <Button
                     variant="link"
                     className="ml-1 h-auto p-0 text-[color:var(--sinaxys-primary)]"
-                    onClick={() => {/* TODO: Open add member dialog */}}
+                    onClick={() => setMembersEditorOpen(true)}
                   >
                     Adicionar membro
                   </Button>
@@ -300,6 +302,17 @@ export default function SquadDetail() {
           </div>
         </ScrollArea>
       </Card>
+
+      {/* Members editor modal */}
+      {isAdmin && (
+        <SquadMembersEditor
+          open={membersEditorOpen}
+          onOpenChange={setMembersEditorOpen}
+          squadId={squad.id}
+          companyId={user.companyId}
+          existingMembers={squad.members || []}
+        />
+      )}
     </div>
   );
 }
