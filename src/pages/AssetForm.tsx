@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 type AssetCategory = "it_equipment" | "office_equipment" | "mobile_devices" | "furniture" | "vehicles" | "tools" | "licenses" | "other";
 type AssetCondition = "new" | "good" | "fair" | "poor" | "damaged";
@@ -87,9 +88,7 @@ export default function AssetForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!formData.asset_code.trim()) {
-      return toast({ title: "Código do ativo é obrigatório", variant: "destructive" });
-    }
+    // Allow asset_code to be empty - server will generate it
     if (!formData.asset_type.trim()) {
       return toast({ title: "Tipo do equipamento é obrigatório", variant: "destructive" });
     }
@@ -122,7 +121,7 @@ export default function AssetForm() {
       } else {
         const input: CreateAssetInput = {
           tenant_id: companyId!,
-          asset_code: formData.asset_code,
+          asset_code: formData.asset_code || undefined,
           category: formData.category,
           asset_type: formData.asset_type,
           brand: formData.brand || undefined,
@@ -189,15 +188,52 @@ export default function AssetForm() {
                         className="rounded-2xl"
                       />
                       <Button type="button" variant="outline" className="rounded-2xl" onClick={async () => {
-                        // generate preview code using same logic as server by calling a minimal endpoint client-side
                         if (!companyId) return;
                         try {
-                          const { data: comp } = await fetch(`/api/_internal/company/${companyId}/initials`).then(r => r.json());
-                          if (comp && comp.initials) {
-                            // find existing highest via RPC
-                            const res = await fetch(`/api/_internal/next-code?tenant_id=${companyId}&initials=${comp.initials}`).then(r => r.json());
-                            if (res && res.next) setFormData({ ...formData, asset_code: res.next });
+                          const { data: comp, error: compErr } = await supabase
+                            .from('companies')
+                            .select('name, trade_name')
+                            .eq('id', companyId)
+                            .maybeSingle();
+                          if (compErr) throw compErr;
+                          const companyName = (comp && (comp.trade_name || comp.name)) || 'COMP';
+
+                          // compute initials
+                          const words = companyName.replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 5);
+                          const ignore = new Set(['da','de','do','das','dos','e','the','and','of','&']);
+                          const initialsArr: string[] = [];
+                          for (const w of words) {
+                            const lw = w.toLowerCase();
+                            if (words.length > 2 && ignore.has(lw)) continue;
+                            const m = w.match(/\p{L}/u);
+                            if (m) initialsArr.push(w[0].toUpperCase());
+                            if (initialsArr.length >= 3) break;
                           }
+                          const initials = (initialsArr.join('') || companyName.slice(0,2).toUpperCase()).replace(/[^A-Z]/g, '').slice(0,3);
+
+                          // find existing asset codes for tenant that start with initials
+                          const { data: existing, error: existingErr } = await supabase
+                            .from('assets')
+                            .select('asset_code')
+                            .eq('tenant_id', companyId)
+                            .ilike('asset_code', `${initials}%`);
+                          if (existingErr) throw existingErr;
+
+                          let maxNum = 0;
+                          const re = new RegExp(`^${initials}0*([0-9]+)$`, 'i');
+                          (existing || []).forEach((r: any) => {
+                            const code = r.asset_code || '';
+                            const match = code.match(re);
+                            if (match && match[1]) {
+                              const n = parseInt(match[1], 10);
+                              if (!isNaN(n) && n > maxNum) maxNum = n;
+                            }
+                          });
+
+                          const next = maxNum + 1;
+                          const numberPart = String(next).padStart(4, '0');
+                          const generated = `${initials}${numberPart}`;
+                          setFormData(prev => ({ ...prev, asset_code: generated }));
                         } catch (e) {
                           console.warn('preview generate failed', e);
                         }
