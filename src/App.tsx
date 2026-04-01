@@ -103,6 +103,7 @@ import AssetIncidentForm from "./pages/AssetIncidentForm";
 import AssetPublicView from "./pages/AssetPublicView";
 import SquadList from "./pages/SquadList";
 import SquadDetail from "./pages/SquadDetail";
+import AssetPublicDemo from "./pages/AssetPublicDemo";
 
 const queryClient = new QueryClient();
 
@@ -118,6 +119,7 @@ const App = () => (
               {/* Rotas públicas (fora do AppShell e sem autenticação) */}
               <Routes>
                 <Route path="/ativo/:assetId" element={<AssetPublicView />} />
+                <Route path="/companies/:companyId/assets/:assetId/demo" element={<AssetPublicDemo />} />
               </Routes>
 
               <AppShell>
