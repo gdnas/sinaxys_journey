@@ -1441,6 +1441,29 @@ export async function createAsset(input: CreateAssetInput) {
 }
 
 export async function updateAsset(id: string, patch: UpdateAssetInput) {
+  // Prevent changing asset_code or qr_code_url after QR has been generated
+  try {
+    const { data: existing, error: existingErr } = await supabase
+      .from('assets')
+      .select('asset_code, qr_code_url')
+      .eq('id', id)
+      .maybeSingle();
+    if (existingErr) throw existingErr;
+
+    if (existing && existing.qr_code_url) {
+      // If QR already exists, disallow updates to asset_code or qr_code_url
+      if ((patch as any).asset_code && (patch as any).asset_code !== existing.asset_code) {
+        throw new Error('Código do ativo não pode ser alterado após geração da etiqueta/QR.');
+      }
+      if ((patch as any).qr_code_url && (patch as any).qr_code_url !== existing.qr_code_url) {
+        throw new Error('QR code não pode ser alterado após geração.');
+      }
+    }
+  } catch (e) {
+    // rethrow to be handled by caller
+    throw e;
+  }
+
   const { data, error } = await supabase
     .from("assets")
     .update(patch)
