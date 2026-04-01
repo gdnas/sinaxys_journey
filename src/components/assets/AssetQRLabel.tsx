@@ -10,6 +10,8 @@ interface AssetQRLabelProps {
   qrCodeUrl: string;
   brand?: string | null;
   model?: string | null;
+  companyName?: string | null;
+  registeredAt?: string | null; // ISO date
   onClose?: () => void;
 }
 
@@ -19,25 +21,101 @@ export default function AssetQRLabel({
   qrCodeUrl,
   brand,
   model,
+  companyName,
+  registeredAt,
   onClose,
 }: AssetQRLabelProps) {
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  const handlePrint = () => {
-    setIsPrinting(true);
-    setTimeout(() => {
-      window.print();
-      setIsPrinting(false);
-    }, 100);
-  };
+  const MM_TO_PX = (mm: number, dpi = 300) => Math.round((mm / 25.4) * dpi);
+  const LABEL_SIZE_MM = 40; // 40 x 40 mm
+  const DPI = 300;
+  const SIZE_PX = MM_TO_PX(LABEL_SIZE_MM, DPI); // pixels for canvas
 
   const handleDownloadImage = () => {
-    const canvas = document.getElementById("qr-code-canvas") as HTMLCanvasElement;
-    if (canvas) {
-      const link = document.createElement("a");
-      link.download = `etiqueta-${assetCode}.png`;
-      link.href = canvas.toDataURL();
-      link.click();
+    setIsDownloading(true);
+    // Render a canvas that matches 40x40mm at 300 DPI
+    const canvas = document.createElement('canvas');
+    canvas.width = SIZE_PX;
+    canvas.height = SIZE_PX;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // White background
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Padding (in px) inside the label
+    const pad = Math.round(SIZE_PX * 0.06);
+
+    // Company name (top) - small
+    if (companyName) {
+      ctx.fillStyle = '#111827';
+      ctx.font = `${Math.round(SIZE_PX * 0.08)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(companyName, canvas.width / 2, pad + Math.round(SIZE_PX * 0.08));
+    }
+
+    // Asset code (bold)
+    ctx.fillStyle = '#111827';
+    ctx.font = `bold ${Math.round(SIZE_PX * 0.13)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillText(assetCode, canvas.width / 2, Math.round(SIZE_PX * 0.13) + pad + (companyName ? Math.round(SIZE_PX * 0.06) : 0));
+
+    // Asset type (small)
+    ctx.fillStyle = '#374151';
+    ctx.font = `${Math.round(SIZE_PX * 0.07)}px sans-serif`;
+    ctx.fillText(assetType, canvas.width / 2, Math.round(SIZE_PX * 0.13) + pad + Math.round(SIZE_PX * 0.13));
+
+    // QR code - generate using qrcode library to data URL
+    // We'll draw it as image in the center-right area
+    const qrSize = Math.round(SIZE_PX * 0.46);
+    const qrCanvas = document.createElement('canvas');
+    qrCanvas.width = qrSize;
+    qrCanvas.height = qrSize;
+
+    // Use QRCodeCanvas from qrcode.react to draw into a temporary canvas
+    // Instead of mounting React component, draw with library 'qrcode' synchronously
+    try {
+      // Use dynamic import of 'qrcode' library
+      // @ts-ignore
+      const QRCodeLib = require('qrcode');
+      QRCodeLib.toCanvas(qrCanvas, qrCodeUrl, { errorCorrectionLevel: 'H', margin: 1 }, function (err: any) {
+        if (err) {
+          console.error('Erro ao gerar QR:', err);
+        }
+        // Draw QR onto main canvas, centered horizontally
+        const qrX = Math.round((canvas.width - qrSize) / 2);
+        const qrY = Math.round(canvas.height * 0.38);
+        ctx.drawImage(qrCanvas, qrX, qrY, qrSize, qrSize);
+
+        // Registered at (bottom)
+        if (registeredAt) {
+          ctx.fillStyle = '#6B7280';
+          ctx.font = `${Math.round(SIZE_PX * 0.06)}px sans-serif`;
+          ctx.textAlign = 'center';
+          const dateLabel = `Registrado em: ${new Date(registeredAt).toLocaleDateString('pt-BR')}`;
+          ctx.fillText(dateLabel, canvas.width / 2, canvas.height - pad);
+        }
+
+        // Asset details small under QR
+        const modelLabel = model ? `${brand || ''} ${model}`.trim() : brand || '';
+        if (modelLabel) {
+          ctx.fillStyle = '#374151';
+          ctx.font = `${Math.round(SIZE_PX * 0.06)}px sans-serif`;
+          ctx.fillText(modelLabel, canvas.width / 2, Math.round(canvas.height * 0.36));
+        }
+
+        const link = document.createElement('a');
+        link.download = `etiqueta-${assetCode}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+        setIsDownloading(false);
+      });
+    } catch (e) {
+      console.error('Erro ao gerar QR (lib):', e);
+      setIsDownloading(false);
     }
   };
 
@@ -48,102 +126,33 @@ export default function AssetQRLabel({
           <DialogTitle>Etiqueta do Ativo</DialogTitle>
         </DialogHeader>
 
-        {/* Etiqueta para impressão */}
+        {/* Visual preview simples */}
         <div className="space-y-4">
-          {/* Visualização da etiqueta */}
-          <div
-            id="asset-label"
-            className="bg-white border-2 border-gray-300 rounded-xl p-6 space-y-4"
-          >
-            {/* Header da etiqueta */}
-            <div className="border-b-2 border-gray-800 pb-3">
-              <p className="text-xs text-gray-500 uppercase tracking-wide">
-                Patrimônio da Empresa
-              </p>
-            </div>
-
-            {/* Código do ativo */}
-            <div className="text-center">
-              <h2 className="text-3xl font-bold text-gray-900">{assetCode}</h2>
-              <p className="text-sm text-gray-600 mt-1">{assetType}</p>
-            </div>
-
-            {/* QR Code */}
-            <div className="flex justify-center py-4">
-              <div className="bg-white p-4 rounded-lg shadow-inner border border-gray-200">
-                <QRCodeCanvas
-                  id="qr-code-canvas"
-                  value={qrCodeUrl}
-                  size={180}
-                  level="H"
-                  includeMargin={true}
-                />
+          <div className="flex justify-center">
+            <div style={{ width: 240, height: 240 }} className="bg-white p-4 border rounded-lg flex flex-col items-center justify-center">
+              <QRCodeCanvas value={qrCodeUrl} size={160} level="H" includeMargin={true} />
+              <div className="text-center mt-3 text-sm">
+                <div className="font-bold">{companyName}</div>
+                <div className="text-xs">{assetCode} — {assetType}</div>
               </div>
             </div>
-
-            {/* Informações adicionais */}
-            <div className="space-y-2 text-sm">
-              {brand && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Marca:</span>
-                  <span className="font-medium text-gray-900">{brand}</span>
-                </div>
-              )}
-              {model && (
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Modelo:</span>
-                  <span className="font-medium text-gray-900">{model}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Instrução */}
-            <div className="text-center text-xs text-gray-500 pt-2">
-              Escaneie para ver informações do ativo
-            </div>
           </div>
 
-          {/* URL para referência */}
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs text-gray-500 mb-1">URL do QR Code:</p>
-            <p className="text-xs text-gray-700 break-all font-mono">
-              {qrCodeUrl}
-            </p>
-          </div>
-
-          {/* Botões de ação */}
           <div className="flex gap-3 pt-4">
             <Button
               className="flex-1 rounded-xl bg-[color:var(--sinaxys-primary)] text-white"
               onClick={handleDownloadImage}
+              disabled={isDownloading}
             >
               <Download className="w-4 h-4 mr-2" />
-              Baixar Etiqueta
+              {isDownloading ? 'Gerando...' : 'Baixar Etiqueta 40×40mm'}
+            </Button>
+            <Button variant="outline" className="rounded-xl" onClick={() => onClose?.()}>
+              Fechar
             </Button>
           </div>
         </div>
 
-        {/* Estilos para impressão */}
-        <style>{`
-          @media print {
-            body * {
-              visibility: hidden;
-            }
-            #asset-label,
-            #asset-label * {
-              visibility: visible;
-            }
-            #asset-label {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-              max-width: 400px;
-              margin: 20px;
-              border: 2px solid #000;
-            }
-          }
-        `}</style>
       </DialogContent>
     </Dialog>
   );

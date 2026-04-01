@@ -305,9 +305,11 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
         <AssetQRLabel
           assetCode={asset.asset_code}
           assetType={asset.asset_type}
-          qrCodeUrl={asset.qr_code_url || `${window.location.origin}/ativo/${asset.id}`}
+          qrCodeUrl={asset.qr_code_url || `https://kairoos.ai/companies/${asset.tenant_id}/assets/${asset.id}/demo`}
           brand={asset.brand}
           model={asset.model}
+          companyName={asset.company_name || ''}
+          registeredAt={asset.created_at}
           onClose={() => setShowQRLabel(false)}
         />
       )}

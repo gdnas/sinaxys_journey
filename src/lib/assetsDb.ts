@@ -1349,8 +1349,9 @@ export async function createAsset(input: CreateAssetInput) {
 
   const asset = data as DbAsset;
 
-  // Gerar URL do QR code automaticamente
-  const qrCodeUrl = `${window.location.origin}/ativo/${asset.id}`;
+  // Gerar URL do QR code automaticamente usando domínio Kairoos (multitenant: companies/{tenant}/assets/{id}/demo)
+  const KAIROOS_DOMAIN = "https://kairoos.ai";
+  const qrCodeUrl = `${KAIROOS_DOMAIN}/companies/${asset.tenant_id}/assets/${asset.id}/demo`;
 
   await supabase
     .from("assets")
