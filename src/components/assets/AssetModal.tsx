@@ -8,7 +8,9 @@ import { useToast } from "@/hooks/use-toast";
 import { getAssetWithDetails, deleteAsset, uploadAssetDocumentFile, createAssetDocument, createAssetDocumentSignedUrl } from "@/lib/assetsDb";
 import { useCompany } from "@/lib/company";
 import { useAuth } from "@/lib/auth";
-import { X, Trash2, Edit3, UploadCloud } from "lucide-react";
+import { X, Trash2, Edit3, UploadCloud, QrCode } from "lucide-react";
+import AssetQRLabel from "@/components/assets/AssetQRLabel";
+import { supabase } from "@/integrations/supabase/client";
 
 type Props = {
   assetId?: string | null;
@@ -30,6 +32,7 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewType, setPreviewType] = useState<string | null>(null);
+  const [showQRLabel, setShowQRLabel] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -48,6 +51,27 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
     }
     void load();
   }, [open, assetId]);
+
+  async function ensureQrCodeUrl() {
+    if (!assetId || !asset) return;
+    if (asset.qr_code_url) return; // já existe
+
+    try {
+      const url = `${window.location.origin}/ativo/${assetId}`;
+      const { error } = await supabase.from('assets').update({ qr_code_url: url }).eq('id', assetId);
+      if (error) throw error;
+      // atualizar estado local
+      setAsset((prev: any) => ({ ...prev, qr_code_url: url }));
+    } catch (e) {
+      console.warn('Falha ao atualizar qr_code_url:', e);
+    }
+  }
+
+  const handleShowQR = async () => {
+    if (!asset) return;
+    await ensureQrCodeUrl();
+    setShowQRLabel(true);
+  };
 
   async function handleDelete() {
     if (!assetId) return;
@@ -180,6 +204,7 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
               </div>
 
               <div className="flex items-start gap-2">
+                <Button size="sm" variant="outline" onClick={handleShowQR}><QrCode className="mr-2 h-4 w-4"/>Etiqueta</Button>
                 {canManage && asset?.status === 'in_stock' && (
                   <Button asChild size="sm" variant="secondary"><a href={`/app/ativos/${assetId}/entregar`}>Entregar</a></Button>
                 )}
@@ -275,6 +300,17 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
           <BlurDialogFooter />
         </BlurDialogContent>
       </BlurDialog>
+
+      {showQRLabel && asset && (
+        <AssetQRLabel
+          assetCode={asset.asset_code}
+          assetType={asset.asset_type}
+          qrCodeUrl={asset.qr_code_url || `${window.location.origin}/ativo/${asset.id}`}
+          brand={asset.brand}
+          model={asset.model}
+          onClose={() => setShowQRLabel(false)}
+        />
+      )}
 
       {/* Preview dialog */}
       {previewOpen && (
