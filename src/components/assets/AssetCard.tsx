@@ -1,5 +1,5 @@
 import { format } from "date-fns";
-import { Building2, User, FileText, ExternalLink } from "lucide-react";
+import { Building2, User, FileText, ExternalLink, QrCode } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ interface AssetCardProps {
   onView: (assetId: string) => void;
   onEdit?: (assetId: string) => void;
   onContract?: (contractUrl: string) => void;
+  onLabel?: (assetId: string) => void;
   canEdit?: boolean;
   canManage?: boolean;
 }
@@ -28,6 +29,7 @@ export function AssetCard({
   onView,
   onEdit,
   onContract,
+  onLabel,
   canEdit = false,
   canManage = false,
 }: AssetCardProps) {
@@ -138,6 +140,12 @@ export function AssetCard({
           >
             <FileText className="h-4 w-4 mr-1" />
             Contrato
+          </Button>
+        )}
+        {onLabel && (
+          <Button size="sm" variant="outline" onClick={() => onLabel(asset.id)} className="rounded-xl">
+            <QrCode className="h-4 w-4 mr-1" />
+            Etiqueta
           </Button>
         )}
       </div>

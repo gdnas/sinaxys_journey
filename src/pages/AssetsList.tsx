@@ -196,6 +196,13 @@ function AssetsList() {
     window.open(contractUrl, "_blank", "noopener,noreferrer");
   };
 
+  const handleLabel = (assetId: string) => {
+    // abrir modal de visualização do asset (reaproveita AssetModal)
+    setSelectedAssetId(assetId);
+    setModalOpen(true);
+    // o AssetModal contém o botão Etiqueta no topo
+  };
+
   const handleCreateAsset = () => {
     navigate("/app/ativos/novo");
   };
@@ -238,6 +245,7 @@ function AssetsList() {
           onView={handleViewAsset}
           onEdit={canEdit ? handleEditAsset : undefined}
           onContract={handleOpenContract}
+          onLabel={handleLabel}
           canEdit={canEdit}
           canManage={canManage}
           emptyTitle="Nenhum ativo encontrado"

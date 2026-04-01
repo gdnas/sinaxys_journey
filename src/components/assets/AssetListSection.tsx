@@ -8,6 +8,7 @@ interface AssetListSectionProps {
   onView: (assetId: string) => void;
   onEdit?: (assetId: string) => void;
   onContract?: (contractUrl: string) => void;
+  onLabel?: (assetId: string) => void;
   canEdit?: boolean;
   canManage?: boolean;
   emptyTitle?: string;
@@ -24,6 +25,7 @@ export function AssetListSection({
   onView,
   onEdit,
   onContract,
+  onLabel,
   canEdit = false,
   canManage = false,
   emptyTitle = "Nenhum ativo encontrado",
@@ -90,6 +92,7 @@ export function AssetListSection({
           onView={onView}
           onEdit={onEdit}
           onContract={onContract}
+          onLabel={onLabel}
           canEdit={canEdit}
           canManage={canManage}
         />
