@@ -100,6 +100,7 @@ import AssetDetail from "./pages/AssetDetail";
 import AssetAssignForm from "./pages/AssetAssignForm";
 import AssetReturnForm from "./pages/AssetReturnForm";
 import AssetIncidentForm from "./pages/AssetIncidentForm";
+import AssetPublicView from "./pages/AssetPublicView";
 import SquadList from "./pages/SquadList";
 import SquadDetail from "./pages/SquadDetail";
 
@@ -114,6 +115,11 @@ const App = () => (
         <AuthProvider>
           <CompanyProvider>
             <BrowserRouter>
+              {/* Rotas públicas (fora do AppShell e sem autenticação) */}
+              <Routes>
+                <Route path="/ativo/:assetId" element={<AssetPublicView />} />
+              </Routes>
+
               <AppShell>
                 <Routes>
                   <Route

@@ -134,6 +134,7 @@ export interface DbAsset {
   status: AssetStatus;
   current_location: string | null;
   notes: string | null;
+  qr_code_url: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -790,7 +791,7 @@ const CONTRACTOR_COMPANIES_BASE_SELECT =
   "id,tenant_id,cnpj,legal_name,trade_name,email,phone,address,city,state,zip_code,notes,created_at,updated_at";
 
 const ASSETS_BASE_SELECT = 
-  "id,tenant_id,asset_code,category,asset_type,brand,model,serial_number,condition_initial,purchase_date,purchase_value,supplier,useful_life_months,depreciation_method,monthly_depreciation_value,residual_value_current,accumulated_depreciation,status,current_location,notes,created_at,updated_at";
+  "id,tenant_id,asset_code,category,asset_type,brand,model,serial_number,condition_initial,purchase_date,purchase_value,supplier,useful_life_months,depreciation_method,monthly_depreciation_value,residual_value_current,accumulated_depreciation,status,current_location,notes,qr_code_url,created_at,updated_at";
 
 const ASSIGNMENTS_BASE_SELECT = 
   "id,tenant_id,asset_id,profile_id,contractor_company_id,modality,monthly_amount,assigned_at,expected_until_contract_end,expected_return_date,signed_document_url,status,returned_at,return_condition,return_notes,acquired_at,acquired_value,acquisition_document_url,created_at,updated_at";
@@ -1345,7 +1346,19 @@ export async function createAsset(input: CreateAssetInput) {
     .single();
 
   if (error) throw error;
-  return data as DbAsset;
+
+  const asset = data as DbAsset;
+
+  // Gerar URL do QR code automaticamente
+  const qrCodeUrl = `${window.location.origin}/ativo/${asset.id}`;
+
+  await supabase
+    .from("assets")
+    .update({ qr_code_url: qrCodeUrl })
+    .eq("id", asset.id);
+
+  // Retornar o ativo com o QR code URL atualizado
+  return { ...asset, qr_code_url: qrCodeUrl } as DbAsset & { qr_code_url: string };
 }
 
 export async function updateAsset(id: string, patch: UpdateAssetInput) {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { format } from "date-fns";
-import { ArrowLeft, Box, DollarSign, FileText, History, AlertTriangle, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Box, DollarSign, FileText, History, MoreHorizontal, QrCode } from "lucide-react";
 import { getAssetWithDetails, calculateDepreciationSummary, getAssetStatusLabel, getAssetCategoryLabel } from "@/lib/assetsDb";
 import { RequireAuth } from "@/components/RequireAuth";
 import { RequireCompanyModule } from "@/components/RequireCompanyModule";
@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import AssetQRLabel from "@/components/assets/AssetQRLabel";
 
 export default function AssetDetail() {
   const { assetId } = useParams();
@@ -25,6 +26,7 @@ export default function AssetDetail() {
   const [asset, setAsset] = useState<any>(null);
   const [depreciation, setDepreciation] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showQRLabel, setShowQRLabel] = useState(false);
 
   const canManage = user?.role === "MASTERADMIN" || user?.role === "ADMIN";
 
@@ -87,6 +89,16 @@ export default function AssetDetail() {
             </div>
 
             <div className="flex gap-2">
+              {asset.qr_code_url && (
+                <Button
+                  variant="outline"
+                  className="rounded-2xl"
+                  onClick={() => setShowQRLabel(true)}
+                >
+                  <QrCode className="mr-2 h-4 w-4" />
+                  Etiqueta
+                </Button>
+              )}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="rounded-2xl">
@@ -316,6 +328,18 @@ export default function AssetDetail() {
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Modal de etiqueta com QR Code */}
+        {showQRLabel && asset && (
+          <AssetQRLabel
+            assetCode={asset.asset_code}
+            assetType={asset.asset_type}
+            qrCodeUrl={asset.qr_code_url}
+            brand={asset.brand}
+            model={asset.model}
+            onClose={() => setShowQRLabel(false)}
+          />
+        )}
       </RequireCompanyModule>
     </RequireAuth>
   );
