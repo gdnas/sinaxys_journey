@@ -190,16 +190,16 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
   return (
     <>
       <BlurDialog open={open} onOpenChange={onOpenChange}>
-        <BlurDialogContent>
+        <BlurDialogContent className="max-w-5xl w-full">
           <BlurDialogHeader>
             <BlurDialogTitle>{asset?.asset_code ?? "Detalhes do ativo"}</BlurDialogTitle>
           </BlurDialogHeader>
 
-          <div className="mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="mt-4 overflow-auto max-h-[72vh]">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {/* Left column: visual + main actions */}
-              <div className="md:col-span-1">
-                <Card className="p-4 rounded-2xl">
+              <div className="md:col-span-1 flex flex-col gap-4">
+                <Card className="p-4 rounded-2xl w-full">
                   <div className="flex flex-col items-center text-center">
                     <div className="w-28 h-28 rounded-xl bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center mb-3">
                       <div className="text-2xl font-bold text-indigo-700">{asset?.asset_code ? asset.asset_code.slice(0,3) : '—'}</div>
@@ -207,19 +207,19 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
                     <div className="text-sm font-semibold text-slate-900">{asset?.asset_type}</div>
                     <div className="text-xs text-slate-500">{asset?.company_name}</div>
 
-                    <div className="mt-4 flex w-full gap-2">
-                      <Button size="sm" className="flex-1" variant="ghost" onClick={handleShowQR}><QrCode className="mr-2"/>Etiqueta</Button>
-                      {canManage && <Button size="sm" className="flex-1" asChild><a href={`/app/ativos/${assetId}/entregar`}>Entregar</a></Button>}
+                    <div className="mt-4 flex w-full gap-2 flex-wrap">
+                      <Button size="sm" className="flex-1 min-w-[120px]" variant="ghost" onClick={handleShowQR}><QrCode className="mr-2"/>Etiqueta</Button>
+                      {canManage && <Button size="sm" className="flex-1 min-w-[120px]" asChild><a href={`/app/ativos/${assetId}/entregar`}>Entregar</a></Button>}
                     </div>
 
-                    <div className="mt-3 w-full flex gap-2">
-                      <Button size="sm" variant="outline" className="flex-1" asChild><a href={`/app/ativos/${assetId}/editar`}><Edit3 className="mr-2"/>Editar</a></Button>
-                      <Button size="sm" variant="destructive" className="flex-1" onClick={handleDelete}><Trash2 className="mr-2"/>Excluir</Button>
+                    <div className="mt-3 w-full flex gap-2 flex-wrap">
+                      <Button size="sm" variant="outline" className="flex-1 min-w-[120px]" asChild><a href={`/app/ativos/${assetId}/editar`}><Edit3 className="mr-2"/>Editar</a></Button>
+                      <Button size="sm" variant="destructive" className="flex-1 min-w-[120px]" onClick={handleDelete}><Trash2 className="mr-2"/>Excluir</Button>
                     </div>
                   </div>
                 </Card>
 
-                <Card className="mt-4 p-4 rounded-2xl">
+                <Card className="mt-0 p-4 rounded-2xl w-full">
                   <div className="text-sm font-semibold mb-2">Status</div>
                   <div className="inline-block px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm font-medium">{getAssetStatusLabel(asset?.status)}</div>
 
@@ -236,9 +236,9 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
               </div>
 
               {/* Right column: details */}
-              <div className="md:col-span-2">
-                <Card className="p-6 rounded-2xl">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-3">
+                <Card className="p-6 rounded-2xl w-full">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <div className="text-xs text-muted-foreground">Código</div>
                       <div className="font-medium text-lg">{asset?.asset_code}</div>
@@ -290,7 +290,7 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
                   </div>
                 </Card>
 
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
                   <Card className="p-4 rounded-2xl">
                     <div className="text-sm font-semibold mb-2">Dados Financeiros</div>
                     <div className="text-sm">
@@ -299,7 +299,7 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
                     </div>
                   </Card>
 
-                  <Card className="p-4 rounded-2xl">
+                  <Card className="p-4 rounded-2xl col-span-2 md:col-span-1">
                     <div className="text-sm font-semibold mb-2">Documentos</div>
                     <div className="space-y-2">
                       {(asset?.documents || []).length ? (
