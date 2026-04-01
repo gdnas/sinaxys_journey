@@ -181,13 +181,29 @@ export default function AssetForm() {
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="grid gap-2">
                     <Label>Código do patrimônio *</Label>
-                    <Input
-                      value={formData.asset_code}
-                      onChange={(e) => setFormData({ ...formData, asset_code: e.target.value })}
-                      placeholder="Ex: NB-001"
-                      className="rounded-2xl"
-                      required
-                    />
+                    <div className="flex gap-2">
+                      <Input
+                        value={formData.asset_code}
+                        onChange={(e) => setFormData({ ...formData, asset_code: e.target.value })}
+                        placeholder="Ex: NB-001 (deixe em branco para gerar automaticamente)"
+                        className="rounded-2xl"
+                      />
+                      <Button type="button" variant="outline" className="rounded-2xl" onClick={async () => {
+                        // generate preview code using same logic as server by calling a minimal endpoint client-side
+                        if (!companyId) return;
+                        try {
+                          const { data: comp } = await fetch(`/api/_internal/company/${companyId}/initials`).then(r => r.json());
+                          if (comp && comp.initials) {
+                            // find existing highest via RPC
+                            const res = await fetch(`/api/_internal/next-code?tenant_id=${companyId}&initials=${comp.initials}`).then(r => r.json());
+                            if (res && res.next) setFormData({ ...formData, asset_code: res.next });
+                          }
+                        } catch (e) {
+                          console.warn('preview generate failed', e);
+                        }
+                      }}>Gerar</Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground">Se deixado em branco, o código será gerado automaticamente usando as iniciais da empresa.</p>
                   </div>
                   <div className="grid gap-2">
                     <Label>Categoria *</Label>

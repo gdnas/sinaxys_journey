@@ -308,7 +308,7 @@ export interface UpdateContractorCompanyInput {
  */
 export interface CreateAssetInput {
   tenant_id: string;
-  asset_code: string;
+  asset_code?: string;
   category: AssetCategory;
   asset_type: string;
   brand?: string;
@@ -1323,11 +1323,89 @@ export async function getAssetWithDetails(id: string): Promise<AssetWithDetails 
 }
 
 export async function createAsset(input: CreateAssetInput) {
+  // If asset_code not provided, generate based on company initials + incremental number
+  let assetCode = input.asset_code && input.asset_code.trim() ? input.asset_code.trim() : '';
+  if (!assetCode) {
+    try {
+      // fetch company name
+      const { data: comp, error: compErr } = await supabase
+        .from('companies')
+        .select('name, trade_name')
+        .eq('id', input.tenant_id)
+        .maybeSingle();
+      if (compErr) throw compErr;
+
+      const companyName = (comp && (comp.trade_name || comp.name)) || 'COMP';
+
+      // compute initials: take first letter of up to 3 words, ignore small words, keep letters only
+      const words = companyName
+        .replace(/[^\p{L}\s]/gu, ' ')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 5);
+
+      // filter out common small words if many words
+      const ignore = new Set(['da','de','do','das','dos','e','the','and','of','&']);
+      const initialsArr: string[] = [];
+      for (const w of words) {
+        const lw = w.toLowerCase();
+        if (words.length > 2 && ignore.has(lw)) continue;
+        const m = w.match(/\p{L}/u);
+        if (m) initialsArr.push(w[0].toUpperCase());
+        if (initialsArr.length >= 3) break;
+      }
+      const initials = (initialsArr.join('') || companyName.slice(0,2).toUpperCase()).replace(/[^A-Z]/g, '').slice(0,3);
+
+      // find existing asset codes for tenant that start with initials
+      const { data: existing, error: existingErr } = await supabase
+        .from('assets')
+        .select('asset_code')
+        .eq('tenant_id', input.tenant_id)
+        .ilike('asset_code', `${initials}%`);
+      if (existingErr) throw existingErr;
+
+      let maxNum = 0;
+      const re = new RegExp(`^${initials}0*([0-9]+)$`, 'i');
+      (existing || []).forEach((r: any) => {
+        const code = r.asset_code || '';
+        const match = code.match(re);
+        if (match && match[1]) {
+          const n = parseInt(match[1], 10);
+          if (!isNaN(n) && n > maxNum) maxNum = n;
+        }
+      });
+
+      const next = maxNum + 1;
+      const numberPart = String(next).padStart(4, '0');
+      assetCode = `${initials}${numberPart}`;
+
+      // ensure uniqueness, try incrementing a few times if collision
+      let attempts = 0;
+      while (attempts < 10) {
+        const { data: dup, error: dupErr } = await supabase
+          .from('assets')
+          .select('id')
+          .eq('tenant_id', input.tenant_id)
+          .eq('asset_code', assetCode)
+          .limit(1);
+        if (dupErr) throw dupErr;
+        if (!dup || dup.length === 0) break;
+        // collision, increment
+        const nv = parseInt(numberPart, 10) + attempts + 1;
+        assetCode = `${initials}${String(nv).padStart(4,'0')}`;
+        attempts++;
+      }
+    } catch (e) {
+      console.warn('Failed to auto-generate asset code, falling back to timestamp code', e);
+      assetCode = `A${Date.now().toString().slice(-6)}`;
+    }
+  }
+
   const { data, error } = await supabase
     .from("assets")
     .insert({
       tenant_id: input.tenant_id,
-      asset_code: input.asset_code,
+      asset_code: assetCode,
       category: input.category,
       asset_type: input.asset_type,
       brand: input.brand || null,
