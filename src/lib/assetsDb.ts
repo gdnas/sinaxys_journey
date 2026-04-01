@@ -1330,12 +1330,12 @@ export async function createAsset(input: CreateAssetInput) {
       // fetch company name
       const { data: comp, error: compErr } = await supabase
         .from('companies')
-        .select('name, trade_name')
+        .select('name')
         .eq('id', input.tenant_id)
         .maybeSingle();
       if (compErr) throw compErr;
 
-      const companyName = (comp && (comp.trade_name || comp.name)) || 'COMP';
+      const companyName = (comp && comp.name) || 'COMP';
 
       // compute initials: take first letter of up to 3 words, ignore small words, keep letters only
       const words = companyName

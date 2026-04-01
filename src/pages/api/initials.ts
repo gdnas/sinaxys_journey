@@ -5,9 +5,9 @@ export default async function handler(req: any, res: any) {
   const { companyId } = req.query;
   if (!companyId) return res.status(400).json({ error: 'companyId required' });
   try {
-    const { data: comp, error } = await supabase.from('companies').select('name, trade_name').eq('id', companyId).maybeSingle();
+    const { data: comp, error } = await supabase.from('companies').select('name').eq('id', companyId).maybeSingle();
     if (error) throw error;
-    const companyName = (comp && (comp.trade_name || comp.name)) || 'COMP';
+    const companyName = (comp && comp.name) || 'COMP';
     const words = companyName.replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0,5);
     const ignore = new Set(['da','de','do','das','dos','e','the','and','of','&']);
     const initialsArr: string[] = [];

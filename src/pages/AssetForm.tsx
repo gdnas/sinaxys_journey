@@ -192,11 +192,11 @@ export default function AssetForm() {
                         try {
                           const { data: comp, error: compErr } = await supabase
                             .from('companies')
-                            .select('name, trade_name')
+                            .select('name')
                             .eq('id', companyId)
                             .maybeSingle();
                           if (compErr) throw compErr;
-                          const companyName = (comp && (comp.trade_name || comp.name)) || 'COMP';
+                          const companyName = (comp && comp.name) || 'COMP';
 
                           // compute initials
                           const words = companyName.replace(/[^\p{L}\s]/gu, ' ').split(/\s+/).filter(Boolean).slice(0, 5);
