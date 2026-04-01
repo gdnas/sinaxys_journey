@@ -42,6 +42,15 @@ export default function AssetModal({ assetId, open, onOpenChange, onDeleted, onU
       try {
         const a = await getAssetWithDetails(assetId);
         setAsset(a);
+        // fetch company name to ensure it's available for the label
+        try {
+          const { data: comp } = await supabase.from('companies').select('name').eq('id', a.tenant_id).maybeSingle();
+          if (comp && comp.name) {
+            setAsset((prev: any) => ({ ...(prev || {}), company_name: comp.name }));
+          }
+        } catch (e) {
+          // ignore
+        }
       } catch (e: any) {
         console.error("AssetModal: failed to load asset", e);
         toast({ title: "Erro ao carregar ativo", description: e?.message ?? String(e), variant: "destructive" });

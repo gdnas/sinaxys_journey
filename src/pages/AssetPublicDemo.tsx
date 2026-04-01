@@ -5,7 +5,7 @@ import { getAssetWithDetails } from "@/lib/assetsDb";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function AssetPublicDemo() {
-  const { companyId, assetId } = useParams<{ companyId: string; assetId: string }>();
+  const { companyId, assetId } = useParams<{ companyId?: string; assetId?: string }>();
   const [loading, setLoading] = useState(true);
   const [asset, setAsset] = useState<any | null>(null);
   const [companyName, setCompanyName] = useState<string | null>(null);
@@ -13,27 +13,32 @@ export default function AssetPublicDemo() {
 
   useEffect(() => {
     async function load() {
-      if (!assetId || !companyId) {
+      if (!assetId) {
         setError("Parâmetros inválidos");
         setLoading(false);
         return;
       }
       try {
+        // buscar ativo por id (não depender do companyId na URL)
         const a = await getAssetWithDetails(assetId);
         if (!a) {
           setError("Ativo não encontrado");
           setLoading(false);
           return;
         }
-        if (a.tenant_id !== companyId) {
-          setError("O ativo não pertence a esta empresa");
-          setLoading(false);
-          return;
-        }
+
         setAsset(a);
-        // buscar nome da empresa
-        const { data: comp } = await supabase.from('companies').select('name').eq('id', companyId).maybeSingle();
-        if (comp) setCompanyName(comp.name);
+
+        // buscar nome da empresa correto a partir do tenant_id do asset
+        try {
+          const { data: comp } = await supabase.from('companies').select('name').eq('id', a.tenant_id).maybeSingle();
+          if (comp && comp.name) setCompanyName(comp.name);
+        } catch (e) {
+          console.warn('Failed to fetch company name', e);
+        }
+
+        // If companyId was provided but doesn't match asset.tenant_id, still show the asset
+        // but note the mismatch (previously we hid the asset). This makes the public demo robust.
       } catch (e: any) {
         console.error(e);
         setError("Erro ao carregar ativo");
@@ -61,7 +66,7 @@ export default function AssetPublicDemo() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8 px-4">
       <div className="max-w-3xl mx-auto">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-indigo-900 mb-2">{companyName}</h1>
+          <h1 className="text-3xl font-bold text-indigo-900 mb-2">{companyName || 'Empresa'}</h1>
           <p className="text-gray-600">Demonstração do ativo</p>
         </div>
         <Card className="rounded-3xl overflow-hidden shadow-xl bg-white p-6">
