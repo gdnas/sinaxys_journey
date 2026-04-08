@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MailPlus, Pencil, Search, Shield, UploadCloud, UserRound, CalendarDays, Filter, Key } from "lucide-react";
+import { MailPlus, Pencil, Search, Shield, UploadCloud, UserRound, CalendarDays, Filter, Key, Trash2 } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -208,6 +208,10 @@ export default function AdminUsers() {
   const [resetTempPassword, setResetTempPassword] = useState("");
   const [resetting, setResetting] = useState(false);
 
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletingUser, setDeletingUser] = useState<DbProfile | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
   const openEdit = (p: DbProfile) => {
     setEditing(p);
     setEditName(p.name ?? "");
@@ -222,6 +226,11 @@ export default function AdminUsers() {
     setEditManagerId(p.manager_id ?? "");
     setResetTempPassword("");
     setEditOpen(true);
+  };
+
+  const openDeleteConfirm = (p: DbProfile) => {
+    setDeletingUser(p);
+    setDeleteConfirmOpen(true);
   };
 
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -439,10 +448,16 @@ export default function AdminUsers() {
                             </Badge>
                           </TableCell>
                           <TableCell className="text-right">
-                            <Button variant="outline" className="h-8 rounded-lg" onClick={() => openEdit(p)}>
-                              <Pencil className="mr-2 h-4 w-4" />
-                              Editar
-                            </Button>
+                            <div className="flex justify-end gap-2">
+                              <Button variant="outline" className="h-8 rounded-lg" onClick={() => openEdit(p)}>
+                                <Pencil className="mr-2 h-4 w-4" />
+                                Editar
+                              </Button>
+                              <Button variant="destructive" className="h-8 rounded-lg" onClick={() => openDeleteConfirm(p)}>
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Excluir
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );
@@ -883,6 +898,62 @@ export default function AdminUsers() {
               disabled={resetting}
             >
               {resetting ? "Redefinindo…" : "Redefinir senha"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Excluir usuário</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div className="rounded-2xl bg-amber-50 p-3">
+              <div className="text-sm font-semibold text-amber-900">Atenção</div>
+              <div className="mt-1 text-xs text-amber-900">A exclusão remove permanentemente o acesso e o perfil do usuário. Esta ação não pode ser desfeita.</div>
+            </div>
+
+            <div className="text-sm">
+              {deletingUser ? (
+                <>
+                  Confirma excluir <span className="font-semibold">{deletingUser.name ?? deletingUser.email}</span> ({deletingUser.email})?
+                </>
+              ) : (
+                "Selecione um usuário."
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setDeleteConfirmOpen(false)} disabled={deleting}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl bg-red-600 text-white hover:bg-red-700"
+              onClick={async () => {
+                if (!deletingUser) return;
+                try {
+                  setDeleting(true);
+                  const { data, error } = await supabase.functions.invoke("admin-delete-user", { body: { userId: deletingUser.id } });
+                  if (error) throw error;
+                  if (!data?.ok) throw new Error(data?.message ?? "Erro ao excluir usuário.");
+
+                  toast({ title: "Usuário excluído" });
+                  await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
+                  setDeleteConfirmOpen(false);
+                } catch (e) {
+                  const msg = await describeFunctionError(e);
+                  toast({ title: "Não foi possível excluir usuário", description: msg, variant: "destructive" });
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+              disabled={deleting}
+            >
+              {deleting ? "Excluindo…" : "Excluir usuário"}
             </Button>
           </DialogFooter>
         </DialogContent>
