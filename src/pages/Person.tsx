@@ -17,6 +17,7 @@ import { listOkrCycles, listOkrObjectives, listOkrObjectivesByIds, listOkrObject
 import { PersonFeedbackCard } from "@/components/PersonFeedbackCard";
 import { getAssignmentsForUser } from "@/lib/journeyDb";
 import { getSharedFeedbacksForUser } from "@/lib/feedbackSharesDb";
+import { brl } from "@/lib/costs";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -30,6 +31,13 @@ function shortDate(isoOrDate: string | null | undefined) {
   const d = new Date(isoOrDate);
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+function fullDateTime(isoOrDate: string | null | undefined) {
+  if (!isoOrDate) return null;
+  const d = new Date(isoOrDate);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
 
 export default function Person() {
@@ -213,6 +221,10 @@ export default function Person() {
   const email = qSensitive.data?.email ?? "—";
   const phone = qSensitive.data?.phone?.trim() || "—";
 
+  const offboardingState = qSensitive.data?.offboarding_state ?? null;
+  const offboardingScheduledAt = qSensitive.data?.offboarding_scheduled_at ?? null;
+  const monthlyCost = typeof qSensitive.data?.monthly_cost_brl === "number" ? qSensitive.data?.monthly_cost_brl : null;
+
   const okrCount = okrInvolvement.length;
 
   return (
@@ -232,6 +244,25 @@ export default function Person() {
           ) : null}
         </div>
       </div>
+
+      {offboardingState === "PENDING" ? (
+        <div>
+          <Card className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-sm font-semibold text-amber-900">Usuário em processo de desligamento</div>
+                <div className="mt-1 text-xs text-amber-900">
+                  {offboardingScheduledAt ? (
+                    <>Inativação agendada para <span className="font-medium">{fullDateTime(offboardingScheduledAt)}</span>. O custo continuará sendo considerado até essa data.</>
+                  ) : (
+                    <>inativação sem data definida. O usuário já tem acesso suspenso e o custo será mantido conforme política da empresa.</>
+                  )}
+                </div>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -375,6 +406,24 @@ export default function Person() {
           </div>
 
           <aside className="grid gap-6">
+            <div>
+              <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos</div>
+                <p className="mt-1 text-sm text-muted-foreground">Informações de custo do colaborador.</p>
+                <Separator className="my-4" />
+                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{monthlyCost ? brl(monthlyCost) : "—"}</div>
+                {offboardingState === "PENDING" ? (
+                  <div className="mt-2 text-xs text-amber-900">
+                    {offboardingScheduledAt ? (
+                      <>Desligamento agendado para <span className="font-medium">{fullDateTime(offboardingScheduledAt)}</span>. Custo mantido até essa data.</>
+                    ) : (
+                      <>Usuário em processo de desligamento (data não definida). Custo mantido até confirmação.</>
+                    )}
+                  </div>
+                ) : null}
+              </Card>
+            </div>
+
             <div>
               <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Trilhas de Conhecimento</div>
