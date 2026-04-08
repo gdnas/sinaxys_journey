@@ -35,6 +35,7 @@ type DbProfile = {
   monthly_cost_brl: number | null;
   joined_at: string | null;
   manager_id: string | null;
+  limited_access: boolean;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -78,7 +79,7 @@ async function fetchMyProfile(userId: string): Promise<DbProfile | null> {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id,email,name,role,company_id,department_id,active,must_change_password,avatar_url,phone,job_title,contract_url,monthly_cost_brl,joined_at,manager_id",
+      "id,email,name,role,company_id,department_id,active,must_change_password,avatar_url,phone,job_title,contract_url,monthly_cost_brl,joined_at,manager_id,limited_access",
     )
     .eq("id", userId)
     .maybeSingle();
@@ -137,6 +138,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (!mountedRef.current) return;
         setUser(null);
         setActiveCompanyIdState(null);
+        return;
+      }
+
+      // If user is in offboarding limited access, immediately sign out but allow limited profile view
+      if (p.limited_access) {
+        // Keep a minimal user in memory so the UI can render limited-access profile views
+        const limitedUser = mapProfileToUser(p);
+        // explicitly mark as inactive for general access checks
+        limitedUser.active = false;
+        if (!mountedRef.current) return;
+        setUser(limitedUser);
+        setActiveCompanyIdState(p.company_id ?? null);
+        setLoading(false);
         return;
       }
 

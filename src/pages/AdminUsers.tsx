@@ -21,6 +21,7 @@ import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilesByCompany, updateProfile, type DbProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
 import { ImportUsersPanel } from "@/components/admin/ImportUsersPanel";
+import AdminUsersOffboardDialog from "./AdminUsersOffboardDialog";
 
 const ROLE_OPTIONS = [
   { value: "ADMIN", label: "Admin" },
@@ -212,6 +213,14 @@ export default function AdminUsers() {
   const [deletingUser, setDeletingUser] = useState<DbProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [offboardOpen, setOffboardOpen] = useState(false);
+  const [offboardUserId, setOffboardUserId] = useState<string | null>(null);
+
+  const openOffboardDialogHandler = (p: DbProfile) => {
+    setOffboardUserId(p.id);
+    setOffboardOpen(true);
+  };
+
   const openEdit = (p: DbProfile) => {
     setEditing(p);
     setEditName(p.name ?? "");
@@ -225,6 +234,16 @@ export default function AdminUsers() {
     setEditJoinedAtStr(displayFromIso(p.joined_at));
     setEditManagerId(p.manager_id ?? "");
     setResetTempPassword("");
+    setEditOpen(true);
+  };
+
+  const openOffboardDialog = (p: DbProfile) => {
+    setEditing(p);
+    // prefill scheduled date to 7 days from now as example
+    const defaultDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    setEditJoinedAtStr(displayFromIso(p.joined_at));
+    // reuse resetTempPassword field to hold scheduledAt ISO in UI flow (quick reuse)
+    setResetTempPassword(defaultDate);
     setEditOpen(true);
   };
 
@@ -452,6 +471,10 @@ export default function AdminUsers() {
                               <Button variant="outline" className="h-8 rounded-lg" onClick={() => openEdit(p)}>
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Editar
+                              </Button>
+                              <Button variant="ghost" className="h-8 rounded-lg" onClick={() => openOffboardDialogHandler(p)}>
+                                <Key className="mr-2 h-4 w-4" />
+                                Desligamento
                               </Button>
                               <Button variant="destructive" className="h-8 rounded-lg" onClick={() => openDeleteConfirm(p)}>
                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -958,6 +981,9 @@ export default function AdminUsers() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Offboarding dialog (reuse edit modal for scheduling) */}
+      <AdminUsersOffboardDialog open={offboardOpen} onOpenChange={setOffboardOpen} userId={offboardUserId} onDone={() => qc.invalidateQueries({ queryKey: ["profiles", companyId] })} />
     </div>
   );
 }
