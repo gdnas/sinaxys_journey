@@ -36,6 +36,7 @@ import VacationRequests from "@/pages/VacationRequests";
 import VacationApprovals from "@/pages/VacationApprovals";
 import { useTranslation } from "react-i18next";
 import { UserAssetsTab } from "@/components/assets/UserAssetsTab";
+import MinimalLimitedProfile from "./MinimalLimitedProfile";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -66,6 +67,11 @@ export default function Profile() {
   const docFileRef = useRef<HTMLInputElement | null>(null);
 
   if (!user) return null;
+
+  // If the user is in limited access due to offboarding, show minimal view
+  if (!user.active) {
+    return <MinimalLimitedProfile />;
+  }
 
   const isMaster = user.role === "MASTERADMIN";
 
