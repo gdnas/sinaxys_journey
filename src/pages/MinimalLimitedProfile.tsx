@@ -1,12 +1,18 @@
-import React, { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { getProfile } from "@/lib/profilesDb";
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Upload } from "lucide-react";
 import type { DbProfile } from "@/lib/profilesDb";
 import { listUserDocuments } from "@/lib/documentsDb";
-import { listUserInvoices, createInvoiceSignedUrl } from "@/lib/financeDb";
+import { listUserInvoices, createInvoiceSignedUrl, uploadInvoiceFile, createUserInvoice } from "@/lib/financeDb";
 import { supabase } from "@/integrations/supabase/client";
 import { brl } from "@/lib/costs";
 
@@ -30,6 +36,9 @@ function formatTenure(joinedAt?: string | null) {
 
 export default function MinimalLimitedProfile() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  
   const { data: profile } = useQuery({
     queryKey: ["profile", user?.id],
     queryFn: () => (user?.id ? getProfile(user.id) : Promise.resolve(null)),
@@ -47,6 +56,22 @@ export default function MinimalLimitedProfile() {
     queryFn: () => (user?.companyId && user?.id ? listUserInvoices({ userId: user.id, companyId: user.companyId }) : Promise.resolve([])),
     enabled: !!user?.companyId && !!user?.id,
   });
+
+  // Dialog: enviar nota
+  const [sendOpen, setSendOpen] = useState(false);
+  const [invoiceNumber, setInvoiceNumber] = useState("");
+  const [issueDate, setIssueDate] = useState("");
+  const [amount, setAmount] = useState("");
+  const [description, setDescription] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+
+  const amountNumber = useMemo(() => {
+    const t = amount.trim();
+    if (!t) return null;
+    const n = Number(t.replace(/\./g, "").replace(/,/g, "."));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [amount]);
 
   const p = profile as DbProfile | null;
   if (!p) return null;
@@ -82,6 +107,67 @@ export default function MinimalLimitedProfile() {
     } catch (e) {
       // fallback: try direct file path or do nothing
       console.error("Failed to open invoice", e);
+    }
+  };
+
+  const handleUploadInvoice = async () => {
+    if (!user?.companyId) return;
+    if (!file) return;
+    if (!issueDate) return;
+    if (!amountNumber) return;
+
+    setSending(true);
+    try {
+      const invoiceId = crypto.randomUUID();
+      const { path, fileName, mimeType } = await uploadInvoiceFile({
+        userId: user.id,
+        invoiceId,
+        file,
+      });
+
+      // Audit log: user uploaded invoice during offboarding
+      try {
+        await supabase.from("audit_logs").insert({
+          company_id: user.companyId,
+          actor_user_id: user.id,
+          target_user_id: user.id,
+          action: "offboarding_upload_invoice",
+          meta: { invoice_id: invoiceId, uploaded_at: new Date().toISOString() },
+        });
+      } catch {
+        // ignore audit failures
+      }
+
+      await createUserInvoice({
+        id: invoiceId,
+        companyId: user.companyId,
+        userId: user.id,
+        invoiceNumber: invoiceNumber.trim() || null,
+        issueDate,
+        amountBRL: amountNumber,
+        description: description.trim() || null,
+        filePath: path,
+        fileName,
+        mimeType,
+      });
+
+      await qc.invalidateQueries({ queryKey: ["user-invoices", user.companyId, user.id] });
+
+      toast({ title: "Nota fiscal enviada" });
+      setSendOpen(false);
+      setInvoiceNumber("");
+      setIssueDate("");
+      setAmount("");
+      setDescription("");
+      setFile(null);
+    } catch (e) {
+      toast({
+        title: "Não foi possível enviar a nota fiscal",
+        description: e instanceof Error ? e.message : "Erro inesperado.",
+        variant: "destructive",
+      });
+    } finally {
+      setSending(false);
     }
   };
 
@@ -152,7 +238,24 @@ export default function MinimalLimitedProfile() {
       <Card className="rounded-3xl p-6">
         <div className="flex items-center justify-between">
           <div className="text-sm font-semibold">Minhas notas fiscais</div>
-          <div className="text-xs text-muted-foreground">Visualização somente leitura</div>
+          <div className="flex items-center gap-2">
+            <div className="text-xs text-muted-foreground">Você pode enviar notas mesmo durante o desligamento</div>
+            <Button
+              type="button"
+              className="h-10 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              onClick={() => {
+                setInvoiceNumber("");
+                setIssueDate("");
+                setAmount("");
+                setDescription("");
+                setFile(null);
+                setSendOpen(true);
+              }}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              Enviar nota
+            </Button>
+          </div>
         </div>
 
         <div className="mt-4 grid gap-3">
@@ -173,6 +276,61 @@ export default function MinimalLimitedProfile() {
           )}
         </div>
       </Card>
+
+      {/* Dialog: Enviar nota */}
+      <Dialog open={sendOpen} onOpenChange={setSendOpen}>
+        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Enviar nota fiscal</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-3">
+            <div className="grid gap-2">
+              <Label>Número da nota (opcional)</Label>
+              <Input className="h-11 rounded-2xl" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} placeholder="Ex.: 12345" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Data de emissão</Label>
+              <Input className="h-11 rounded-2xl" type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Valor (R$)</Label>
+              <Input className="h-11 rounded-2xl" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Ex.: 4500" inputMode="decimal" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Descrição (opcional)</Label>
+              <Textarea className="min-h-[90px] rounded-2xl" value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Ex.: Prestação de serviços — Jan/2026" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Arquivo (PDF ou imagem)</Label>
+              <Input
+                type="file"
+                className="h-11 rounded-2xl"
+                accept="application/pdf,image/*"
+                onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setSendOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              disabled={sending || !user?.companyId || !issueDate || !amountNumber || !file}
+              onClick={handleUploadInvoice}
+            >
+              <Upload className="mr-2 h-4 w-4" />
+              {sending ? "Enviando..." : "Enviar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
