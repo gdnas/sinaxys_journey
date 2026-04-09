@@ -271,11 +271,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // This prevents inactive users from "logging in" and only then being kicked out.
         const prof = await fetchMyProfile(uid);
         if (!prof) {
+          // IMPORTANT: never create/vinculate tenant on login.
+          // If profile is missing, access must be provisioned out-of-band.
           await supabase.auth.signOut();
+          sessionUserIdRef.current = null;
+          if (!mountedRef.current) return;
+          setUser(null);
+          setActiveCompanyIdState(null);
           return { ok: false as const, message: "Seu acesso ainda não foi provisionado. Solicite ao administrador da sua empresa." };
         }
 
-        if (!prof.active) {
+        // Allow login for users in limited_access (offboarding) so they can view their limited profile.
+        if (!prof.active && !prof.limited_access) {
           await supabase.auth.signOut();
           return { ok: false as const, message: "Usuário inativo. Solicite reativação ao administrador." };
         }

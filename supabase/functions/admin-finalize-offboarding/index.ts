@@ -72,6 +72,19 @@ serve(async (req) => {
           } catch (e) {
             console.warn("[admin-finalize-offboarding] audit log failed", { e: e instanceof Error ? e.message : String(e), userId: p.id });
           }
+
+          // Also insert a compensation event to mark the end of cost recording (duplicate-safe)
+          try {
+            await service.from("compensation_events").insert({
+              company_id: p.company_id,
+              user_id: p.id,
+              monthly_cost_brl: p.monthly_cost_brl,
+              effective_at: new Date().toISOString(),
+              created_by: null,
+            });
+          } catch (e) {
+            // ignore
+          }
         }
       } catch (e) {
         console.error("[admin-finalize-offboarding] unexpected error", { error: String(e), userId: p.id });
