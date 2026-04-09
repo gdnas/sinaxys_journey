@@ -215,10 +215,27 @@ export default function AdminUsers() {
 
   const [offboardOpen, setOffboardOpen] = useState(false);
   const [offboardUserId, setOffboardUserId] = useState<string | null>(null);
+  const [runningOffboards, setRunningOffboards] = useState(false);
 
   const openOffboardDialogHandler = (p: DbProfile) => {
     setOffboardUserId(p.id);
     setOffboardOpen(true);
+  };
+
+  const runFinalizeOffboards = async () => {
+    try {
+      setRunningOffboards(true);
+      const { data, error } = await supabase.functions.invoke("admin-finalize-offboarding");
+      if (error) throw error;
+      if (!data?.ok) throw new Error(data?.message ?? "Erro ao executar finalização.");
+      toast({ title: "Finalização executada", description: `${data.processed ?? 0} desligamento(s) processado(s).` });
+      await qc.invalidateQueries({ queryKey: ["profiles", companyId] });
+    } catch (e) {
+      const msg = (e as any)?.message ?? "Erro inesperado.";
+      toast({ title: "Falha ao executar", description: msg, variant: "destructive" });
+    } finally {
+      setRunningOffboards(false);
+    }
   };
 
   const openEdit = (p: DbProfile) => {
@@ -364,6 +381,16 @@ export default function AdminUsers() {
                   <UploadCloud className="mr-2 h-4 w-4" />
                   Importar
                 </Button>
+                
+                <Button
+                  variant="ghost"
+                  className="h-10 rounded-lg"
+                  onClick={runFinalizeOffboards}
+                  disabled={runningOffboards}
+                  title="Executar finalização de desligamentos agendados agora"
+                >
+                  {runningOffboards ? "Executando…" : "Executar desligamentos"}
+                </Button>
               </div>
 
               <div className="flex items-center gap-3 px-2">
@@ -471,14 +498,6 @@ export default function AdminUsers() {
                               <Button variant="outline" className="h-8 rounded-lg" onClick={() => openEdit(p)}>
                                 <Pencil className="mr-2 h-4 w-4" />
                                 Editar
-                              </Button>
-                              <Button variant="ghost" className="h-8 rounded-lg" onClick={() => openOffboardDialogHandler(p)}>
-                                <Key className="mr-2 h-4 w-4" />
-                                Desligamento
-                              </Button>
-                              <Button variant="destructive" className="h-8 rounded-lg" onClick={() => openDeleteConfirm(p)}>
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Excluir
                               </Button>
                             </div>
                           </TableCell>

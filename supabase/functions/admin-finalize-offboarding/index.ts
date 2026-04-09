@@ -20,12 +20,14 @@ serve(async (req) => {
 
     // Only service role will run this; no auth header expected for scheduled run.
 
-    // Find all pending offboardings that are due
+    // Find all pending offboardings that are due OR have no scheduled date (process immediately)
+    // We use an OR filter: offboarding_scheduled_at IS NULL OR offboarding_scheduled_at <= now()
+    const nowIso = new Date().toISOString();
     const { data: due, error: dueErr } = await service
       .from("profiles")
       .select("id,company_id,monthly_cost_brl,offboarding_scheduled_at")
-      .eq("offboarding_state", "PENDING")
-      .lte("offboarding_scheduled_at", new Date().toISOString());
+      .or(`offboarding_scheduled_at.is.null,offboarding_scheduled_at.lte.${nowIso}`)
+      .eq("offboarding_state", "PENDING");
 
     if (dueErr) {
       console.error("[admin-finalize-offboarding] failed to query due offboardings", { dueErr: dueErr.message });

@@ -72,7 +72,7 @@ serve(async (req) => {
     if (scheduledAt && Number.isNaN(scheduledAt.getTime())) return json(400, { ok: false, message: "scheduledAt inválido." });
 
     // Load target profile to ensure same tenant when caller is not MASTERADMIN
-    const { data: targetProfile, error: targetErr } = await service.from("profiles").select("id,company_id,active").eq("id", userId).maybeSingle();
+    const { data: targetProfile, error: targetErr } = await service.from("profiles").select("id,company_id,active,monthly_cost_brl").eq("id", userId).maybeSingle();
     if (targetErr) {
       console.error("[admin-set-offboarding] failed to load target profile", { targetErr: targetErr.message, userId });
       return json(500, { ok: false, message: "Erro ao localizar usuário." });
@@ -95,6 +95,42 @@ serve(async (req) => {
     }
 
     console.log("[admin-set-offboarding] scheduled", { userId, scheduledAt });
+
+    // If scheduledAt is null, the caller intended immediate processing: finalize now for this user
+    if (!scheduledAt) {
+      try {
+        // Record compensation event if applicable
+        if (targetProfile.monthly_cost_brl) {
+          const { error: compErr } = await service.from("compensation_events").insert({
+            company_id: targetProfile.company_id,
+            user_id: targetProfile.id,
+            monthly_cost_brl: targetProfile.monthly_cost_brl,
+            effective_at: new Date().toISOString(),
+            created_by: callerId,
+          });
+          if (compErr) console.warn("[admin-set-offboarding] failed to insert compensation event", { compErr: compErr.message, userId: targetProfile.id });
+        }
+
+        // Finalize offboarding immediately for this user
+        const { error: finalizeErr } = await service
+          .from("profiles")
+          .update({ active: false, offboarding_state: "COMPLETED", limited_access: false })
+          .eq("id", targetProfile.id);
+
+        if (finalizeErr) {
+          console.error("[admin-set-offboarding] finalize failed", { finalizeErr: finalizeErr.message, userId: targetProfile.id });
+          // return partial success
+          return json(200, { ok: true, userId, scheduledAt: null, message: "Agendado, mas falha ao finalizar imediatamente." });
+        }
+
+        console.log("[admin-set-offboarding] finalized immediately", { userId: targetProfile.id });
+        return json(200, { ok: true, userId, scheduledAt: null, finalized: true });
+      } catch (e) {
+        console.error("[admin-set-offboarding] unexpected finalize error", { message: e instanceof Error ? e.message : String(e), userId });
+        return json(500, { ok: false, message: "Agendado, mas erro ao finalizar imediatamente." });
+      }
+    }
+
     return json(200, { ok: true, userId, scheduledAt: scheduledAt ? scheduledAt.toISOString() : null });
   } catch (e) {
     console.error("[admin-set-offboarding] unexpected error", { message: e instanceof Error ? e.message : String(e) });

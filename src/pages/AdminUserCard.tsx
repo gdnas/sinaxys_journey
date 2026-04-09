@@ -38,6 +38,8 @@ import {
 } from "@/lib/documentsDb";
 import { getProfile, listProfilesByCompany, updateProfile } from "@/lib/profilesDb";
 import { roleLabel } from "@/lib/sinaxys";
+import AdminUsersOffboardDialog from "./AdminUsersOffboardDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -157,6 +159,10 @@ export default function AdminUserCard() {
   const [docUrl, setDocUrl] = useState("");
   const [addingDoc, setAddingDoc] = useState(false);
 
+  const [offboardOpen, setOffboardOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const dirty = useMemo(() => {
     if (!profile) return false;
     const baseName = profile.name ?? "";
@@ -213,6 +219,16 @@ export default function AdminUserCard() {
               <Button variant="outline" className="h-10 rounded-xl" onClick={() => nav(-1)}>
                 Voltar
               </Button>
+              {profile ? (
+                <>
+                  <Button variant="ghost" className="h-10 rounded-xl" onClick={() => setOffboardOpen(true)}>
+                    Desligamento
+                  </Button>
+                  <Button variant="destructive" className="h-10 rounded-xl" onClick={() => setDeleteConfirmOpen(true)}>
+                    Excluir
+                  </Button>
+                </>
+              ) : null}
             </div>
           </div>
           <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
@@ -736,6 +752,54 @@ export default function AdminUserCard() {
               }}
             >
               {addingAttachment ? "Salvando…" : "Adicionar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Offboard dialog for this user */}
+      <AdminUsersOffboardDialog open={offboardOpen} onOpenChange={setOffboardOpen} userId={profile?.id ?? null} onDone={async () => {
+        await qc.invalidateQueries({ queryKey: ["profile", userId] });
+        await qc.invalidateQueries({ queryKey: ["profiles", cid] });
+      }} />
+
+      {/* Delete confirmation dialog */}
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="max-w-md rounded-2xl">
+          <DialogHeader>
+            <DialogTitle>Excluir usuário</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-3">
+            <div className="rounded-2xl bg-amber-50 p-3">
+              <div className="text-sm font-semibold text-amber-900">Atenção</div>
+              <div className="mt-1 text-xs text-amber-900">A exclusão remove permanentemente o acesso e o perfil do usuário. Esta ação não pode ser desfeita.</div>
+            </div>
+            <div className="text-sm">Confirma excluir <span className="font-semibold">{profile?.name ?? profile?.email}</span> ({profile?.email})?</div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setDeleteConfirmOpen(false)} disabled={deleting}>Cancelar</Button>
+            <Button className="rounded-xl bg-red-600 text-white hover:bg-red-700" onClick={async () => {
+              if (!profile) return;
+              try {
+                setDeleting(true);
+                const { data, error } = await supabase.functions.invoke("admin-delete-user", { body: { userId: profile.id } });
+                if (error) throw error;
+                if (!data?.ok) throw new Error(data?.message ?? "Erro ao excluir usuário.");
+                toast({ title: "Usuário excluído" });
+                await Promise.all([
+                  qc.invalidateQueries({ queryKey: ["profiles", cid] }),
+                  qc.invalidateQueries({ queryKey: ["profile", userId] }),
+                ]);
+                setDeleteConfirmOpen(false);
+                nav(-1);
+              } catch (e) {
+                const msg = (e as any)?.message ?? "Erro inesperado.";
+                toast({ title: "Não foi possível excluir usuário", description: msg, variant: "destructive" });
+              } finally {
+                setDeleting(false);
+              }
+            }}>
+              {deleting ? "Excluindo…" : "Excluir usuário"}
             </Button>
           </DialogFooter>
         </DialogContent>
