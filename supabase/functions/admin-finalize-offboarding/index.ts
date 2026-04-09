@@ -60,6 +60,18 @@ serve(async (req) => {
           console.error("[admin-finalize-offboarding] failed to finalize profile", { updErr: updErr.message, userId: p.id });
         } else {
           processed++;
+          // Audit log: record finalization
+          try {
+            await service.from("audit_logs").insert({
+              company_id: p.company_id,
+              actor_user_id: null,
+              target_user_id: p.id,
+              action: "offboarding_finalized",
+              meta: { processed_at: new Date().toISOString() },
+            });
+          } catch (e) {
+            console.warn("[admin-finalize-offboarding] audit log failed", { e: e instanceof Error ? e.message : String(e), userId: p.id });
+          }
         }
       } catch (e) {
         console.error("[admin-finalize-offboarding] unexpected error", { error: String(e), userId: p.id });

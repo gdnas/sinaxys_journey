@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import type { DbProfile } from "@/lib/profilesDb";
+import { listUserDocuments } from "@/lib/documentsDb";
 
 export default function MinimalLimitedProfile() {
   const { user } = useAuth();
@@ -12,6 +13,12 @@ export default function MinimalLimitedProfile() {
     queryKey: ["profile", user?.id],
     queryFn: () => (user?.id ? getProfile(user.id) : Promise.resolve(null)),
     enabled: !!user?.id,
+  });
+
+  const { data: documents = [] } = useQuery({
+    queryKey: ["user-documents", user?.companyId, user?.id],
+    queryFn: () => (user?.companyId && user?.id ? listUserDocuments({ companyId: user.companyId, userId: user.id }) : Promise.resolve([])),
+    enabled: !!user?.companyId && !!user?.id,
   });
 
   const p = profile as DbProfile | null;
@@ -28,6 +35,18 @@ export default function MinimalLimitedProfile() {
             <a href={p.contract_url} target="_blank" rel="noreferrer">
               <Button className="w-full">Ver contrato assinado</Button>
             </a>
+          ) : null}
+          {documents?.length ? (
+            <div className="mt-4">
+              <div className="text-sm font-semibold">Documentos</div>
+              <div className="grid gap-2 mt-2">
+                {documents.map((d: any) => (
+                  <a key={d.id} href={d.url} target="_blank" rel="noreferrer" className="inline-block text-sm text-[color:var(--sinaxys-primary)] hover:underline">
+                    {d.title}
+                  </a>
+                ))}
+              </div>
+            </div>
           ) : null}
         </div>
 

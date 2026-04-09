@@ -168,6 +168,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       })();
 
+      // Audit: if profile is limited_access, insert a view log that the user logged in while offboarding
+      if (p.limited_access) {
+        try {
+          await supabase.from("audit_logs").insert({
+            company_id: p.company_id,
+            actor_user_id: p.id,
+            target_user_id: p.id,
+            action: "offboarding_limited_login",
+            meta: { at: new Date().toISOString() },
+          });
+        } catch {
+          // ignore audit failures
+        }
+      }
+
       // Best-effort: create storage bucket used for user documents automatically once per browser.
       // We attempt to invoke the edge function that creates the bucket (idempotent). This avoids
       // failing uploads when the bucket is missing. Keep errors silent.

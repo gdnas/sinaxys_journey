@@ -96,6 +96,19 @@ serve(async (req) => {
 
     console.log("[admin-set-offboarding] scheduled", { userId, scheduledAt });
 
+    // Audit log: record scheduling action
+    try {
+      await service.from("audit_logs").insert({
+        company_id: targetProfile.company_id,
+        actor_user_id: callerId,
+        target_user_id: targetProfile.id,
+        action: scheduledAt ? "offboarding_scheduled" : "offboarding_scheduled_immediate",
+        meta: { scheduled_at: scheduledAt ? scheduledAt.toISOString() : null },
+      });
+    } catch (e) {
+      console.warn("[admin-set-offboarding] audit log failed", { e: e instanceof Error ? e.message : String(e) });
+    }
+
     // If scheduledAt is null, the caller intended immediate processing: finalize now for this user
     if (!scheduledAt) {
       try {
