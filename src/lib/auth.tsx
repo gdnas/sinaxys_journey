@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       });
       if (error) throw error;
-      navigate("/");
+      navigate.push("/");
     } catch (error) {
       console.error("Signup error:", error);
     } finally {
@@ -64,7 +64,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
       if (error) {
         return { ok: false, message: error.message };
       }
@@ -96,13 +99,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     await supabase.auth.signOut();
-    navigate("/login");
+    navigate.push("/login");
     setUser(null);
     setActiveCompanyId(null);
   };
 
   const refresh = async () => {
     await supabase.auth.refreshSession();
+    const { data: session } = await supabase.auth.getSession();
     const profile = await hydrateFromSession();
     setUser(profile);
   };
@@ -114,7 +118,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     logout,
     refresh,
     companyId: activeCompanyId,
-    activeCompanyId: activeCompanyId,
     setCompanyId: setActiveCompanyId
   };
 
