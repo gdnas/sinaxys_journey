@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { Link, useParams } from "react-router-dom";
-import { CalendarClock, Mail, MessageSquareText, Phone, Target, UserRound, Users } from "lucide-react";
+import { CalendarClock, Mail, MessageSquareText, Phone, Target, UserRound, Users, BadgeCheck } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -190,6 +190,11 @@ export default function Person() {
     return (qDepartments.data ?? []).find((d) => d.id === profile.department_id)?.name ?? null;
   }, [profile?.department_id, qDepartments.data]);
 
+  const managerLabel = useMemo(() => {
+    if (!profile?.manager_id) return null;
+    return qLeader.data?.name ?? profile.manager_id;
+  }, [profile?.manager_id, qLeader.data?.name]);
+
   if (qPublic.isLoading) {
     return (
       <div className="grid min-h-[60vh] place-items-center">
@@ -224,6 +229,9 @@ export default function Person() {
   const offboardingState = qSensitive.data?.offboarding_state ?? null;
   const offboardingScheduledAt = qSensitive.data?.offboarding_scheduled_at ?? null;
   const monthlyCost = typeof qSensitive.data?.monthly_cost_brl === "number" ? qSensitive.data?.monthly_cost_brl : null;
+
+  // If profile has offboarding_state PENDING and not active, show status 'Desligamento' instead of 'Inativo'
+  const displayedStatus = offboardingState === "PENDING" ? "Desligamento" : profile?.active ? "Ativo" : "Inativo";
 
   const okrCount = okrInvolvement.length;
 
@@ -291,10 +299,25 @@ export default function Person() {
                     {departmentName}
                   </Badge>
                 ) : null}
-                {!profile.active ? <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Inativo</Badge> : null}
-                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white ring-1 ring-[color:var(--sinaxys-border)]">
-                  {okrCount} OKR{okrCount === 1 ? "" : "s"}
-                </Badge>
+                {managerLabel ? (
+                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                    Líder: {managerLabel}
+                  </Badge>
+                ) : (
+                  <Badge className="rounded-full bg-white text-muted-foreground ring-1 ring-[color:var(--sinaxys-border)] hover:bg-white">
+                    Sem líder
+                  </Badge>
+                )}
+                {displayedStatus === "Ativo" ? (
+                  <Badge className="rounded-full bg-emerald-100 text-emerald-900 hover:bg-emerald-100">
+                    <BadgeCheck className="mr-1.5 h-3.5 w-3.5" />
+                    Ativo
+                  </Badge>
+                ) : displayedStatus === "Desligamento" ? (
+                  <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Desligamento</Badge>
+                ) : (
+                  <Badge className="rounded-full bg-amber-100 text-amber-900 hover:bg-amber-100">Inativo</Badge>
+                )}
               </div>
               <div className="mt-2 text-sm text-muted-foreground">{jobTitle}</div>
             </div>
@@ -423,9 +446,9 @@ export default function Person() {
                 {offboardingState === "PENDING" && canViewOffboardingNotice ? (
                   <div className="mt-2 text-xs text-amber-900">
                     {offboardingScheduledAt ? (
-                      <>Desligamento agendado para <span className="font-medium">{fullDateTime(offboardingScheduledAt)}</span>. Custo mantido até essa data.</>
+                      <>Desligamento agendado para <span className="font-medium">{fullDateTime(offboardingScheduledAt)}</span>. Este custo continuará sendo alocado ao departamento e à empresa até essa data.</>
                     ) : (
-                      <>Usuário em processo de desligamento (data não definida). Custo mantido até confirmação.</>
+                      <>Usuário em processo de desligamento (data não definida). Este custo continuará sendo alocado até confirmação.</>
                     )}
                   </div>
                 ) : null}

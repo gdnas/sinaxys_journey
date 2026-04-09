@@ -62,6 +62,8 @@ export default function AdminCosts() {
   const deptById = useMemo(() => new Map(departments.map((d) => [d.id, d] as const)), [departments]);
   const profileById = useMemo(() => new Map(profiles.map((p) => [p.id, p] as const)), [profiles]);
 
+  const nowIso = useMemo(() => new Date().toISOString(), []);
+
   const headByDeptId = useMemo(() => {
     // Infer the "Head do departamento" pelo gestor mais recorrente das pessoas do dept.
     const counts = new Map<string, Map<string, number>>();
@@ -96,9 +98,24 @@ export default function AdminCosts() {
     return result;
   }, [profiles, profileById]);
 
+  // Include profiles that are active OR are in offboarding pending state where scheduled_at is null or in the future.
   const activePeople = useMemo((): CostPerson[] => {
     return profiles
-      .filter((p) => p.active)
+      .filter((p) => {
+        if (p.active) return true;
+        if (p.offboarding_state === "PENDING") {
+          const sched = p.offboarding_scheduled_at;
+          if (!sched) return true; // no date -> still counted until processed
+          try {
+            const dt = new Date(sched);
+            if (Number.isNaN(dt.getTime())) return true;
+            return dt.toISOString() > nowIso; // scheduled in future -> still counted
+          } catch {
+            return true;
+          }
+        }
+        return false;
+      })
       .map((p) => ({
         id: p.id,
         name: p.name ?? p.email,
@@ -108,10 +125,11 @@ export default function AdminCosts() {
         department_id: p.department_id,
         monthly_cost_brl: p.monthly_cost_brl,
       }));
-  }, [profiles]);
+  }, [profiles, nowIso]);
 
   const activeWithCost = useMemo(() => activePeople.filter((p) => n(p.monthly_cost_brl) > 0), [activePeople]);
 
+  // Sum costs for company including pending offboardings counted above
   const companyMonthly = useMemo(() => activeWithCost.reduce((acc, p) => acc + Math.max(0, n(p.monthly_cost_brl)), 0), [activeWithCost]);
 
   const peopleByDept = useMemo(() => {
