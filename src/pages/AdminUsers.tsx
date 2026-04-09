@@ -489,9 +489,14 @@ export default function AdminUsers() {
                           <TableCell className="text-right text-muted-foreground">{stat?.access_count ?? 0}</TableCell>
                           <TableCell className="text-right text-muted-foreground">{fmtDateTime(stat?.last_access_at)}</TableCell>
                           <TableCell className="text-right">
-                            <Badge className={p.active ? "rounded-full bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : "rounded-full bg-amber-50 text-amber-800 hover:bg-amber-50"}>
-                              {p.active ? "Ativo" : "Inativo"}
-                            </Badge>
+                            {/* Show 'Desligamento' status inline if profile.offboarding_state === 'PENDING' */}
+                            {p.offboarding_state === "PENDING" ? (
+                              <Badge className="rounded-full bg-amber-50 text-amber-800 hover:bg-amber-50">Desligamento</Badge>
+                            ) : (
+                              <Badge className={p.active ? "rounded-full bg-emerald-50 text-emerald-800 hover:bg-emerald-50" : "rounded-full bg-amber-50 text-amber-800 hover:bg-amber-50"}>
+                                {p.active ? "Ativo" : "Inativo"}
+                              </Badge>
+                            )}
                           </TableCell>
                           <TableCell className="text-right">
                             <div className="flex justify-end gap-2">

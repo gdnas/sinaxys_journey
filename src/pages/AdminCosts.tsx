@@ -31,6 +31,40 @@ function normalizeRole(raw: unknown) {
   return String(raw ?? "").trim().toUpperCase();
 }
 
+function daysInMonth(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+}
+
+function prorateForCurrentMonth(monthlyCost: number | null | undefined, scheduledAtIso: string | null | undefined) {
+  const cost = typeof monthlyCost === "number" ? monthlyCost : (monthlyCost ? Number(monthlyCost) : 0);
+  if (!cost || cost <= 0) return 0;
+  if (!scheduledAtIso) return cost; // no scheduled date -> count full
+
+  try {
+    const sched = new Date(scheduledAtIso);
+    const now = new Date();
+    // If scheduled date is in a future month beyond current month, count full monthly cost for current month
+    if (sched.getFullYear() > now.getFullYear() || (sched.getFullYear() === now.getFullYear() && sched.getMonth() > now.getMonth())) {
+      return cost;
+    }
+    // If scheduled date is this month: prorate remaining days (exclude the day of offboarding?) we'll consider day of offboarding as last paid day (not included)
+    if (sched.getFullYear() === now.getFullYear() && sched.getMonth() === now.getMonth()) {
+      const daysThisMonth = daysInMonth(now);
+      // remaining days including today up to day before scheduled date
+      const dayNow = now.getDate();
+      const daySched = sched.getDate();
+      const remaining = Math.max(0, daySched - dayNow);
+      const fraction = remaining / daysThisMonth;
+      return Math.round(cost * fraction);
+    }
+    // If scheduled date is in the past, don't count
+    if (sched < now) return 0;
+    return cost;
+  } catch {
+    return cost;
+  }
+}
+
 type CostPerson = {
   id: string;
   name: string;
@@ -129,8 +163,38 @@ export default function AdminCosts() {
 
   const activeWithCost = useMemo(() => activePeople.filter((p) => n(p.monthly_cost_brl) > 0), [activePeople]);
 
-  // Sum costs for company including pending offboardings counted above
-  const companyMonthly = useMemo(() => activeWithCost.reduce((acc, p) => acc + Math.max(0, n(p.monthly_cost_brl)), 0), [activeWithCost]);
+  // Sum costs for company including pending offboardings counted above; apply proration when needed
+  const companyMonthly = useMemo(() => {
+    let sum = 0;
+    for (const p of profiles) {
+      // Only count if active or pending (as earlier)
+      if (!(p.active || p.offboarding_state === "PENDING")) continue;
+      // Only consider those that are pending and not yet processed
+      const sched = p.offboarding_scheduled_at;
+      const include = p.active || (p.offboarding_state === "PENDING" && (!sched || new Date(sched).toISOString() > nowIso));
+      if (!include) continue;
+      // prorate if scheduled in current month
+      const c = prorateForCurrentMonth(n(p.monthly_cost_brl), p.offboarding_scheduled_at);
+      sum += c;
+    }
+    return sum;
+  }, [profiles, nowIso]);
+
+  // Compute totals specifically for offboarding people (count and sum prorated)
+  const offboardingTotals = useMemo(() => {
+    let count = 0;
+    let total = 0;
+    for (const p of profiles) {
+      if (p.offboarding_state === "PENDING") {
+        const sched = p.offboarding_scheduled_at;
+        const stillCounted = !sched || new Date(sched).toISOString() > nowIso;
+        if (!stillCounted) continue;
+        count += 1;
+        total += prorateForCurrentMonth(n(p.monthly_cost_brl), p.offboarding_scheduled_at);
+      }
+    }
+    return { count, total };
+  }, [profiles, nowIso]);
 
   const peopleByDept = useMemo(() => {
     const m = new Map<string, CostPerson[]>();
@@ -262,7 +326,10 @@ export default function AdminCosts() {
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pessoas com custo</div>
           <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{activeWithCost.length}</div>
-          <div className="mt-1 text-xs text-muted-foreground">Apenas perfis ativos com valor &gt; 0.</div>
+          <div className="mt-1 text-xs text-muted-foreground">Apenas perfis ativos ou em desligamento (contados) com valor &gt; 0.</div>
+          {offboardingTotals.count ? (
+            <div className="mt-3 text-xs text-amber-900">{offboardingTotals.count} em desligamento • {offboardingTotals.total > 0 ? brl(offboardingTotals.total) : "—"}</div>
+          ) : null}
         </Card>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
