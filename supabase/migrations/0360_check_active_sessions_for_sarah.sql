@@ -1,0 +1,1 @@
+SELECT * FROM auth.sessions WHERE user_id = 'ffdf5772-7445-420e-9c99-13f291964d08' ORDER BY created_at DESC LIMIT 5;
