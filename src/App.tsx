@@ -113,9 +113,9 @@ const App = () => (
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <AuthProvider>
-          <CompanyProvider>
-            <BrowserRouter>
+        <BrowserRouter>
+          <AuthProvider>
+            <CompanyProvider>
               {/* Rotas públicas (fora do AppShell e sem autenticação) */}
               <Routes>
                 <Route path="/ativo/:assetId" element={<AssetPublicView />} />
@@ -124,6 +124,7 @@ const App = () => (
 
               <AppShell>
                 <Routes>
+
                   <Route
                     path="/settings"
                     element={
@@ -1041,9 +1042,9 @@ const App = () => (
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </AppShell>
-            </BrowserRouter>
-          </CompanyProvider>
-        </AuthProvider>
+            </CompanyProvider>
+          </AuthProvider>
+        </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>
   </QueryClientProvider>
