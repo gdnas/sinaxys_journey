@@ -149,6 +149,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const limitedUser = mapProfileToUser(p);
         // explicitly mark as inactive for general access checks
         limitedUser.active = false;
+        // mark limited access on the user object so the UI can restrict navigation
+        (limitedUser as any).limitedAccess = true;
+        // For safety, downgrade role to least-privilege
+        limitedUser.role = "COLABORADOR";
         if (!mountedRef.current) return;
         setUser(limitedUser);
         setActiveCompanyIdState(p.company_id ?? null);

@@ -37,6 +37,7 @@ import VacationApprovals from "@/pages/VacationApprovals";
 import { useTranslation } from "react-i18next";
 import { UserAssetsTab } from "@/components/assets/UserAssetsTab";
 import MinimalLimitedProfile from "./MinimalLimitedProfile";
+import { listUserInvoices } from "@/lib/financeDb";
 
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);

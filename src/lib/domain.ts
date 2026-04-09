@@ -88,6 +88,9 @@ export type User = {
   password?: string; // senha inicial (definida pelo admin) / senha atual
   mustChangePassword?: boolean; // exige troca no primeiro acesso
   joinedAt?: string; // data de entrada na empresa (ISO)
+
+  // If true, this user is in offboarding/limited mode and UI should restrict access
+  limitedAccess?: boolean;
 };
 
 export type TrackStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED" | "LOCKED";
