@@ -132,7 +132,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const nextUser = mapProfileToUser(p);
-      if (!nextUser.active) {
+      // If the profile is inactive and NOT in limited_access, block session;
+      // otherwise allow limited_access users to continue to limited view.
+      if (!nextUser.active && !p.limited_access) {
         await supabase.auth.signOut();
         sessionUserIdRef.current = null;
         if (!mountedRef.current) return;
