@@ -42,12 +42,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { data: session } = await supabase.auth.signInWithPassword(email, password);
+      const { data, error } = await supabase.auth.signInWithPassword(email, password);
       if (error) throw error;
       await hydrateFromSession();
-      const { data: session } = data;
-      if (session?.user) {
-        const userId = session.user.id;
+      if (data?.session?.user) {
+        const userId = data.session.user.id;
         const client = createClient();
         const { data: profile } = await client
           .from("profiles")
@@ -70,7 +69,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           (limitedUser as any).limitedAccess = true;
           (limitedUser as any).role = "COLABORADOR";
 
-          // Persist limitedAccess in memory AND on the JWT token (via updateUser) so that the next request is immediately 'limbo' without needing to re-fetch profile.
+          // Persist limitedAccess in memory AND on JWT token (via updateUser) so that next request is immediately 'limbo' without needing to re-fetch profile.
           const { data: updatedSession } = await supabase.auth.updateUser({
             data: { limited_access: true }
           });
