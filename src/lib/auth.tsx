@@ -12,6 +12,7 @@ interface AuthContextType {
   companyId: string | null;
   activeCompanyId: string | null;
   setCompanyId: (id: string | null) => void;
+  setActiveCompanyId: (id: string | null) => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -53,7 +54,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       });
       if (error) throw error;
-      navigate.push("/");
+      navigate("/");
     } catch (error) {
       console.error("Signup error:", error);
     } finally {
@@ -96,7 +97,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     await supabase.auth.signOut();
-    navigate.push("/login");
+    navigate("/login");
     setUser(null);
     setActiveCompanyId(null);
   };
@@ -115,7 +116,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     refresh,
     companyId: activeCompanyId,
     activeCompanyId: activeCompanyId,
-    setCompanyId: setActiveCompanyId
+    setCompanyId: setActiveCompanyId,
+    setActiveCompanyId: setActiveCompanyId
   };
 
   return <AuthContext.Provider value={authContextValue}>{children}</AuthContext.Provider>;
