@@ -35,7 +35,7 @@ const hydrateFromSession = async () => {
 const mapProfileToUser = (profile: any): BaseUser => profile;
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const router = useNavigate();
+  const navigate = useNavigate();
   const [user, setUser] = useState<BaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
       });
       if (error) throw error;
-      router.push("/");
+      navigate("/");
     } catch (error) {
       console.error("Signup error:", error);
     } finally {
@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     await supabase.auth.signOut();
-    router.push("/login");
+    navigate("/login");
     setUser(null);
     setActiveCompanyId(null);
   };
