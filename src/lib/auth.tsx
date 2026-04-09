@@ -10,6 +10,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   companyId: string | null;
+  activeCompanyId: string | null;
   setCompanyId: (id: string | null) => void;
 }
 
@@ -63,7 +64,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword(email, password);
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         return { ok: false, message: error.message };
       }
@@ -113,6 +114,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     logout,
     refresh,
     companyId: activeCompanyId,
+    activeCompanyId: activeCompanyId,
     setCompanyId: setActiveCompanyId
   };
 
