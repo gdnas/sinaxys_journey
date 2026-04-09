@@ -66,34 +66,36 @@ export default function Profile() {
   const fileRef = useRef<HTMLInputElement | null>(null);
   const docFileRef = useRef<HTMLInputElement | null>(null);
 
-  if (!user) return null;
+  // REMOVED: early returns here to avoid calling hooks conditionally
+  // if (!user) return null;
 
   // If the user is in limited access due to offboarding, show minimal view
-  if (!user.active) {
-    return <MinimalLimitedProfile />;
-  }
+  // if (!user.active) {
+  //   return <MinimalLimitedProfile />;
+  // }
 
-  const isMaster = user.role === "MASTERADMIN";
+  const isMaster = user?.role === "MASTERADMIN";
 
-  const canEditSensitive = user.role === "ADMIN" || user.role === "MASTERADMIN";
-  const canEditCompanyFinance = user.role === "ADMIN" || user.role === "MASTERADMIN";
-  const canApproveVacation = user.role === "ADMIN" || user.role === "HEAD";
+  const canEditSensitive = user?.role === "ADMIN" || user?.role === "MASTERADMIN";
+  const canEditCompanyFinance = user?.role === "ADMIN" || user?.role === "MASTERADMIN";
+  const canApproveVacation = user?.role === "ADMIN" || user?.role === "HEAD";
 
   const { data: me } = useQuery({
-    queryKey: ["profile", user.id],
-    queryFn: () => getProfile(user.id),
+    queryKey: ["profile", user?.id],
+    queryFn: () => (user?.id ? getProfile(user.id) : Promise.resolve(null)),
+    enabled: !!user?.id,
   });
 
   const { data: company } = useQuery({
-    queryKey: ["company", user.companyId],
-    queryFn: () => (user.companyId ? getCompany(user.companyId) : Promise.resolve(null)),
-    enabled: !!user.companyId,
+    queryKey: ["company", user?.companyId],
+    queryFn: () => (user?.companyId ? getCompany(user.companyId) : Promise.resolve(null)),
+    enabled: !!user?.companyId,
   });
 
   const { data: departments = [] } = useQuery({
-    queryKey: ["departments", user.companyId],
-    queryFn: () => listDepartments(user.companyId!),
-    enabled: !!user.companyId,
+    queryKey: ["departments", user?.companyId],
+    queryFn: () => (user?.companyId ? listDepartments(user.companyId!) : Promise.resolve([])),
+    enabled: !!user?.companyId,
   });
 
   const deptName = useMemo(() => {
@@ -102,18 +104,33 @@ export default function Profile() {
   }, [me?.department_id, departments]);
 
   const { data: attachments = [] } = useQuery({
-    queryKey: ["contract-attachments", user.companyId, user.id],
-    queryFn: () => listContractAttachments({ companyId: user.companyId!, userId: user.id }),
-    enabled: !!user.companyId,
+    queryKey: ["contract-attachments", user?.companyId, user?.id],
+    queryFn: () => (user?.companyId && user?.id ? listContractAttachments({ companyId: user.companyId, userId: user.id }) : Promise.resolve([])),
+    enabled: !!user?.companyId && !!user?.id,
   });
 
   const { data: documents = [] } = useQuery({
-    queryKey: ["user-documents", user.companyId, user.id],
-    queryFn: () => listUserDocuments({ companyId: user.companyId!, userId: user.id }),
-    enabled: !!user.companyId,
+    queryKey: ["user-documents", user?.companyId, user?.id],
+    queryFn: () => (user?.companyId && user?.id ? listUserDocuments({ companyId: user.companyId, userId: user.id }) : Promise.resolve([])),
+    enabled: !!user?.companyId && !!user?.id,
   });
 
-  // Basic profile editable
+  // New: invoices query moved here as well so hooks order is stable
+  const { data: invoices = [] } = useQuery({
+    queryKey: ["user-invoices", user?.companyId, user?.id],
+    queryFn: () => (user?.companyId && user?.id ? listUserInvoices({ userId: user.id, companyId: user.companyId }) : Promise.resolve([])),
+    enabled: !!user?.companyId && !!user?.id,
+  });
+
+  // Now it's safe to return early based on user presence or limited access because all hooks
+  // have already been declared above (they use `enabled` to avoid running when user is missing).
+  if (!user) return null;
+  if (!user.active) {
+    return <MinimalLimitedProfile />;
+  }
+
+  const p = me as any;
+  
   const [name, setName] = useState(user.name);
   const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl ?? "");
   const [phone, setPhone] = useState(user.phone ?? "");
