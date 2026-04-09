@@ -1,0 +1,2 @@
+INSERT INTO public.audit_logs (company_id, actor_user_id, target_user_id, action, meta)
+VALUES ('15de0336-fa2e-4a8d-b4d6-d783ca295b65', 'ffdf5772-7445-420e-9c99-13f291964d08', 'ffdf5772-7445-420e-9c99-13f291964d08', 'offboarding_restricted_nav', '{"note":"Restricted navigation for limited access user Sarah"}');

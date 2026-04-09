@@ -708,6 +708,69 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (!user) return <>{children}</>;
 
+  // If user is limited access (offboarding), ensure they have only minimal role and restrict UI navigation
+  const isLimited = (user as any)?.limitedAccess === true;
+  if (isLimited) {
+    // Render a shell that only exposes the profile route and a logout button.
+    return (
+      <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
+        <header className="fixed inset-x-0 top-0 z-40 border-b bg-white/90 backdrop-blur dark:bg-[hsl(var(--background))]/85">
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+            <div className="flex items-center gap-3">
+              <Link to="/" className="flex min-w-0 items-center gap-3">
+                <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-[color:var(--sinaxys-primary)]">
+                  {company.logoDataUrl ? (
+                    <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
+                  ) : (
+                    <span className="text-sm font-semibold text-white">{initials(company.name || "SJ")}</span>
+                  )}
+                </div>
+                <div className="min-w-0 leading-tight">
+                  <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))] sm:max-w-[260px]">
+                    {company.name}
+                  </div>
+                </div>
+              </Link>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={user.avatarUrl} alt={user.name} />
+                  <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">{initials(user.name)}</AvatarFallback>
+                </Avatar>
+                <div className="hidden max-w-[42vw] min-w-0 text-right sm:block lg:max-w-[360px]">
+                  <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)]">{user.name}</div>
+                  <div className="text-xs text-muted-foreground">Acesso limitado</div>
+                </div>
+              </div>
+
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full border-[color:var(--sinaxys-border)] bg-white dark:border-border dark:bg-background"
+                onClick={async () => {
+                  await logout();
+                  navigate("/login");
+                }}
+                aria-label="Sair"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-20 sm:px-6 lg:px-8">
+          <main className="min-w-0 max-w-full">
+            {/* Only render the profile page */}
+            {children}
+          </main>
+        </div>
+      </div>
+    );
+  }
+
   const allowPdiLink = user.role === "MASTERADMIN" ? true : !!pdiEnabled;
   const allowTracks = user.role === "MASTERADMIN" ? true : !!tracksEnabled;
   const allowPoints = user.role === "MASTERADMIN" ? true : !!pointsEnabled;
