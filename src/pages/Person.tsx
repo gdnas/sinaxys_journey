@@ -227,6 +227,14 @@ export default function Person() {
 
   const okrCount = okrInvolvement.length;
 
+  // Determine if current viewer should see offboarding notice:
+  // - Admins (MASTERADMIN / ADMIN)
+  // - Heads when they are the manager of this profile
+  const canViewOffboardingNotice = Boolean(
+    user &&
+      (user.role === "MASTERADMIN" || user.role === "ADMIN" || (user.role === "HEAD" && qSensitive.data?.manager_id === user.id))
+  );
+
   return (
     <div className="grid gap-6">
       <div className="flex items-center justify-between gap-3">
@@ -245,7 +253,7 @@ export default function Person() {
         </div>
       </div>
 
-      {offboardingState === "PENDING" ? (
+      {offboardingState === "PENDING" && canViewOffboardingNotice ? (
         <div>
           <Card className="rounded-3xl border border-amber-200 bg-amber-50 p-4">
             <div className="flex items-start justify-between gap-4">
@@ -255,7 +263,7 @@ export default function Person() {
                   {offboardingScheduledAt ? (
                     <>Inativação agendada para <span className="font-medium">{fullDateTime(offboardingScheduledAt)}</span>. O custo continuará sendo considerado até essa data.</>
                   ) : (
-                    <>inativação sem data definida. O usuário já tem acesso suspenso e o custo será mantido conforme política da empresa.</>
+                    <>Inativação sem data definida. O usuário já tem acesso suspenso e o custo será mantido conforme política da empresa.</>
                   )}
                 </div>
               </div>
@@ -412,7 +420,7 @@ export default function Person() {
                 <p className="mt-1 text-sm text-muted-foreground">Informações de custo do colaborador.</p>
                 <Separator className="my-4" />
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{monthlyCost ? brl(monthlyCost) : "—"}</div>
-                {offboardingState === "PENDING" ? (
+                {offboardingState === "PENDING" && canViewOffboardingNotice ? (
                   <div className="mt-2 text-xs text-amber-900">
                     {offboardingScheduledAt ? (
                       <>Desligamento agendado para <span className="font-medium">{fullDateTime(offboardingScheduledAt)}</span>. Custo mantido até essa data.</>
