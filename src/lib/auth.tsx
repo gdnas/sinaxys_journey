@@ -41,6 +41,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
 
+  // Initialize session on mount and listen for auth changes so `loading` is cleared
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        const profile = await hydrateFromSession();
+        if (!mounted) return;
+        if (profile) setUser(profile as any);
+      } catch (e) {
+        console.error("hydrateFromSession failed:", e);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        // refresh profile
+        hydrateFromSession().then((p) => {
+          if (!mounted) return;
+          if (p) setUser(p as any);
+        }).catch(() => {});
+      } else if (event === "SIGNED_OUT") {
+        if (!mounted) return;
+        setUser(null);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      try { data.subscription.unsubscribe(); } catch {};
+    };
+  }, []);
+
   const signup = async ({ email, password }: { email: string; password: string }) => {
     setLoading(true);
     try {
