@@ -48,7 +48,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       try {
         const profile = await hydrateFromSession();
         if (!mounted) return;
-        if (profile) setUser(profile as any);
+        if (profile) {
+          setUser(profile as any);
+          setActiveCompanyId(profile.company_id ?? null);
+        }
       } catch (e) {
         console.error("hydrateFromSession failed:", e);
       } finally {
@@ -61,12 +64,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         hydrateFromSession()
           .then((p) => {
             if (!mounted) return;
-            if (p) setUser(p as any);
+            if (p) {
+              setUser(p as any);
+              setActiveCompanyId(p.company_id ?? null);
+            }
           })
           .catch(() => {});
       } else if (event === "SIGNED_OUT") {
         if (!mounted) return;
         setUser(null);
+        setActiveCompanyId(null);
       }
     });
 
@@ -83,8 +90,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) {
         return { ok: false, message: error.message };
       }
+
       const profile = await hydrateFromSession();
       if (!profile) throw new Error("Perfil não encontrado");
+
+      setActiveCompanyId(profile.company_id ?? null);
 
       if (profile.limited_access) {
         const limitedUser: any = { ...profile };
@@ -120,6 +130,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     await supabase.auth.refreshSession();
     const profile = await hydrateFromSession();
     setUser(profile);
+    setActiveCompanyId(profile?.company_id ?? null);
   };
 
   const authContextValue: AuthContextType = {
