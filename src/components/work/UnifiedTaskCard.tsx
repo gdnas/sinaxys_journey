@@ -16,12 +16,11 @@ interface UnifiedTaskCardProps {
 export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }: UnifiedTaskCardProps) {
   const isDone = workItem.status === 'DONE';
   const isProject = !!workItem.project_id;
-  const isOkr = !!workItem.key_result_id;
 
   const contextColor = isProject ? 'text-blue-600' : 'text-purple-600';
   const contextIcon = isProject ? <LayoutDashboard className="h-4 w-4" /> : <Target className="h-4 w-4" />;
 
-  const navigateTo = isProject && workItem.project_id && workItem.id
+  const navigateTo = isProject && workItem.project_id
     ? `/app/projetos/${workItem.project_id}/tarefas/${workItem.id}/editar`
     : workItem.deliverable_id
       ? `/okr/entregaveis/${workItem.deliverable_id}`
