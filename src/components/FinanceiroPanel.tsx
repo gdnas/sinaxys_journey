@@ -29,20 +29,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from 'react-i18next';
-import {
-  createInvoiceSignedUrl,
-  createUserInvoice,
-  deleteUserInvoice,
-  getCompanyFinanceSettings,
-  getUserFinancialProfile,
-  listUserInvoices,
-  removeInvoiceFile,
-  upsertCompanyFinanceSettings,
-  upsertUserFinancialProfile,
-  uploadInvoiceFile,
-  type CompanyFinanceSettings,
-  type UserFinancialRecipientType,
-} from "@/lib/financeDb";
+import { } from "@/lib/financeDb";
 
 function formatBRL(v: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(v);

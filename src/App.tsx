@@ -105,6 +105,7 @@ import SquadList from "./pages/SquadList";
 import SquadDetail from "./pages/SquadDetail";
 import AssetPublicDemo from "./pages/AssetPublicDemo";
 import Finance from "./pages/Finance";
+import FinanceSetup from "./pages/FinanceSetup";
 
 const queryClient = new QueryClient();
 
@@ -188,6 +189,16 @@ const App = () => (
                       <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
                         <RequireCompanyModule moduleKey="FINANCE">
                           <Finance />
+                        </RequireCompanyModule>
+                      </RequireAuth>
+                    }
+                  />
+                  <Route
+                    path="/finance/setup"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="FINANCE">
+                          <FinanceSetup />
                         </RequireCompanyModule>
                       </RequireAuth>
                     }
