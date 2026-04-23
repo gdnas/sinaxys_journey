@@ -1,7 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import WorkItemStatusBadge from './WorkItemStatusBadge';
 import WorkItemPriorityBadge from './WorkItemPriorityBadge';
 import { CheckCircle2, Circle, LayoutDashboard, Target, ChevronRight, Calendar } from 'lucide-react';
@@ -22,12 +21,12 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
   const contextColor = isProject ? 'text-blue-600' : 'text-purple-600';
   const contextIcon = isProject ? <LayoutDashboard className="h-4 w-4" /> : <Target className="h-4 w-4" />;
 
-  const navigateTo = isProject
-    ? `/app/projetos/${workItem.project_id}/kanban`
+  const navigateTo = isProject && workItem.project_id && workItem.id
+    ? `/app/projetos/${workItem.project_id}/tarefas/${workItem.id}/editar`
     : workItem.deliverable_id
       ? `/okr/entregaveis/${workItem.deliverable_id}`
       : workItem.key_result_id
-        ? `/okr/objetivos/${workItem.objective_title ? workItem.key_result_id : workItem.key_result_id}`
+        ? `/okr/objetivos/${workItem.key_result_id}`
         : '/app';
 
   const formatDate = (dateStr: string | null) => {
@@ -89,11 +88,11 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
               )}
             </div>
 
-            <Link to={navigateTo}>
-              <Button variant="ghost" size="icon" className="flex-shrink-0">
+            <Button asChild variant="ghost" size="icon" className="flex-shrink-0">
+              <Link to={navigateTo}>
                 <ChevronRight className="h-4 w-4" />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
 
           {workItem.description && (
