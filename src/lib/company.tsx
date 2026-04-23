@@ -125,16 +125,12 @@ function mergeBrand(raw: Partial<CompanyBrand> | null | undefined): CompanyBrand
 export function applyCompanyTheme(brand: CompanyBrand) {
   const root = document.documentElement;
 
-  // We store LIGHT and DARK variants separately, and let CSS decide which one
-  // is active based on the `.dark` class. (Inline styles would otherwise override
-  // `.dark { ... }` definitions.)
   root.style.setProperty("--sinaxys-ink-light", brand.colors.ink);
   root.style.setProperty("--sinaxys-primary-light", brand.colors.primary);
   root.style.setProperty("--sinaxys-bg-light", brand.colors.bg);
   root.style.setProperty("--sinaxys-tint-light", brand.colors.tint);
   root.style.setProperty("--sinaxys-border-light", brand.colors.border);
 
-  // Dark palette: keep a comfortable neutral base, but keep the brand accent.
   const primaryDarkHex = mixHex(brand.colors.primary, "#FFFFFF", 0.22);
   root.style.setProperty("--sinaxys-ink-dark", "#F2EFFF");
   root.style.setProperty("--sinaxys-primary-dark", primaryDarkHex);
@@ -149,7 +145,6 @@ export function applyCompanyTheme(brand: CompanyBrand) {
 
     const primaryHslDark = hexToHsl(primaryDarkHex);
     if (primaryHslDark) {
-      // Slightly brighten in dark mode to read well on dark surfaces.
       const l = clamp(primaryHslDark.l + 6, 58, 78);
       root.style.setProperty("--primary-dark", `${primaryHslDark.h} ${primaryHslDark.s}% ${l}%`);
       root.style.setProperty("--ring-dark", `${primaryHslDark.h} ${primaryHslDark.s}% ${l}%`);
@@ -158,7 +153,6 @@ export function applyCompanyTheme(brand: CompanyBrand) {
 }
 
 export function bootstrapCompanyTheme() {
-  // Applies a neutral default theme before React mounts.
   applyCompanyTheme(DEFAULT_BRAND);
 }
 
@@ -201,8 +195,7 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    // Company context is always derived from profiles.company_id (via AuthProvider)
-    const cid = activeCompanyId;
+    const cid = activeCompanyId ?? (user as any)?.company_id ?? null;
     setCompanyId(cid);
 
     if (!cid) {
@@ -254,7 +247,6 @@ export function CompanyProvider({ children }: { children: React.ReactNode }) {
           .eq("id", companyId);
 
         if (error) {
-          // Re-hydrate from server so we don't keep a local state that wasn't persisted.
           try {
             const fresh = await fetchCompanyBrand(companyId);
             setCompanyState(fresh);
