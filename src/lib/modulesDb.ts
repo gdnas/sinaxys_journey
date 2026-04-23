@@ -21,6 +21,7 @@ export type ModuleKey =
   | "PROJECTS"
   | "ASSETS"
   | "SQUAD_INTELLIGENCE"
+  | "FINANCE"
   | (string & {});
 
 const DEFAULT_ENABLED: Record<string, boolean> = {
@@ -39,6 +40,7 @@ const DEFAULT_ENABLED: Record<string, boolean> = {
   PROJECTS: false,
   ASSETS: false,
   SQUAD_INTELLIGENCE: false,
+  FINANCE: false,
 
   // Core areas (not sold as modules for now)
   PROFILE: true,

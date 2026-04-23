@@ -104,6 +104,7 @@ import AssetPublicView from "./pages/AssetPublicView";
 import SquadList from "./pages/SquadList";
 import SquadDetail from "./pages/SquadDetail";
 import AssetPublicDemo from "./pages/AssetPublicDemo";
+import Finance from "./pages/Finance";
 
 const queryClient = new QueryClient();
 
@@ -177,6 +178,17 @@ const App = () => (
                     element={
                       <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
                         <TrackPlayer />
+                      </RequireAuth>
+                    }
+                  />
+
+                  <Route
+                    path="/finance"
+                    element={
+                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
+                        <RequireCompanyModule moduleKey="FINANCE">
+                          <Finance />
+                        </RequireCompanyModule>
                       </RequireAuth>
                     }
                   />
