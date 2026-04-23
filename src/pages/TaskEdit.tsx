@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, MessageSquare, ListChecks, History, Save, CheckCircle2, Circle } from 'lucide-react';
+import { ArrowLeft, ExternalLink, MessageSquare, ListChecks, History, CheckCircle2, Circle } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -135,7 +135,9 @@ export default function TaskEdit() {
               onCancel={() => navigate(projectTaskListPath)}
             />
           ) : (
-            <AccessDenied message="Você não tem permissão para editar esta tarefa." />
+            <div className="rounded-xl border border-border/60 bg-muted/20 p-4 text-sm text-muted-foreground">
+              Você pode visualizar esta tarefa, comentar, acompanhar o histórico e marcar o status, mas não editar os campos principais.
+            </div>
           )}
         </Card>
 

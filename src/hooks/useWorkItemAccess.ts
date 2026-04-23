@@ -42,12 +42,15 @@ export function useWorkItemAccess(workItemId: string): WorkItemAccess {
     loadWorkItemAccess();
   }, [workItemId]);
 
-  const isAdmin = user?.role === 'ADMIN';
+  const isAdmin = user?.role === 'ADMIN' || user?.role === 'MASTERADMIN';
   const isProjectOwner = workItem?.project?.owner_user_id === user?.id;
+  const isAssignee = workItem?.assignee_user_id === user?.id;
+  const isCreator = workItem?.created_by_user_id === user?.id;
+  const isProjectMember = !!workItem?.project_id;
 
   const canView = !!workItem;
-  const canEdit = isAdmin || isProjectOwner;
-  const canDelete = isAdmin || isProjectOwner;
+  const canEdit = isAdmin || isProjectOwner || isAssignee || isCreator || isProjectMember;
+  const canDelete = isAdmin || isProjectOwner || isCreator;
 
   return {
     canView,
