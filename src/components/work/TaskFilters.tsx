@@ -1,8 +1,7 @@
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Filter, Calendar, AlertCircle, LayoutDashboard, Target } from 'lucide-react';
-import { TimeFilter, ContextFilter, useUnifiedWorkItemCounts } from '@/hooks/useUnifiedWorkItems';
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Filter, Calendar, AlertCircle, LayoutDashboard, Target } from "lucide-react";
+import { TimeFilter, ContextFilter, useUnifiedWorkItemCounts } from "@/hooks/useUnifiedWorkItems";
 
 interface TaskFiltersProps {
   timeFilter: TimeFilter;
@@ -19,72 +18,80 @@ export default function TaskFilters({
   onContextFilterChange,
   userId,
 }: TaskFiltersProps) {
-  const { counts, isLoading: isLoadingCounts } = useUnifiedWorkItemCounts(userId);
+  const { counts } = useUnifiedWorkItemCounts(userId);
 
   const timeFilters: Array<{ value: TimeFilter; label: string; icon: any; count?: number }> = [
-    { value: 'all', label: 'Todas', icon: Filter },
-    { value: 'today', label: 'Hoje', icon: Calendar, count: counts.today },
-    { value: 'this_week', label: 'Esta Semana', icon: Calendar, count: counts.thisWeek },
-    { value: 'overdue', label: 'Atrasadas', icon: AlertCircle, count: counts.overdue },
+    { value: "all", label: "Todas", icon: Filter },
+    { value: "today", label: "Hoje", icon: Calendar, count: counts.today },
+    { value: "this_week", label: "Esta semana", icon: Calendar, count: counts.thisWeek },
+    { value: "overdue", label: "Atrasadas", icon: AlertCircle, count: counts.overdue },
   ];
 
   const contextFilters: Array<{ value: ContextFilter; label: string; icon: any; count?: number }> = [
-    { value: 'all', label: 'Todos', icon: Filter },
-    { value: 'projects', label: 'Projetos', icon: LayoutDashboard, count: counts.projects },
-    { value: 'okrs', label: 'OKRs', icon: Target, count: counts.okrs },
+    { value: "all", label: "Todos", icon: Filter },
+    { value: "projects", label: "Projetos", icon: LayoutDashboard, count: counts.projects },
+    { value: "okrs", label: "OKRs", icon: Target, count: counts.okrs },
   ];
 
-  return (
-    <div className="space-y-4">
-      {/* Time Filters */}
-      <div className="flex items-center gap-3">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <Tabs value={timeFilter} onValueChange={(v) => onTimeFilterChange(v as TimeFilter)}>
-          <TabsList className="bg-muted/50">
-            {timeFilters.map((filter) => {
-              const Icon = filter.icon;
-              return (
-                <TabsTrigger key={filter.value} value={filter.value} className="relative">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" />
-                    <span>{filter.label}</span>
-                    {filter.count !== undefined && (
-                      <Badge variant="secondary" className="ml-1">
-                        {filter.count}
-                      </Badge>
-                    )}
-                  </div>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
-      </div>
+  const renderFilterGroup = (
+    title: string,
+    items: Array<{ value: string; label: string; icon: any; count?: number }>,
+    value: string,
+    onChange: (filter: any) => void,
+  ) => {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur-sm">
+        <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <Filter className="h-3.5 w-3.5" />
+          <span>{title}</span>
+        </div>
 
-      {/* Context Filters */}
-      <div className="flex items-center gap-3">
-        <Filter className="h-4 w-4 text-muted-foreground" />
-        <Tabs value={contextFilter} onValueChange={(v) => onContextFilterChange(v as ContextFilter)}>
-          <TabsList className="bg-muted/50">
-            {contextFilters.map((filter) => {
-              const Icon = filter.icon;
-              return (
-                <TabsTrigger key={filter.value} value={filter.value} className="relative">
-                  <div className="flex items-center gap-2">
-                    <Icon className="h-4 w-4" />
-                    <span>{filter.label}</span>
-                    {filter.count !== undefined && (
-                      <Badge variant="secondary" className="ml-1">
-                        {filter.count}
-                      </Badge>
-                    )}
-                  </div>
-                </TabsTrigger>
-              );
-            })}
-          </TabsList>
-        </Tabs>
+        <div className="flex flex-wrap gap-2">
+          {items.map((item) => {
+            const Icon = item.icon;
+            const active = value === item.value;
+
+            return (
+              <Button
+                key={item.value}
+                type="button"
+                variant={active ? "default" : "outline"}
+                size="sm"
+                onClick={() => onChange(item.value)}
+                className={[
+                  "h-9 rounded-full px-3 text-sm transition-all",
+                  active
+                    ? "bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                    : "border-white/10 bg-white/5 text-[color:var(--sinaxys-ink)] hover:bg-white/10 hover:text-[color:var(--sinaxys-ink)]",
+                ].join(" ")}
+              >
+                <Icon className="mr-2 h-4 w-4" />
+                <span>{item.label}</span>
+                {item.count !== undefined && (
+                  <Badge
+                    variant="secondary"
+                    className={[
+                      "ml-2 h-5 min-w-5 rounded-full px-1.5 text-[10px] font-semibold",
+                      active
+                        ? "bg-white/20 text-white"
+                        : "bg-white/10 text-[color:var(--sinaxys-ink)]",
+                    ].join(" ")}
+                  >
+                    {item.count}
+                  </Badge>
+                )}
+              </Button>
+            );
+          })}
+        </div>
       </div>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      {renderFilterGroup("Período", timeFilters, timeFilter, onTimeFilterChange)}
+      {renderFilterGroup("Origem", contextFilters, contextFilter, onContextFilterChange)}
     </div>
   );
 }
