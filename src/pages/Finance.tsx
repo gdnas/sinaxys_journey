@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
-import { trackFinanceModuleEnabled } from "@/lib/financeDb";
+import { trackFinanceModuleEnabled, seedFinanceFiscalPeriods } from "@/lib/financeDb";
 import { setCompanyModuleEnabled } from "@/lib/modulesDb";
 import { useToast } from "@/hooks/use-toast";
 
@@ -41,9 +41,10 @@ export default function Finance() {
     setIsActivating(true);
     await setCompanyModuleEnabled(companyId, "FINANCE", true);
     await trackFinanceModuleEnabled(companyId, user.id);
+    await seedFinanceFiscalPeriods(companyId);
     toast({
       title: "Finance ativado",
-      description: "Você será direcionado para a configuração inicial.",
+      description: "Os períodos financeiros iniciais foram criados.",
     });
     navigate("/finance/setup", { replace: true });
   }
