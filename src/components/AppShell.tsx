@@ -229,7 +229,6 @@ const nav: NavItem[] = [
         roles: ["ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "POINTS",
       },
-      // NOTE: 'Conhecimento' removed from Evolução - it should appear only under Empresa as 'Base de Conhecimento'
     ],
   },
 
@@ -257,7 +256,6 @@ const nav: NavItem[] = [
     label: "nav.company.group",
     icon: <Building2 className="h-4 w-4" />,
     children: [
-      // Estrutura subgroup
       {
         type: "link",
         to: "/org",
@@ -280,7 +278,6 @@ const nav: NavItem[] = [
         icon: <UserIcon className="h-4 w-4" />,
         roles: ["MASTERADMIN", "ADMIN", "HEAD"],
       },
-      // Comunicação Interna subgroup
       {
         type: "link",
         to: "/announcements",
@@ -288,7 +285,14 @@ const nav: NavItem[] = [
         icon: <Megaphone className="h-4 w-4" />,
         roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
       },
-      // Financeiro subgroup
+      {
+        type: "link",
+        to: "/finance",
+        label: "Finance",
+        icon: <Wallet className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "FINANCE",
+      },
       {
         type: "link",
         to: "/admin/costs",
@@ -297,7 +301,6 @@ const nav: NavItem[] = [
         roles: ["MASTERADMIN", "ADMIN", "HEAD"],
         moduleKey: "COSTS",
       },
-      // Gestão de Ativos
       {
         type: "link",
         to: "/app/ativos/lista",
@@ -306,7 +309,6 @@ const nav: NavItem[] = [
         roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
         moduleKey: "ASSETS",
       },
-      // Settings moved to Configurações group
     ],
   },
 
@@ -344,7 +346,6 @@ const nav: NavItem[] = [
         icon: <Wrench className="h-4 w-4" />,
         roles: ["MASTERADMIN", "ADMIN"],
       },
-      // New: move Settings into this group as 'Ajustes'
       {
         type: "link",
         to: "/settings",
@@ -355,7 +356,6 @@ const nav: NavItem[] = [
     ],
   },
 
-  // Outros itens (PDI, Knowledge, etc.)
   {
     type: "link",
     to: "/pdi-performance",
@@ -374,7 +374,6 @@ const nav: NavItem[] = [
     moduleKey: "KNOWLEDGE",
   },
 
-  // Head specific
   {
     type: "link",
     to: "/head/users",
@@ -391,11 +390,6 @@ const nav: NavItem[] = [
     moduleKey: "COSTS",
   },
 
-  // Admin "montar trilhas" page is accessible from Knowledge — removed from global menu.
-
-  // NOTE: The standalone settings link was moved into the "Configurações" group as "Ajustes".
-
-  // Minha área
   {
     type: "link",
     to: "/profile",
@@ -424,9 +418,7 @@ function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNav
       <Accordion type="multiple" defaultValue={defaultOpen} className="grid gap-1">
         {items.map((item) => {
           if (item.type === "link") {
-            // Determine if the module for this link is allowed for the company
             const allowed = moduleAllowed(item.moduleKey);
-            // If user doesn't have role for this link, skip
             const { user } = useAuth();
             if (!item.roles.includes(user?.role ?? "" as any)) return null;
 
@@ -449,7 +441,6 @@ function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNav
               );
             }
 
-            // If not allowed, render a disabled-looking item with tooltip
             return (
               <div
                 key={item.to}
@@ -466,7 +457,6 @@ function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNav
             );
           }
 
-          // For groups: we still show the group label even if the group's module is disabled.
           return (
             <AccordionItem key={item.label} value={item.label} className="border-0">
               <AccordionTrigger
@@ -485,7 +475,6 @@ function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNav
               <AccordionContent className="pb-1 pt-1">
                 <div className="grid gap-1">
                   {item.children.map((child) => {
-                    // Show child even if module disabled, but render disabled appearance when not allowed
                     const childAllowed = moduleAllowed(child.moduleKey);
                     const { user } = useAuth();
                     if (!child.roles.includes(user?.role ?? "" as any)) return null;
@@ -557,7 +546,6 @@ function FundamentalsSpotlightCard() {
     const addText = (kind: "purpose" | "mission" | "vision", label: string, raw?: string | null) => {
       const t = (raw ?? "").trim();
       if (!t) return;
-      // Do NOT truncate — user asked for the full text.
       res.push({ kind, label, text: t });
     };
 
@@ -650,11 +638,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    // When route changes (navigation), close the mobile sheet menu.
     setMenuOpen(false);
   }, [pathname]);
 
-  // Module flags
   const { data: pdiEnabled = true } = useQuery({
     queryKey: ["company-module", companyId, "PDI_PERFORMANCE"],
     queryFn: () => isCompanyModuleEnabled(String(companyId), "PDI_PERFORMANCE"),
@@ -705,13 +691,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     queryFn: () => isCompanyModuleEnabled(String(companyId), "SQUAD_INTELLIGENCE"),
     enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
   });
+  const { data: financeEnabled = true } = useQuery({
+    queryKey: ["company-module", companyId, "FINANCE"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "FINANCE"),
+    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
+  });
 
   if (!user) return <>{children}</>;
 
-  // If user is limited access (offboarding), ensure they have only minimal role and restrict UI navigation
   const isLimited = (user as any)?.limitedAccess === true;
   if (isLimited) {
-    // Render a shell that only exposes the profile route and a logout button.
     return (
       <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
         <header className="fixed inset-x-0 top-0 z-40 border-b bg-white/90 backdrop-blur dark:bg-[hsl(var(--background))]/85">
@@ -762,10 +751,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-20 sm:px-6 lg:px-8">
-          <main className="min-w-0 max-w-full">
-            {/* Only render the profile page */}
-            {children}
-          </main>
+          <main className="min-w-0 max-w-full">{children}</main>
         </div>
       </div>
     );
@@ -781,6 +767,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const allowProjects = user.role === "MASTERADMIN" ? true : !!projectsEnabled;
   const allowAssets = user.role === "MASTERADMIN" ? true : !!assetsEnabled;
   const allowSquadIntelligence = user.role === "MASTERADMIN" ? true : !!squadIntelligenceEnabled;
+  const allowFinance = user.role === "MASTERADMIN" ? true : !!financeEnabled;
 
   const moduleAllowed = (key?: string) => {
     if (!key) return true;
@@ -805,6 +792,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         return allowAssets;
       case "SQUAD_INTELLIGENCE":
         return allowSquadIntelligence;
+      case "FINANCE":
+        return allowFinance;
       default:
         return true;
     }
