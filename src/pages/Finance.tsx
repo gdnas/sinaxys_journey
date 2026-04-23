@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { BarChart3, ShieldCheck, Wallet, ArrowRight, BadgeCheck, Sparkles } from "lucide-react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 export default function Finance() {
   const { user } = useAuth();
   const { companyId } = useCompany();
-  const { enabled } = useCompanyModuleEnabled("FINANCE");
+  const { enabled, isLoading } = useCompanyModuleEnabled("FINANCE");
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isActivating, setIsActivating] = useState(false);
@@ -35,12 +35,6 @@ export default function Finance() {
     };
   }, [isActive]);
 
-  useEffect(() => {
-    if (isActive) {
-      navigate("/finance/setup", { replace: true });
-    }
-  }, [isActive, navigate]);
-
   async function handleActivate() {
     if (!companyId || !user) return;
 
@@ -55,6 +49,15 @@ export default function Finance() {
   }
 
   if (!user) return <Navigate to="/login" replace />;
+  if (isLoading) {
+    return (
+      <div className="grid min-h-[60vh] place-items-center px-4">
+        <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-6 py-4 text-sm text-muted-foreground">
+          Carregando…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[color:var(--sinaxys-bg)] px-4 py-6 md:px-6">
