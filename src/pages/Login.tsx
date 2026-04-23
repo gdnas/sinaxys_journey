@@ -79,7 +79,6 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 className="h-11 rounded-xl"
                 autoComplete="email"
-                disabled={submitting || loading}
               />
             </div>
 
@@ -98,13 +97,13 @@ export default function Login() {
                 className="h-11 rounded-xl"
                 type="password"
                 autoComplete="current-password"
-                disabled={submitting || loading}
+                disabled={submitting}
               />
             </div>
 
             <Button
               className="h-11 rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={!canSubmit || submitting || loading}
+              disabled={!canSubmit || submitting}
               onClick={async () => {
                 try {
                   setSubmitting(true);

@@ -41,7 +41,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
 
-  // Initialize session on mount and listen for auth changes so `loading` is cleared
   useEffect(() => {
     let mounted = true;
 
@@ -57,13 +56,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
     })();
 
-    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        // refresh profile
-        hydrateFromSession().then((p) => {
-          if (!mounted) return;
-          if (p) setUser(p as any);
-        }).catch(() => {});
+        hydrateFromSession()
+          .then((p) => {
+            if (!mounted) return;
+            if (p) setUser(p as any);
+          })
+          .catch(() => {});
       } else if (event === "SIGNED_OUT") {
         if (!mounted) return;
         setUser(null);
@@ -72,35 +72,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       mounted = false;
-      try { data.subscription.unsubscribe(); } catch {};
+      data.subscription.unsubscribe();
     };
   }, []);
-
-  const signup = async ({ email, password }: { email: string; password: string }) => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            limited_access: false
-          }
-        }
-      });
-      if (error) throw error;
-      navigate("/");
-    } catch (error) {
-      console.error("Signup error:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const login = async (email: string, password: string) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
         return { ok: false, message: error.message };
       }
@@ -122,7 +101,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
       
       return { ok: true };
-    } catch (error) {
+    } catch (error: any) {
       console.error("Login error:", error);
       return { ok: false, message: error.message };
     } finally {
