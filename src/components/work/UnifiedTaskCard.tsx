@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import WorkItemStatusBadge from './WorkItemStatusBadge';
 import WorkItemPriorityBadge from './WorkItemPriorityBadge';
-import { CheckCircle2, Circle, LayoutDashboard, Target, ChevronRight, Calendar, User } from 'lucide-react';
+import { CheckCircle2, Circle, LayoutDashboard, Target, ChevronRight, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { UnifiedWorkItem } from '@/hooks/useUnifiedWorkItems';
 
@@ -19,23 +19,23 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
   const isProject = !!workItem.project_id;
   const isOkr = !!workItem.key_result_id;
 
-  // Determinar cor de destaque baseada no contexto
   const contextColor = isProject ? 'text-blue-600' : 'text-purple-600';
   const contextIcon = isProject ? <LayoutDashboard className="h-4 w-4" /> : <Target className="h-4 w-4" />;
 
-  // Determinar link de navegação
   const navigateTo = isProject
     ? `/app/projetos/${workItem.project_id}/kanban`
-    : `/okr/deliverable/${workItem.deliverable_id}`;
+    : workItem.deliverable_id
+      ? `/okr/entregaveis/${workItem.deliverable_id}`
+      : workItem.key_result_id
+        ? `/okr/objetivos/${workItem.objective_title ? workItem.key_result_id : workItem.key_result_id}`
+        : '/app';
 
-  // Formatar data de vencimento
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return null;
     const date = new Date(dateStr);
     return format(date, 'dd/MM/yyyy');
   };
 
-  // Determinar se está atrasado
   const isOverdue = workItem.is_overdue && !isDone;
 
   const handleStatusToggle = async () => {
@@ -48,7 +48,6 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
       isOverdue ? 'border-l-red-500' : isDone ? 'border-l-green-500' : 'border-l-blue-500'
     }`}>
       <div className="flex items-start gap-3">
-        {/* Checkbox/Status Icon */}
         <button
           onClick={handleStatusToggle}
           disabled={isUpdating}
@@ -61,9 +60,7 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
           )}
         </button>
 
-        {/* Task Content */}
         <div className="flex-1 min-w-0">
-          {/* Header: Title + Badges */}
           <div className="flex items-start justify-between gap-2 mb-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap mb-1">
@@ -74,7 +71,6 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
                 <WorkItemPriorityBadge priority={workItem.priority} />
               </div>
 
-              {/* Context Badge */}
               {(workItem.project_name || workItem.objective_title) && (
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                   {contextIcon}
@@ -93,7 +89,6 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
               )}
             </div>
 
-            {/* Navigate Button */}
             <Link to={navigateTo}>
               <Button variant="ghost" size="icon" className="flex-shrink-0">
                 <ChevronRight className="h-4 w-4" />
@@ -101,16 +96,13 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
             </Link>
           </div>
 
-          {/* Description */}
           {workItem.description && (
             <p className={`text-sm mb-3 ${isDone ? 'line-through text-muted-foreground' : 'text-muted-foreground'} line-clamp-2`}>
               {workItem.description}
             </p>
           )}
 
-          {/* Footer: Dates + Info */}
           <div className="flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
-            {/* Due Date */}
             {workItem.due_date && (
               <div className={`flex items-center gap-1 ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
                 <Calendar className="h-3 w-3" />
@@ -121,7 +113,6 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
               </div>
             )}
 
-            {/* Cycle (for OKRs) */}
             {workItem.cycle_label && (
               <div className="flex items-center gap-1">
                 <Target className="h-3 w-3" />
@@ -129,7 +120,6 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
               </div>
             )}
 
-            {/* Start Date */}
             {workItem.start_date && (
               <div className="flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
@@ -137,7 +127,6 @@ export default function UnifiedTaskCard({ workItem, onStatusToggle, isUpdating }
               </div>
             )}
 
-            {/* Estimate */}
             {workItem.estimate_minutes && (
               <div className="flex items-center gap-1">
                 <span>⏱️ {Math.round(workItem.estimate_minutes / 60)}h</span>
