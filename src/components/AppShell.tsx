@@ -9,8 +9,6 @@ import {
   Building2,
   CalendarClock,
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
   Crown,
   GraduationCap,
   Handshake,
@@ -21,18 +19,15 @@ import {
   Megaphone,
   Network,
   Palette,
-  Search,
   Settings,
   Shield,
   Target,
   TestTube,
   Trophy,
-  UploadCloud,
   User as UserIcon,
   Video,
   Wallet,
   Wrench,
-  Users,
   Users2,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -46,14 +41,14 @@ import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { isCompanyModuleEnabled } from "@/lib/modulesDb";
 import { getCompanyFundamentals } from "@/lib/okrDb";
-import { describedItemsToLines, parseDescribedItems, textPreview } from "@/lib/fundamentalsFormat";
+import { describedItemsToLines, parseDescribedItems } from "@/lib/fundamentalsFormat";
 import { roleLabel } from "@/lib/sinaxys";
 import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { LanguageSwitcher } from '@/components/LanguageSwitcher';
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import NotificationsPanel from "@/components/Notifications/NotificationsPanel";
 import type { Role } from "@/lib/domain";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 
 type NavLinkItem = {
   type: "link";
@@ -75,7 +70,6 @@ type NavGroupItem = {
 type NavItem = NavLinkItem | NavGroupItem;
 
 const nav: NavItem[] = [
-  // Master admin
   {
     type: "link",
     to: "/master/overview",
@@ -104,8 +98,6 @@ const nav: NavItem[] = [
     icon: <TestTube className="h-4 w-4" />,
     roles: ["MASTERADMIN"],
   },
-
-  // === HOME ===
   {
     type: "link",
     to: "/app",
@@ -113,8 +105,6 @@ const nav: NavItem[] = [
     icon: <LayoutDashboard className="h-4 w-4" />,
     roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
   },
-
-  // === ESTRATÉGIA ===
   {
     type: "group",
     label: "nav.strategy.group",
@@ -155,8 +145,6 @@ const nav: NavItem[] = [
       },
     ],
   },
-
-  // === EXECUÇÃO ===
   {
     type: "group",
     label: "nav.execution.group",
@@ -189,8 +177,6 @@ const nav: NavItem[] = [
       },
     ],
   },
-
-  // === EVOLUÇÃO ===
   {
     type: "group",
     label: "nav.evolution.group",
@@ -231,8 +217,6 @@ const nav: NavItem[] = [
       },
     ],
   },
-
-  // === SQUAD INTELLIGENCE ===
   {
     type: "group",
     label: "Squad Intelligence",
@@ -249,8 +233,6 @@ const nav: NavItem[] = [
       },
     ],
   },
-
-  // === EMPRESA ===
   {
     type: "group",
     label: "nav.company.group",
@@ -295,6 +277,14 @@ const nav: NavItem[] = [
       },
       {
         type: "link",
+        to: "/finance/scenarios",
+        label: "Cenários",
+        icon: <Layers className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "FINANCE",
+      },
+      {
+        type: "link",
         to: "/admin/costs",
         label: "Custos e Despesas",
         icon: <Wallet className="h-4 w-4" />,
@@ -311,8 +301,6 @@ const nav: NavItem[] = [
       },
     ],
   },
-
-  // === CONFIGURAÇÕES ===
   {
     type: "group",
     label: "Configurações",
@@ -355,7 +343,6 @@ const nav: NavItem[] = [
       },
     ],
   },
-
   {
     type: "link",
     to: "/pdi-performance",
@@ -364,7 +351,6 @@ const nav: NavItem[] = [
     roles: ["COLABORADOR", "HEAD", "ADMIN"],
     moduleKey: "PDI_PERFORMANCE",
   },
-
   {
     type: "link",
     to: "/knowledge",
@@ -373,7 +359,6 @@ const nav: NavItem[] = [
     roles: ["ADMIN", "HEAD", "COLABORADOR"],
     moduleKey: "KNOWLEDGE",
   },
-
   {
     type: "link",
     to: "/head/users",
@@ -389,7 +374,6 @@ const nav: NavItem[] = [
     roles: ["HEAD"],
     moduleKey: "COSTS",
   },
-
   {
     type: "link",
     to: "/profile",
@@ -407,11 +391,10 @@ function isLinkActive(pathname: string, to: string) {
 function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNavigate?: () => void; moduleAllowed: (key?: string) => boolean }) {
   const { pathname } = useLocation();
   const { t } = useTranslation();
+  const { user } = useAuth();
 
   const groups = items.filter((i): i is NavGroupItem => i.type === "group");
-  const defaultOpen = groups
-    .filter((g) => g.children.some((c) => isLinkActive(pathname, c.to)))
-    .map((g) => g.label);
+  const defaultOpen = groups.filter((g) => g.children.some((c) => isLinkActive(pathname, c.to))).map((g) => g.label);
 
   return (
     <nav className="flex flex-col gap-1">
@@ -419,8 +402,7 @@ function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNav
         {items.map((item) => {
           if (item.type === "link") {
             const allowed = moduleAllowed(item.moduleKey);
-            const { user } = useAuth();
-            if (!item.roles.includes(user?.role ?? "" as any)) return null;
+            if (!item.roles.includes(user?.role ?? ("" as any))) return null;
 
             if (allowed) {
               return (
@@ -444,12 +426,8 @@ function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNav
             return (
               <div
                 key={item.to}
-                className={cn(
-                  "flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] transition opacity-60",
-                  "hover:bg-[color:var(--sinaxys-tint)]/70 cursor-not-allowed",
-                )}
-                onClick={(e) => e.preventDefault()}
-                title={t('modules.disabled')}
+                className="flex cursor-not-allowed items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] opacity-60 hover:bg-[color:var(--sinaxys-tint)]/70"
+                title={t("modules.disabled")}
               >
                 <span className="text-[color:var(--sinaxys-primary)]">{item.icon}</span>
                 {t(item.label)}
@@ -462,9 +440,7 @@ function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNav
               <AccordionTrigger
                 className={cn(
                   "rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] hover:no-underline",
-                  item.children.some((c) => isLinkActive(pathname, c.to))
-                    ? "bg-[color:var(--sinaxys-tint)]"
-                    : "hover:bg-[color:var(--sinaxys-tint)]/70",
+                  item.children.some((c) => isLinkActive(pathname, c.to)) ? "bg-[color:var(--sinaxys-tint)]" : "hover:bg-[color:var(--sinaxys-tint)]/70",
                 )}
               >
                 <span className="inline-flex items-center gap-2">
@@ -476,8 +452,7 @@ function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNav
                 <div className="grid gap-1">
                   {item.children.map((child) => {
                     const childAllowed = moduleAllowed(child.moduleKey);
-                    const { user } = useAuth();
-                    if (!child.roles.includes(user?.role ?? "" as any)) return null;
+                    if (!child.roles.includes(user?.role ?? ("" as any))) return null;
 
                     if (childAllowed) {
                       return (
@@ -501,8 +476,8 @@ function SideNav({ items, onNavigate, moduleAllowed }: { items: NavItem[]; onNav
                     return (
                       <div
                         key={child.to}
-                        className="ml-6 flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] opacity-60 cursor-not-allowed"
-                        title={t('modules.disabled')}
+                        className="ml-6 flex cursor-not-allowed items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-[color:var(--sinaxys-ink)] opacity-60"
+                        title={t("modules.disabled")}
                       >
                         <span className="text-[color:var(--sinaxys-primary)]">{child.icon}</span>
                         {t(child.label)}
@@ -544,9 +519,9 @@ function FundamentalsSpotlightCard() {
     if (!fundamentals) return res;
 
     const addText = (kind: "purpose" | "mission" | "vision", label: string, raw?: string | null) => {
-      const t = (raw ?? "").trim();
-      if (!t) return;
-      res.push({ kind, label, text: t });
+      const text = (raw ?? "").trim();
+      if (!text) return;
+      res.push({ kind, label, text });
     };
 
     addText("purpose", "Propósito", fundamentals.purpose);
@@ -555,16 +530,16 @@ function FundamentalsSpotlightCard() {
 
     const valuesLines = describedItemsToLines(parseDescribedItems(fundamentals.values));
     valuesLines.forEach((line, index) => {
-      const t = String(line ?? "").trim();
-      if (!t) return;
-      res.push({ kind: "values", label: "Valores", text: t, index });
+      const text = String(line ?? "").trim();
+      if (!text) return;
+      res.push({ kind: "values", label: "Valores", text, index });
     });
 
     const cultureLines = describedItemsToLines(parseDescribedItems(fundamentals.culture));
     cultureLines.forEach((line, index) => {
-      const t = String(line ?? "").trim();
-      if (!t) return;
-      res.push({ kind: "culture", label: "Cultura", text: t, index });
+      const text = String(line ?? "").trim();
+      if (!text) return;
+      res.push({ kind: "culture", label: "Cultura", text, index });
     });
 
     return res;
@@ -596,7 +571,7 @@ function FundamentalsSpotlightCard() {
         "w-full rounded-xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-3 text-left",
         "transition hover:bg-[color:var(--sinaxys-tint)]/80 hover:shadow-sm",
       )}
-      title={t('menu.fundamentals.open')}
+      title={t("menu.fundamentals.open")}
     >
       <div className="flex items-start gap-3">
         <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-white shadow-sm">
@@ -609,12 +584,12 @@ function FundamentalsSpotlightCard() {
 
         <div className="min-w-0">
           <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
-            {selected?.label ?? t('menu.fundamentals.open')}
+            {selected?.label ?? t("menu.fundamentals.open")}
           </div>
           <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-[color:var(--sinaxys-ink)]">
             {selected?.text ?? (company.tagline || "Defina os fundamentos e volte aqui para ver um destaque aleatório.")}
           </p>
-          <div className="mt-2 text-[11px] font-semibold text-[color:var(--sinaxys-primary)]">{t('menu.fundamentals.open')}</div>
+          <div className="mt-2 text-[11px] font-semibold text-[color:var(--sinaxys-primary)]">{t("menu.fundamentals.open")}</div>
         </div>
       </div>
     </button>
@@ -634,7 +609,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { t } = useTranslation();
-
   const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
@@ -822,92 +796,92 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)]">
       <header className="fixed inset-x-0 top-0 z-40 border-b bg-white/90 backdrop-blur dark:bg-[hsl(var(--background))]/85">
-          <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
-            <div className="flex items-center gap-3">
-              <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-                <SheetTrigger asChild>
-                  <Button variant="outline" size="icon" className="rounded-xl" aria-label="Abrir menu" data-tour="top-menu">
-                    <Menu className="h-4 w-4" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-[86vw] max-w-sm p-4">
-                  <SheetHeader className="text-left">
-                    <SheetTitle className="text-[color:var(--sinaxys-ink)]">{t('menu.title')}</SheetTitle>
-                  </SheetHeader>
-                  <div className="mt-4 grid gap-3">
-                    <SideNav items={visible} onNavigate={() => setMenuOpen(false)} moduleAllowed={moduleAllowed} />
-                    {user.role !== "MASTERADMIN" ? (
-                      <>
-                        <Separator />
-                        <FundamentalsSpotlightCard />
-                      </>
-                    ) : null}
-                  </div>
-                </SheetContent>
-              </Sheet>
-
-              <Link to="/" className="flex min-w-0 items-center gap-3">
-                <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-[color:var(--sinaxys-primary)]">
-                  {company.logoDataUrl ? (
-                    <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
-                  ) : (
-                    <span className="text-sm font-semibold text-white">{initials(company.name || "SJ")}</span>
-                  )}
+        <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-3">
+            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="outline" size="icon" className="rounded-xl" aria-label="Abrir menu" data-tour="top-menu">
+                  <Menu className="h-4 w-4" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[86vw] max-w-sm p-4">
+                <SheetHeader className="text-left">
+                  <SheetTitle className="text-[color:var(--sinaxys-ink)]">{t("menu.title")}</SheetTitle>
+                </SheetHeader>
+                <div className="mt-4 grid gap-3">
+                  <SideNav items={visible} onNavigate={() => setMenuOpen(false)} moduleAllowed={moduleAllowed} />
+                  {user.role !== "MASTERADMIN" ? (
+                    <>
+                      <Separator />
+                      <FundamentalsSpotlightCard />
+                    </>
+                  ) : null}
                 </div>
-                <div className="min-w-0 leading-tight">
-                  <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))] sm:max-w-[260px]">
-                    {company.name}
-                  </div>
-                  <div className="hidden text-xs text-muted-foreground sm:block">{company.tagline}</div>
-                </div>
-              </Link>
-            </div>
+              </SheetContent>
+            </Sheet>
 
-            <div className="flex items-center gap-3">
-              <LanguageSwitcher />
-              <ThemeToggle />
-              <NotificationsPanel />
-              <button
-                type="button"
-                className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)] dark:border-border dark:bg-background dark:hover:bg-muted"
-                onClick={() => navigate("/profile")}
-                aria-label="Abrir perfil"
-                data-tour="top-profile"
-              >
-                <Avatar className="h-9 w-9">
-                  <AvatarImage src={user.avatarUrl} alt={user.name} />
-                  <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] dark:bg-muted dark:text-[hsl(var(--foreground))]">
-                    {initials(user.name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="hidden max-w-[42vw] min-w-0 text-right sm:block lg:max-w-[360px]">
-                  <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))]">
-                    {user.name} <span className="text-muted-foreground">— {jobTitleLabel}</span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">{roleLabel(user.role)}</div>
+            <Link to="/" className="flex min-w-0 items-center gap-3">
+              <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-[color:var(--sinaxys-primary)]">
+                {company.logoDataUrl ? (
+                  <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
+                ) : (
+                  <span className="text-sm font-semibold text-white">{initials(company.name || "SJ")}</span>
+                )}
+              </div>
+              <div className="min-w-0 leading-tight">
+                <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))] sm:max-w-[260px]">
+                  {company.name}
                 </div>
-              </button>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="rounded-full border-[color:var(--sinaxys-border)] bg-white dark:border-border dark:bg-background"
-                    onClick={async () => {
-                      await logout();
-                      navigate("/login");
-                    }}
-                    aria-label="Sair"
-                  >
-                    <LogOut className="h-4 w-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{t('tooltip.logout')}</TooltipContent>
-              </Tooltip>
-            </div>
+                <div className="hidden text-xs text-muted-foreground sm:block">{company.tagline}</div>
+              </div>
+            </Link>
           </div>
-        </header>
+
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
+            <ThemeToggle />
+            <NotificationsPanel />
+            <button
+              type="button"
+              className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 transition hover:bg-[color:var(--sinaxys-tint)] dark:border-border dark:bg-background dark:hover:bg-muted"
+              onClick={() => navigate("/profile")}
+              aria-label="Abrir perfil"
+              data-tour="top-profile"
+            >
+              <Avatar className="h-9 w-9">
+                <AvatarImage src={user.avatarUrl} alt={user.name} />
+                <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] dark:bg-muted dark:text-[hsl(var(--foreground))]">
+                  {initials(user.name)}
+                </AvatarFallback>
+              </Avatar>
+              <div className="hidden max-w-[42vw] min-w-0 text-right sm:block lg:max-w-[360px]">
+                <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))]">
+                  {user.name} <span className="text-muted-foreground">— {jobTitleLabel}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">{roleLabel(user.role)}</div>
+              </div>
+            </button>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="rounded-full border-[color:var(--sinaxys-border)] bg-white dark:border-border dark:bg-background"
+                  onClick={async () => {
+                    await logout();
+                    navigate("/login");
+                  }}
+                  aria-label="Sair"
+                >
+                  <LogOut className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{t("tooltip.logout")}</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </header>
 
       <div className="mx-auto w-full max-w-7xl px-4 pb-12 pt-20 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 items-start gap-6">
