@@ -107,6 +107,8 @@ import AssetPublicDemo from "./pages/AssetPublicDemo";
 import Finance from "./pages/Finance";
 import FinanceSetup from "./pages/FinanceSetup";
 import FinanceScenarios from "./pages/FinanceScenarios";
+import FinanceVersions from "./pages/FinanceVersions";
+import FinanceVersionDetail from "./pages/FinanceVersionDetail";
 
 const queryClient = new QueryClient();
 
@@ -126,15 +128,12 @@ const App = () => (
 
               <AppShell>
                 <Routes>
-                  <Route
-                    path="/settings"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <Settings />
-                      </RequireAuth>
-                    }
-                  />
                   <Route path="/" element={<Index />} />
+                  <Route path="/finance" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="FINANCE"><Finance /></RequireCompanyModule></RequireAuth>} />
+                  <Route path="/finance/setup" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceSetup /></RequireCompanyModule></RequireAuth>} />
+                  <Route path="/finance/scenarios" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceScenarios /></RequireCompanyModule></RequireAuth>} />
+                  <Route path="/finance/versions" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceVersions /></RequireCompanyModule></RequireAuth>} />
+                  <Route path="/finance/versions/:id" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceVersionDetail /></RequireCompanyModule></RequireAuth>} />
                   <Route path="/pricing" element={<Pricing />} />
                   <Route path="/como-funciona" element={<HowItWorks />} />
                   <Route path="/demo" element={<Demo />} />
@@ -144,68 +143,10 @@ const App = () => (
                   <Route path="/signup" element={<Signup />} />
                   <Route path="/forgot" element={<ForgotPassword />} />
                   <Route path="/supabase" element={<SupabaseStatus />} />
-                  <Route
-                    path="/test-runner"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN"]}>
-                        <TestRunner />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/app"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <AppHome />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <Navigate to="/app" replace />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/app/tracks/:assignmentId"
-                    element={
-                      <RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}>
-                        <TrackPlayer />
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/finance"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <RequireCompanyModule moduleKey="FINANCE">
-                          <Finance />
-                        </RequireCompanyModule>
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/finance/setup"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <RequireCompanyModule moduleKey="FINANCE">
-                          <FinanceSetup />
-                        </RequireCompanyModule>
-                      </RequireAuth>
-                    }
-                  />
-                  <Route
-                    path="/finance/scenarios"
-                    element={
-                      <RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}>
-                        <RequireCompanyModule moduleKey="FINANCE">
-                          <FinanceScenarios />
-                        </RequireCompanyModule>
-                      </RequireAuth>
-                    }
-                  />
+                  <Route path="/app" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><AppHome /></RequireAuth>} />
+                  <Route path="/dashboard" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><Navigate to="/app" replace /></RequireAuth>} />
+                  <Route path="/app/tracks/:assignmentId" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><TrackPlayer /></RequireAuth>} />
+                  <Route path="/settings" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><Settings /></RequireAuth>} />
                   <Route path="/org" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="ORG"><OrgChart /></RequireCompanyModule></RequireAuth>} />
                   <Route path="/people/:userId" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="ORG"><Person /></RequireCompanyModule></RequireAuth>} />
                   <Route path="/password" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><ChangePassword /></RequireAuth>} />
@@ -222,13 +163,6 @@ const App = () => (
                   <Route path="/okr/objectives/:objectiveId" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrObjectiveDetail /></RequireCompanyModule></RequireAuth>} />
                   <Route path="/okr/deliverables/:deliverableId" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrDeliverableDetail /></RequireCompanyModule></RequireAuth>} />
                   <Route path="/okr/assistant" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrAssistant /></RequireCompanyModule></RequireAuth>} />
-                  <Route path="/okr/hoje" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrToday /></RequireCompanyModule></RequireAuth>} />
-                  <Route path="/okr/fundamentos" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrFundamentals /></RequireCompanyModule></RequireAuth>} />
-                  <Route path="/okr/mapa" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrMap /></RequireCompanyModule></RequireAuth>} />
-                  <Route path="/okr/ciclos" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><Navigate to="/okr/quarter" replace /></RequireCompanyModule></RequireAuth>} />
-                  <Route path="/okr/objetivos/:objectiveId" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrObjectiveDetail /></RequireCompanyModule></RequireAuth>} />
-                  <Route path="/okr/entregaveis/:deliverableId" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrDeliverableDetail /></RequireCompanyModule></RequireAuth>} />
-                  <Route path="/okr/assistente" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrAssistant /></RequireCompanyModule></RequireAuth>} />
                   <Route path="/track/:trackId" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><TrackPlayer /></RequireAuth>} />
                   <Route path="/app/certificates" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><AppCertificates /></RequireAuth>} />
                   <Route path="/app/certificates/:certificateId" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><CertificateView /></RequireAuth>} />

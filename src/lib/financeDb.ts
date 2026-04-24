@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 
 export type FinanceFiscalPeriodType = "month" | "quarter" | "year";
+export type FinanceVersionStatus = "draft" | "locked";
 
 export type FinanceFiscalPeriod = {
   id: string;
@@ -29,6 +30,44 @@ export type FinanceScenario = {
   created_by_user_id: string;
   created_at: string;
   updated_at: string;
+};
+
+export type FinanceVersion = {
+  id: string;
+  company_id: string;
+  scenario_id: string;
+  name: string;
+  status: FinanceVersionStatus;
+  period_type: FinanceFiscalPeriodType;
+  fiscal_year: number;
+  fiscal_quarter: number | null;
+  fiscal_month: number | null;
+  created_by_user_id: string;
+  locked_at: string | null;
+  created_at: string;
+  updated_at: string;
+  scenario?: FinanceScenario | null;
+  line_count?: number;
+};
+
+export type FinanceVersionLine = {
+  id: string;
+  company_id: string;
+  finance_version_id: string;
+  finance_account_id: string;
+  fiscal_period_id: string;
+  department_id: string | null;
+  project_id: string | null;
+  squad_id: string | null;
+  amount: number;
+  created_by_user_id: string;
+  created_at: string;
+  updated_at: string;
+  account?: { id: string; name: string; code?: string | null } | null;
+  fiscal_period?: FinanceFiscalPeriod | null;
+  department?: { id: string; name: string } | null;
+  project?: { id: string; name: string } | null;
+  squad?: { id: string; name: string } | null;
 };
 
 export type FinanceScenarioAssumption = {
@@ -497,4 +536,136 @@ export async function activateFinanceScenario(scenarioId: string) {
 
   if (error) throw error;
   return data as FinanceScenario;
+}
+
+export async function listFinanceVersions(companyId: string) {
+  const { data, error } = await supabase
+    .from("finance_versions")
+    .select("*, scenario:finance_scenarios(*)")
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as FinanceVersion[];
+}
+
+export async function getFinanceVersion(versionId: string) {
+  const { data, error } = await supabase
+    .from("finance_versions")
+    .select("*, scenario:finance_scenarios(*)")
+    .eq("id", versionId)
+    .single();
+
+  if (error) throw error;
+  return data as FinanceVersion;
+}
+
+export async function createFinanceVersion(companyId: string, userId: string, payload: Pick<FinanceVersion, "scenario_id" | "name" | "period_type" | "fiscal_year" | "fiscal_quarter" | "fiscal_month">) {
+  const { data, error } = await supabase
+    .from("finance_versions")
+    .insert({
+      company_id: companyId,
+      created_by_user_id: userId,
+      status: "draft",
+      ...payload,
+    })
+    .select("*, scenario:finance_scenarios(*)")
+    .single();
+
+  if (error) throw error;
+  return data as FinanceVersion;
+}
+
+export async function updateFinanceVersion(versionId: string, payload: Partial<Pick<FinanceVersion, "name" | "status" | "scenario_id" | "period_type" | "fiscal_year" | "fiscal_quarter" | "fiscal_month">>) {
+  const { data, error } = await supabase
+    .from("finance_versions")
+    .update(payload)
+    .eq("id", versionId)
+    .select("*, scenario:finance_scenarios(*)")
+    .single();
+
+  if (error) throw error;
+  return data as FinanceVersion;
+}
+
+export async function lockFinanceVersion(versionId: string) {
+  return updateFinanceVersion(versionId, { status: "locked" });
+}
+
+export async function deleteFinanceVersion(versionId: string) {
+  const { error } = await supabase.from("finance_versions").delete().eq("id", versionId);
+  if (error) throw error;
+}
+
+export async function listFinanceVersionLines(versionId: string) {
+  const { data, error } = await supabase
+    .from("finance_version_lines")
+    .select("*, account:finance_accounts(*), fiscal_period:finance_fiscal_periods(*), department:departments(*), project:projects(*), squad:squads(*)")
+    .eq("finance_version_id", versionId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return (data ?? []) as FinanceVersionLine[];
+}
+
+export async function createFinanceVersionLine(companyId: string, userId: string, payload: Pick<FinanceVersionLine, "finance_version_id" | "finance_account_id" | "fiscal_period_id" | "department_id" | "project_id" | "squad_id" | "amount">) {
+  const { data, error } = await supabase
+    .from("finance_version_lines")
+    .insert({
+      company_id: companyId,
+      created_by_user_id: userId,
+      ...payload,
+    })
+    .select("*, account:finance_accounts(*), fiscal_period:finance_fiscal_periods(*), department:departments(*), project:projects(*), squad:squads(*)")
+    .single();
+
+  if (error) throw error;
+  return data as FinanceVersionLine;
+}
+
+export async function updateFinanceVersionLine(lineId: string, payload: Partial<Pick<FinanceVersionLine, "finance_account_id" | "fiscal_period_id" | "department_id" | "project_id" | "squad_id" | "amount">>) {
+  const { data, error } = await supabase
+    .from("finance_version_lines")
+    .update(payload)
+    .eq("id", lineId)
+    .select("*, account:finance_accounts(*), fiscal_period:finance_fiscal_periods(*), department:departments(*), project:projects(*), squad:squads(*)")
+    .single();
+
+  if (error) throw error;
+  return data as FinanceVersionLine;
+}
+
+export async function deleteFinanceVersionLine(lineId: string) {
+  const { error } = await supabase.from("finance_version_lines").delete().eq("id", lineId);
+  if (error) throw error;
+}
+
+export async function listFinanceAccounts(companyId: string) {
+  const { data, error } = await supabase.from("finance_accounts").select("*").eq("company_id", companyId).order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Array<{ id: string; company_id: string; name: string; code: string | null }>;
+}
+
+export async function listFinanceFiscalPeriods(companyId: string) {
+  const { data, error } = await supabase.from("finance_fiscal_periods").select("*").eq("company_id", companyId).order("start_date", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as FinanceFiscalPeriod[];
+}
+
+export async function listFinanceDepartments(companyId: string) {
+  const { data, error } = await supabase.from("departments").select("id,name,company_id").eq("company_id", companyId).order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Array<{ id: string; name: string; company_id: string }>;
+}
+
+export async function listFinanceProjects(companyId: string) {
+  const { data, error } = await supabase.from("projects").select("id,name,tenant_id").eq("tenant_id", companyId).order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Array<{ id: string; name: string; tenant_id: string }>;
+}
+
+export async function listFinanceSquads(companyId: string) {
+  const { data, error } = await supabase.from("squads").select("id,name,company_id").eq("company_id", companyId).order("name", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as Array<{ id: string; name: string; company_id: string }>;
 }

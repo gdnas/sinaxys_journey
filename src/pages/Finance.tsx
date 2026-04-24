@@ -24,8 +24,8 @@ export default function Finance() {
   const primaryCta = useMemo(() => {
     if (isActive) {
       return {
-        label: "Abrir planejamento",
-        to: "/finance/setup",
+        label: "Abrir versões",
+        to: "/finance/versions",
       };
     }
 
@@ -46,7 +46,7 @@ export default function Finance() {
       title: "Finance ativado",
       description: "Os períodos financeiros iniciais foram criados.",
     });
-    navigate("/finance/setup", { replace: true });
+    navigate("/finance/versions", { replace: true });
   }
 
   if (!user) return <Navigate to="/login" replace />;
@@ -120,9 +120,9 @@ export default function Finance() {
                   <Wallet className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold">Sprint 0 pronta para expansão</div>
+                  <div className="text-sm font-semibold">Sprint 4 pronta para uso</div>
                   <p className="mt-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70">
-                    A base já respeita feature flag por empresa e prepara o caminho para contas, períodos, cenários e versões.
+                    A base agora leva direto para versões financeiras com edição inline e bloqueio por status.
                   </p>
                 </div>
               </div>
@@ -130,9 +130,9 @@ export default function Finance() {
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {[
                   "Feature flag por empresa",
-                  "Integração com cost_items",
+                  "Versões e linhas inline",
                   "Compatível com RLS",
-                  "Base para /finance",
+                  "Base para /finance/versions",
                 ].map((item) => (
                   <div key={item} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white/5 px-4 py-3 text-sm font-semibold">
                     {item}
@@ -147,17 +147,17 @@ export default function Finance() {
           {[
             {
               title: "Governança",
-              desc: "Controle por empresa, com ativação/desativação centralizada.",
+              desc: "Controle por empresa, com versões bloqueáveis e integridade reforçada.",
               icon: <ShieldCheck className="h-5 w-5" />,
             },
             {
               title: "Visão executiva",
-              desc: "Estrutura pensada para leitura gerencial, não contábil.",
+              desc: "Listagem direta de versões e detalhe em formato de planilha.",
               icon: <BarChart3 className="h-5 w-5" />,
             },
             {
-              title: "Próximos passos",
-              desc: "A próxima sprint cria a estrutura de contas gerenciais.",
+              title: "Próximo passo",
+              desc: "Abra a listagem e comece a planejar com linhas inline.",
               icon: <Wallet className="h-5 w-5" />,
             },
           ].map((card) => (
@@ -182,7 +182,7 @@ export default function Finance() {
               Módulo ativo
             </div>
             <p className="mt-2">
-              O Finance já está habilitado para esta empresa. Você pode seguir para a configuração inicial.
+              O Finance já está habilitado para esta empresa. Você pode seguir para a listagem de versões.
             </p>
           </div>
         )}
