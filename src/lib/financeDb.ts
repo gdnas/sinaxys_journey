@@ -217,38 +217,52 @@ export async function getPeriodRange(companyId: string, start: string, end: stri
 }
 
 export async function seedFinanceScenarios(companyId: string, userId: string) {
+  const { data: existing, error: existingError } = await supabase
+    .from("finance_scenarios")
+    .select("id,name")
+    .eq("company_id", companyId);
+
+  if (existingError) throw existingError;
+
+  const existingNames = new Set((existing ?? []).map((item) => item.name));
+
+  const scenariosToInsert = [
+    {
+      company_id: companyId,
+      name: "Base",
+      description: "Cenário principal da empresa.",
+      status: "active" as const,
+      base_scenario_id: null,
+      created_by_user_id: userId,
+    },
+    {
+      company_id: companyId,
+      name: "Conservador",
+      description: "Premissas mais prudentes para simulação.",
+      status: "draft" as const,
+      base_scenario_id: null,
+      created_by_user_id: userId,
+    },
+    {
+      company_id: companyId,
+      name: "Agressivo",
+      description: "Premissas mais otimistas para simulação.",
+      status: "draft" as const,
+      base_scenario_id: null,
+      created_by_user_id: userId,
+    },
+  ].filter((item) => !existingNames.has(item.name));
+
+  if (scenariosToInsert.length) {
+    const { error } = await supabase.from("finance_scenarios").insert(scenariosToInsert);
+    if (error) throw error;
+  }
+
   const { data: scenarios, error: scenarioError } = await supabase
     .from("finance_scenarios")
-    .upsert(
-      [
-        {
-          company_id: companyId,
-          name: "Base",
-          description: "Cenário principal da empresa.",
-          status: "active",
-          base_scenario_id: null,
-          created_by_user_id: userId,
-        },
-        {
-          company_id: companyId,
-          name: "Conservador",
-          description: "Premissas mais prudentes para simulação.",
-          status: "draft",
-          base_scenario_id: null,
-          created_by_user_id: userId,
-        },
-        {
-          company_id: companyId,
-          name: "Agressivo",
-          description: "Premissas mais otimistas para simulação.",
-          status: "draft",
-          base_scenario_id: null,
-          created_by_user_id: userId,
-        },
-      ],
-      { onConflict: "company_id,name" },
-    )
-    .select("*");
+    .select("*")
+    .eq("company_id", companyId)
+    .in("name", ["Base", "Conservador", "Agressivo"]);
 
   if (scenarioError) throw scenarioError;
 
@@ -258,55 +272,81 @@ export async function seedFinanceScenarios(companyId: string, userId: string) {
 
   if (!baseScenario || !conservativeScenario || !aggressiveScenario) return;
 
-  const { error: assumptionError } = await supabase.from("finance_scenario_assumptions").upsert(
-    [
-      {
-        company_id: companyId,
-        scenario_id: baseScenario.id,
-        key: "growth_rate",
-        label: "Taxa de crescimento",
-        value_number: 0,
-        value_text: null,
-        value_json: null,
-        unit: "%",
-        applies_to_account_id: null,
-        applies_to_department_id: null,
-        applies_to_project_id: null,
-        applies_to_squad_id: null,
-      },
-      {
-        company_id: companyId,
-        scenario_id: conservativeScenario.id,
-        key: "growth_rate",
-        label: "Taxa de crescimento",
-        value_number: -5,
-        value_text: null,
-        value_json: null,
-        unit: "%",
-        applies_to_account_id: null,
-        applies_to_department_id: null,
-        applies_to_project_id: null,
-        applies_to_squad_id: null,
-      },
-      {
-        company_id: companyId,
-        scenario_id: aggressiveScenario.id,
-        key: "growth_rate",
-        label: "Taxa de crescimento",
-        value_number: 12,
-        value_text: null,
-        value_json: null,
-        unit: "%",
-        applies_to_account_id: null,
-        applies_to_department_id: null,
-        applies_to_project_id: null,
-        applies_to_squad_id: null,
-      },
-    ],
-    { onConflict: "company_id,scenario_id,key,applies_to_account_id,applies_to_department_id,applies_to_project_id,applies_to_squad_id" },
+  await supabase
+    .from("finance_scenarios")
+    .update({ base_scenario_id: baseScenario.id })
+    .eq("company_id", companyId)
+    .in("name", ["Conservador", "Agressivo"]);
+
+  const { data: existingAssumptions, error: assumptionsError } = await supabase
+    .from("finance_scenario_assumptions")
+    .select("scenario_id,key,applies_to_account_id,applies_to_department_id,applies_to_project_id,applies_to_squad_id")
+    .eq("company_id", companyId)
+    .eq("key", "growth_rate");
+
+  if (assumptionsError) throw assumptionsError;
+
+  const existingAssumptionKeys = new Set(
+    (existingAssumptions ?? []).map(
+      (item) =>
+        `${item.scenario_id}:${item.key}:${item.applies_to_account_id ?? ""}:${item.applies_to_department_id ?? ""}:${item.applies_to_project_id ?? ""}:${item.applies_to_squad_id ?? ""}`,
+    ),
   );
 
-  if (assumptionError) throw assumptionError;
+  const assumptionsToInsert = [
+    {
+      company_id: companyId,
+      scenario_id: baseScenario.id,
+      key: "growth_rate",
+      label: "Taxa de crescimento",
+      value_number: 0,
+      value_text: null,
+      value_json: null,
+      unit: "%",
+      applies_to_account_id: null,
+      applies_to_department_id: null,
+      applies_to_project_id: null,
+      applies_to_squad_id: null,
+    },
+    {
+      company_id: companyId,
+      scenario_id: conservativeScenario.id,
+      key: "growth_rate",
+      label: "Taxa de crescimento",
+      value_number: -5,
+      value_text: null,
+      value_json: null,
+      unit: "%",
+      applies_to_account_id: null,
+      applies_to_department_id: null,
+      applies_to_project_id: null,
+      applies_to_squad_id: null,
+    },
+    {
+      company_id: companyId,
+      scenario_id: aggressiveScenario.id,
+      key: "growth_rate",
+      label: "Taxa de crescimento",
+      value_number: 12,
+      value_text: null,
+      value_json: null,
+      unit: "%",
+      applies_to_account_id: null,
+      applies_to_department_id: null,
+      applies_to_project_id: null,
+      applies_to_squad_id: null,
+    },
+  ].filter(
+    (item) =>
+      !existingAssumptionKeys.has(
+        `${item.scenario_id}:${item.key}:${item.applies_to_account_id ?? ""}:${item.applies_to_department_id ?? ""}:${item.applies_to_project_id ?? ""}:${item.applies_to_squad_id ?? ""}`,
+      ),
+  );
+
+  if (assumptionsToInsert.length) {
+    const { error } = await supabase.from("finance_scenario_assumptions").insert(assumptionsToInsert);
+    if (error) throw error;
+  }
 }
 
 export async function listFinanceScenarios(companyId: string) {
@@ -374,13 +414,7 @@ export async function duplicateFinanceScenario(companyId: string, userId: string
 
   if (sourceError) throw sourceError;
 
-  const duplicated = await createFinanceScenario(
-    companyId,
-    userId,
-    `${source.name} - Cópia`,
-    source.description,
-    source.id,
-  );
+  const duplicated = await createFinanceScenario(companyId, userId, `${source.name} - Cópia`, source.description, source.id);
 
   const assumptions = await listFinanceScenarioAssumptions(companyId, scenarioId);
 

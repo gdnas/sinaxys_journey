@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Award,
-  BadgeCheck,
   BarChart3,
   BookOpen,
   Box,
@@ -567,10 +566,7 @@ function FundamentalsSpotlightCard() {
     <button
       type="button"
       onClick={() => navigate(destination)}
-      className={cn(
-        "w-full rounded-xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-3 text-left",
-        "transition hover:bg-[color:var(--sinaxys-tint)]/80 hover:shadow-sm",
-      )}
+      className={cn("w-full rounded-xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] p-3 text-left", "transition hover:bg-[color:var(--sinaxys-tint)]/80 hover:shadow-sm")}
       title={t("menu.fundamentals.open")}
     >
       <div className="flex items-start gap-3">
@@ -583,9 +579,7 @@ function FundamentalsSpotlightCard() {
         </div>
 
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">
-            {selected?.label ?? t("menu.fundamentals.open")}
-          </div>
+          <div className="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--sinaxys-ink)]">{selected?.label ?? t("menu.fundamentals.open")}</div>
           <p className="mt-1 whitespace-pre-wrap text-sm leading-snug text-[color:var(--sinaxys-ink)]">
             {selected?.text ?? (company.tagline || "Defina os fundamentos e volte aqui para ver um destaque aleatório.")}
           </p>
@@ -615,61 +609,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setMenuOpen(false);
   }, [pathname]);
 
-  const { data: pdiEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "PDI_PERFORMANCE"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "PDI_PERFORMANCE"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: tracksEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "TRACKS"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "TRACKS"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: pointsEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "POINTS"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "POINTS"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: costsEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "COSTS"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "COSTS"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: okrEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "OKR"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "OKR"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: orgEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "ORG"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "ORG"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: knowledgeEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "KNOWLEDGE"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "KNOWLEDGE"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: projectsEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "PROJECTS"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "PROJECTS"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: assetsEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "ASSETS"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "ASSETS"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: squadIntelligenceEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "SQUAD_INTELLIGENCE"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "SQUAD_INTELLIGENCE"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
-  const { data: financeEnabled = true } = useQuery({
-    queryKey: ["company-module", companyId, "FINANCE"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "FINANCE"),
-    enabled: !!user && !!companyId && user.role !== "MASTERADMIN",
-  });
+  const { data: pdiEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "PDI_PERFORMANCE"], queryFn: () => isCompanyModuleEnabled(String(companyId), "PDI_PERFORMANCE"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: tracksEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "TRACKS"], queryFn: () => isCompanyModuleEnabled(String(companyId), "TRACKS"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: pointsEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "POINTS"], queryFn: () => isCompanyModuleEnabled(String(companyId), "POINTS"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: costsEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "COSTS"], queryFn: () => isCompanyModuleEnabled(String(companyId), "COSTS"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: okrEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "OKR"], queryFn: () => isCompanyModuleEnabled(String(companyId), "OKR"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: orgEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "ORG"], queryFn: () => isCompanyModuleEnabled(String(companyId), "ORG"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: knowledgeEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "KNOWLEDGE"], queryFn: () => isCompanyModuleEnabled(String(companyId), "KNOWLEDGE"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: projectsEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "PROJECTS"], queryFn: () => isCompanyModuleEnabled(String(companyId), "PROJECTS"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: assetsEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "ASSETS"], queryFn: () => isCompanyModuleEnabled(String(companyId), "ASSETS"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: squadIntelligenceEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "SQUAD_INTELLIGENCE"], queryFn: () => isCompanyModuleEnabled(String(companyId), "SQUAD_INTELLIGENCE"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
+  const { data: financeEnabled = true } = useQuery({ queryKey: ["company-module", companyId, "FINANCE"], queryFn: () => isCompanyModuleEnabled(String(companyId), "FINANCE"), enabled: !!user && !!companyId && user.role !== "MASTERADMIN" });
 
   if (!user) return <>{children}</>;
 
@@ -682,16 +632,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-3">
               <Link to="/" className="flex min-w-0 items-center gap-3">
                 <div className="grid h-9 w-9 place-items-center overflow-hidden rounded-xl bg-[color:var(--sinaxys-primary)]">
-                  {company.logoDataUrl ? (
-                    <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-contain" />
-                  ) : (
-                    <span className="text-sm font-semibold text-white">{initials(company.name || "SJ")}</span>
-                  )}
+                  {company.logoDataUrl ? <img src={company.logoDataUrl} alt="Logo" className="h-full w-full object-contain" /> : <span className="text-sm font-semibold text-white">{initials(company.name || "SJ")}</span>}
                 </div>
                 <div className="min-w-0 leading-tight">
-                  <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))] sm:max-w-[260px]">
-                    {company.name}
-                  </div>
+                  <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))] sm:max-w-[260px]">{company.name}</div>
                 </div>
               </Link>
             </div>
@@ -829,9 +773,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 )}
               </div>
               <div className="min-w-0 leading-tight">
-                <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))] sm:max-w-[260px]">
-                  {company.name}
-                </div>
+                <div className="max-w-[52vw] truncate text-sm font-semibold text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))] sm:max-w-[260px]">{company.name}</div>
                 <div className="hidden text-xs text-muted-foreground sm:block">{company.tagline}</div>
               </div>
             </Link>
@@ -850,9 +792,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Avatar className="h-9 w-9">
                 <AvatarImage src={user.avatarUrl} alt={user.name} />
-                <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] dark:bg-muted dark:text-[hsl(var(--foreground))]">
-                  {initials(user.name)}
-                </AvatarFallback>
+                <AvatarFallback className="bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)] dark:bg-muted dark:text-[hsl(var(--foreground))]">{initials(user.name)}</AvatarFallback>
               </Avatar>
               <div className="hidden max-w-[42vw] min-w-0 text-right sm:block lg:max-w-[360px]">
                 <div className="truncate text-sm font-medium text-[color:var(--sinaxys-ink)] dark:text-[hsl(var(--foreground))]">

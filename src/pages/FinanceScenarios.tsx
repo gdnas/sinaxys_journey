@@ -45,19 +45,11 @@ function ScenarioCard({
           <div>
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">{scenario.name}</h3>
-              {scenario.status === "active" && (
-                <Badge className="rounded-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">Ativo</Badge>
-              )}
-              {scenario.status === "draft" && (
-                <Badge className="rounded-full bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">Rascunho</Badge>
-              )}
-              {scenario.status === "archived" && (
-                <Badge className="rounded-full bg-slate-500/10 text-slate-700 hover:bg-slate-500/10">Arquivado</Badge>
-              )}
+              {scenario.status === "active" && <Badge className="rounded-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10">Ativo</Badge>}
+              {scenario.status === "draft" && <Badge className="rounded-full bg-amber-500/10 text-amber-700 hover:bg-amber-500/10">Rascunho</Badge>}
+              {scenario.status === "archived" && <Badge className="rounded-full bg-slate-500/10 text-slate-700 hover:bg-slate-500/10">Arquivado</Badge>}
             </div>
-            <p className="mt-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70">
-              {scenario.description || "Sem descrição"}
-            </p>
+            <p className="mt-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70">{scenario.description || "Sem descrição"}</p>
           </div>
         </div>
 
@@ -68,9 +60,7 @@ function ScenarioCard({
           </div>
           <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white/5 px-4 py-3">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Base</div>
-            <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-              {scenario.base_scenario_id ? "Herdado" : "Principal"}
-            </div>
+            <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{scenario.base_scenario_id ? "Herdado" : "Principal"}</div>
           </div>
         </div>
 
@@ -117,24 +107,21 @@ export default function FinanceScenarios() {
   const [assumptionValueText, setAssumptionValueText] = useState("");
   const [assumptionUnit, setAssumptionUnit] = useState("%");
 
-  const selectedScenario = useMemo(
-    () => scenarios.find((item) => item.id === selectedScenarioId) ?? null,
-    [scenarios, selectedScenarioId],
-  );
+  const selectedScenario = useMemo(() => scenarios.find((item) => item.id === selectedScenarioId) ?? null, [scenarios, selectedScenarioId]);
 
   async function load() {
     if (!companyId) return;
     setLoading(true);
-    const [scenarioRows] = await Promise.all([listFinanceScenarios(companyId)]);
+    const scenarioRows = await listFinanceScenarios(companyId);
     setScenarios(scenarioRows);
     setSelectedScenarioId((current) => current ?? scenarioRows[0]?.id ?? null);
     setLoading(false);
   }
 
   useEffect(() => {
-    if (!companyId) return;
+    if (!companyId || !user?.id) return;
     void (async () => {
-      await seedFinanceScenarios(companyId, user?.id ?? "");
+      await seedFinanceScenarios(companyId, user.id);
       await load();
     })();
   }, [companyId, user?.id]);
@@ -151,9 +138,7 @@ export default function FinanceScenarios() {
   if (isLoading || loading) {
     return (
       <div className="grid min-h-[60vh] place-items-center px-4">
-        <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-6 py-4 text-sm text-muted-foreground">
-          Carregando…
-        </div>
+        <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-6 py-4 text-sm text-muted-foreground">Carregando…</div>
       </div>
     );
   }
@@ -164,7 +149,6 @@ export default function FinanceScenarios() {
     if (!companyId || !user) return;
     setSaving(true);
     const created = await createFinanceScenario(companyId, user.id, scenarioName, scenarioDescription || null, null);
-    await seedFinanceScenarios(companyId, user.id);
     setNewScenarioOpen(false);
     setScenarioName("");
     setScenarioDescription("");
