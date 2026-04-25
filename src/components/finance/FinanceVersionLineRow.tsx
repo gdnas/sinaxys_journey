@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from "react";
-import { Loader2, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle, Loader2, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TableCell, TableRow } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import type { FinanceVersionLine } from "@/lib/financeDb";
 
 export type FinanceLineDraft = {
@@ -22,8 +23,12 @@ export function FinanceVersionLineRow({
   onSave,
   onDelete,
   onFocusNext,
+  onFocusPrevious,
+  onCancel,
   readOnly,
   saving,
+  hasError,
+  isEditing,
   accounts,
   periods,
   departments,
@@ -36,8 +41,12 @@ export function FinanceVersionLineRow({
   onSave: () => void;
   onDelete: () => void;
   onFocusNext: () => void;
+  onFocusPrevious: () => void;
+  onCancel: () => void;
   readOnly: boolean;
   saving: boolean;
+  hasError: boolean;
+  isEditing: boolean;
   accounts: Array<{ id: string; name: string; code?: string | null }>;
   periods: Array<{ id: string; label: string }>;
   departments: Array<{ id: string; name: string }>;
@@ -45,19 +54,30 @@ export function FinanceVersionLineRow({
   squads: Array<{ id: string; name: string }>;
 }) {
   const amountRef = useRef<HTMLInputElement | null>(null);
-  const accountRef = useRef<HTMLButtonElement | null>(null);
+  const accountTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const periodTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const departmentTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const projectTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const squadTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const [cellError, setCellError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!line.id) amountRef.current?.focus();
-  }, [line.id]);
+    if (isEditing) {
+      amountRef.current?.focus();
+    }
+  }, [isEditing]);
+
+  useEffect(() => {
+    if (!hasError) setCellError(null);
+  }, [hasError]);
 
   const accountLabel = useMemo(() => accounts.find((item) => item.id === draft.finance_account_id)?.name ?? "Selecionar", [accounts, draft.finance_account_id]);
 
   return (
-    <TableRow className={line.id ? "" : "bg-[color:var(--sinaxys-tint)]/40"}>
+    <TableRow className={cn("transition-colors", isEditing && "bg-[color:var(--sinaxys-tint)]/40", hasError && "bg-red-50") }>
       <TableCell className="min-w-[220px]">
         <Select value={draft.finance_account_id} onValueChange={(value) => onDraftChange({ ...draft, finance_account_id: value })} disabled={readOnly || saving}>
-          <SelectTrigger ref={accountRef} className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
+          <SelectTrigger ref={accountTriggerRef} className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
             <SelectValue placeholder={accountLabel} />
           </SelectTrigger>
           <SelectContent>
@@ -69,7 +89,7 @@ export function FinanceVersionLineRow({
       </TableCell>
       <TableCell className="min-w-[180px]">
         <Select value={draft.fiscal_period_id} onValueChange={(value) => onDraftChange({ ...draft, fiscal_period_id: value })} disabled={readOnly || saving}>
-          <SelectTrigger className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
+          <SelectTrigger ref={periodTriggerRef} className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
             <SelectValue placeholder="Período" />
           </SelectTrigger>
           <SelectContent>
@@ -89,18 +109,32 @@ export function FinanceVersionLineRow({
               e.preventDefault();
               onSave();
             }
+            if (e.key === "Escape") {
+              e.preventDefault();
+              onCancel();
+            }
+            if (e.key === "Tab" && e.shiftKey) {
+              e.preventDefault();
+              onFocusPrevious();
+            }
             if (e.key === "Tab") {
+              e.preventDefault();
               onFocusNext();
             }
           }}
           disabled={readOnly || saving}
-          className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-right"
+          className={cn("h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-right", hasError && "border-red-400 focus-visible:ring-red-400")}
           inputMode="decimal"
         />
+        {cellError && (
+          <div className="mt-1 flex items-center gap-1 text-xs text-red-600">
+            <AlertCircle className="h-3.5 w-3.5" />{cellError}
+          </div>
+        )}
       </TableCell>
       <TableCell className="min-w-[180px]">
         <Select value={draft.department_id ?? "__none__"} onValueChange={(value) => onDraftChange({ ...draft, department_id: value === "__none__" ? null : value })} disabled={readOnly || saving}>
-          <SelectTrigger className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
+          <SelectTrigger ref={departmentTriggerRef} className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
             <SelectValue placeholder="Departamento" />
           </SelectTrigger>
           <SelectContent>
@@ -113,7 +147,7 @@ export function FinanceVersionLineRow({
       </TableCell>
       <TableCell className="min-w-[180px]">
         <Select value={draft.project_id ?? "__none__"} onValueChange={(value) => onDraftChange({ ...draft, project_id: value === "__none__" ? null : value })} disabled={readOnly || saving}>
-          <SelectTrigger className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
+          <SelectTrigger ref={projectTriggerRef} className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
             <SelectValue placeholder="Projeto" />
           </SelectTrigger>
           <SelectContent>
@@ -126,7 +160,7 @@ export function FinanceVersionLineRow({
       </TableCell>
       <TableCell className="min-w-[180px]">
         <Select value={draft.squad_id ?? "__none__"} onValueChange={(value) => onDraftChange({ ...draft, squad_id: value === "__none__" ? null : value })} disabled={readOnly || saving}>
-          <SelectTrigger className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
+          <SelectTrigger ref={squadTriggerRef} className="h-9 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-xs">
             <SelectValue placeholder="Squad" />
           </SelectTrigger>
           <SelectContent>

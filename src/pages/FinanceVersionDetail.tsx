@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Lock } from "lucide-react";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
 import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
@@ -31,6 +30,10 @@ function canEditRole(role: Role) {
   return role === "ADMIN" || role === "HEAD" || role === "MASTERADMIN";
 }
 
+function canSeeFinanceModule(role: Role) {
+  return role === "ADMIN" || role === "HEAD" || role === "MASTERADMIN";
+}
+
 export default function FinanceVersionDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -48,8 +51,17 @@ export default function FinanceVersionDetail() {
   const [drafts, setDrafts] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [savingLineId, setSavingLineId] = useState<string | null>(null);
+  const [editingLineId, setEditingLineId] = useState<string | null>(null);
+  const [errorLineId, setErrorLineId] = useState<string | null>(null);
+  const [pendingNewLineId, setPendingNewLineId] = useState<string | null>(null);
 
   const readOnly = version?.status === "locked" || !canEditRole(user?.role as Role);
+  const visibleDepartments = useMemo(() => {
+    if (user?.role === "HEAD") {
+      return departments.filter((department) => department.id === user.departmentId);
+    }
+    return departments;
+  }, [departments, user?.departmentId, user?.role]);
 
   async function load() {
     if (!id || !companyId) return;
@@ -97,6 +109,7 @@ export default function FinanceVersionDetail() {
   }, [searchParams, version?.id]);
 
   if (!user) return <Navigate to="/login" replace />;
+  if (user.role === "COLABORADOR") return <Navigate to="/" replace />;
   if (isLoading || loading || !version) {
     return <div className="grid min-h-[60vh] place-items-center px-4"><div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-6 py-4 text-sm text-muted-foreground">Carregando…</div></div>;
   }
@@ -112,6 +125,7 @@ export default function FinanceVersionDetail() {
   async function handleSaveLine(lineId: string) {
     if (!version || !drafts[lineId]) return;
     setSavingLineId(lineId);
+    setErrorLineId(null);
     const draft = drafts[lineId];
     const payload = {
       finance_account_id: draft.finance_account_id,
@@ -121,19 +135,54 @@ export default function FinanceVersionDetail() {
       squad_id: draft.squad_id,
       amount: Number(draft.amount || 0),
     };
-    const updated = lineId.startsWith("new-")
-      ? await createFinanceVersionLine(version.company_id, user.id, { finance_version_id: version.id, ...payload })
-      : await updateFinanceVersionLine(lineId, payload);
-    await load();
-    setSavingLineId(null);
-    toast({ title: "Linha salva", description: "As alterações foram sincronizadas." });
-    return updated;
+    const previousLines = lines;
+    const previousDrafts = drafts;
+    try {
+      if (lineId.startsWith("new-")) {
+        const tempLine = { id: lineId, company_id: version.company_id, finance_version_id: version.id, ...payload } as FinanceVersionLine;
+        setLines((current) => [tempLine, ...current]);
+        const created = await createFinanceVersionLine(version.company_id, user.id, { finance_version_id: version.id, ...payload });
+        setLines((current) => current.map((line) => (line.id === lineId ? created : line)));
+        setDrafts((current) => {
+          const next = { ...current };
+          delete next[lineId];
+          next[created.id] = {
+            finance_account_id: created.finance_account_id,
+            fiscal_period_id: created.fiscal_period_id,
+            department_id: created.department_id,
+            project_id: created.project_id,
+            squad_id: created.squad_id,
+            amount: String(created.amount),
+          };
+          return next;
+        });
+        setPendingNewLineId(created.id);
+        setEditingLineId(created.id);
+      } else {
+        const updated = await updateFinanceVersionLine(lineId, payload);
+        setLines((current) => current.map((line) => (line.id === lineId ? updated : line)));
+      }
+      toast({ title: "Linha salva", description: "As alterações foram sincronizadas." });
+    } catch {
+      setLines(previousLines);
+      setDrafts(previousDrafts);
+      setErrorLineId(lineId);
+      toast({ title: "Erro ao salvar", description: "Revise os campos destacados e tente novamente.", variant: "destructive" });
+    } finally {
+      setSavingLineId(null);
+    }
   }
 
   async function handleDeleteLine(lineId: string) {
-    await deleteFinanceVersionLine(lineId);
-    await load();
-    toast({ title: "Linha removida", description: "A linha foi excluída." });
+    const previousLines = lines;
+    setLines((current) => current.filter((line) => line.id !== lineId));
+    try {
+      await deleteFinanceVersionLine(lineId);
+      toast({ title: "Linha removida", description: "A linha foi excluída." });
+    } catch {
+      setLines(previousLines);
+      toast({ title: "Erro ao remover", description: "Não foi possível excluir a linha.", variant: "destructive" });
+    }
   }
 
   function handleAddLine() {
@@ -144,12 +193,52 @@ export default function FinanceVersionDetail() {
       [newId]: {
         finance_account_id: accounts[0]?.id ?? "",
         fiscal_period_id: periods[0]?.id ?? "",
-        department_id: null,
+        department_id: user?.role === "HEAD" ? user.departmentId ?? null : null,
+
         project_id: null,
         squad_id: null,
         amount: "0",
       },
     }));
+    setEditingLineId(newId);
+    setPendingNewLineId(newId);
+  }
+
+  function handleCancelLine(lineId: string) {
+    if (lineId.startsWith("new-")) {
+      setLines((current) => current.filter((line) => line.id !== lineId));
+      setDrafts((current) => {
+        const next = { ...current };
+        delete next[lineId];
+        return next;
+      });
+      setEditingLineId(null);
+      setPendingNewLineId(null);
+      return;
+    }
+    const line = lines.find((item) => item.id === lineId);
+    if (!line) return;
+    setDrafts((current) => ({
+      ...current,
+      [lineId]: {
+        finance_account_id: line.finance_account_id,
+        fiscal_period_id: line.fiscal_period_id,
+        department_id: line.department_id,
+        project_id: line.project_id,
+        squad_id: line.squad_id,
+        amount: String(line.amount),
+      },
+    }));
+    setEditingLineId(null);
+  }
+
+  function handleMoveLine(lineId: string, direction: "next" | "previous") {
+    const index = lines.findIndex((line) => line.id === lineId);
+    if (index === -1) return;
+    const nextIndex = direction === "next" ? index + 1 : index - 1;
+    const nextLine = lines[nextIndex];
+    if (!nextLine) return;
+    setEditingLineId(nextLine.id);
   }
 
   return (
@@ -165,17 +254,22 @@ export default function FinanceVersionDetail() {
         )}
 
         <FinanceVersionLinesTable
-          lines={lines}
+          lines={visibleDepartments.length ? lines.filter((line) => !line.department_id || visibleDepartments.some((department) => department.id === line.department_id)) : lines}
           drafts={drafts}
           onDraftChange={(lineId, next) => setDrafts((current) => ({ ...current, [lineId]: next }))}
           onSaveLine={handleSaveLine}
           onDeleteLine={handleDeleteLine}
           onAddLine={handleAddLine}
+          onCancelLine={handleCancelLine}
           readOnly={readOnly}
           savingLineId={savingLineId}
+          editingLineId={editingLineId ?? pendingNewLineId}
+          errorLineId={errorLineId}
+          onEditLine={setEditingLineId}
+          onMoveLine={handleMoveLine}
           accounts={accounts}
           periods={periods}
-          departments={departments}
+          departments={visibleDepartments}
           projects={projects}
           squads={squads}
         />
