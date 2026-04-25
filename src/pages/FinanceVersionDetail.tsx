@@ -22,15 +22,9 @@ import {
   type FinanceVersion,
   type FinanceVersionLine,
 } from "@/lib/financeDb";
-import { supabase } from "@/integrations/supabase/client";
 import type { Role } from "@/lib/domain";
-import { Badge } from "@/components/ui/badge";
 
 function canEditRole(role: Role) {
-  return role === "ADMIN" || role === "HEAD" || role === "MASTERADMIN";
-}
-
-function canSeeFinanceModule(role: Role) {
   return role === "ADMIN" || role === "HEAD" || role === "MASTERADMIN";
 }
 
@@ -58,10 +52,11 @@ export default function FinanceVersionDetail() {
   const readOnly = version?.status === "locked" || !canEditRole(user?.role as Role);
   const visibleDepartments = useMemo(() => {
     if (user?.role === "HEAD") {
+      console.info("[FINANCE_QA] head_scope_applied", { role: user.role, companyId, departmentId: user.departmentId, action: "apply_head_scope" });
       return departments.filter((department) => department.id === user.departmentId);
     }
     return departments;
-  }, [departments, user?.departmentId, user?.role]);
+  }, [departments, user?.departmentId, user?.role, companyId]);
 
   async function load() {
     if (!id || !companyId) return;
@@ -99,6 +94,7 @@ export default function FinanceVersionDetail() {
 
   useEffect(() => {
     if (!companyId || !user?.id) return;
+    console.info("[FINANCE_QA] version_detail_opened", { role: user.role, companyId, versionId: id, action: "open_version_detail" });
     void load();
   }, [companyId, user?.id, id]);
 
@@ -109,7 +105,10 @@ export default function FinanceVersionDetail() {
   }, [searchParams, version?.id]);
 
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === "COLABORADOR") return <Navigate to="/" replace />;
+  if (user.role === "COLABORADOR") {
+    console.warn("[FINANCE_QA] access_denied_colaborador", { role: user.role, companyId, versionId: id, action: "deny_finance_access" });
+    return <Navigate to="/" replace />;
+  }
   if (isLoading || loading || !version) {
     return <div className="grid min-h-[60vh] place-items-center px-4"><div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-white px-6 py-4 text-sm text-muted-foreground">Carregando…</div></div>;
   }
@@ -117,13 +116,21 @@ export default function FinanceVersionDetail() {
 
   async function handleLock() {
     if (!version) return;
-    const locked = await lockFinanceVersion(version.id);
-    setVersion(locked);
-    toast({ title: "Versão bloqueada", description: "A versão agora está somente leitura." });
+    console.info("[FINANCE_QA] version_lock_started", { role: user?.role, companyId, versionId: version.id, action: "lock_version" });
+    try {
+      const locked = await lockFinanceVersion(version.id);
+      setVersion(locked);
+      console.info("[FINANCE_QA] version_locked", { role: user?.role, companyId, versionId: version.id, action: "lock_version" });
+      toast({ title: "Versão bloqueada", description: "A versão agora está somente leitura." });
+    } catch (error) {
+      console.warn("[FINANCE_QA] version_lock_failed", { role: user?.role, companyId, versionId: version.id, action: "lock_version", error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
   }
 
   async function handleSaveLine(lineId: string) {
     if (!version || !drafts[lineId]) return;
+    console.info("[FINANCE_QA] line_save_started", { role: user?.role, companyId, versionId: version.id, lineId, departmentId: drafts[lineId]?.department_id, action: "save_line" });
     setSavingLineId(lineId);
     setErrorLineId(null);
     const draft = drafts[lineId];
@@ -158,15 +165,18 @@ export default function FinanceVersionDetail() {
         });
         setPendingNewLineId(created.id);
         setEditingLineId(created.id);
+        console.info("[FINANCE_QA] line_created", { role: user?.role, companyId, versionId: version.id, lineId: created.id, departmentId: created.department_id, action: "create_line" });
       } else {
         const updated = await updateFinanceVersionLine(lineId, payload);
         setLines((current) => current.map((line) => (line.id === lineId ? updated : line)));
+        console.info("[FINANCE_QA] line_saved", { role: user?.role, companyId, versionId: version.id, lineId, departmentId: payload.department_id, action: "save_line" });
       }
       toast({ title: "Linha salva", description: "As alterações foram sincronizadas." });
-    } catch {
+    } catch (error) {
       setLines(previousLines);
       setDrafts(previousDrafts);
       setErrorLineId(lineId);
+      console.warn("[FINANCE_QA] line_save_failed", { role: user?.role, companyId, versionId: version.id, lineId, departmentId: payload.department_id, action: "save_line", error: error instanceof Error ? error.message : String(error) });
       toast({ title: "Erro ao salvar", description: "Revise os campos destacados e tente novamente.", variant: "destructive" });
     } finally {
       setSavingLineId(null);
@@ -174,18 +184,22 @@ export default function FinanceVersionDetail() {
   }
 
   async function handleDeleteLine(lineId: string) {
+    console.info("[FINANCE_QA] line_delete_started", { role: user?.role, companyId, versionId: version?.id, lineId, action: "delete_line" });
     const previousLines = lines;
     setLines((current) => current.filter((line) => line.id !== lineId));
     try {
       await deleteFinanceVersionLine(lineId);
+      console.info("[FINANCE_QA] line_deleted", { role: user?.role, companyId, versionId: version?.id, lineId, action: "delete_line" });
       toast({ title: "Linha removida", description: "A linha foi excluída." });
-    } catch {
+    } catch (error) {
       setLines(previousLines);
+      console.warn("[FINANCE_QA] line_delete_failed", { role: user?.role, companyId, versionId: version?.id, lineId, action: "delete_line", error: error instanceof Error ? error.message : String(error) });
       toast({ title: "Erro ao remover", description: "Não foi possível excluir a linha.", variant: "destructive" });
     }
   }
 
   function handleAddLine() {
+    console.info("[FINANCE_QA] line_create_started", { role: user?.role, companyId, versionId: version?.id, departmentId: user?.departmentId, action: "create_line" });
     const newId = `new-${crypto.randomUUID()}`;
     setLines((current) => [{ id: newId } as FinanceVersionLine, ...current]);
     setDrafts((current) => ({
@@ -194,7 +208,6 @@ export default function FinanceVersionDetail() {
         finance_account_id: accounts[0]?.id ?? "",
         fiscal_period_id: periods[0]?.id ?? "",
         department_id: user?.role === "HEAD" ? user.departmentId ?? null : null,
-
         project_id: null,
         squad_id: null,
         amount: "0",

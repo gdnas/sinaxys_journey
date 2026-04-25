@@ -43,6 +43,7 @@ export default function FinanceVersions() {
 
   useEffect(() => {
     if (!companyId || !user?.id) return;
+    console.info("[FINANCE_QA] versions_page_opened", { role: user.role, companyId, action: "open_versions_page" });
     void (async () => {
       await seedFinanceFiscalPeriods(companyId);
       await seedFinanceScenarios(companyId, user.id);
@@ -58,18 +59,26 @@ export default function FinanceVersions() {
 
   async function handleCreateVersion() {
     if (!companyId || !user || !activeScenarioId) return;
+    console.info("[FINANCE_QA] version_create_started", { role: user.role, companyId, action: "create_version" });
     setCreating(true);
-    const created = await createFinanceVersion(companyId, user.id, {
-      scenario_id: activeScenarioId,
-      name: `Versão ${new Date().getFullYear()}`,
-      period_type: "month",
-      fiscal_year: new Date().getFullYear(),
-      fiscal_quarter: null,
-      fiscal_month: new Date().getMonth() + 1,
-    });
-    await load();
-    navigate(`/finance/versions/${created.id}`);
-    setCreating(false);
+    try {
+      const created = await createFinanceVersion(companyId, user.id, {
+        scenario_id: activeScenarioId,
+        name: `Versão ${new Date().getFullYear()}`,
+        period_type: "month",
+        fiscal_year: new Date().getFullYear(),
+        fiscal_quarter: null,
+        fiscal_month: new Date().getMonth() + 1,
+      });
+      console.info("[FINANCE_QA] version_created", { role: user.role, companyId, versionId: created.id, action: "create_version" });
+      await load();
+      navigate(`/finance/versions/${created.id}`);
+    } catch (error) {
+      console.warn("[FINANCE_QA] version_create_failed", { role: user.role, companyId, action: "create_version", error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function handleDeleteVersion(id: string) {
