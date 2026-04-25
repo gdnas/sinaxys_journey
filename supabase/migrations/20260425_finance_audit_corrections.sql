@@ -14,9 +14,13 @@ alter table public.finance_accounts
   alter column account_type set not null;
 
 alter table public.finance_accounts
+  drop constraint if exists finance_accounts_account_type_check;
+alter table public.finance_accounts
   add constraint finance_accounts_account_type_check
   check (account_type in ('revenue', 'cogs', 'opex', 'capex', 'other'));
 
+alter table public.finance_accounts
+  drop constraint if exists finance_accounts_parent_account_id_fkey;
 alter table public.finance_accounts
   add constraint finance_accounts_parent_account_id_fkey
   foreign key (parent_account_id) references public.finance_accounts(id) on delete set null;
