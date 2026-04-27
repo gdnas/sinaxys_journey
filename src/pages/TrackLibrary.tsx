@@ -59,7 +59,9 @@ export default function TrackLibrary() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const companyId = user?.companyId;
+  console.log('USER DEBUG', user)
+
+  const companyId = user?.companyId || (user as any)?.company_id;
   const isMasterAdmin = user?.role === "MASTERADMIN";
   const canRender = !!user && !!companyId && !isMasterAdmin;
   const canCreateTrack = user?.role === "HEAD";
@@ -168,14 +170,6 @@ export default function TrackLibrary() {
       );
     });
   }, [profiles, delegateUserQuery, deptById]);
-
-  if (!canRender) {
-    return (
-      <div className="rounded-3xl border bg-white p-6 text-sm text-muted-foreground">
-        Trilha de conhecimento indisponível.
-      </div>
-    );
-  }
 
   return (
     <div className="grid gap-6">
