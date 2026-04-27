@@ -18,6 +18,11 @@ interface UserAssetsTabProps {
   currentUserId?: string;
 }
 
+function isValidUuid(value: string | null | undefined) {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 export function UserAssetsTab({
   userId,
   companyId,
@@ -29,6 +34,8 @@ export function UserAssetsTab({
   const [currentAssets, setCurrentAssets] = useState<UserAsset[]>([]);
   const [historyAssets, setHistoryAssets] = useState<UserAsset[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const hasValidUserId = isValidUuid(userId);
 
   // Verificar permissão
   const canView =
@@ -43,8 +50,13 @@ export function UserAssetsTab({
       return;
     }
 
+    if (!hasValidUserId) {
+      setLoading(false);
+      return;
+    }
+
     loadAssets();
-  }, [userId, companyId, canView]);
+  }, [userId, companyId, canView, hasValidUserId]);
 
   async function loadAssets() {
     try {
@@ -76,6 +88,14 @@ export function UserAssetsTab({
         <p className="text-sm text-muted-foreground">
           Você não tem permissão para visualizar os ativos deste usuário.
         </p>
+      </div>
+    );
+  }
+
+  if (!hasValidUserId) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-sm text-muted-foreground">Usuário ainda não carregado.</p>
       </div>
     );
   }

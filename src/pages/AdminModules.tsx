@@ -19,7 +19,6 @@ import {
   Megaphone,
   Box,
   Users2,
-  LineChart,
 } from "lucide-react";
 
 interface ModuleSectionProps {
@@ -119,12 +118,6 @@ export default function AdminModules() {
   const { data: squadIntelligenceEnabled = true, refetch: refetchSquadIntelligence } = useQuery({
     queryKey: ["company-module", companyId, "SQUAD_INTELLIGENCE"],
     queryFn: () => isCompanyModuleEnabled(String(companyId), "SQUAD_INTELLIGENCE"),
-    enabled: queryEnabled,
-  });
-
-  const { data: financeEnabled = true, refetch: refetchFinance } = useQuery({
-    queryKey: ["company-module", companyId, "FINANCE"],
-    queryFn: () => isCompanyModuleEnabled(String(companyId), "FINANCE"),
     enabled: queryEnabled,
   });
 
@@ -263,19 +256,6 @@ export default function AdminModules() {
             if (!companyId) return;
             await setCompanyModuleEnabled(companyId, "COSTS", v);
             await refetchCosts();
-            toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
-          }}
-        />
-
-        <ModuleToggle
-          icon={<LineChart className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
-          title="Finance"
-          description="Planejamento financeiro e performance. Orçamento, forecast, margem e análise gerencial conectados à execução."
-          checked={financeEnabled}
-          onChange={async (v) => {
-            if (!companyId) return;
-            await setCompanyModuleEnabled(companyId, "FINANCE", v);
-            await refetchFinance();
             toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
           }}
         />

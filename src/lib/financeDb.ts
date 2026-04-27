@@ -1,671 +1,200 @@
 import { supabase } from "@/integrations/supabase/client";
 
-export type FinanceFiscalPeriodType = "month" | "quarter" | "year";
-export type FinanceVersionStatus = "draft" | "locked";
+export type UserFinancialRecipientType = "PF" | "PJ" | (string & {});
 
-export type FinanceFiscalPeriod = {
-  id: string;
-  company_id: string;
-  period_type: FinanceFiscalPeriodType;
-  fiscal_year: number;
-  fiscal_quarter: number | null;
-  fiscal_month: number | null;
-  label: string;
-  start_date: string;
-  end_date: string;
-  is_closed: boolean;
+export type UserFinancialProfile = {
+  user_id: string;
+  company_id: string | null;
+  recipient_type: UserFinancialRecipientType;
+  destination_account: string | null;
+  pix_key: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export type FinanceScenarioStatus = "draft" | "active" | "archived";
-
-export type FinanceScenario = {
+export type CompanyFinanceSettings = {
   id: string;
   company_id: string;
-  name: string;
+  legal_name: string | null;
+  cnpj: string | null;
+  bank_name: string | null;
+  agency: string | null;
+  account_number: string | null;
+  account_holder: string | null;
+  pix_key: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type UserInvoiceStatus = "ENVIADA" | "EM_ANALISE" | "APROVADA" | "PAGA" | "REJEITADA" | (string & {});
+
+export type UserInvoice = {
+  id: string;
+  company_id: string | null;
+  user_id: string;
+  invoice_number: string | null;
+  issue_date: string | null; // date
+  amount_brl: number | null;
   description: string | null;
-  status: FinanceScenarioStatus;
-  base_scenario_id: string | null;
-  created_by_user_id: string;
+  file_path: string;
+  file_name: string | null;
+  mime_type: string | null;
+  status: UserInvoiceStatus;
   created_at: string;
   updated_at: string;
 };
 
-export type FinanceVersion = {
-  id: string;
-  company_id: string;
-  scenario_id: string;
-  name: string;
-  status: FinanceVersionStatus;
-  period_type: FinanceFiscalPeriodType;
-  fiscal_year: number;
-  fiscal_quarter: number | null;
-  fiscal_month: number | null;
-  created_by_user_id: string;
-  locked_at: string | null;
-  created_at: string;
-  updated_at: string;
-  scenario?: FinanceScenario | null;
-  line_count?: number;
-};
+export const FINANCE_INVOICES_BUCKET = "finance-invoices";
 
-export type FinanceVersionLine = {
-  id: string;
-  company_id: string;
-  finance_version_id: string;
-  finance_account_id: string;
-  fiscal_period_id: string;
-  department_id: string | null;
-  project_id: string | null;
-  squad_id: string | null;
-  amount: number;
-  created_by_user_id: string;
-  created_at: string;
-  updated_at: string;
-  account?: { id: string; name: string; code?: string | null } | null;
-  fiscal_period?: FinanceFiscalPeriod | null;
-  department?: { id: string; name: string } | null;
-  project?: { id: string; name: string } | null;
-  squad?: { id: string; name: string } | null;
-};
-
-export type FinanceScenarioAssumption = {
-  id: string;
-  company_id: string;
-  scenario_id: string;
-  key: string;
-  label: string;
-  value_number: number | null;
-  value_text: string | null;
-  value_json: Record<string, unknown> | null;
-  unit: string | null;
-  applies_to_account_id: string | null;
-  applies_to_department_id: string | null;
-  applies_to_project_id: string | null;
-  applies_to_squad_id: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
-export async function trackFinanceModuleEnabled(companyId: string, userId: string) {
-  const { error } = await supabase.from("audit_logs").insert({
-    company_id: companyId,
-    actor_user_id: userId,
-    action: "finance_module_enabled",
-    meta: { company_id: companyId, user_id: userId, enabled_at: new Date().toISOString() },
-  });
-
-  if (error) throw error;
+function sanitizeFilename(name: string) {
+  return name
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-zA-Z0-9._-]/g, "");
 }
 
-function monthLabel(date: Date) {
-  return new Intl.DateTimeFormat("en-US", { month: "short" }).format(date).replace(".", "");
-}
-
-function toIsoDate(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function startOfMonth(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-}
-
-function endOfMonth(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
-}
-
-function startOfQuarter(year: number, quarter: number) {
-  return new Date(Date.UTC(year, (quarter - 1) * 3, 1));
-}
-
-function endOfQuarter(year: number, quarter: number) {
-  return new Date(Date.UTC(year, quarter * 3, 0));
-}
-
-function startOfYear(year: number) {
-  return new Date(Date.UTC(year, 0, 1));
-}
-
-function endOfYear(year: number) {
-  return new Date(Date.UTC(year, 11, 31));
-}
-
-function buildMonthPeriods(companyId: string, baseDate: Date) {
-  const periods = [];
-  for (let offset = -12; offset < 12; offset += 1) {
-    const date = new Date(Date.UTC(baseDate.getUTCFullYear(), baseDate.getUTCMonth() + offset, 1));
-    const year = date.getUTCFullYear();
-    const month = date.getUTCMonth() + 1;
-    const quarter = Math.floor((month - 1) / 3) + 1;
-
-    periods.push({
-      company_id: companyId,
-      period_type: "month" as const,
-      fiscal_year: year,
-      fiscal_quarter: quarter,
-      fiscal_month: month,
-      label: `${monthLabel(date)} ${year}`,
-      start_date: toIsoDate(startOfMonth(date)),
-      end_date: toIsoDate(endOfMonth(date)),
-      is_closed: false,
-    });
-  }
-  return periods;
-}
-
-function buildQuarterPeriods(companyId: string, baseYear: number) {
-  const periods = [];
-  for (let offset = -2; offset < 6; offset += 1) {
-    const year = baseYear + Math.floor(offset / 4);
-    const quarter = ((offset % 4) + 4) % 4 + 1;
-    const start = startOfQuarter(year, quarter);
-    const end = endOfQuarter(year, quarter);
-
-    periods.push({
-      company_id: companyId,
-      period_type: "quarter" as const,
-      fiscal_year: year,
-      fiscal_quarter: quarter,
-      fiscal_month: null,
-      label: `Q${quarter} ${year}`,
-      start_date: toIsoDate(start),
-      end_date: toIsoDate(end),
-      is_closed: false,
-    });
-  }
-  return periods;
-}
-
-function buildYearPeriods(companyId: string, baseYear: number) {
-  const periods = [];
-  for (let offset = -1; offset < 1; offset += 1) {
-    const year = baseYear + offset;
-    periods.push({
-      company_id: companyId,
-      period_type: "year" as const,
-      fiscal_year: year,
-      fiscal_quarter: null,
-      fiscal_month: null,
-      label: `${year}`,
-      start_date: toIsoDate(startOfYear(year)),
-      end_date: toIsoDate(endOfYear(year)),
-      is_closed: false,
-    });
-  }
-  return periods;
-}
-
-export async function seedFinanceFiscalPeriods(companyId: string) {
-  const now = new Date();
-  const baseYear = now.getUTCFullYear();
-
-  const periods = [
-    ...buildMonthPeriods(companyId, now),
-    ...buildQuarterPeriods(companyId, baseYear),
-    ...buildYearPeriods(companyId, baseYear),
-  ];
-
-  const { error } = await supabase
-    .from("finance_fiscal_periods")
-    .upsert(periods, { onConflict: "company_id,period_type,fiscal_year,fiscal_quarter,fiscal_month" });
-
-  if (error) throw error;
-}
-
-export async function getCurrentPeriod(companyId: string) {
-  const today = toIsoDate(new Date());
+export async function getUserFinancialProfile(userId: string) {
   const { data, error } = await supabase
-    .from("finance_fiscal_periods")
+    .from("user_financial_profiles")
     .select("*")
-    .eq("company_id", companyId)
-    .lte("start_date", today)
-    .gte("end_date", today)
-    .order("period_type", { ascending: true })
-    .limit(1);
-
+    .eq("user_id", userId)
+    .maybeSingle();
   if (error) throw error;
-  return (data?.[0] ?? null) as FinanceFiscalPeriod | null;
+  return (data ?? null) as UserFinancialProfile | null;
 }
 
-export async function getPeriodByDate(companyId: string, date: string) {
+export async function upsertUserFinancialProfile(params: {
+  userId: string;
+  companyId: string | null;
+  recipientType: UserFinancialRecipientType;
+  destinationAccount: string | null;
+  pixKey: string | null;
+}) {
   const { data, error } = await supabase
-    .from("finance_fiscal_periods")
-    .select("*")
-    .eq("company_id", companyId)
-    .lte("start_date", date)
-    .gte("end_date", date)
-    .order("period_type", { ascending: true })
-    .limit(1);
-
-  if (error) throw error;
-  return (data?.[0] ?? null) as FinanceFiscalPeriod | null;
-}
-
-export async function getPeriodRange(companyId: string, start: string, end: string) {
-  const { data, error } = await supabase
-    .from("finance_fiscal_periods")
-    .select("*")
-    .eq("company_id", companyId)
-    .lte("start_date", end)
-    .gte("end_date", start)
-    .order("start_date", { ascending: true });
-
-  if (error) throw error;
-  return (data ?? []) as FinanceFiscalPeriod[];
-}
-
-export async function seedFinanceScenarios(companyId: string, userId: string) {
-  const { data: existing, error: existingError } = await supabase
-    .from("finance_scenarios")
-    .select("id,name")
-    .eq("company_id", companyId);
-
-  if (existingError) throw existingError;
-
-  const existingNames = new Set((existing ?? []).map((item) => item.name));
-
-  const scenariosToInsert = [
-    {
-      company_id: companyId,
-      name: "Base",
-      description: "Cenário principal da empresa.",
-      status: "active" as const,
-      base_scenario_id: null,
-      created_by_user_id: userId,
-    },
-    {
-      company_id: companyId,
-      name: "Conservador",
-      description: "Premissas mais prudentes para simulação.",
-      status: "draft" as const,
-      base_scenario_id: null,
-      created_by_user_id: userId,
-    },
-    {
-      company_id: companyId,
-      name: "Agressivo",
-      description: "Premissas mais otimistas para simulação.",
-      status: "draft" as const,
-      base_scenario_id: null,
-      created_by_user_id: userId,
-    },
-  ].filter((item) => !existingNames.has(item.name));
-
-  if (scenariosToInsert.length) {
-    const { error } = await supabase.from("finance_scenarios").insert(scenariosToInsert);
-    if (error) throw error;
-  }
-
-  const { data: scenarios, error: scenarioError } = await supabase
-    .from("finance_scenarios")
-    .select("*")
-    .eq("company_id", companyId)
-    .in("name", ["Base", "Conservador", "Agressivo"]);
-
-  if (scenarioError) throw scenarioError;
-
-  const baseScenario = scenarios?.find((item) => item.name === "Base");
-  const conservativeScenario = scenarios?.find((item) => item.name === "Conservador");
-  const aggressiveScenario = scenarios?.find((item) => item.name === "Agressivo");
-
-  if (!baseScenario || !conservativeScenario || !aggressiveScenario) return;
-
-  await supabase
-    .from("finance_scenarios")
-    .update({ base_scenario_id: baseScenario.id })
-    .eq("company_id", companyId)
-    .in("name", ["Conservador", "Agressivo"]);
-
-  const { data: existingAssumptions, error: assumptionsError } = await supabase
-    .from("finance_scenario_assumptions")
-    .select("scenario_id,key,applies_to_account_id,applies_to_department_id,applies_to_project_id,applies_to_squad_id")
-    .eq("company_id", companyId)
-    .eq("key", "growth_rate");
-
-  if (assumptionsError) throw assumptionsError;
-
-  const existingAssumptionKeys = new Set(
-    (existingAssumptions ?? []).map(
-      (item) =>
-        `${item.scenario_id}:${item.key}:${item.applies_to_account_id ?? ""}:${item.applies_to_department_id ?? ""}:${item.applies_to_project_id ?? ""}:${item.applies_to_squad_id ?? ""}`,
-    ),
-  );
-
-  const assumptionsToInsert = [
-    {
-      company_id: companyId,
-      scenario_id: baseScenario.id,
-      key: "growth_rate",
-      label: "Taxa de crescimento",
-      value_number: 0,
-      value_text: null,
-      value_json: null,
-      unit: "%",
-      applies_to_account_id: null,
-      applies_to_department_id: null,
-      applies_to_project_id: null,
-      applies_to_squad_id: null,
-    },
-    {
-      company_id: companyId,
-      scenario_id: conservativeScenario.id,
-      key: "growth_rate",
-      label: "Taxa de crescimento",
-      value_number: -5,
-      value_text: null,
-      value_json: null,
-      unit: "%",
-      applies_to_account_id: null,
-      applies_to_department_id: null,
-      applies_to_project_id: null,
-      applies_to_squad_id: null,
-    },
-    {
-      company_id: companyId,
-      scenario_id: aggressiveScenario.id,
-      key: "growth_rate",
-      label: "Taxa de crescimento",
-      value_number: 12,
-      value_text: null,
-      value_json: null,
-      unit: "%",
-      applies_to_account_id: null,
-      applies_to_department_id: null,
-      applies_to_project_id: null,
-      applies_to_squad_id: null,
-    },
-  ].filter(
-    (item) =>
-      !existingAssumptionKeys.has(
-        `${item.scenario_id}:${item.key}:${item.applies_to_account_id ?? ""}:${item.applies_to_department_id ?? ""}:${item.applies_to_project_id ?? ""}:${item.applies_to_squad_id ?? ""}`,
-      ),
-  );
-
-  if (assumptionsToInsert.length) {
-    const { error } = await supabase.from("finance_scenario_assumptions").insert(assumptionsToInsert);
-    if (error) throw error;
-  }
-}
-
-export async function listFinanceScenarios(companyId: string) {
-  const { data, error } = await supabase
-    .from("finance_scenarios")
-    .select("*")
-    .eq("company_id", companyId)
-    .order("created_at", { ascending: true });
-
-  if (error) throw error;
-  return (data ?? []) as FinanceScenario[];
-}
-
-export async function listFinanceScenarioAssumptions(companyId: string, scenarioId: string) {
-  const { data, error } = await supabase
-    .from("finance_scenario_assumptions")
-    .select("*")
-    .eq("company_id", companyId)
-    .eq("scenario_id", scenarioId)
-    .order("created_at", { ascending: true });
-
-  if (error) throw error;
-  return (data ?? []) as FinanceScenarioAssumption[];
-}
-
-export async function createFinanceScenario(companyId: string, userId: string, name: string, description: string | null, baseScenarioId: string | null) {
-  const { data, error } = await supabase
-    .from("finance_scenarios")
-    .insert({
-      company_id: companyId,
-      name,
-      description,
-      status: "draft",
-      base_scenario_id: baseScenarioId,
-      created_by_user_id: userId,
-    })
-    .select("*")
-    .single();
-
-  if (error) throw error;
-  return data as FinanceScenario;
-}
-
-export async function updateFinanceScenario(
-  scenarioId: string,
-  payload: Partial<Pick<FinanceScenario, "name" | "description" | "status" | "base_scenario_id">>,
-) {
-  const { data, error } = await supabase
-    .from("finance_scenarios")
-    .update(payload)
-    .eq("id", scenarioId)
-    .select("*")
-    .single();
-
-  if (error) throw error;
-  return data as FinanceScenario;
-}
-
-export async function duplicateFinanceScenario(companyId: string, userId: string, scenarioId: string) {
-  const { data: source, error: sourceError } = await supabase
-    .from("finance_scenarios")
-    .select("*")
-    .eq("id", scenarioId)
-    .single();
-
-  if (sourceError) throw sourceError;
-
-  const duplicated = await createFinanceScenario(companyId, userId, `${source.name} - Cópia`, source.description, source.id);
-
-  const assumptions = await listFinanceScenarioAssumptions(companyId, scenarioId);
-
-  if (assumptions.length) {
-    const { error } = await supabase.from("finance_scenario_assumptions").insert(
-      assumptions.map((item) => ({
-        company_id: companyId,
-        scenario_id: duplicated.id,
-        key: item.key,
-        label: item.label,
-        value_number: item.value_number,
-        value_text: item.value_text,
-        value_json: item.value_json,
-        unit: item.unit,
-        applies_to_account_id: item.applies_to_account_id,
-        applies_to_department_id: item.applies_to_department_id,
-        applies_to_project_id: item.applies_to_project_id,
-        applies_to_squad_id: item.applies_to_squad_id,
-      })),
-    );
-
-    if (error) throw error;
-  }
-
-  return duplicated;
-}
-
-export async function upsertFinanceScenarioAssumption(
-  companyId: string,
-  scenarioId: string,
-  payload: Omit<FinanceScenarioAssumption, "id" | "company_id" | "scenario_id" | "created_at" | "updated_at">,
-) {
-  const { data, error } = await supabase
-    .from("finance_scenario_assumptions")
+    .from("user_financial_profiles")
     .upsert(
       {
-        company_id: companyId,
-        scenario_id: scenarioId,
-        ...payload,
+        user_id: params.userId,
+        company_id: params.companyId,
+        recipient_type: params.recipientType,
+        destination_account: params.destinationAccount,
+        pix_key: params.pixKey,
+        updated_at: new Date().toISOString(),
       },
-      {
-        onConflict: "company_id,scenario_id,key,applies_to_account_id,applies_to_department_id,applies_to_project_id,applies_to_squad_id",
-      },
+      { onConflict: "user_id" },
     )
     .select("*")
     .single();
 
   if (error) throw error;
-  return data as FinanceScenarioAssumption;
+  return data as any as UserFinancialProfile;
 }
 
-export async function deleteFinanceScenarioAssumption(assumptionId: string) {
-  const { error } = await supabase.from("finance_scenario_assumptions").delete().eq("id", assumptionId);
+export async function getCompanyFinanceSettings(companyId: string) {
+  const { data, error } = await supabase
+    .from("company_finance_settings")
+    .select("*")
+    .eq("company_id", companyId)
+    .maybeSingle();
   if (error) throw error;
+  return (data ?? null) as CompanyFinanceSettings | null;
 }
 
-export async function activateFinanceScenario(scenarioId: string) {
-  const { data: scenario, error: scenarioError } = await supabase
-    .from("finance_scenarios")
-    .select("id,company_id")
-    .eq("id", scenarioId)
-    .single();
-
-  if (scenarioError) throw scenarioError;
-
-  const { error: deactivateError } = await supabase
-    .from("finance_scenarios")
-    .update({ status: "archived" })
-    .eq("company_id", scenario.company_id)
-    .neq("id", scenarioId);
-
-  if (deactivateError) throw deactivateError;
+export async function upsertCompanyFinanceSettings(params: {
+  companyId: string;
+  patch: Partial<Omit<CompanyFinanceSettings, "id" | "company_id" | "created_at" | "updated_at">>;
+}) {
+  const payload = {
+    company_id: params.companyId,
+    ...params.patch,
+    updated_at: new Date().toISOString(),
+  };
 
   const { data, error } = await supabase
-    .from("finance_scenarios")
-    .update({ status: "active" })
-    .eq("id", scenarioId)
+    .from("company_finance_settings")
+    .upsert(payload, { onConflict: "company_id" })
     .select("*")
     .single();
 
   if (error) throw error;
-  return data as FinanceScenario;
+  return data as any as CompanyFinanceSettings;
 }
 
-export async function listFinanceVersions(companyId: string) {
-  const { data, error } = await supabase
-    .from("finance_versions")
-    .select("*, scenario:finance_scenarios(*)")
-    .eq("company_id", companyId)
-    .order("created_at", { ascending: false });
+export async function listUserInvoices(params: { userId: string; companyId?: string | null }) {
+  let q = supabase.from("user_invoices").select("*").eq("user_id", params.userId);
+  if (params.companyId) q = q.eq("company_id", params.companyId);
 
+  const { data, error } = await q.order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []) as FinanceVersion[];
+  return (data ?? []) as UserInvoice[];
 }
 
-export async function getFinanceVersion(versionId: string) {
+export async function createUserInvoice(params: {
+  id: string;
+  userId: string;
+  companyId: string | null;
+  invoiceNumber: string | null;
+  issueDate: string | null; // YYYY-MM-DD
+  amountBRL: number | null;
+  description: string | null;
+  filePath: string;
+  fileName: string;
+  mimeType: string | null;
+}) {
   const { data, error } = await supabase
-    .from("finance_versions")
-    .select("*, scenario:finance_scenarios(*)")
-    .eq("id", versionId)
-    .single();
-
-  if (error) throw error;
-  return data as FinanceVersion;
-}
-
-export async function createFinanceVersion(companyId: string, userId: string, payload: Pick<FinanceVersion, "scenario_id" | "name" | "period_type" | "fiscal_year" | "fiscal_quarter" | "fiscal_month">) {
-  const { data, error } = await supabase
-    .from("finance_versions")
+    .from("user_invoices")
     .insert({
-      company_id: companyId,
-      created_by_user_id: userId,
-      status: "draft",
-      ...payload,
+      id: params.id,
+      user_id: params.userId,
+      company_id: params.companyId,
+      invoice_number: params.invoiceNumber,
+      issue_date: params.issueDate,
+      amount_brl: params.amountBRL,
+      description: params.description,
+      file_path: params.filePath,
+      file_name: params.fileName,
+      mime_type: params.mimeType,
+      status: "ENVIADA",
+      updated_at: new Date().toISOString(),
     })
-    .select("*, scenario:finance_scenarios(*)")
+    .select("*")
     .single();
-
   if (error) throw error;
-  return data as FinanceVersion;
+  return data as any as UserInvoice;
 }
 
-export async function updateFinanceVersion(versionId: string, payload: Partial<Pick<FinanceVersion, "name" | "status" | "scenario_id" | "period_type" | "fiscal_year" | "fiscal_quarter" | "fiscal_month">>) {
-  const { data, error } = await supabase
-    .from("finance_versions")
-    .update(payload)
-    .eq("id", versionId)
-    .select("*, scenario:finance_scenarios(*)")
-    .single();
-
-  if (error) throw error;
-  return data as FinanceVersion;
-}
-
-export async function lockFinanceVersion(versionId: string) {
-  return updateFinanceVersion(versionId, { status: "locked" });
-}
-
-export async function deleteFinanceVersion(versionId: string) {
-  const { error } = await supabase.from("finance_versions").delete().eq("id", versionId);
+export async function deleteUserInvoice(id: string) {
+  const { error } = await supabase.from("user_invoices").delete().eq("id", id);
   if (error) throw error;
 }
 
-export async function listFinanceVersionLines(versionId: string) {
-  const { data, error } = await supabase
-    .from("finance_version_lines")
-    .select("*, account:finance_accounts(*), fiscal_period:finance_fiscal_periods(*), department:departments(*), project:projects(*), squad:squads(*)")
-    .eq("finance_version_id", versionId)
-    .order("created_at", { ascending: true });
+export async function uploadInvoiceFile(params: { userId: string; invoiceId: string; file: File }) {
+  const safeName = sanitizeFilename(params.file.name) || `arquivo-${Date.now()}`;
+  const path = `${params.userId}/${params.invoiceId}/${safeName}`;
+
+  const { error } = await supabase.storage
+    .from(FINANCE_INVOICES_BUCKET)
+    .upload(path, params.file, { contentType: params.file.type || undefined, upsert: false });
 
   if (error) throw error;
-  return (data ?? []) as FinanceVersionLine[];
+
+  return {
+    path,
+    fileName: safeName,
+    mimeType: params.file.type || null,
+  };
 }
 
-export async function createFinanceVersionLine(companyId: string, userId: string, payload: Pick<FinanceVersionLine, "finance_version_id" | "finance_account_id" | "fiscal_period_id" | "department_id" | "project_id" | "squad_id" | "amount">) {
-  const { data, error } = await supabase
-    .from("finance_version_lines")
-    .insert({
-      company_id: companyId,
-      created_by_user_id: userId,
-      ...payload,
-    })
-    .select("*, account:finance_accounts(*), fiscal_period:finance_fiscal_periods(*), department:departments(*), project:projects(*), squad:squads(*)")
-    .single();
-
-  if (error) throw error;
-  return data as FinanceVersionLine;
-}
-
-export async function updateFinanceVersionLine(lineId: string, payload: Partial<Pick<FinanceVersionLine, "finance_account_id" | "fiscal_period_id" | "department_id" | "project_id" | "squad_id" | "amount">>) {
-  const { data, error } = await supabase
-    .from("finance_version_lines")
-    .update(payload)
-    .eq("id", lineId)
-    .select("*, account:finance_accounts(*), fiscal_period:finance_fiscal_periods(*), department:departments(*), project:projects(*), squad:squads(*)")
-    .single();
-
-  if (error) throw error;
-  return data as FinanceVersionLine;
-}
-
-export async function deleteFinanceVersionLine(lineId: string) {
-  const { error } = await supabase.from("finance_version_lines").delete().eq("id", lineId);
+export async function removeInvoiceFile(path: string) {
+  const { error } = await supabase.storage.from(FINANCE_INVOICES_BUCKET).remove([path]);
   if (error) throw error;
 }
 
-export async function listFinanceAccounts(companyId: string) {
-  const { data, error } = await supabase.from("finance_accounts").select("*").eq("company_id", companyId).order("name", { ascending: true });
+export async function createInvoiceSignedUrl(path: string, expiresInSeconds = 60) {
+  const { data, error } = await supabase.storage
+    .from(FINANCE_INVOICES_BUCKET)
+    .createSignedUrl(path, expiresInSeconds);
   if (error) throw error;
-  return (data ?? []) as Array<{ id: string; company_id: string; name: string; code: string | null }>;
-}
-
-export async function listFinanceFiscalPeriods(companyId: string) {
-  const { data, error } = await supabase.from("finance_fiscal_periods").select("*").eq("company_id", companyId).order("start_date", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as FinanceFiscalPeriod[];
-}
-
-export async function listFinanceDepartments(companyId: string) {
-  const { data, error } = await supabase.from("departments").select("id,name,company_id").eq("company_id", companyId).order("name", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Array<{ id: string; name: string; company_id: string }>;
-}
-
-export async function listFinanceProjects(companyId: string) {
-  const { data, error } = await supabase.from("projects").select("id,name,tenant_id").eq("tenant_id", companyId).order("name", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Array<{ id: string; name: string; tenant_id: string }>;
-}
-
-export async function listFinanceSquads(companyId: string) {
-  const { data, error } = await supabase.from("squads").select("id,name,company_id").eq("company_id", companyId).order("name", { ascending: true });
-  if (error) throw error;
-  return (data ?? []) as Array<{ id: string; name: string; company_id: string }>;
+  return data.signedUrl;
 }
