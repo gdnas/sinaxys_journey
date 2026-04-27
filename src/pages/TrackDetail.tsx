@@ -79,16 +79,13 @@ export default function TrackDetail() {
   const [dueDate, setDueDate] = useState<string>("");
   const [starting, setStarting] = useState(false);
 
-  // Admin: change responsible department
   const canChangeDept = user?.role === "ADMIN";
   const [deptOpen, setDeptOpen] = useState(false);
   const [deptSaving, setDeptSaving] = useState(false);
   const [deptNextId, setDeptNextId] = useState<string>("");
 
-  if (!user) return null;
-  if (!user.companyId) return null;
-
-  const companyId = user.companyId;
+  const companyId = user?.companyId || (user as any)?.company_id;
+  const hasContext = !!user && !!companyId && !!trackId;
 
   const { data: track, isLoading: loadingTrack } = useQuery({
     queryKey: ["track", trackId],
@@ -96,7 +93,6 @@ export default function TrackDetail() {
     enabled: !!trackId,
   });
 
-  // Fetch total comments for track (track-level badge)
   const { data: trackCommentsCount } = useQuery({
     queryKey: ["track-comments-count", trackId],
     queryFn: async () => {
@@ -107,9 +103,8 @@ export default function TrackDetail() {
     enabled: !!trackId,
   });
 
-  // Permission: who can edit this track?
   const canEdit = useMemo(() => {
-    if (!track) return false;
+    if (!track || !user) return false;
     if (user.role === "ADMIN") return true;
     if (user.role === "HEAD") return user.departmentId && track.department_id === user.departmentId;
     if (user.role === "COLABORADOR") return track.created_by_user_id === user.id;
@@ -124,7 +119,8 @@ export default function TrackDetail() {
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments", companyId],
-    queryFn: () => listDepartments(companyId),
+    queryFn: () => listDepartments(companyId as string),
+    enabled: !!companyId,
   });
 
   const deptName = useMemo(() => {
@@ -133,16 +129,16 @@ export default function TrackDetail() {
   }, [departments, track?.department_id]);
 
   const { data: latestAssignment } = useQuery({
-    queryKey: ["my-latest-assignment", user.id, trackId],
-    queryFn: () => getLatestAssignmentForUserAndTrack({ userId: user.id, trackId }),
-    enabled: !!trackId,
+    queryKey: ["my-latest-assignment", user?.id, trackId],
+    queryFn: () => getLatestAssignmentForUserAndTrack({ userId: user?.id as string, trackId }),
+    enabled: !!trackId && !!user?.id,
   });
 
   const canStart = useMemo(() => {
-    if (!track) return false;
+    if (!track || !user) return false;
     if (user.role === "COLABORADOR" && !track.published) return false;
     return true;
-  }, [track, user.role]);
+  }, [track, user]);
 
   const cta = useMemo(() => {
     if (!latestAssignment) return { label: t("tracks.add_to_journey"), mode: "start" as const };
@@ -154,6 +150,10 @@ export default function TrackDetail() {
     if (!dueDate.trim()) return null;
     return toDueIso(dueDate);
   }, [dueDate]);
+
+  if (!user || !companyId || !trackId) {
+    return <div className="rounded-3xl border bg-white p-6 text-sm text-muted-foreground">Detalhe da trilha ainda não pôde ser carregado.</div>;
+  }
 
   return (
     <div className="grid gap-6">
