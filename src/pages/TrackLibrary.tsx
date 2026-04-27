@@ -60,7 +60,6 @@ export default function TrackLibrary() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  console.log('USER DEBUG', user)
 
   const companyId = getUserCompanyId(user);
   const isMasterAdmin = user?.role === "MASTERADMIN";
