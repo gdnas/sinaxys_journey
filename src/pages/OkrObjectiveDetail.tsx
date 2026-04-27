@@ -32,6 +32,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useSyncAcrossViews } from "@/hooks/useSyncAcrossViews";
 import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { useAuth } from "@/lib/auth";
+import { getUserCompanyId } from "@/lib/getUserCompanyId";
 import { useCompany } from "@/lib/company";
 import { brl } from "@/lib/costs";
 import { parsePtNumber } from "@/lib/roi";
@@ -125,10 +126,10 @@ export default function OkrObjectiveDetail() {
   const qc = useQueryClient();
   const { objectiveId } = useParams();
   const { user } = useAuth();
-  const { companyId } = useCompany();
+  const companyId = getUserCompanyId(user);
   const { enabled: okrRoiEnabled } = useCompanyModuleEnabled("OKR_ROI");
 
-  if (!objectiveId || !user) return null;
+  if (!objectiveId || !user) return <div className="rounded-3xl border bg-white p-6 text-sm text-muted-foreground">Objetivo ainda não pôde ser carregado.</div>;
 
   const cid = companyId ?? "";
   const hasCompany = !!companyId;

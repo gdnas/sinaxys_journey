@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator";
 import { ResourceEmbed } from "@/components/ResourceEmbed";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { getUserCompanyId } from "@/lib/getUserCompanyId";
 import { listDepartments } from "@/lib/departmentsDb";
 import {
   assignTrack,
@@ -84,7 +85,7 @@ export default function TrackDetail() {
   const [deptSaving, setDeptSaving] = useState(false);
   const [deptNextId, setDeptNextId] = useState<string>("");
 
-  const companyId = user?.companyId || (user as any)?.company_id;
+  const companyId = getUserCompanyId(user);
   const hasContext = !!user && !!companyId && !!trackId;
 
   const { data: track, isLoading: loadingTrack } = useQuery({

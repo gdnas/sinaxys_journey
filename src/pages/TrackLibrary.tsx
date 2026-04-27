@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { getUserCompanyId } from "@/lib/getUserCompanyId";
 import { listDepartments } from "@/lib/departmentsDb";
 import { listProfilePublicByCompany, listProfilesByCompany } from "@/lib/profilesDb";
 import { assignTrack, createTrack, getTracksByCompany, setTrackPublished } from "@/lib/journeyDb";
@@ -61,7 +62,7 @@ export default function TrackLibrary() {
 
   console.log('USER DEBUG', user)
 
-  const companyId = user?.companyId || (user as any)?.company_id;
+  const companyId = getUserCompanyId(user);
   const isMasterAdmin = user?.role === "MASTERADMIN";
   const canRender = !!user && !!companyId && !isMasterAdmin;
   const canCreateTrack = user?.role === "HEAD";

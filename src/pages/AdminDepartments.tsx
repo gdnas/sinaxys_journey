@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { getUserCompanyId } from "@/lib/getUserCompanyId";
 import { createDepartment, deleteDepartment, listDepartments, updateDepartment } from "@/lib/departmentsDb";
 import { listProfilesByCompany } from "@/lib/profilesDb";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,9 +34,9 @@ export default function AdminDepartments() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const companyId = getUserCompanyId(user);
 
-  if (!user || user.role !== "ADMIN" || !user.companyId) return null;
-  const companyId = user.companyId;
+  if (!user || user.role !== "ADMIN" || !companyId) return <div className="rounded-3xl border bg-white p-6 text-sm text-muted-foreground">Departamentos ainda não puderam ser carregados.</div>;
 
   const { data: departments = [], isLoading } = useQuery({
     queryKey: ["departments", companyId],

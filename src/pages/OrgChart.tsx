@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { OrgChartTreeCanvas, type OrgNode } from "@/components/OrgChartTreeCanvas";
 import { useAuth } from "@/lib/auth";
+import { getUserCompanyId } from "@/lib/getUserCompanyId";
 import { listDepartments } from "@/lib/departmentsDb";
 import { fetchLeaderboard, listRewardTiers } from "@/lib/pointsDb";
 import { listPublicProfilesByCompany, type DbProfilePublic } from "@/lib/profilePublicDb";
@@ -234,9 +235,8 @@ function PersonDialog({
 
 export default function OrgChart() {
   const { user } = useAuth();
-  if (!user || !user.companyId) return null;
-
-  const companyId = user.companyId;
+  const companyId = getUserCompanyId(user);
+  if (!user || !companyId) return <div className="rounded-3xl border bg-white p-6 text-sm text-muted-foreground">Organograma ainda não pôde ser carregado.</div>;
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments", companyId],

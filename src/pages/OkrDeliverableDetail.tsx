@@ -38,6 +38,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { OkrPageHeader } from "@/components/OkrPageHeader";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { getUserCompanyId } from "@/lib/getUserCompanyId";
 import { useCompany } from "@/lib/company";
 import { listProfilesByCompany } from "@/lib/profilesDb";
 import {
@@ -150,7 +151,7 @@ async function getKeyResultObjectiveId(keyResultId: string) {
 export default function OkrDeliverableDetail() {
   const { deliverableId } = useParams();
   const { user } = useAuth();
-  const { companyId } = useCompany();
+  const companyId = getUserCompanyId(user);
   const { toast } = useToast();
   const qc = useQueryClient();
 
@@ -178,7 +179,7 @@ export default function OkrDeliverableDetail() {
   const [stepTitle, setStepTitle] = useState("");
   const [stepSaving, setStepSaving] = useState(false);
 
-  if (!deliverableId || !user) return null;
+  if (!deliverableId || !user) return <div className="rounded-3xl border bg-white p-6 text-sm text-muted-foreground">Entregável ainda não pôde ser carregado.</div>;
 
   const cid = companyId ?? "";
   const hasCompany = !!companyId;

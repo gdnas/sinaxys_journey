@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/lib/auth";
+import { getUserCompanyId } from "@/lib/getUserCompanyId";
 import { useCompany } from "@/lib/company";
 import { listDepartments } from "@/lib/departmentsDb";
 import { getPublicProfile } from "@/lib/profilePublicDb";
@@ -42,10 +43,10 @@ function fullDateTime(isoOrDate: string | null | undefined) {
 
 export default function Person() {
   const { user } = useAuth();
-  const { companyId } = useCompany();
+  const companyId = getUserCompanyId(user);
   const { userId } = useParams();
 
-  if (!user || !companyId || !userId) return null;
+  if (!user || !companyId || !userId) return <div className="rounded-3xl border bg-white p-6 text-sm text-muted-foreground">Perfil ainda não pôde ser carregado.</div>;
 
   const qPublic = useQuery({
     queryKey: ["profile-public", userId],
