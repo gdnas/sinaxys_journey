@@ -20,9 +20,9 @@ import { listSquads, calculateAllSquadCosts } from "@/lib/squadsDb";
 export default function SquadList() {
   const nav = useNavigate();
   const { user } = useAuth();
-  if (!user || !user.companyId) return null;
+  const companyId = user?.companyId ?? (user as any)?.company_id ?? null;
+  if (!user || !companyId) return null;
 
-  const companyId = user.companyId;
   const [showInactive, setShowInactive] = useState(false);
   const [typeFilter, setTypeFilter] = useState<"all" | "core" | "growth" | "support">("all");
 

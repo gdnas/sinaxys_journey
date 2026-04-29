@@ -18,9 +18,10 @@ export default function HeadTracks() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const companyId = user?.companyId ?? (user as any)?.company_id ?? null;
+  const deptId = user?.departmentId ?? (user as any)?.department_id ?? null;
 
-  if (!user || user.role !== "HEAD" || !user.departmentId || !user.companyId) return null;
-  const deptId = user.departmentId;
+  if (!user || user.role !== "HEAD" || !deptId || !companyId) return null;
 
   const { data: tracks = [], isLoading } = useQuery({
     queryKey: ["tracks-by-dept", deptId],
@@ -34,12 +35,13 @@ export default function HeadTracks() {
   const createMutation = useMutation({
     mutationFn: () =>
       createTrack({
-        companyId: user.companyId!,
+        companyId,
         departmentId: deptId,
         title,
         description,
         createdByUserId: user.id,
       }),
+
     onSuccess: async (t) => {
       await qc.invalidateQueries({ queryKey: ["tracks-by-dept", deptId] });
       setOpen(false);

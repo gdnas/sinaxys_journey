@@ -22,9 +22,8 @@ function fmtDateTime(ts: string | null | undefined) {
 
 export default function HeadUsers() {
   const { user } = useAuth();
-  if (!user || user.role !== "HEAD" || !user.companyId) return null;
-
-  const companyId = user.companyId;
+  const companyId = user?.companyId ?? (user as any)?.company_id ?? null;
+  if (!user || user.role !== "HEAD" || !companyId) return null;
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments", companyId],

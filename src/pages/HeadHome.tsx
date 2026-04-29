@@ -106,18 +106,20 @@ export default function HeadHome() {
 
   if (!user) return null;
 
+  const departmentId = user.departmentId ?? (user as any)?.department_id ?? null;
+
   const today = new Date();
   const todayLabel = format(today, "EEEE, d 'de' MMMM", { locale: ptBR });
   const todayIso = format(today, "yyyy-MM-dd");
   const weekFrom = format(startOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
   const weekTo = format(endOfWeek(today, { weekStartsOn: 1 }), "yyyy-MM-dd");
 
-  const enabled = !!companyId && !!user.departmentId;
+  const enabled = !!companyId && !!departmentId;
 
   const { data: weekDeptTasks = [] } = useQuery({
-    queryKey: ["home-head", "okr-dept", companyId, user.departmentId, weekFrom, weekTo],
+    queryKey: ["home-head", "okr-dept", companyId, departmentId, weekFrom, weekTo],
     enabled,
-    queryFn: () => listTasksForDepartment(String(companyId), String(user.departmentId), { from: weekFrom, to: weekTo }),
+    queryFn: () => listTasksForDepartment(String(companyId), String(departmentId), { from: weekFrom, to: weekTo }),
   });
 
   const { data: vacationRows = [] } = useQuery({

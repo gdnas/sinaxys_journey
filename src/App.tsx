@@ -217,8 +217,9 @@ const App = () => (
 
                         <Route path="/admin/modules" element={<RequireAuth roles={["ADMIN", "MASTERADMIN"]}><AdminModules /></RequireAuth>} />
                         <Route path="/admin/email" element={<RequireAuth roles={["ADMIN", "MASTERADMIN"]}><AdminEmailTemplates /></RequireAuth>} />
-                        <Route path="/admin/org" element={<RequireAuth roles={["ADMIN", "HEAD"]}><AdminOrgChart /></RequireAuth>} />
+                        <Route path="/admin/org" element={<RequireAuth roles={["ADMIN", "HEAD", "MASTERADMIN"]}><AdminOrgChart /></RequireAuth>} />
                         <Route path="/admin/squads" element={<RequireAuth roles={["ADMIN"]}><RequireCompanyModule moduleKey="SQUAD_INTELLIGENCE"><SquadList /></RequireCompanyModule></RequireAuth>} />
+
                         <Route path="/admin/squads/:squadId" element={<RequireAuth roles={["ADMIN"]}><RequireCompanyModule moduleKey="SQUAD_INTELLIGENCE"><SquadDetail /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/admin/import-users" element={<RequireAuth roles={["ADMIN", "MASTERADMIN"]}><AdminImportUsers /></RequireAuth>} />
                         <Route path="/admin/tracks" element={<RequireAuth roles={["ADMIN", "MASTERADMIN"]}><AdminTracks /></RequireAuth>} />

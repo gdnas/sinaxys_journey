@@ -33,10 +33,9 @@ export default function AdminTracks() {
   const qc = useQueryClient();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const companyId = user?.companyId ?? (user as any)?.company_id ?? null;
 
-  // Allow ADMIN, HEAD and COLABORADOR to access this page
-  if (!user || !(user.role === "ADMIN" || user.role === "HEAD" || user.role === "COLABORADOR") || !user.companyId) return null;
-  const companyId = user.companyId;
+  if (!user || !["ADMIN", "MASTERADMIN"].includes(user.role) || !companyId) return null;
 
   const { data: companyWideDept } = useQuery({
     queryKey: ["company-wide-dept", companyId],

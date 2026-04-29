@@ -191,7 +191,8 @@ export default function AppDashboard() {
 
   if (!user) return null;
 
-  const companyId = user.companyId ?? null;
+  const companyId = user.companyId ?? (user as any)?.company_id ?? null;
+  const departmentId = user.departmentId ?? (user as any)?.department_id ?? null;
 
   const isCollaborator = user.role === "COLABORADOR";
   const isHead = user.role === "HEAD";
@@ -232,11 +233,11 @@ export default function AppDashboard() {
 
   // Team/company tasks (for HEAD/ADMIN)
   const { data: scopeTasks = [] } = useQuery({
-    queryKey: ["okr-scope-tasks", companyId, user.role, user.departmentId, weekFrom, weekTo],
-    enabled: !!companyId && ((isHead && !!user.departmentId) || isAdmin),
+    queryKey: ["okr-scope-tasks", companyId, user.role, departmentId, weekFrom, weekTo],
+    enabled: !!companyId && ((isHead && !!departmentId) || isAdmin),
     queryFn: () => {
       if (isAdmin) return listTasksForCompany(companyId as string, { from: weekFrom, to: weekTo });
-      return listTasksForDepartment(companyId as string, user.departmentId as string, { from: weekFrom, to: weekTo });
+      return listTasksForDepartment(companyId as string, departmentId as string, { from: weekFrom, to: weekTo });
     },
   });
 
@@ -263,9 +264,9 @@ export default function AppDashboard() {
 
   const scopedObjectives = useMemo(() => {
     if (isAdmin) return quarterObjectives;
-    if (isHead) return quarterObjectives.filter((o) => o.department_id === user.departmentId);
+    if (isHead) return quarterObjectives.filter((o) => o.department_id === departmentId);
     return [];
-  }, [quarterObjectives, isAdmin, isHead, user.departmentId]);
+  }, [quarterObjectives, isAdmin, isHead, departmentId]);
 
   const objectivesByLevel = useMemo(() => {
     const m = new Map<string, number>();

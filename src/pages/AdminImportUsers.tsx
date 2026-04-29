@@ -4,8 +4,9 @@ import { ImportUsersPanel } from "@/components/admin/ImportUsersPanel";
 
 export default function AdminImportUsers() {
   const { user } = useAuth();
+  const companyId = user?.companyId ?? (user as any)?.company_id ?? null;
 
-  if (!user || user.role !== "ADMIN" || !user.companyId) return null;
+  if (!user || !["ADMIN", "MASTERADMIN"].includes(user.role) || !companyId) return null;
 
-  return <ImportUsersPanel companyId={user.companyId} />;
+  return <ImportUsersPanel companyId={companyId} />;
 }

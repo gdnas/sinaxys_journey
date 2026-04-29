@@ -79,9 +79,9 @@ export default function AdminOrgChart() {
   const { toast } = useToast();
   const qc = useQueryClient();
   const { user } = useAuth();
+  const companyId = user?.companyId ?? (user as any)?.company_id ?? null;
 
-  if (!user || user.role !== "ADMIN" || !user.companyId) return null;
-  const companyId = user.companyId;
+  if (!user || !["ADMIN", "HEAD", "MASTERADMIN"].includes(user.role) || !companyId) return null;
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments", companyId],
