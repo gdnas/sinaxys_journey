@@ -38,26 +38,22 @@ function daysInMonth(date: Date) {
 function prorateForCurrentMonth(monthlyCost: number | null | undefined, scheduledAtIso: string | null | undefined) {
   const cost = typeof monthlyCost === "number" ? monthlyCost : (monthlyCost ? Number(monthlyCost) : 0);
   if (!cost || cost <= 0) return 0;
-  if (!scheduledAtIso) return cost; // no scheduled date -> count full
+  if (!scheduledAtIso) return cost;
 
   try {
     const sched = new Date(scheduledAtIso);
     const now = new Date();
-    // If scheduled date is in a future month beyond current month, count full monthly cost for current month
     if (sched.getFullYear() > now.getFullYear() || (sched.getFullYear() === now.getFullYear() && sched.getMonth() > now.getMonth())) {
       return cost;
     }
-    // If scheduled date is this month: prorate remaining days (exclude the day of offboarding?) we'll consider day of offboarding as last paid day (not included)
     if (sched.getFullYear() === now.getFullYear() && sched.getMonth() === now.getMonth()) {
       const daysThisMonth = daysInMonth(now);
-      // remaining days including today up to day before scheduled date
       const dayNow = now.getDate();
       const daySched = sched.getDate();
       const remaining = Math.max(0, daySched - dayNow);
       const fraction = remaining / daysThisMonth;
       return Math.round(cost * fraction);
     }
-    // If scheduled date is in the past, don't count
     if (sched < now) return 0;
     return cost;
   } catch {
@@ -79,9 +75,10 @@ type CostPerson = {
 export default function AdminCosts() {
   const nav = useNavigate();
   const { user } = useAuth();
-  if (!user || !["MASTERADMIN", "ADMIN"].includes(user.role) || !user.companyId) return null;
+  const companyId = user?.companyId ?? (user as any)?.company_id ?? null;
+  const myDepartmentId = user?.departmentId ?? (user as any)?.department_id ?? null;
 
-  const companyId = user.companyId;
+  if (!user || !["MASTERADMIN", "ADMIN"].includes(user.role) || !companyId) return null;
 
   const { data: departments = [] } = useQuery({
     queryKey: ["departments", companyId],
@@ -99,7 +96,6 @@ export default function AdminCosts() {
   const nowIso = useMemo(() => new Date().toISOString(), []);
 
   const headByDeptId = useMemo(() => {
-    // Infer the "Head do departamento" pelo gestor mais recorrente das pessoas do dept.
     const counts = new Map<string, Map<string, number>>();
 
     for (const p of profiles) {
@@ -132,18 +128,17 @@ export default function AdminCosts() {
     return result;
   }, [profiles, profileById]);
 
-  // Include profiles that are active OR are in offboarding pending state where scheduled_at is null or in the future.
   const activePeople = useMemo((): CostPerson[] => {
     return profiles
       .filter((p) => {
         if (p.active) return true;
         if (p.offboarding_state === "PENDING") {
           const sched = p.offboarding_scheduled_at;
-          if (!sched) return true; // no date -> still counted until processed
+          if (!sched) return true;
           try {
             const dt = new Date(sched);
             if (Number.isNaN(dt.getTime())) return true;
-            return dt.toISOString() > nowIso; // scheduled in future -> still counted
+            return dt.toISOString() > nowIso;
           } catch {
             return true;
           }
@@ -163,24 +158,19 @@ export default function AdminCosts() {
 
   const activeWithCost = useMemo(() => activePeople.filter((p) => n(p.monthly_cost_brl) > 0), [activePeople]);
 
-  // Sum costs for company including pending offboardings counted above; apply proration when needed
   const companyMonthly = useMemo(() => {
     let sum = 0;
     for (const p of profiles) {
-      // Only count if active or pending (as earlier)
       if (!(p.active || p.offboarding_state === "PENDING")) continue;
-      // Only consider those that are pending and not yet processed
       const sched = p.offboarding_scheduled_at;
       const include = p.active || (p.offboarding_state === "PENDING" && (!sched || new Date(sched).toISOString() > nowIso));
       if (!include) continue;
-      // prorate if scheduled in current month
       const c = prorateForCurrentMonth(n(p.monthly_cost_brl), p.offboarding_scheduled_at);
       sum += c;
     }
     return sum;
   }, [profiles, nowIso]);
 
-  // Compute totals specifically for offboarding people (count and sum prorated)
   const offboardingTotals = useMemo(() => {
     let count = 0;
     let total = 0;
@@ -211,7 +201,6 @@ export default function AdminCosts() {
       memberIdByDept.set(deptId, s);
     }
 
-    // Inject head cost (when the head is not explicitly linked to the dept).
     for (const d of departments) {
       const head = headByDeptId.get(d.id);
       if (!head) continue;
@@ -250,7 +239,6 @@ export default function AdminCosts() {
     const m = new Map<string, { deptId: string; deptName: string; people: number; total: number }>();
     const memberIds = new Map<string, Set<string>>();
 
-    // Start with all departments so empty-cost departments can still appear when they have people.
     for (const d of departments) {
       m.set(d.id, { deptId: d.id, deptName: d.name, people: 0, total: 0 });
     }
@@ -268,7 +256,6 @@ export default function AdminCosts() {
       memberIds.set(deptId, s);
     }
 
-    // Add inferred head per department (if not already counted).
     for (const d of departments) {
       const head = headByDeptId.get(d.id);
       if (!head) continue;
@@ -290,9 +277,9 @@ export default function AdminCosts() {
   }, [activePeople, departments, deptById, headByDeptId]);
 
   const myDeptTotal = useMemo(() => {
-    if (!user.departmentId) return 0;
-    return byDept.find((d) => d.deptId === user.departmentId)?.total ?? 0;
-  }, [byDept, user.departmentId]);
+    if (!myDepartmentId) return 0;
+    return byDept.find((d) => d.deptId === myDepartmentId)?.total ?? 0;
+  }, [byDept, myDepartmentId]);
 
   const [openDept, setOpenDept] = useState(false);
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
@@ -334,8 +321,8 @@ export default function AdminCosts() {
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seu departamento</div>
-          <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{user.departmentId ? brl(myDeptTotal) : "—"}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{user.departmentId ? "Total do seu dept." : "Você está sem departamento."}</div>
+          <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{myDepartmentId ? brl(myDeptTotal) : "—"}</div>
+          <div className="mt-1 text-xs text-muted-foreground">{myDepartmentId ? "Total do seu dept." : "Você está sem departamento."}</div>
         </Card>
       </div>
 
@@ -365,7 +352,7 @@ export default function AdminCosts() {
               </TableHeader>
               <TableBody>
                 {byDept.map((d) => {
-                  const isMine = !!user.departmentId && d.deptId === user.departmentId;
+                  const isMine = !!myDepartmentId && d.deptId === myDepartmentId;
                   return (
                     <TableRow
                       key={d.deptId}

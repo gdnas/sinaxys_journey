@@ -19,10 +19,10 @@ function n(v: unknown) {
 
 export default function HeadCosts() {
   const { user } = useAuth();
-  if (!user || user.role !== "HEAD" || !user.companyId) return null;
+  const companyId = user?.companyId ?? (user as any)?.company_id ?? null;
+  const myDeptId = user?.departmentId ?? (user as any)?.department_id ?? null;
 
-  const companyId = user.companyId;
-  const myDeptId = user.departmentId;
+  if (!user || user.role !== "HEAD" || !companyId) return null;
 
   if (!myDeptId) {
     return (
