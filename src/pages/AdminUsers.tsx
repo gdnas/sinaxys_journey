@@ -111,8 +111,9 @@ export default function AdminUsers() {
 
   if (!user || !(user.role === "ADMIN" || user.role === "MASTERADMIN")) return null;
 
-  const companyId = user.companyId;
+  const companyId = user.companyId ?? (user as any)?.company_id ?? null;
   if (!companyId) {
+
     return (
       <div className="grid gap-6">
         <div className="rounded-3xl border bg-white p-6">
