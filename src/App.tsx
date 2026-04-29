@@ -212,8 +212,9 @@ const App = () => (
                         <Route path="/announcements/create" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="INTERNAL_COMMUNICATION"><AnnouncementCreate /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/announcements/:id" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="INTERNAL_COMMUNICATION"><AnnouncementDetail /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/announcements/:id/edit" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="INTERNAL_COMMUNICATION"><AnnouncementEdit /></RequireCompanyModule></RequireAuth>} />
-                        <Route path="/admin/users/:userId" element={<RequireAuth roles={["ADMIN", "HEAD"]}><AdminUserCard /></RequireAuth>} />
+                        <Route path="/admin/users/:userId" element={<RequireAuth roles={["ADMIN", "MASTERADMIN"]}><AdminUserCard /></RequireAuth>} />
                         <Route path="/admin/brand" element={<RequireAuth roles={["ADMIN", "MASTERADMIN"]}><AdminBrand /></RequireAuth>} />
+
                         <Route path="/admin/modules" element={<RequireAuth roles={["ADMIN", "MASTERADMIN"]}><AdminModules /></RequireAuth>} />
                         <Route path="/admin/email" element={<RequireAuth roles={["ADMIN", "MASTERADMIN"]}><AdminEmailTemplates /></RequireAuth>} />
                         <Route path="/admin/org" element={<RequireAuth roles={["ADMIN", "HEAD"]}><AdminOrgChart /></RequireAuth>} />

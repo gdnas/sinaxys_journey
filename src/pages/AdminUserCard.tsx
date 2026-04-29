@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -52,7 +52,6 @@ function isUrl(v: string) {
   const t = v.trim();
   if (!t) return false;
   try {
-    // eslint-disable-next-line no-new
     new URL(t);
     return true;
   } catch {
@@ -76,9 +75,9 @@ export default function AdminUserCard() {
   const { userId } = useParams();
 
   const canAdmin = !!user && (user.role === "ADMIN" || user.role === "MASTERADMIN");
-  if (!user || !canAdmin || !user.companyId) return null;
+  const cid = user?.companyId ?? (user as any)?.company_id ?? null;
 
-  const cid = user.companyId;
+  if (!user || !canAdmin || !cid) return null;
 
   const { data: profile, isLoading } = useQuery({
     queryKey: ["profile", userId],
@@ -135,7 +134,6 @@ export default function AdminUserCard() {
     enabled: !!cid && !!userId && allowed,
   });
 
-  // Editable state
   const [name, setName] = useState("");
   const [role, setRole] = useState("COLABORADOR");
   const [managerId, setManagerId] = useState<string>("__none__");
@@ -147,7 +145,6 @@ export default function AdminUserCard() {
   const [contractUrl, setContractUrl] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Docs dialogs
   const [addAttachmentOpen, setAddAttachmentOpen] = useState(false);
   const [attTitle, setAttTitle] = useState("");
   const [attUrl, setAttUrl] = useState("");
@@ -187,8 +184,7 @@ export default function AdminUserCard() {
     );
   }, [profile, name, role, managerId, phone, jobTitle, deptId, active, monthlyCost, contractUrl]);
 
-  // Sync state from profile
-  useMemo(() => {
+  useEffect(() => {
     if (!profile) return;
     setName(profile.name ?? "");
     setRole(profile.role ?? "COLABORADOR");
@@ -199,8 +195,7 @@ export default function AdminUserCard() {
     setActive(!!profile.active);
     setMonthlyCost(typeof profile.monthly_cost_brl === "number" ? String(profile.monthly_cost_brl) : "");
     setContractUrl(profile.contract_url ?? "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.id, profile?.updated_at]);
+  }, [profile?.id, profile?.updated_at, profile]);
 
   return (
     <div className="grid gap-6">
@@ -426,80 +421,78 @@ export default function AdminUserCard() {
                                 monthly_cost_brl: cost,
                                 contract_url: contractUrl.trim() || null,
                               });
+                              await qc.invalidateQueries({ queryKey: ["profile", userId] });
+                              await qc.invalidateQueries({ queryKey: ["profiles", cid] });
                               toast({ title: "Perfil atualizado" });
-                              await Promise.all([
-                                qc.invalidateQueries({ queryKey: ["profile", userId] }),
-                                qc.invalidateQueries({ queryKey: ["profiles", cid] }),
-                              ]);
-                            } catch (e) {
-                              toast({
-                                title: "Não foi possível salvar",
-                                description: e instanceof Error ? e.message : "Erro inesperado.",
-                                variant: "destructive",
-                              });
+                            } catch (e: any) {
+                              toast({ title: "Erro ao salvar", description: e?.message ?? "Tente novamente.", variant: "destructive" });
                             } finally {
                               setSaving(false);
                             }
                           }}
                         >
                           <Save className="mr-2 h-4 w-4" />
-                          Salvar
+                          {saving ? "Salvando..." : "Salvar alterações"}
                         </Button>
                       </div>
                     </div>
                   </Card>
 
-                  <div className="grid gap-4">
-                    <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-5">
-                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Resumo rápido</div>
-                      <div className="mt-2 grid gap-2 text-sm text-muted-foreground">
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="inline-flex items-center gap-2">
-                            <BriefcaseBusiness className="h-4 w-4 text-[color:var(--sinaxys-primary)]" /> Cargo
-                          </span>
-                          <span className="font-semibold text-[color:var(--sinaxys-ink)]">{profile.job_title?.trim() ? profile.job_title.trim() : "—"}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="inline-flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-[color:var(--sinaxys-primary)]" /> Departamento
-                          </span>
-                          <span className="font-semibold text-[color:var(--sinaxys-ink)]">{departmentName ?? "—"}</span>
-                        </div>
-                        <div className="flex items-center justify-between gap-3">
-                          <span className="inline-flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-[color:var(--sinaxys-primary)]" /> Docs
-                          </span>
-                          <span className="font-semibold text-[color:var(--sinaxys-ink)]">{documents.length + attachments.length}</span>
-                        </div>
+                  <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Resumo do vínculo</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Atalhos rápidos para informações úteis da pessoa.</div>
+                      </div>
+                      <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-primary)]">
+                        <BriefcaseBusiness className="h-5 w-5" />
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-5">
-                      <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">ID do usuário</div>
-                      <div className="mt-1 break-all text-sm font-semibold text-[color:var(--sinaxys-ink)]">{profile.id}</div>
+                    <Separator className="my-4" />
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Departamento</div>
+                        <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{departmentName ?? "Sem departamento"}</div>
+                      </div>
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Líder</div>
+                        <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{managerLabel ?? "Sem líder"}</div>
+                      </div>
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Custo mensal</div>
+                        <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{typeof profile.monthly_cost_brl === "number" && profile.monthly_cost_brl > 0 ? brl(profile.monthly_cost_brl) : "—"}</div>
+                      </div>
+                      <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4">
+                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Custo / hora</div>
+                        <div className="mt-1 text-sm font-semibold text-[color:var(--sinaxys-ink)]">{typeof profile.monthly_cost_brl === "number" && profile.monthly_cost_brl > 0 ? brlPerHourFromMonthly(profile.monthly_cost_brl) : "—"}</div>
+                      </div>
                     </div>
-                  </div>
+
+                    <div className="mt-4 rounded-2xl border border-[color:var(--sinaxys-border)] p-4 text-sm text-muted-foreground">
+                      {profile.contract_url ? (
+                        <a href={profile.contract_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-medium text-[color:var(--sinaxys-primary)] hover:underline">
+                          <ExternalLink className="h-4 w-4" />
+                          Abrir contrato
+                        </a>
+                      ) : (
+                        <span>Nenhum contrato vinculado.</span>
+                      )}
+                    </div>
+                  </Card>
                 </div>
               </TabsContent>
 
               <TabsContent value="documentos" className="mt-5">
                 <div className="grid gap-4 lg:grid-cols-2">
                   <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Documentos do colaborador</div>
-                        <div className="mt-1 text-sm text-muted-foreground">Links internos/externos organizados por categoria.</div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Anexos de contrato</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Links complementares relacionados ao contrato.</div>
                       </div>
-                      <Button
-                        type="button"
-                        className="h-11 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-                        onClick={() => {
-                          setDocTitle("");
-                          setDocCategory("EMPRESA");
-                          setDocUrl("");
-                          setAddDocOpen(true);
-                        }}
-                      >
+                      <Button variant="outline" className="h-10 rounded-xl" onClick={() => setAddAttachmentOpen(true)}>
                         <Plus className="mr-2 h-4 w-4" />
                         Adicionar
                       </Button>
@@ -507,76 +500,43 @@ export default function AdminUserCard() {
 
                     <Separator className="my-4" />
 
-                    {documents.length ? (
-                      <div className="grid gap-2">
-                        {documents.map((d) => (
-                          <div
-                            key={d.id}
-                            className="flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4"
-                          >
+                    <div className="grid gap-3">
+                      {attachments.length ? (
+                        attachments.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
                             <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">{d.category}</Badge>
-                                <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{d.title}</div>
-                              </div>
-                              {d.url ? (
-                                <a
-                                  className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-[color:var(--sinaxys-primary)] hover:underline"
-                                  href={d.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
-                                  Abrir
-                                  <ExternalLink className="h-3.5 w-3.5" />
-                                </a>
-                              ) : null}
+                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{item.title}</div>
+                              <a href={item.url} target="_blank" rel="noreferrer" className="mt-1 inline-flex max-w-full items-center gap-2 truncate text-xs text-[color:var(--sinaxys-primary)] hover:underline">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                                {item.url}
+                              </a>
                             </div>
                             <Button
-                              type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                              className="rounded-xl"
                               onClick={async () => {
-                                try {
-                                  await deleteUserDocument(d.id);
-                                  await qc.invalidateQueries({ queryKey: ["user-documents", cid, userId] });
-                                  toast({ title: "Documento removido" });
-                                } catch (e) {
-                                  toast({
-                                    title: "Não foi possível remover",
-                                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                                    variant: "destructive",
-                                  });
-                                }
+                                await deleteContractAttachment(item.id);
+                                await qc.invalidateQueries({ queryKey: ["contract-attachments", cid, userId] });
                               }}
-                              title="Remover"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum documento ainda.</div>
-                    )}
+                        ))
+                      ) : (
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum anexo cadastrado.</div>
+                      )}
+                    </div>
                   </Card>
 
                   <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-                    <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Anexos de contrato</div>
-                        <div className="mt-1 text-sm text-muted-foreground">Links úteis (contrato, aditivos, PDFs no Drive).</div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Documentos do usuário</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Documentos internos relacionados ao colaborador.</div>
                       </div>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="h-11 rounded-2xl bg-white"
-                        onClick={() => {
-                          setAttTitle("");
-                          setAttUrl("");
-                          setAddAttachmentOpen(true);
-                        }}
-                      >
+                      <Button variant="outline" className="h-10 rounded-xl" onClick={() => setAddDocOpen(true)}>
                         <Plus className="mr-2 h-4 w-4" />
                         Adicionar
                       </Button>
@@ -584,55 +544,37 @@ export default function AdminUserCard() {
 
                     <Separator className="my-4" />
 
-                    {attachments.length ? (
-                      <div className="grid gap-2">
-                        {attachments.map((a) => (
-                          <div
-                            key={a.id}
-                            className="flex items-start justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] p-4"
-                          >
+                    <div className="grid gap-3">
+                      {documents.length ? (
+                        documents.map((item) => (
+                          <div key={item.id} className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] p-4">
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{a.title}</div>
-                              {a.url ? (
-                                <a
-                                  className="mt-2 inline-flex items-center gap-2 text-xs font-semibold text-[color:var(--sinaxys-primary)] hover:underline"
-                                  href={a.url}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                >
+                              <div className="truncate text-sm font-semibold text-[color:var(--sinaxys-ink)]">{item.title}</div>
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">{item.category}</Badge>
+                                <a href={item.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[color:var(--sinaxys-primary)] hover:underline">
+                                  <FileText className="h-3.5 w-3.5" />
                                   Abrir
-                                  <ExternalLink className="h-3.5 w-3.5" />
                                 </a>
-                              ) : null}
+                              </div>
                             </div>
                             <Button
-                              type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-9 w-9 rounded-xl text-destructive/80 hover:bg-destructive/10 hover:text-destructive"
+                              className="rounded-xl"
                               onClick={async () => {
-                                try {
-                                  await deleteContractAttachment(a.id);
-                                  await qc.invalidateQueries({ queryKey: ["contract-attachments", cid, userId] });
-                                  toast({ title: "Anexo removido" });
-                                } catch (e) {
-                                  toast({
-                                    title: "Não foi possível remover",
-                                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                                    variant: "destructive",
-                                  });
-                                }
+                                await deleteUserDocument(item.id);
+                                await qc.invalidateQueries({ queryKey: ["user-documents", cid, userId] });
                               }}
-                              title="Remover"
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="rounded-2xl bg-[color:var(--sinaxys-bg)] p-4 text-sm text-muted-foreground">Nenhum anexo ainda.</div>
-                    )}
+                        ))
+                      ) : (
+                        <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">Nenhum documento cadastrado.</div>
+                      )}
+                    </div>
                   </Card>
                 </div>
               </TabsContent>
@@ -641,165 +583,164 @@ export default function AdminUserCard() {
         )}
       </Card>
 
-      {/* Add document */}
-      <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
-        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Adicionar documento</DialogTitle>
-          </DialogHeader>
-
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label>Categoria</Label>
-              <Input className="h-11 rounded-2xl" value={docCategory} onChange={(e) => setDocCategory(e.target.value)} placeholder="Ex.: RH / FINANCEIRO / EMPRESA" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Título</Label>
-              <Input className="h-11 rounded-2xl" value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="Ex.: Política de reembolso" />
-            </div>
-            <div className="grid gap-2">
-              <Label>Link</Label>
-              <Input className="h-11 rounded-2xl" value={docUrl} onChange={(e) => setDocUrl(e.target.value)} placeholder="https://…" />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setAddDocOpen(false)}>
-              Cancelar
-            </Button>
-            <Button
-              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={addingDoc || docTitle.trim().length < 3 || !isUrl(docUrl)}
-              onClick={async () => {
-                if (!userId) return;
-                setAddingDoc(true);
-                try {
-                  await createUserDocument({
-                                      companyId: cid,
-                                      userId,
-                                      category: docCategory.trim() || "EMPRESA",
-                                      title: docTitle,
-                                      url: docUrl,
-                                      kind: "LINK",
-                                    });
-                  toast({ title: "Documento adicionado" });
-                  await qc.invalidateQueries({ queryKey: ["user-documents", cid, userId] });
-                  setAddDocOpen(false);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível adicionar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
-                } finally {
-                  setAddingDoc(false);
-                }
-              }}
-            >
-              {addingDoc ? "Salvando…" : "Adicionar"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add contract attachment */}
       <Dialog open={addAttachmentOpen} onOpenChange={setAddAttachmentOpen}>
-        <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-lg">
+        <DialogContent className="rounded-3xl">
           <DialogHeader>
             <DialogTitle>Adicionar anexo de contrato</DialogTitle>
           </DialogHeader>
-
-          <div className="grid gap-4">
+          <div className="grid gap-3 py-2">
             <div className="grid gap-2">
               <Label>Título</Label>
-              <Input className="h-11 rounded-2xl" value={attTitle} onChange={(e) => setAttTitle(e.target.value)} placeholder="Ex.: Contrato assinado" />
+              <Input value={attTitle} onChange={(e) => setAttTitle(e.target.value)} placeholder="Ex.: Aditivo contratual" className="h-11 rounded-2xl" />
             </div>
             <div className="grid gap-2">
-              <Label>Link</Label>
-              <Input className="h-11 rounded-2xl" value={attUrl} onChange={(e) => setAttUrl(e.target.value)} placeholder="https://…" />
+              <Label>URL</Label>
+              <Input value={attUrl} onChange={(e) => setAttUrl(e.target.value)} placeholder="https://…" className="h-11 rounded-2xl" />
             </div>
           </div>
-
           <DialogFooter>
             <Button variant="outline" className="rounded-xl" onClick={() => setAddAttachmentOpen(false)}>
               Cancelar
             </Button>
             <Button
-              className="rounded-xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-              disabled={addingAttachment || attTitle.trim().length < 3 || !isUrl(attUrl)}
+              className="rounded-xl"
+              disabled={addingAttachment || !attTitle.trim() || !isUrl(attUrl) || !userId}
               onClick={async () => {
-                if (!userId) return;
                 setAddingAttachment(true);
                 try {
                   await createContractAttachment({
                     companyId: cid,
                     userId,
-                    title: attTitle,
-                    url: attUrl,
+                    title: attTitle.trim(),
+                    url: attUrl.trim(),
                   });
-                  toast({ title: "Anexo adicionado" });
                   await qc.invalidateQueries({ queryKey: ["contract-attachments", cid, userId] });
+                  setAttTitle("");
+                  setAttUrl("");
                   setAddAttachmentOpen(false);
-                } catch (e) {
-                  toast({
-                    title: "Não foi possível adicionar",
-                    description: e instanceof Error ? e.message : "Erro inesperado.",
-                    variant: "destructive",
-                  });
+                  toast({ title: "Anexo adicionado" });
+                } catch (e: any) {
+                  toast({ title: "Erro ao adicionar anexo", description: e?.message ?? "Tente novamente.", variant: "destructive" });
                 } finally {
                   setAddingAttachment(false);
                 }
               }}
             >
-              {addingAttachment ? "Salvando…" : "Adicionar"}
+              {addingAttachment ? "Salvando..." : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Offboard dialog for this user */}
-      <AdminUsersOffboardDialog open={offboardOpen} onOpenChange={setOffboardOpen} userId={profile?.id ?? null} onDone={async () => {
-        await qc.invalidateQueries({ queryKey: ["profile", userId] });
-        await qc.invalidateQueries({ queryKey: ["profiles", cid] });
-      }} />
-
-      {/* Delete confirmation dialog */}
-      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <DialogContent className="max-w-md rounded-2xl">
+      <Dialog open={addDocOpen} onOpenChange={setAddDocOpen}>
+        <DialogContent className="rounded-3xl">
           <DialogHeader>
-            <DialogTitle>Excluir usuário</DialogTitle>
+            <DialogTitle>Adicionar documento</DialogTitle>
           </DialogHeader>
-          <div className="grid gap-3">
-            <div className="rounded-2xl bg-amber-50 p-3">
-              <div className="text-sm font-semibold text-amber-900">Atenção</div>
-              <div className="mt-1 text-xs text-amber-900">A exclusão remove permanentemente o acesso e o perfil do usuário. Esta ação não pode ser desfeita.</div>
+          <div className="grid gap-3 py-2">
+            <div className="grid gap-2">
+              <Label>Título</Label>
+              <Input value={docTitle} onChange={(e) => setDocTitle(e.target.value)} placeholder="Ex.: RG digitalizado" className="h-11 rounded-2xl" />
             </div>
-            <div className="text-sm">Confirma excluir <span className="font-semibold">{profile?.name ?? profile?.email}</span> ({profile?.email})?</div>
+            <div className="grid gap-2">
+              <Label>Categoria</Label>
+              <Select value={docCategory} onValueChange={setDocCategory}>
+                <SelectTrigger className="h-11 rounded-2xl bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="EMPRESA">Empresa</SelectItem>
+                  <SelectItem value="PESSOAL">Pessoal</SelectItem>
+                  <SelectItem value="CONTRATO">Contrato</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2">
+              <Label>URL</Label>
+              <Input value={docUrl} onChange={(e) => setDocUrl(e.target.value)} placeholder="https://…" className="h-11 rounded-2xl" />
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" className="rounded-xl" onClick={() => setDeleteConfirmOpen(false)} disabled={deleting}>Cancelar</Button>
-            <Button className="rounded-xl bg-red-600 text-white hover:bg-red-700" onClick={async () => {
-              if (!profile) return;
-              try {
+            <Button variant="outline" className="rounded-xl" onClick={() => setAddDocOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              className="rounded-xl"
+              disabled={addingDoc || !docTitle.trim() || !isUrl(docUrl) || !userId}
+              onClick={async () => {
+                setAddingDoc(true);
+                try {
+                  await createUserDocument({
+                    companyId: cid,
+                    userId,
+                    title: docTitle.trim(),
+                    category: docCategory,
+                    url: docUrl.trim(),
+                    kind: "LINK",
+                  });
+                  await qc.invalidateQueries({ queryKey: ["user-documents", cid, userId] });
+                  setDocTitle("");
+                  setDocCategory("EMPRESA");
+                  setDocUrl("");
+                  setAddDocOpen(false);
+                  toast({ title: "Documento adicionado" });
+                } catch (e: any) {
+                  toast({ title: "Erro ao adicionar documento", description: e?.message ?? "Tente novamente.", variant: "destructive" });
+                } finally {
+                  setAddingDoc(false);
+                }
+              }}
+            >
+              {addingDoc ? "Salvando..." : "Salvar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AdminUsersOffboardDialog
+        open={offboardOpen}
+        onOpenChange={setOffboardOpen}
+        userId={userId ?? ""}
+        onDone={() => {
+          void qc.invalidateQueries({ queryKey: ["profile", userId] });
+          void qc.invalidateQueries({ queryKey: ["profiles", cid] });
+        }}
+      />
+
+      <Dialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>Excluir colaborador</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm text-muted-foreground">
+            Esta ação remove o perfil do colaborador. Se quiser apenas retirar acesso, prefira usar o desligamento.
+          </div>
+          <DialogFooter>
+            <Button variant="outline" className="rounded-xl" onClick={() => setDeleteConfirmOpen(false)}>
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              className="rounded-xl"
+              disabled={deleting || !userId}
+              onClick={async () => {
+                if (!userId) return;
                 setDeleting(true);
-                const { data, error } = await supabase.functions.invoke("admin-delete-user", { body: { userId: profile.id } });
-                if (error) throw error;
-                if (!data?.ok) throw new Error(data?.message ?? "Erro ao excluir usuário.");
-                toast({ title: "Usuário excluído" });
-                await Promise.all([
-                  qc.invalidateQueries({ queryKey: ["profiles", cid] }),
-                  qc.invalidateQueries({ queryKey: ["profile", userId] }),
-                ]);
-                setDeleteConfirmOpen(false);
-                nav(-1);
-              } catch (e) {
-                const msg = (e as any)?.message ?? "Erro inesperado.";
-                toast({ title: "Não foi possível excluir usuário", description: msg, variant: "destructive" });
-              } finally {
-                setDeleting(false);
-              }
-            }}>
-              {deleting ? "Excluindo…" : "Excluir usuário"}
+                try {
+                  const { error } = await supabase.from("profiles").delete().eq("id", userId);
+                  if (error) throw error;
+                  await qc.invalidateQueries({ queryKey: ["profiles", cid] });
+                  setDeleteConfirmOpen(false);
+                  toast({ title: "Colaborador excluído" });
+                  nav("/admin/users");
+                } catch (e: any) {
+                  toast({ title: "Erro ao excluir", description: e?.message ?? "Tente novamente.", variant: "destructive" });
+                } finally {
+                  setDeleting(false);
+                }
+              }}
+            >
+              {deleting ? "Excluindo..." : "Excluir"}
             </Button>
           </DialogFooter>
         </DialogContent>
