@@ -132,9 +132,10 @@ const App = () => (
                         <Route path="/okr/map" element={<OkrMap />} />
                         <Route path="/admin/departments" element={<AdminDepartments />} />
                         <Route path="/admin/users" element={<AdminUsers />} />
-                        <Route path="/admin/costs" element={<AdminCosts />} />
+                        <Route path="/admin/costs" element={<RequireAuth roles={["MASTERADMIN", "ADMIN"]}><AdminCosts /></RequireAuth>} />
                         <Route path="/org" element={<OrgChart />} />
                         <Route path="/settings" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><Settings /></RequireAuth>} />
+
                         <Route path="/pricing" element={<Pricing />} />
                         <Route path="/como-funciona" element={<HowItWorks />} />
                         <Route path="/demo" element={<Demo />} />

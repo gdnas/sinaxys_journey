@@ -294,10 +294,11 @@ const nav: NavItem[] = [
         to: "/admin/costs",
         label: "Custos e Despesas",
         icon: <Wallet className="h-4 w-4" />,
-        roles: ["MASTERADMIN", "ADMIN", "HEAD"],
+        roles: ["MASTERADMIN", "ADMIN"],
         moduleKey: "COSTS",
       },
       // Gestão de Ativos
+
       {
         type: "link",
         to: "/app/ativos/lista",

@@ -79,7 +79,7 @@ type CostPerson = {
 export default function AdminCosts() {
   const nav = useNavigate();
   const { user } = useAuth();
-  if (!user || user.role !== "ADMIN" || !user.companyId) return null;
+  if (!user || !["MASTERADMIN", "ADMIN"].includes(user.role) || !user.companyId) return null;
 
   const companyId = user.companyId;
 
