@@ -3,7 +3,6 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -125,7 +124,7 @@ const App = () => (
                   element={
                     <AppShell>
                       <Routes>
-                        <Route path="/" element={<Index />} />
+                        <Route path="/" element={<Login />} />
                         <Route path="/app" element={<AppHome />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="/tracks" element={<TrackLibrary />} />
@@ -232,7 +231,7 @@ const App = () => (
                         <Route path="/head/home" element={<RequireAuth roles={["HEAD"]}><HeadHome /></RequireAuth>} />
                         <Route path="/collaborator/home" element={<RequireAuth roles={["COLABORADOR"]}><CollaboratorHome /></RequireAuth>} />
                         <Route path="/pdi/performance" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><PdiPerformance /></RequireAuth>} />
-                        <Route path="/" element={<Index />} />
+                        <Route path="/" element={<Login />} />
                         <Route path="*" element={<NotFound />} />
                       </Routes>
                     </AppShell>
