@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2, ChevronRight, Download, Pencil, Plus, Receipt, Search, Trash2, Users, Wallet } from "lucide-react";
+import { Building2, ChevronRight, Download, LayoutGrid, List, Pencil, Plus, Receipt, Search, Trash2, Users, Wallet } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -126,6 +126,7 @@ export default function AdminCosts() {
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [ownerDepartmentFilter, setOwnerDepartmentFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [expenseView, setExpenseView] = useState<"cards" | "list">("cards");
 
   if (!user || !["MASTERADMIN", "ADMIN"].includes(user.role) || !companyId) return null;
 
@@ -444,6 +445,21 @@ export default function AdminCosts() {
       .sort((a, b) => a.departmentName.localeCompare(b.departmentName));
   }, [deptById, filteredCostItems]);
 
+  const filteredCostItemsList = useMemo(() => {
+    return filteredCostItems.map((item) => ({
+      item,
+      collaboratorName: item.target_profile_id
+        ? profileById.get(item.target_profile_id)?.name ?? profileById.get(item.target_profile_id)?.email ?? "—"
+        : "—",
+      ownerDepartmentName: item.owner_department_id
+        ? deptById.get(item.owner_department_id)?.name ?? "Departamento"
+        : "Sem departamento",
+      allocationLabel: (allocationsByItem[item.id] ?? [])
+        .map((allocation) => `${allocation.department_name || deptById.get(allocation.department_id)?.name || "Departamento"} ${n(allocation.allocation_percentage).toFixed(0)}%`)
+        .join(" • "),
+    }));
+  }, [allocationsByItem, deptById, filteredCostItems, profileById]);
+
   async function refreshCosts() {
     await queryClient.invalidateQueries({ queryKey: ["cost-items", companyId] });
     await queryClient.invalidateQueries({ queryKey: ["cost-items", companyId, "all"] });
@@ -661,95 +677,196 @@ export default function AdminCosts() {
           </Badge>
         </div>
 
-        <div className="mt-6 grid gap-6">
-          {groupedFilteredCostItems.map((group) => (
-            <section key={group.departmentId} className="grid gap-4">
-              <div className="flex flex-col gap-2 rounded-[24px] border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/45 p-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{group.departmentName}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">{group.items.length} despesa(s) • {brl(group.total)} equivalentes/mês</div>
-                </div>
-                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">Departamento responsável</Badge>
-              </div>
-
-              <div className="grid gap-4 lg:grid-cols-2">
-                {group.items.map((item) => {
-                  const allocations = allocationsByItem[item.id] ?? [];
-                  return (
-                    <Card key={item.id} className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-5 shadow-none">
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="truncate text-base font-semibold text-[color:var(--sinaxys-ink)]">{item.name}</div>
-                            <Badge className={item.active ? "rounded-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10" : "rounded-full bg-slate-500/10 text-slate-700 hover:bg-slate-500/10"}>
-                              {item.active ? "Ativa" : "Inativa"}
-                            </Badge>
-                            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                              {item.is_shared ? "Compartilhada" : "Exclusiva"}
-                            </Badge>
-                          </div>
-                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                            <span>{item.category || "Sem categoria"}</span>
-                            <span>•</span>
-                            <span>{billingCycleLabel(item.billing_cycle)}</span>
-                            <span>•</span>
-                            <span>{item.type === "fixed" ? "Fixa" : "Variável"}</span>
-                            {item.target_profile_id ? (
-                              <>
-                                <span>•</span>
-                                <span>Colaborador: {profileById.get(item.target_profile_id)?.name ?? profileById.get(item.target_profile_id)?.email ?? "Vinculado"}</span>
-                              </>
-                            ) : null}
-                          </div>
-                          {item.notes ? <p className="mt-3 text-sm text-muted-foreground">{item.notes}</p> : null}
-                        </div>
-
-                        <div className="text-right">
-                          <div className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">{brl(n(item.total_monthly_cost))}</div>
-                          <div className="text-xs text-muted-foreground">equivalente mensal</div>
-                        </div>
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {allocations.map((allocation) => (
-                          <Badge key={allocation.id} className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                            {(allocation.department_name || deptById.get(allocation.department_id)?.name || "Departamento")} · {n(allocation.allocation_percentage).toFixed(0)}%
-                          </Badge>
-                        ))}
-                      </div>
-
-                      <div className="mt-5 flex flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          className="rounded-full"
-                          onClick={() => {
-                            setEditingExpense(item);
-                            setExpenseDialogOpen(true);
-                          }}
-                        >
-                          <Pencil className="mr-2 h-4 w-4" />Editar
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="rounded-full text-red-600 hover:bg-red-50 hover:text-red-700"
-                          onClick={() => handleDeleteExpense(item)}
-                        >
-                          <Trash2 className="mr-2 h-4 w-4" />Excluir
-                        </Button>
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-
-          {!groupedFilteredCostItems.length && (
-            <Card className="rounded-3xl border-dashed border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-8 text-center text-sm text-muted-foreground">
-              Nenhuma despesa encontrada com os filtros atuais.
-            </Card>
-          )}
+        <div className="mt-4 flex justify-end">
+          <div className="inline-flex rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/40 p-1">
+            <Button
+              type="button"
+              variant="ghost"
+              className={`h-9 rounded-full px-4 ${expenseView === "cards" ? "bg-white text-[color:var(--sinaxys-ink)] shadow-sm hover:bg-white" : "text-muted-foreground hover:text-[color:var(--sinaxys-ink)]"}`}
+              onClick={() => setExpenseView("cards")}
+            >
+              <LayoutGrid className="mr-2 h-4 w-4" />Cards
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className={`h-9 rounded-full px-4 ${expenseView === "list" ? "bg-white text-[color:var(--sinaxys-ink)] shadow-sm hover:bg-white" : "text-muted-foreground hover:text-[color:var(--sinaxys-ink)]"}`}
+              onClick={() => setExpenseView("list")}
+            >
+              <List className="mr-2 h-4 w-4" />Lista
+            </Button>
+          </div>
         </div>
+
+        {expenseView === "cards" ? (
+          <div className="mt-6 grid gap-6">
+            {groupedFilteredCostItems.map((group) => (
+              <section key={group.departmentId} className="grid gap-4">
+                <div className="flex flex-col gap-2 rounded-[24px] border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/45 p-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{group.departmentName}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{group.items.length} despesa(s) • {brl(group.total)} equivalentes/mês</div>
+                  </div>
+                  <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">Departamento responsável</Badge>
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                  {group.items.map((item) => {
+                    const allocations = allocationsByItem[item.id] ?? [];
+                    return (
+                      <Card key={item.id} className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-5 shadow-none">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="truncate text-base font-semibold text-[color:var(--sinaxys-ink)]">{item.name}</div>
+                              <Badge className={item.active ? "rounded-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10" : "rounded-full bg-slate-500/10 text-slate-700 hover:bg-slate-500/10"}>
+                                {item.active ? "Ativa" : "Inativa"}
+                              </Badge>
+                              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                                {item.is_shared ? "Compartilhada" : "Exclusiva"}
+                              </Badge>
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              <span>{item.category || "Sem categoria"}</span>
+                              <span>•</span>
+                              <span>{billingCycleLabel(item.billing_cycle)}</span>
+                              <span>•</span>
+                              <span>{item.type === "fixed" ? "Fixa" : "Variável"}</span>
+                              {item.target_profile_id ? (
+                                <>
+                                  <span>•</span>
+                                  <span>Colaborador: {profileById.get(item.target_profile_id)?.name ?? profileById.get(item.target_profile_id)?.email ?? "Vinculado"}</span>
+                                </>
+                              ) : null}
+                            </div>
+                            {item.notes ? <p className="mt-3 text-sm text-muted-foreground">{item.notes}</p> : null}
+                          </div>
+
+                          <div className="text-right">
+                            <div className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">{brl(n(item.total_monthly_cost))}</div>
+                            <div className="text-xs text-muted-foreground">equivalente mensal</div>
+                          </div>
+                        </div>
+
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {allocations.map((allocation) => (
+                            <Badge key={allocation.id} className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                              {(allocation.department_name || deptById.get(allocation.department_id)?.name || "Departamento")} · {n(allocation.allocation_percentage).toFixed(0)}%
+                            </Badge>
+                          ))}
+                        </div>
+
+                        <div className="mt-5 flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            className="rounded-full"
+                            onClick={() => {
+                              setEditingExpense(item);
+                              setExpenseDialogOpen(true);
+                            }}
+                          >
+                            <Pencil className="mr-2 h-4 w-4" />Editar
+                          </Button>
+                          <Button
+                            variant="outline"
+                            className="rounded-full text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={() => handleDeleteExpense(item)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />Excluir
+                          </Button>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </section>
+            ))}
+
+            {!groupedFilteredCostItems.length && (
+              <Card className="rounded-3xl border-dashed border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-8 text-center text-sm text-muted-foreground">
+                Nenhuma despesa encontrada com os filtros atuais.
+              </Card>
+            )}
+          </div>
+        ) : (
+          <div className="mt-6">
+            <ResponsiveTable minWidth="1180px">
+              <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white">
+                <Table className="min-w-[1180px]">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Despesa</TableHead>
+                      <TableHead>Departamento responsável</TableHead>
+                      <TableHead>Colaborador</TableHead>
+                      <TableHead>Categoria / tipo</TableHead>
+                      <TableHead>Rateio</TableHead>
+                      <TableHead className="text-right">Valor</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredCostItemsList.map(({ item, collaboratorName, ownerDepartmentName, allocationLabel }) => (
+                      <TableRow key={item.id} className="hover:bg-[color:var(--sinaxys-tint)]/35">
+                        <TableCell className="align-top">
+                          <div className="min-w-[220px]">
+                            <div className="font-semibold text-[color:var(--sinaxys-ink)]">{item.name}</div>
+                            <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              <span>{billingCycleLabel(item.billing_cycle)}</span>
+                              <span>•</span>
+                              <span>{item.active ? "Ativa" : "Inativa"}</span>
+                              <span>•</span>
+                              <span>{item.is_shared ? "Compartilhada" : "Exclusiva"}</span>
+                            </div>
+                            {item.notes ? <div className="mt-2 text-xs text-muted-foreground">{item.notes}</div> : null}
+                          </div>
+                        </TableCell>
+                        <TableCell className="align-top text-sm text-muted-foreground">{ownerDepartmentName}</TableCell>
+                        <TableCell className="align-top text-sm text-muted-foreground">{collaboratorName}</TableCell>
+                        <TableCell className="align-top">
+                          <div className="text-sm text-[color:var(--sinaxys-ink)]">{item.category || "Sem categoria"}</div>
+                          <div className="mt-1 text-xs text-muted-foreground">{item.type === "fixed" ? "Fixa" : "Variável"}</div>
+                        </TableCell>
+                        <TableCell className="align-top text-sm text-muted-foreground">
+                          <div className="max-w-[320px] whitespace-normal leading-relaxed">{allocationLabel || "—"}</div>
+                        </TableCell>
+                        <TableCell className="align-top text-right font-semibold text-[color:var(--sinaxys-ink)]">{brl(n(item.total_monthly_cost))}</TableCell>
+                        <TableCell className="align-top">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="outline"
+                              className="rounded-full"
+                              onClick={() => {
+                                setEditingExpense(item);
+                                setExpenseDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="mr-2 h-4 w-4" />Editar
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="rounded-full text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => handleDeleteExpense(item)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />Excluir
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+
+                    {!filteredCostItemsList.length && (
+                      <TableRow>
+                        <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                          Nenhuma despesa encontrada com os filtros atuais.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </ResponsiveTable>
+          </div>
+        )}
       </Card>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
