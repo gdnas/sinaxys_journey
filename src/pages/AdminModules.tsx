@@ -19,6 +19,7 @@ import {
   Megaphone,
   Box,
   Users2,
+  BarChart3,
 } from "lucide-react";
 
 interface ModuleSectionProps {
@@ -112,6 +113,12 @@ export default function AdminModules() {
   const { data: assetsEnabled = true, refetch: refetchAssets } = useQuery({
     queryKey: ["company-module", companyId, "ASSETS"],
     queryFn: () => isCompanyModuleEnabled(String(companyId), "ASSETS"),
+    enabled: queryEnabled,
+  });
+
+  const { data: financeEnabled = false, refetch: refetchFinance } = useQuery({
+    queryKey: ["company-module", companyId, "FINANCE"],
+    queryFn: () => isCompanyModuleEnabled(String(companyId), "FINANCE"),
     enabled: queryEnabled,
   });
 
@@ -257,6 +264,19 @@ export default function AdminModules() {
             await setCompanyModuleEnabled(companyId, "COSTS", v);
             await refetchCosts();
             toast({ title: v ? "Módulo ativado" : "Módulo ocultado", description: "O menu será atualizado automaticamente." });
+          }}
+        />
+
+        <ModuleToggle
+          icon={<BarChart3 className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />}
+          title="Planejamento Financeiro"
+          description="Versões, cenários e premissas financeiras para planejamento gerencial sem depender do ERP operacional."
+          checked={financeEnabled}
+          onChange={async (v) => {
+            if (!companyId) return;
+            await setCompanyModuleEnabled(companyId, "FINANCE", v);
+            await refetchFinance();
+            toast({ title: v ? "Financeiro ativado" : "Financeiro ocultado", description: "O acesso ao módulo financeiro foi atualizado para a empresa." });
           }}
         />
 
