@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
-import { Lock } from "lucide-react";
+import { Landmark, Lock, Plus, Receipt } from "lucide-react";
 import { Navigate, useParams, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useCompany } from "@/lib/company";
+
 import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 import { useToast } from "@/hooks/use-toast";
 import { FinanceVersionHeader } from "@/components/finance/FinanceVersionHeader";
@@ -10,6 +13,7 @@ import { FinanceVersionLinesTable } from "@/components/finance/FinanceVersionLin
 import {
   createFinanceVersionLine,
   deleteFinanceVersionLine,
+  FINANCE_ACCOUNT_CODES,
   getFinanceVersion,
   listFinanceAccounts,
   listFinanceDepartments,
@@ -26,6 +30,10 @@ import type { Role } from "@/lib/domain";
 
 function canEditRole(role: Role) {
   return role === "ADMIN" || role === "HEAD" || role === "MASTERADMIN";
+}
+
+function brl(value: number) {
+  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
 }
 
 export default function FinanceVersionDetail() {
@@ -58,6 +66,25 @@ export default function FinanceVersionDetail() {
     }
     return departments;
   }, [departments, user?.departmentId, user?.role, companyId]);
+  const visibleLines = useMemo(
+    () => (visibleDepartments.length ? lines.filter((line) => !line.department_id || visibleDepartments.some((department) => department.id === line.department_id)) : lines),
+    [lines, visibleDepartments],
+  );
+  const structuralSummary = useMemo(() => {
+    const accountById = new Map(accounts.map((account) => [account.id, account] as const));
+    return visibleLines.reduce(
+      (acc, line) => {
+        const account = accountById.get(line.finance_account_id);
+        const code = account?.code ?? "";
+        acc.total += line.amount;
+        if (code === FINANCE_ACCOUNT_CODES.taxes) acc.taxes += line.amount;
+        else if (code === FINANCE_ACCOUNT_CODES.loans) acc.loans += line.amount;
+        else acc.other += line.amount;
+        return acc;
+      },
+      { total: 0, taxes: 0, loans: 0, other: 0 },
+    );
+  }, [accounts, visibleLines]);
 
   async function load() {
     if (!id || !companyId) return;
@@ -202,14 +229,14 @@ export default function FinanceVersionDetail() {
     }
   }
 
-  function handleAddLine() {
-    console.info("[FINANCE_QA] line_create_started", { role: user?.role, companyId, versionId: version?.id, departmentId: user?.departmentId, action: "create_line" });
+  function startNewLine(accountCode?: string) {
+    const accountId = accountCode ? accounts.find((account) => account.code === accountCode)?.id ?? accounts[0]?.id ?? "" : accounts[0]?.id ?? "";
     const newId = `new-${crypto.randomUUID()}`;
     setLines((current) => [{ id: newId } as FinanceVersionLine, ...current]);
     setDrafts((current) => ({
       ...current,
       [newId]: {
-        finance_account_id: accounts[0]?.id ?? "",
+        finance_account_id: accountId,
         fiscal_period_id: periods[0]?.id ?? "",
         department_id: user?.role === "HEAD" ? user.departmentId ?? null : null,
         project_id: null,
@@ -219,6 +246,16 @@ export default function FinanceVersionDetail() {
     }));
     setEditingLineId(newId);
     setPendingNewLineId(newId);
+  }
+
+  function handleAddLine() {
+    console.info("[FINANCE_QA] line_create_started", { role: user?.role, companyId, versionId: version?.id, departmentId: user?.departmentId, action: "create_line" });
+    startNewLine();
+  }
+
+  function handleAddStructuralLine(accountCode: typeof FINANCE_ACCOUNT_CODES.taxes | typeof FINANCE_ACCOUNT_CODES.loans) {
+    console.info("[FINANCE_QA] structural_line_create_started", { role: user?.role, companyId, versionId: version?.id, accountCode, action: "create_structural_line" });
+    startNewLine(accountCode);
   }
 
   function handleCancelLine(lineId: string) {
@@ -263,6 +300,43 @@ export default function FinanceVersionDetail() {
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
         <FinanceVersionHeader version={version} onLock={handleLock} saving={lockingVersion} canEdit={!readOnly} />
 
+        <section className="grid gap-4 md:grid-cols-4">
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white/5 p-5 backdrop-blur">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total da versão</div>
+            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(structuralSummary.total)}</div>
+            <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/65">Soma das linhas visíveis no plano.</div>
+          </Card>
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white/5 p-5 backdrop-blur">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Receipt className="h-4 w-4" />Impostos
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(structuralSummary.taxes)}</div>
+            <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/65">Conta 2003 consolidada nesta versão.</div>
+            {!readOnly && (
+              <Button variant="outline" className="mt-4 rounded-full" onClick={() => handleAddStructuralLine(FINANCE_ACCOUNT_CODES.taxes)}>
+                <Plus className="mr-2 h-4 w-4" />Nova linha de imposto
+              </Button>
+            )}
+          </Card>
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white/5 p-5 backdrop-blur">
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <Landmark className="h-4 w-4" />Empréstimos
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(structuralSummary.loans)}</div>
+            <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/65">Conta 2004 para parcelas, juros e serviço da dívida.</div>
+            {!readOnly && (
+              <Button variant="outline" className="mt-4 rounded-full" onClick={() => handleAddStructuralLine(FINANCE_ACCOUNT_CODES.loans)}>
+                <Plus className="mr-2 h-4 w-4" />Nova linha de empréstimo
+              </Button>
+            )}
+          </Card>
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white/5 p-5 backdrop-blur">
+            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Demais contas</div>
+            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(structuralSummary.other)}</div>
+            <div className="mt-1 text-xs text-[color:var(--sinaxys-ink)]/65">Receita, folha, marketing, investimentos e outras linhas.</div>
+          </Card>
+        </section>
+
         {version.status === "locked" && (
           <div className="rounded-3xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">
             <div className="flex items-center gap-2 font-semibold"><Lock className="h-4 w-4" />Versão bloqueada</div>
@@ -271,7 +345,7 @@ export default function FinanceVersionDetail() {
         )}
 
         <FinanceVersionLinesTable
-          lines={visibleDepartments.length ? lines.filter((line) => !line.department_id || visibleDepartments.some((department) => department.id === line.department_id)) : lines}
+          lines={visibleLines}
           drafts={drafts}
           onDraftChange={(lineId, next) => setDrafts((current) => ({ ...current, [lineId]: next }))}
           onSaveLine={handleSaveLine}

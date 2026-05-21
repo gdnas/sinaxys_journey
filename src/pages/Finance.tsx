@@ -52,9 +52,10 @@ export default function Finance() {
                 {[
                   "Versões por período",
                   "Cenários comparáveis",
-                  "Compatível com RLS",
+                  "Impostos e empréstimos",
                   "Integração com custos",
                 ].map((item) => (
+
                   <div key={item} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white/5 px-4 py-3 text-sm font-semibold">
                     {item}
                   </div>

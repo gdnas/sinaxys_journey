@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Copy, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, Copy, Landmark, Percent, PiggyBank, Plus, Receipt, Sparkles } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -12,13 +12,14 @@ import { useCompany } from "@/lib/company";
 import {
   activateFinanceScenario,
   createFinanceScenario,
+  deleteFinanceScenarioAssumption,
   duplicateFinanceScenario,
+  FINANCE_ASSUMPTION_KEYS,
   listFinanceScenarioAssumptions,
   listFinanceScenarios,
   seedFinanceScenarios,
   updateFinanceScenario,
   upsertFinanceScenarioAssumption,
-  deleteFinanceScenarioAssumption,
   type FinanceScenario,
   type FinanceScenarioAssumption,
 } from "@/lib/financeDb";
@@ -28,18 +29,23 @@ import { useCompanyModuleEnabled } from "@/hooks/useCompanyModuleEnabled";
 function ScenarioCard({
   scenario,
   assumptions,
+  selected,
+  onSelect,
   onEdit,
   onDuplicate,
   onActivate,
 }: {
   scenario: FinanceScenario;
   assumptions: FinanceScenarioAssumption[];
+  selected: boolean;
+  onSelect: () => void;
   onEdit: () => void;
   onDuplicate: () => void;
   onActivate: () => void;
 }) {
   return (
-    <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white/5 p-5 backdrop-blur">
+    <Card className={`rounded-3xl p-5 backdrop-blur ${selected ? "border-[color:var(--sinaxys-primary)] bg-[color:var(--sinaxys-tint)]/50" : "border-[color:var(--sinaxys-border)] bg-white/5"}`}>
+
       <div className="flex flex-col gap-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -65,9 +71,13 @@ function ScenarioCard({
         </div>
 
         <div className="flex flex-wrap gap-2">
+          <Button variant={selected ? "default" : "outline"} className={`rounded-full ${selected ? "bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90" : ""}`} onClick={onSelect}>
+            {selected ? "Cenário selecionado" : "Ver premissas"}
+          </Button>
           <Button variant="outline" className="rounded-full" onClick={onEdit}>
             Editar
           </Button>
+
           <Button variant="outline" className="rounded-full" onClick={onDuplicate}>
             <Copy className="mr-2 h-4 w-4" />
             Duplicar
@@ -82,6 +92,10 @@ function ScenarioCard({
       </div>
     </Card>
   );
+}
+
+function assumptionNumber(assumptions: FinanceScenarioAssumption[], key: string) {
+  return assumptions.find((item) => item.key === key)?.value_number ?? null;
 }
 
 export default function FinanceScenarios() {
@@ -106,6 +120,11 @@ export default function FinanceScenarios() {
   const [assumptionValueNumber, setAssumptionValueNumber] = useState("");
   const [assumptionValueText, setAssumptionValueText] = useState("");
   const [assumptionUnit, setAssumptionUnit] = useState("%");
+  const [taxRate, setTaxRate] = useState("");
+  const [taxFixedMonthly, setTaxFixedMonthly] = useState("");
+  const [loanMonthlyPayment, setLoanMonthlyPayment] = useState("");
+  const [loanInterestRate, setLoanInterestRate] = useState("");
+  const [loanOutstandingBalance, setLoanOutstandingBalance] = useState("");
 
   const selectedScenario = useMemo(() => scenarios.find((item) => item.id === selectedScenarioId) ?? null, [scenarios, selectedScenarioId]);
 
@@ -118,6 +137,12 @@ export default function FinanceScenarios() {
     setLoading(false);
   }
 
+  async function loadAssumptions(scenarioId: string) {
+    if (!companyId) return;
+    const rows = await listFinanceScenarioAssumptions(companyId, scenarioId);
+    setAssumptions(rows);
+  }
+
   useEffect(() => {
     if (!companyId || !user?.id) return;
     void (async () => {
@@ -128,11 +153,16 @@ export default function FinanceScenarios() {
 
   useEffect(() => {
     if (!companyId || !selectedScenarioId) return;
-    void (async () => {
-      const rows = await listFinanceScenarioAssumptions(companyId, selectedScenarioId);
-      setAssumptions(rows);
-    })();
+    void loadAssumptions(selectedScenarioId);
   }, [companyId, selectedScenarioId]);
+
+  useEffect(() => {
+    setTaxRate(assumptionNumber(assumptions, FINANCE_ASSUMPTION_KEYS.taxRate)?.toString() ?? "");
+    setTaxFixedMonthly(assumptionNumber(assumptions, FINANCE_ASSUMPTION_KEYS.taxFixedMonthly)?.toString() ?? "");
+    setLoanMonthlyPayment(assumptionNumber(assumptions, FINANCE_ASSUMPTION_KEYS.loanMonthlyPayment)?.toString() ?? "");
+    setLoanInterestRate(assumptionNumber(assumptions, FINANCE_ASSUMPTION_KEYS.loanInterestRate)?.toString() ?? "");
+    setLoanOutstandingBalance(assumptionNumber(assumptions, FINANCE_ASSUMPTION_KEYS.loanOutstandingBalance)?.toString() ?? "");
+  }, [assumptions]);
 
   if (!user) return <Navigate to="/login" replace />;
   if (isLoading || loading) {
@@ -148,80 +178,143 @@ export default function FinanceScenarios() {
   async function handleCreateScenario() {
     if (!companyId || !user) return;
     setSaving(true);
-    const created = await createFinanceScenario(companyId, user.id, scenarioName, scenarioDescription || null, null);
-    setNewScenarioOpen(false);
-    setScenarioName("");
-    setScenarioDescription("");
-    setSelectedScenarioId(created.id);
-    await load();
-    toast({ title: "Cenário criado", description: "O novo cenário foi adicionado com sucesso." });
-    setSaving(false);
+    try {
+      const created = await createFinanceScenario(companyId, user.id, scenarioName, scenarioDescription || null, null);
+      setNewScenarioOpen(false);
+      setScenarioName("");
+      setScenarioDescription("");
+      setSelectedScenarioId(created.id);
+      await load();
+      toast({ title: "Cenário criado", description: "O novo cenário foi adicionado com sucesso." });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleSaveScenario() {
     if (!editingScenario) return;
     setSaving(true);
-    await updateFinanceScenario(editingScenario.id, {
-      name: scenarioName,
-      description: scenarioDescription || null,
-    });
-    setEditingScenario(null);
-    await load();
-    toast({ title: "Cenário atualizado", description: "As informações do cenário foram salvas." });
-    setSaving(false);
+    try {
+      await updateFinanceScenario(editingScenario.id, {
+        name: scenarioName,
+        description: scenarioDescription || null,
+      });
+      setEditingScenario(null);
+      await load();
+      toast({ title: "Cenário atualizado", description: "As informações do cenário foram salvas." });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDuplicateScenario() {
     if (!companyId || !user || !duplicateScenarioId) return;
     setSaving(true);
-    const duplicated = await duplicateFinanceScenario(companyId, user.id, duplicateScenarioId);
-    setDuplicateScenarioId(null);
-    await load();
-    setSelectedScenarioId(duplicated.id);
-    toast({ title: "Cenário duplicado", description: "Uma cópia foi criada com as premissas atuais." });
-    setSaving(false);
+    try {
+      const duplicated = await duplicateFinanceScenario(companyId, user.id, duplicateScenarioId);
+      setDuplicateScenarioId(null);
+      await load();
+      setSelectedScenarioId(duplicated.id);
+      toast({ title: "Cenário duplicado", description: "Uma cópia foi criada com as premissas atuais." });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleActivateScenario(id: string) {
     setSaving(true);
-    await activateFinanceScenario(id);
-    await load();
-    toast({ title: "Cenário ativado", description: "O cenário selecionado agora está ativo." });
-    setSaving(false);
+    try {
+      await activateFinanceScenario(id);
+      await load();
+      toast({ title: "Cenário ativado", description: "O cenário selecionado agora está ativo." });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleAddAssumption() {
     if (!companyId || !selectedScenarioId) return;
     setSaving(true);
+    try {
+      await upsertFinanceScenarioAssumption(companyId, selectedScenarioId, {
+        key: assumptionKey,
+        label: assumptionLabel,
+        value_number: assumptionValueNumber ? Number(assumptionValueNumber) : null,
+        value_text: assumptionValueText || null,
+        value_json: null,
+        unit: assumptionUnit || null,
+        applies_to_account_id: null,
+        applies_to_department_id: null,
+        applies_to_project_id: null,
+        applies_to_squad_id: null,
+      });
+      setAssumptionValueNumber("");
+      setAssumptionValueText("");
+      await loadAssumptions(selectedScenarioId);
+      toast({ title: "Premissa salva", description: "A premissa foi adicionada ao cenário." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDeleteAssumption(id: string) {
+    setSaving(true);
+    try {
+      await deleteFinanceScenarioAssumption(id);
+      if (selectedScenarioId) {
+        await loadAssumptions(selectedScenarioId);
+      }
+      toast({ title: "Premissa removida", description: "A premissa foi excluída do cenário." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function saveStructuredAssumption(key: string, label: string, unit: string | null, value: string) {
+    if (!companyId || !selectedScenarioId) return;
     await upsertFinanceScenarioAssumption(companyId, selectedScenarioId, {
-      key: assumptionKey,
-      label: assumptionLabel,
-      value_number: assumptionValueNumber ? Number(assumptionValueNumber) : null,
-      value_text: assumptionValueText || null,
+      key,
+      label,
+      value_number: value.trim() ? Number(value) : null,
+      value_text: null,
       value_json: null,
-      unit: assumptionUnit || null,
+      unit,
       applies_to_account_id: null,
       applies_to_department_id: null,
       applies_to_project_id: null,
       applies_to_squad_id: null,
     });
-    setAssumptionValueNumber("");
-    setAssumptionValueText("");
-    const rows = await listFinanceScenarioAssumptions(companyId, selectedScenarioId);
-    setAssumptions(rows);
-    toast({ title: "Premissa salva", description: "A premissa foi adicionada ao cenário." });
-    setSaving(false);
   }
 
-  async function handleDeleteAssumption(id: string) {
+  async function handleSaveTaxes() {
+    if (!selectedScenarioId) return;
     setSaving(true);
-    await deleteFinanceScenarioAssumption(id);
-    if (companyId && selectedScenarioId) {
-      const rows = await listFinanceScenarioAssumptions(companyId, selectedScenarioId);
-      setAssumptions(rows);
+    try {
+      await Promise.all([
+        saveStructuredAssumption(FINANCE_ASSUMPTION_KEYS.taxRate, "Carga tributária efetiva", "%", taxRate),
+        saveStructuredAssumption(FINANCE_ASSUMPTION_KEYS.taxFixedMonthly, "Impostos fixos mensais", "R$", taxFixedMonthly),
+      ]);
+      await loadAssumptions(selectedScenarioId);
+      toast({ title: "Impostos atualizados", description: "As premissas tributárias do cenário foram salvas." });
+    } finally {
+      setSaving(false);
     }
-    toast({ title: "Premissa removida", description: "A premissa foi excluída do cenário." });
-    setSaving(false);
+  }
+
+  async function handleSaveLoans() {
+    if (!selectedScenarioId) return;
+    setSaving(true);
+    try {
+      await Promise.all([
+        saveStructuredAssumption(FINANCE_ASSUMPTION_KEYS.loanMonthlyPayment, "Parcela mensal de empréstimos", "R$", loanMonthlyPayment),
+        saveStructuredAssumption(FINANCE_ASSUMPTION_KEYS.loanInterestRate, "Taxa de juros do empréstimo", "%", loanInterestRate),
+        saveStructuredAssumption(FINANCE_ASSUMPTION_KEYS.loanOutstandingBalance, "Saldo devedor", "R$", loanOutstandingBalance),
+      ]);
+      await loadAssumptions(selectedScenarioId);
+      toast({ title: "Empréstimos atualizados", description: "As premissas de dívida do cenário foram salvas." });
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -236,7 +329,7 @@ export default function FinanceScenarios() {
               </div>
               <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-5xl">Simule realidades sem mexer no plano original.</h1>
               <p className="mt-3 max-w-2xl text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70 md:text-base">
-                Base, Conservador e Agressivo com premissas próprias, herança opcional e ativação simples.
+                Agora com premissas estruturadas para operação, impostos da empresa e serviço da dívida em cada cenário.
               </p>
             </div>
 
@@ -309,6 +402,8 @@ export default function FinanceScenarios() {
               key={scenario.id}
               scenario={scenario}
               assumptions={scenario.id === selectedScenarioId ? assumptions : []}
+              selected={scenario.id === selectedScenarioId}
+              onSelect={() => setSelectedScenarioId(scenario.id)}
               onEdit={() => {
                 setEditingScenario(scenario);
                 setScenarioName(scenario.name);
@@ -317,14 +412,93 @@ export default function FinanceScenarios() {
               onDuplicate={() => setDuplicateScenarioId(scenario.id)}
               onActivate={() => handleActivateScenario(scenario.id)}
             />
+
           ))}
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white/5 p-5">
+            <div className="flex items-start gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/5 text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                <Receipt className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Impostos da empresa</h2>
+                <p className="mt-1 text-sm text-[color:var(--sinaxys-ink)]/70">Defina a carga tributária do cenário e o peso fixo mensal dos tributos.</p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Carga tributária efetiva (%)</label>
+                <Input value={taxRate} onChange={(e) => setTaxRate(e.target.value)} placeholder="Ex.: 13.5" className="h-11 rounded-2xl" />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Impostos fixos mensais (R$)</label>
+                <Input value={taxFixedMonthly} onChange={(e) => setTaxFixedMonthly(e.target.value)} placeholder="Ex.: 8500" className="h-11 rounded-2xl" />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                <Percent className="mr-1 h-3.5 w-3.5" />Premissa estrutural
+              </Badge>
+              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                Conta recomendada: Impostos
+              </Badge>
+            </div>
+
+            <Button onClick={handleSaveTaxes} disabled={saving || !selectedScenarioId} className="mt-5 rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+              Salvar impostos
+            </Button>
+          </Card>
+
+          <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white/5 p-5">
+            <div className="flex items-start gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-2xl bg-white/5 text-[color:var(--sinaxys-primary)] ring-1 ring-[color:var(--sinaxys-border)]">
+                <Landmark className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Empréstimos e dívida</h2>
+                <p className="mt-1 text-sm text-[color:var(--sinaxys-ink)]/70">Controle saldo devedor, taxa de juros e a parcela mensal prevista no cenário.</p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2">
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Parcela mensal (R$)</label>
+                <Input value={loanMonthlyPayment} onChange={(e) => setLoanMonthlyPayment(e.target.value)} placeholder="Ex.: 12000" className="h-11 rounded-2xl" />
+              </div>
+              <div className="grid gap-2">
+                <label className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Taxa de juros (%)</label>
+                <Input value={loanInterestRate} onChange={(e) => setLoanInterestRate(e.target.value)} placeholder="Ex.: 1.8" className="h-11 rounded-2xl" />
+              </div>
+              <div className="grid gap-2 md:col-span-2">
+                <label className="text-sm font-medium text-[color:var(--sinaxys-ink)]">Saldo devedor (R$)</label>
+                <Input value={loanOutstandingBalance} onChange={(e) => setLoanOutstandingBalance(e.target.value)} placeholder="Ex.: 450000" className="h-11 rounded-2xl" />
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                <PiggyBank className="mr-1 h-3.5 w-3.5" />Serviço da dívida
+              </Badge>
+              <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                Conta recomendada: Empréstimos e juros
+              </Badge>
+            </div>
+
+            <Button onClick={handleSaveLoans} disabled={saving || !selectedScenarioId} className="mt-5 rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+              Salvar empréstimos
+            </Button>
+          </Card>
         </section>
 
         <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white/5 p-5">
-            <h2 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Premissas do cenário</h2>
+            <h2 className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">Premissas livres do cenário</h2>
             <p className="mt-2 text-sm text-[color:var(--sinaxys-ink)]/70">
-              As premissas podem ser globais ou vinculadas a conta, departamento, projeto ou squad.
+              Além de impostos e empréstimos, você pode manter outras hipóteses globais ou gerenciais.
             </p>
 
             <div className="mt-4 grid gap-3">
@@ -359,14 +533,22 @@ export default function FinanceScenarios() {
                   </div>
                 </div>
               ))}
+
               {!assumptions.length && (
-                <div className="rounded-2xl border border-dashed border-[color:var(--sinaxys-border)] bg-white/5 p-6 text-sm text-muted-foreground">
+                <div className="rounded-2xl border border-dashed border-[color:var(--sinaxys-border)] bg-white/5 p-6 text-sm text-[color:var(--sinaxys-ink)]/70">
                   Nenhuma premissa cadastrada para este cenário.
                 </div>
               )}
             </div>
           </Card>
         </section>
+
+        <div className="flex justify-end">
+          <Button variant="outline" className="rounded-full" onClick={() => navigate("/finance/versions")}>
+            Ir para versões
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

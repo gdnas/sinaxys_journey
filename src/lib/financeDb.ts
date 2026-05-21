@@ -1,5 +1,22 @@
 import { supabase } from "@/integrations/supabase/client";
 
+export const FINANCE_ACCOUNT_CODES = {
+  recurringRevenue: "1001",
+  payroll: "2001",
+  marketing: "2002",
+  taxes: "2003",
+  loans: "2004",
+  investments: "3001",
+} as const;
+
+export const FINANCE_ASSUMPTION_KEYS = {
+  taxRate: "tax_rate",
+  taxFixedMonthly: "tax_fixed_monthly",
+  loanMonthlyPayment: "loan_monthly_payment",
+  loanInterestRate: "loan_interest_rate",
+  loanOutstandingBalance: "loan_outstanding_balance",
+} as const;
+
 export type UserFinancialRecipientType = "PF" | "PJ" | (string & {});
 
 export type UserFinancialProfile = {
@@ -232,20 +249,35 @@ function setFinanceAccountsStore(value: FinanceAccount[]) {
 
 function ensureDefaultFinanceAccounts(companyId: string) {
   const accounts = getFinanceAccountsStore();
-  if (accounts.some((item) => item.company_id === companyId)) {
-    return accounts.filter((item) => item.company_id === companyId);
-  }
+  const companyAccounts = accounts.filter((item) => item.company_id === companyId);
+  const defaults = [
+    { code: FINANCE_ACCOUNT_CODES.recurringRevenue, name: "Receita Recorrente" },
+    { code: FINANCE_ACCOUNT_CODES.payroll, name: "Folha" },
+    { code: FINANCE_ACCOUNT_CODES.marketing, name: "Marketing" },
+    { code: FINANCE_ACCOUNT_CODES.taxes, name: "Impostos" },
+    { code: FINANCE_ACCOUNT_CODES.loans, name: "Empréstimos e juros" },
+    { code: FINANCE_ACCOUNT_CODES.investments, name: "Investimentos" },
+  ] as const;
 
   const timestamp = nowIso();
-  const seeded: FinanceAccount[] = [
-    { id: createId(), company_id: companyId, code: "1001", name: "Receita Recorrente", created_at: timestamp, updated_at: timestamp },
-    { id: createId(), company_id: companyId, code: "2001", name: "Folha", created_at: timestamp, updated_at: timestamp },
-    { id: createId(), company_id: companyId, code: "2002", name: "Marketing", created_at: timestamp, updated_at: timestamp },
-    { id: createId(), company_id: companyId, code: "3001", name: "Investimentos", created_at: timestamp, updated_at: timestamp },
-  ];
+  const missingAccounts = defaults
+    .filter((item) => !companyAccounts.some((account) => account.code === item.code))
+    .map((item) => ({
+      id: createId(),
+      company_id: companyId,
+      code: item.code,
+      name: item.name,
+      created_at: timestamp,
+      updated_at: timestamp,
+    } satisfies FinanceAccount));
 
-  setFinanceAccountsStore([...accounts, ...seeded]);
-  return seeded;
+  if (!missingAccounts.length) {
+    return companyAccounts.sort((a, b) => (a.code ?? "").localeCompare(b.code ?? ""));
+  }
+
+  const next = [...accounts, ...missingAccounts];
+  setFinanceAccountsStore(next);
+  return next.filter((item) => item.company_id === companyId).sort((a, b) => (a.code ?? "").localeCompare(b.code ?? ""));
 }
 
 async function safeSelect<T>(query: PromiseLike<{ data: T[] | null; error: any }>) {
