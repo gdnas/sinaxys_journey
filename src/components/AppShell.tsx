@@ -16,6 +16,7 @@ import {
   Handshake,
   LayoutDashboard,
   Layers,
+  LineChart,
   LogOut,
   Menu,
   Megaphone,
@@ -296,6 +297,22 @@ const nav: NavItem[] = [
         icon: <Wallet className="h-4 w-4" />,
         roles: ["MASTERADMIN", "ADMIN"],
         moduleKey: "COSTS",
+      },
+      {
+        type: "link",
+        to: "/finance",
+        label: "Financeiro",
+        icon: <BarChart3 className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"],
+        moduleKey: "FINANCE",
+      },
+      {
+        type: "link",
+        to: "/finance/forecast",
+        label: "Forecast Financeiro",
+        icon: <LineChart className="h-4 w-4" />,
+        roles: ["MASTERADMIN", "ADMIN", "HEAD"],
+        moduleKey: "FINANCE",
       },
       // Gestão de Ativos
 
