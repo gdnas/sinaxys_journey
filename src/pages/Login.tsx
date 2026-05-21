@@ -56,25 +56,50 @@ export default function Login() {
 
   return (
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)] px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center">
-        <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <section className="flex items-center justify-center rounded-[2rem] border border-[color:var(--sinaxys-border)] bg-white p-8 shadow-sm sm:p-10">
-            <div className="text-center">
-              <h1 className="text-5xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-6xl">
-                kairoos
-              </h1>
-              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--sinaxys-primary)]">
+      <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center justify-center">
+        <div className="grid w-full gap-6 lg:grid-cols-[1.08fr_0.92fr]">
+          <section className="relative overflow-hidden rounded-[2rem] border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-primary)] p-8 shadow-sm sm:p-10 lg:p-12">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.24),transparent_32%),radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.18),transparent_30%)]" />
+            <div className="relative flex min-h-[320px] flex-col justify-between">
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-white/90 backdrop-blur">
                 acesso seguro
+              </div>
+
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-[1.35rem] bg-white text-2xl font-bold tracking-[0.2em] text-[color:var(--sinaxys-primary)] shadow-sm">
+                    K
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.35em] text-white/70">
+                      plataforma
+                    </div>
+                    <h1 className="text-4xl font-semibold tracking-[0.22em] text-white sm:text-5xl">
+                      KAIROOS
+                    </h1>
+                  </div>
+                </div>
+
+                <div className="h-px w-24 bg-white/30" />
+
+                <p className="max-w-md text-sm leading-7 text-white/82 sm:text-base">
+                  Acesse sua conta com segurança e entre no ambiente operacional da Kairoos.
+                </p>
               </div>
             </div>
           </section>
 
-          <Card className="rounded-[2rem] border-[color:var(--sinaxys-border)] bg-white p-6 shadow-sm sm:p-8">
+          <Card className="rounded-[2rem] border-[color:var(--sinaxys-border)] bg-white p-6 shadow-[0_20px_60px_rgba(94,60,255,0.08)] sm:p-8">
             <div>
-              <p className="text-sm font-medium text-muted-foreground">Entrar</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)]">
-                Acesse sua conta
+              <div className="inline-flex items-center rounded-full bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--sinaxys-primary)]">
+                login
+              </div>
+              <h2 className="mt-4 text-3xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)]">
+                Entrar na Kairoos
               </h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Use seu email e sua senha para continuar.
+              </p>
             </div>
 
             <form className="mt-8 grid gap-5" onSubmit={handleSubmit}>
@@ -89,7 +114,7 @@ export default function Login() {
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     autoComplete="email"
-                    className="h-12 rounded-2xl border-[color:var(--sinaxys-border)] pl-11"
+                    className="h-12 rounded-2xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] pl-11 text-[color:var(--sinaxys-ink)]"
                     disabled={submitting || loading}
                   />
                 </div>
@@ -111,7 +136,7 @@ export default function Login() {
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
                     autoComplete="current-password"
-                    className="h-12 rounded-2xl border-[color:var(--sinaxys-border)] pl-11 pr-12"
+                    className="h-12 rounded-2xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)] pl-11 pr-12 text-[color:var(--sinaxys-ink)]"
                     disabled={submitting || loading}
                   />
                   <button
@@ -127,7 +152,7 @@ export default function Login() {
 
               <Button
                 type="submit"
-                className="mt-2 h-12 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+                className="mt-2 h-12 rounded-2xl bg-[color:var(--sinaxys-primary)] text-white shadow-[0_12px_30px_rgba(94,60,255,0.28)] hover:bg-[color:var(--sinaxys-primary)]/90"
                 disabled={!canSubmit || submitting || loading}
               >
                 {submitting ? "Entrando..." : "Entrar"}
