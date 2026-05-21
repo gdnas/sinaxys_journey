@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, Trash2, UserRound } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,13 @@ import { createCostItem, suggestHeadcountAllocations, updateCostItem, type CostA
 type DepartmentOption = {
   id: string;
   name: string;
+};
+
+type ProfileOption = {
+  id: string;
+  name: string;
+  email: string;
+  department_id: string | null;
 };
 
 type AllocationDraft = {
@@ -119,6 +126,7 @@ export function ExpenseItemDialog({
   onOpenChange,
   companyId,
   departments,
+  profiles,
   costItem,
   initialAllocations,
   onSaved,
@@ -127,6 +135,7 @@ export function ExpenseItemDialog({
   onOpenChange: (open: boolean) => void;
   companyId: string;
   departments: DepartmentOption[];
+  profiles: ProfileOption[];
   costItem?: CostItem | null;
   initialAllocations?: CostAllocation[];
   onSaved: () => Promise<void> | void;
@@ -134,6 +143,10 @@ export function ExpenseItemDialog({
   const rateableDepartments = useMemo(
     () => departments.filter((department) => !isCompanyWideDepartmentName(department.name)),
     [departments],
+  );
+  const activeProfiles = useMemo(
+    () => [...profiles].sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email)),
+    [profiles],
   );
 
   const [saving, setSaving] = useState(false);
@@ -147,6 +160,7 @@ export function ExpenseItemDialog({
   const [companyWideMode, setCompanyWideMode] = useState<CompanyWideMode>("equal");
   const [allocationMethod, setAllocationMethod] = useState<"manual" | "headcount">("manual");
   const [ownerDepartmentId, setOwnerDepartmentId] = useState<string | null>(null);
+  const [targetProfileId, setTargetProfileId] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [active, setActive] = useState(true);
   const [allocations, setAllocations] = useState<AllocationDraft[]>([]);
@@ -179,6 +193,7 @@ export function ExpenseItemDialog({
       setCompanyWideMode(companyWideState.mode);
       setAllocationMethod(costItem.allocation_method);
       setOwnerDepartmentId(sanitizedOwnerDepartmentId);
+      setTargetProfileId(costItem.target_profile_id ?? null);
       setNotes(costItem.notes ?? "");
       setActive(costItem.active);
       setAllocations(companyWideState.companyWide ? coverAllDepartments(rateableDepartments, existingAllocations) : existingAllocations);
@@ -196,6 +211,7 @@ export function ExpenseItemDialog({
     setCompanyWideMode("equal");
     setAllocationMethod("manual");
     setOwnerDepartmentId(defaultOwner);
+    setTargetProfileId(null);
     setNotes("");
     setActive(true);
     setAllocations(buildDefaultAllocations(rateableDepartments, defaultOwner));
@@ -221,6 +237,21 @@ export function ExpenseItemDialog({
     setOwnerDepartmentId(departmentId);
     if (!shared) {
       setSingleDepartment(departmentId);
+    }
+  }
+
+  function handleTargetProfileChange(profileId: string | null) {
+    setTargetProfileId(profileId);
+    if (!profileId) return;
+
+    const profile = activeProfiles.find((item) => item.id === profileId);
+    const profileDepartmentId = profile?.department_id ?? null;
+
+    if (profileDepartmentId && rateableDepartments.some((department) => department.id === profileDepartmentId)) {
+      setOwnerDepartmentId(profileDepartmentId);
+      if (!shared) {
+        setSingleDepartment(profileDepartmentId);
+      }
     }
   }
 
@@ -402,6 +433,7 @@ export function ExpenseItemDialog({
         is_shared: companyWide ? true : shared,
         allocation_method: companyWideMode === "headcount" ? ("headcount" as const) : allocationMethod,
         owner_department_id: ownerDepartmentId,
+        target_profile_id: targetProfileId,
         notes: notes.trim() || null,
         active,
         allocations: normalizedAllocations,
@@ -433,19 +465,19 @@ export function ExpenseItemDialog({
               {costItem ? "Editar despesa" : "Nova despesa de ferramenta"}
             </DialogTitle>
             <DialogDescription>
-              Cadastre ferramentas, licenças, fornecedores e outros custos não-humanos com departamento responsável e rateio por área.
+              Cadastre ferramentas, licenças, fornecedores, reembolsos e outros custos não-humanos com departamento responsável, colaborador opcional e rateio por área.
             </DialogDescription>
           </DialogHeader>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <div className="grid gap-2 md:col-span-2">
               <Label>Nome</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Figma, AWS, Google Workspace" className="h-11 rounded-2xl" />
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex.: Reembolso de viagem, Figma, AWS, Google Workspace" className="h-11 rounded-2xl" />
             </div>
 
             <div className="grid gap-2">
               <Label>Categoria</Label>
-              <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex.: Tecnologia" className="h-11 rounded-2xl" />
+              <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex.: Reembolso, Tecnologia, Operações" className="h-11 rounded-2xl" />
             </div>
 
             <div className="grid gap-2">
@@ -464,6 +496,36 @@ export function ExpenseItemDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            <div className="grid gap-2 md:col-span-2">
+              <Label>Colaborador vinculado (opcional)</Label>
+              <Select value={targetProfileId ?? "none"} onValueChange={(value) => handleTargetProfileChange(value === "none" ? null : value)}>
+                <SelectTrigger className="h-11 rounded-2xl">
+                  <SelectValue placeholder="Selecione um colaborador" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Sem colaborador específico</SelectItem>
+                  {activeProfiles.map((profile) => (
+                    <SelectItem key={profile.id} value={profile.id}>
+                      {profile.name || profile.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <div className="text-xs text-muted-foreground">Use para reembolsos, despesas de viagem, celular corporativo, ajuda de custo e similares.</div>
+            </div>
+
+            {targetProfileId ? (
+              <div className="md:col-span-2 rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/45 p-4 text-sm text-[color:var(--sinaxys-ink)]">
+                <div className="flex items-center gap-2 font-semibold">
+                  <UserRound className="h-4 w-4 text-[color:var(--sinaxys-primary)]" />
+                  Despesa vinculada a colaborador
+                </div>
+                <div className="mt-1 text-muted-foreground">
+                  Se o colaborador tiver departamento definido, o sistema usa essa área como sugestão para o responsável e para o rateio exclusivo.
+                </div>
+              </div>
+            ) : null}
 
             <div className="grid gap-2">
               <Label>Custo mensal equivalente</Label>
@@ -648,7 +710,7 @@ export function ExpenseItemDialog({
           <div className="mt-6 grid gap-4 md:grid-cols-2">
             <div className="grid gap-2 md:col-span-2">
               <Label>Observações</Label>
-              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex.: 12 licenças do time de produto, contrato renovado em janeiro..." className="min-h-[96px] rounded-2xl" />
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Ex.: reembolso de passagem, 12 licenças do time de produto, contrato renovado em janeiro..." className="min-h-[96px] rounded-2xl" />
             </div>
 
             <div className="flex items-center gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white px-4 py-3 md:max-w-sm">

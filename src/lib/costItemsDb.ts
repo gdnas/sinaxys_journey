@@ -11,6 +11,7 @@ export type CostItem = {
   is_shared: boolean;
   allocation_method: "manual" | "headcount";
   owner_department_id: string | null;
+  target_profile_id: string | null;
   competence_month: number | null;
   competence_year: number | null;
   active: boolean;
@@ -90,7 +91,6 @@ export async function createCostItem(
     }>;
   },
 ): Promise<CostItem> {
-  // Create cost item
   const { data: costItem, error: createError } = await supabase
     .from("cost_items")
     .insert({
@@ -103,6 +103,7 @@ export async function createCostItem(
       is_shared: data.is_shared || false,
       allocation_method: data.allocation_method || "manual",
       owner_department_id: data.owner_department_id,
+      target_profile_id: data.target_profile_id,
       competence_month: data.competence_month,
       competence_year: data.competence_year,
       active: data.active !== undefined ? data.active : true,
@@ -113,7 +114,6 @@ export async function createCostItem(
 
   if (createError) throw createError;
 
-  // If allocations are provided, use the RPC to set them
   if (data.allocations && data.allocations.length > 0) {
     const { error: rpcError } = await supabase.rpc("set_cost_allocations_safe", {
       p_cost_item_id: costItem.id,
@@ -121,7 +121,6 @@ export async function createCostItem(
     });
 
     if (rpcError) {
-      // Rollback: delete the cost item if allocations failed
       await supabase.from("cost_items").delete().eq("id", costItem.id);
       throw rpcError;
     }
@@ -139,7 +138,6 @@ export async function updateCostItem(
     }>;
   },
 ): Promise<CostItem> {
-  // Update cost item
   const { data: costItem, error: updateError } = await supabase
     .from("cost_items")
     .update({
@@ -151,6 +149,7 @@ export async function updateCostItem(
       is_shared: data.is_shared,
       allocation_method: data.allocation_method,
       owner_department_id: data.owner_department_id,
+      target_profile_id: data.target_profile_id,
       competence_month: data.competence_month,
       competence_year: data.competence_year,
       active: data.active,
@@ -162,7 +161,6 @@ export async function updateCostItem(
 
   if (updateError) throw updateError;
 
-  // If allocations are provided, use the RPC to set them
   if (data.allocations !== undefined) {
     const { error: rpcError } = await supabase.rpc("set_cost_allocations_safe", {
       p_cost_item_id: id,
@@ -227,7 +225,6 @@ export async function suggestHeadcountAllocations(
   );
 
   if (error) {
-    // If the function doesn't exist yet, calculate manually
     const { data: profiles } = await supabase
       .from("profiles")
       .select("department_id")
@@ -300,7 +297,6 @@ export async function calculateDepartmentCosts(
   });
 
   if (error) {
-    // Fallback if function doesn't exist yet
     const { data: departments } = await supabase
       .from("departments")
       .select("*")
@@ -331,7 +327,6 @@ export async function calculateDepartmentCosts(
       });
     });
 
-    // Calculate people costs
     (profiles || []).forEach((profile: any) => {
       if (profile.department_id && profile.monthly_cost_brl) {
         const cost = deptCosts.get(profile.department_id);
@@ -342,7 +337,6 @@ export async function calculateDepartmentCosts(
       }
     });
 
-    // Calculate expense costs
     (costItems || []).forEach((item: any) => {
       (item.cost_allocations || []).forEach((alloc: any) => {
         const cost = deptCosts.get(alloc.department_id);
@@ -353,12 +347,13 @@ export async function calculateDepartmentCosts(
       });
     });
 
-    // Calculate totals
     deptCosts.forEach((cost) => {
       cost.total_cost = cost.people_cost + cost.expense_cost;
     });
 
-    return Array.from(deptCosts.values()).sort((a, b) => b.total_cost - a.total_cost);
+    return Array.from(deptCosts.values()).sort(
+      (a, b) => b.total_cost - a.total_cost,
+    );
   }
 
   return (data || []) as DepartmentCost[];

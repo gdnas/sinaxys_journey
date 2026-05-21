@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Building2, Receipt, Wallet } from "lucide-react";
+import { Building2, Receipt, UserRound, Wallet } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,7 @@ type DepartmentExpenseRow = {
   allocatedCost: number;
   allocationPercentage: number;
   notes: string | null;
+  targetProfileName: string | null;
 };
 
 export default function HeadCosts() {
@@ -92,6 +93,7 @@ export default function HeadCosts() {
     () => new Set(departments.filter((department) => !isCompanyWideDepartmentName(department.name)).map((department) => department.id)),
     [departments],
   );
+  const profileById = useMemo(() => new Map(profiles.map((profile) => [profile.id, profile] as const)), [profiles]);
   const deptName = useMemo(() => departments.find((department) => department.id === myDeptId)?.name ?? "Departamento", [departments, myDeptId]);
 
   const people = useMemo(() => {
@@ -115,6 +117,9 @@ export default function HeadCosts() {
 
     for (const item of costItems) {
       const allocations = allocationsByItem[item.id] ?? [];
+      const targetProfileName = item.target_profile_id
+        ? profileById.get(item.target_profile_id)?.name ?? profileById.get(item.target_profile_id)?.email ?? null
+        : null;
       for (const allocation of allocations) {
         if (allocation.department_id !== myDeptId || !costDepartmentIds.has(allocation.department_id)) continue;
         rows.push({
@@ -125,12 +130,13 @@ export default function HeadCosts() {
           allocatedCost: (n(item.total_monthly_cost) * n(allocation.allocation_percentage)) / 100,
           allocationPercentage: n(allocation.allocation_percentage),
           notes: item.notes,
+          targetProfileName,
         });
       }
     }
 
     return rows.sort((a, b) => b.allocatedCost - a.allocatedCost || a.name.localeCompare(b.name));
-  }, [allocationsByItem, costDepartmentIds, costItems, myDeptId]);
+  }, [allocationsByItem, costDepartmentIds, costItems, myDeptId, profileById]);
 
   const expenseCategories = useMemo(() => {
     return Array.from(new Set(departmentExpenses.map((expense) => expense.category?.trim()).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b));
@@ -138,7 +144,7 @@ export default function HeadCosts() {
 
   const filteredDepartmentExpenses = useMemo(() => {
     return departmentExpenses.filter((expense) => {
-      const matchesSearch = !expenseSearch.trim() || [expense.name, expense.category, expense.notes]
+      const matchesSearch = !expenseSearch.trim() || [expense.name, expense.category, expense.notes, expense.targetProfileName]
         .some((value) => value?.toLowerCase().includes(expenseSearch.trim().toLowerCase()));
       const matchesCategory = categoryFilter === "all" || (expense.category ?? "") === categoryFilter;
       return matchesSearch && matchesCategory;
@@ -186,7 +192,7 @@ export default function HeadCosts() {
         </Card>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ferramentas e despesas</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ferramentas, reembolsos e despesas</div>
           <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(deptExpenses)}</div>
           <div className="mt-1 text-xs text-muted-foreground">{departmentExpenses.length} item(ns) rateado(s) para o seu departamento</div>
         </Card>
@@ -239,9 +245,9 @@ export default function HeadCosts() {
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-              <Receipt className="h-4 w-4" />Ferramentas e despesas rateadas
+              <Receipt className="h-4 w-4" />Ferramentas, reembolsos e despesas rateadas
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">Aqui entram licenças, softwares, fornecedores e outras despesas alocadas ao seu departamento.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Aqui entram licenças, softwares, fornecedores, reembolsos e outras despesas alocadas ao seu departamento.</p>
           </div>
           <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
             Filtrado: {brl(filteredDeptExpenses)}
@@ -251,7 +257,7 @@ export default function HeadCosts() {
         <Separator className="my-5" />
 
         <div className="grid gap-3 md:grid-cols-[1.4fr_220px]">
-          <Input value={expenseSearch} onChange={(e) => setExpenseSearch(e.target.value)} placeholder="Buscar despesa" className="h-11 rounded-2xl" />
+          <Input value={expenseSearch} onChange={(e) => setExpenseSearch(e.target.value)} placeholder="Buscar despesa ou colaborador" className="h-11 rounded-2xl" />
           <Select value={categoryFilter} onValueChange={setCategoryFilter}>
             <SelectTrigger className="h-11 rounded-2xl">
               <SelectValue placeholder="Categoria" />
@@ -285,6 +291,12 @@ export default function HeadCosts() {
                   <div className="mt-1 text-xs text-muted-foreground">
                     {expense.category || "Sem categoria"} • {billingCycleLabel(expense.billingCycle)} • {expense.allocationPercentage.toFixed(0)}%
                   </div>
+                  {expense.targetProfileName ? (
+                    <div className="mt-2 inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-xs font-medium text-[color:var(--sinaxys-primary)]">
+                      <UserRound className="h-3.5 w-3.5" />
+                      {expense.targetProfileName}
+                    </div>
+                  ) : null}
                   {expense.notes ? <div className="mt-2 text-sm text-muted-foreground">{expense.notes}</div> : null}
                 </div>
                 <div className="text-right">

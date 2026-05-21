@@ -106,6 +106,8 @@ type DepartmentExpenseRow = {
   notes: string | null;
   allocatedCost: number;
   allocationPercentage: number;
+  targetProfileId: string | null;
+  targetProfileName: string | null;
 };
 
 export default function AdminCosts() {
@@ -265,6 +267,9 @@ export default function AdminCosts() {
 
     for (const item of activeCostItems) {
       const allocations = allocationsByItem[item.id] ?? [];
+      const targetProfileName = item.target_profile_id
+        ? profileById.get(item.target_profile_id)?.name ?? profileById.get(item.target_profile_id)?.email ?? null
+        : null;
       for (const allocation of allocations) {
         if (!costDepartmentIds.has(allocation.department_id)) continue;
         const allocatedCost = (n(item.total_monthly_cost) * n(allocation.allocation_percentage)) / 100;
@@ -277,6 +282,8 @@ export default function AdminCosts() {
           notes: item.notes,
           allocatedCost,
           allocationPercentage: n(allocation.allocation_percentage),
+          targetProfileId: item.target_profile_id ?? null,
+          targetProfileName,
         });
         map.set(allocation.department_id, list);
       }
@@ -287,7 +294,7 @@ export default function AdminCosts() {
     }
 
     return map;
-  }, [activeCostItems, allocationsByItem, costDepartmentIds]);
+  }, [activeCostItems, allocationsByItem, costDepartmentIds, profileById]);
 
   const byDept = useMemo(() => {
     const map = new Map<string, DepartmentRow>();
@@ -405,14 +412,17 @@ export default function AdminCosts() {
 
   const filteredCostItems = useMemo(() => {
     return costItems.filter((item) => {
-      const matchesSearch = !search.trim() || [item.name, item.category, item.notes]
+      const collaboratorLabel = item.target_profile_id
+        ? profileById.get(item.target_profile_id)?.name ?? profileById.get(item.target_profile_id)?.email ?? ""
+        : "";
+      const matchesSearch = !search.trim() || [item.name, item.category, item.notes, collaboratorLabel]
         .some((value) => value?.toLowerCase().includes(search.trim().toLowerCase()));
       const matchesCategory = categoryFilter === "all" || (item.category ?? "") === categoryFilter;
       const matchesDepartment = ownerDepartmentFilter === "all" || (item.owner_department_id ?? "none") === ownerDepartmentFilter;
       const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? item.active : !item.active);
       return matchesSearch && matchesCategory && matchesDepartment && matchesStatus;
     });
-  }, [categoryFilter, costItems, ownerDepartmentFilter, search, statusFilter]);
+  }, [categoryFilter, costItems, ownerDepartmentFilter, profileById, search, statusFilter]);
 
   const groupedFilteredCostItems = useMemo(() => {
     const map = new Map<string, CostItem[]>();
@@ -460,6 +470,7 @@ export default function AdminCosts() {
     const headers = [
       "departamento_responsavel",
       "despesa",
+      "colaborador",
       "categoria",
       "status",
       "tipo",
@@ -471,6 +482,9 @@ export default function AdminCosts() {
 
     const rows = filteredCostItems.map((item) => {
       const ownerDepartmentName = item.owner_department_id ? deptById.get(item.owner_department_id)?.name ?? "Departamento" : "Sem departamento";
+      const collaboratorName = item.target_profile_id
+        ? profileById.get(item.target_profile_id)?.name ?? profileById.get(item.target_profile_id)?.email ?? ""
+        : "";
       const allocationLabel = (allocationsByItem[item.id] ?? [])
         .map((allocation) => `${allocation.department_name || deptById.get(allocation.department_id)?.name || "Departamento"} ${n(allocation.allocation_percentage).toFixed(0)}%`)
         .join(" | ");
@@ -478,6 +492,7 @@ export default function AdminCosts() {
       return [
         ownerDepartmentName,
         item.name,
+        collaboratorName,
         item.category ?? "",
         item.active ? "ativa" : "inativa",
         item.type === "fixed" ? "fixa" : "variavel",
@@ -679,6 +694,12 @@ export default function AdminCosts() {
                             <span>{billingCycleLabel(item.billing_cycle)}</span>
                             <span>•</span>
                             <span>{item.type === "fixed" ? "Fixa" : "Variável"}</span>
+                            {item.target_profile_id ? (
+                              <>
+                                <span>•</span>
+                                <span>Colaborador: {profileById.get(item.target_profile_id)?.name ?? profileById.get(item.target_profile_id)?.email ?? "Vinculado"}</span>
+                              </>
+                            ) : null}
                           </div>
                           {item.notes ? <p className="mt-3 text-sm text-muted-foreground">{item.notes}</p> : null}
                         </div>
@@ -878,6 +899,7 @@ export default function AdminCosts() {
                         <div className="mt-1 text-xs text-muted-foreground">
                           {expense.category || "Sem categoria"} • {billingCycleLabel(expense.billingCycle)} • {expense.allocationPercentage.toFixed(0)}%
                         </div>
+                        {expense.targetProfileName ? <div className="mt-2 text-xs font-medium text-[color:var(--sinaxys-primary)]">Colaborador vinculado: {expense.targetProfileName}</div> : null}
                         {expense.notes ? <div className="mt-2 text-sm text-muted-foreground">{expense.notes}</div> : null}
                       </div>
                       <div className="text-right">
@@ -909,6 +931,14 @@ export default function AdminCosts() {
         }}
         companyId={companyId}
         departments={costDepartments.map((department) => ({ id: department.id, name: department.name }))}
+        profiles={profiles
+          .filter((profile) => profile.active)
+          .map((profile) => ({
+            id: profile.id,
+            name: profile.name ?? profile.email,
+            email: profile.email,
+            department_id: profile.department_id,
+          }))}
         costItem={editingExpense}
         initialAllocations={editingExpense ? allocationsByItem[editingExpense.id] ?? [] : []}
         onSaved={refreshCosts}
