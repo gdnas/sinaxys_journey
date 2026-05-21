@@ -5,7 +5,14 @@ import { Area, AreaChart, CartesianGrid, Line, XAxis, YAxis } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+  type ChartConfig,
+} from "@/components/ui/chart";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +61,16 @@ type AdjustmentDraft = {
   effective_key: string;
   notes: string;
 };
+
+type ScenarioSeries = {
+  scenarioId: string;
+  key: string;
+  label: string;
+  color: string;
+  isPrimary: boolean;
+};
+
+const SCENARIO_COLORS = ["#6d5efc", "#14b8a6", "#f97316"] as const;
 
 function brl(value: number) {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value || 0);
@@ -117,11 +134,27 @@ function adjustmentLabel(action: FinanceForecastAdjustment["action"], amount: nu
   return `Alterar para ${brl(n(amount))}`;
 }
 
-const chartConfig = {
-  projectedExpenses: { label: "Custos recorrentes", color: "hsl(var(--primary))" },
-  financePlan: { label: "Plano financeiro", color: "#7c86ff" },
-  total: { label: "Total projetado", color: "#14b8a6" },
-} satisfies ChartConfig;
+function buildScenarioAdjustmentMap(adjustments: FinanceForecastAdjustment[]) {
+  const scenarioMap = new Map<string, Map<string, FinanceForecastAdjustment[]>>();
+
+  for (const adjustment of adjustments) {
+    if (!adjustment.scenario_id) continue;
+
+    const byItem = scenarioMap.get(adjustment.scenario_id) ?? new Map<string, FinanceForecastAdjustment[]>();
+    const list = byItem.get(adjustment.cost_item_id) ?? [];
+    list.push(adjustment);
+    byItem.set(adjustment.cost_item_id, list);
+    scenarioMap.set(adjustment.scenario_id, byItem);
+  }
+
+  for (const byItem of scenarioMap.values()) {
+    for (const [itemId, list] of byItem.entries()) {
+      byItem.set(itemId, [...list].sort((a, b) => compareMonth(a.effective_year, a.effective_month, b.effective_year, b.effective_month)));
+    }
+  }
+
+  return scenarioMap;
+}
 
 export default function FinanceForecast() {
   const { user } = useAuth();
@@ -140,9 +173,10 @@ export default function FinanceForecast() {
   const [periodRows, setPeriodRows] = useState<Array<{ id: string; fiscal_year: number; fiscal_month: number | null }>>([]);
   const [versionLines, setVersionLines] = useState<FinanceVersionLine[]>([]);
   const [costItems, setCostItems] = useState<CostItem[]>([]);
-  const [adjustments, setAdjustments] = useState<FinanceForecastAdjustment[]>([]);
+  const [allAdjustments, setAllAdjustments] = useState<FinanceForecastAdjustment[]>([]);
   const [departments, setDepartments] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
+  const [compareScenarioIds, setCompareScenarioIds] = useState<string[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState("none");
   const [search, setSearch] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -156,12 +190,13 @@ export default function FinanceForecast() {
     setLoading(true);
     await Promise.all([seedFinanceScenarios(companyId, user.id), seedFinanceFiscalPeriods(companyId)]);
 
-    const [scenarioRows, versionRows, departmentRows, costItemRows, fiscalPeriods] = await Promise.all([
+    const [scenarioRows, versionRows, departmentRows, costItemRows, fiscalPeriods, adjustmentRows] = await Promise.all([
       listFinanceScenarios(companyId),
       listFinanceVersions(companyId),
       listDepartments(companyId),
       listCostItems(companyId, true),
       listFinanceFiscalPeriods(companyId),
+      listFinanceForecastAdjustments(companyId),
     ]);
 
     setScenarios(scenarioRows);
@@ -169,21 +204,13 @@ export default function FinanceForecast() {
     setDepartments(departmentRows.filter((department) => !isCompanyWideDepartmentName(department.name)));
     setCostItems(costItemRows.filter((item) => item.active));
     setPeriodRows(fiscalPeriods.map((row) => ({ id: row.id, fiscal_year: row.fiscal_year, fiscal_month: row.fiscal_month })));
+    setAllAdjustments(adjustmentRows);
     setSelectedScenarioId((current) => current || scenarioRows.find((item) => item.status === "active")?.id || scenarioRows[0]?.id || "");
     setSelectedVersionId((current) => {
       if (current !== "none" && versionRows.some((item) => item.id === current)) return current;
       return versionRows[0]?.id ?? "none";
     });
     setLoading(false);
-  }
-
-  async function loadScenarioAdjustments(scenarioId: string) {
-    if (!companyId || !scenarioId) {
-      setAdjustments([]);
-      return;
-    }
-    const rows = await listFinanceForecastAdjustments(companyId, scenarioId);
-    setAdjustments(rows);
   }
 
   async function loadVersionLines(versionId: string) {
@@ -195,19 +222,24 @@ export default function FinanceForecast() {
     setVersionLines(rows);
   }
 
+  async function refreshAdjustments() {
+    if (!companyId) return;
+    const rows = await listFinanceForecastAdjustments(companyId);
+    setAllAdjustments(rows);
+  }
+
   useEffect(() => {
     if (!companyId || !user?.id) return;
     void loadBase();
   }, [companyId, user?.id]);
 
   useEffect(() => {
-    if (!selectedScenarioId) return;
-    void loadScenarioAdjustments(selectedScenarioId);
-  }, [selectedScenarioId]);
-
-  useEffect(() => {
     void loadVersionLines(selectedVersionId);
   }, [selectedVersionId]);
+
+  useEffect(() => {
+    setCompareScenarioIds((current) => current.filter((id) => id !== selectedScenarioId && scenarios.some((scenario) => scenario.id === id)).slice(0, 2));
+  }, [scenarios, selectedScenarioId]);
 
   const selectedScenario = useMemo(
     () => scenarios.find((scenario) => scenario.id === selectedScenarioId) ?? null,
@@ -233,21 +265,12 @@ export default function FinanceForecast() {
     return map;
   }, [periodRows]);
 
-  const adjustmentsByItem = useMemo(() => {
-    const map = new Map<string, FinanceForecastAdjustment[]>();
+  const adjustmentsByScenario = useMemo(() => buildScenarioAdjustmentMap(allAdjustments), [allAdjustments]);
 
-    for (const adjustment of adjustments) {
-      const list = map.get(adjustment.cost_item_id) ?? [];
-      list.push(adjustment);
-      map.set(adjustment.cost_item_id, list);
-    }
-
-    for (const [itemId, list] of map.entries()) {
-      map.set(itemId, [...list].sort((a, b) => compareMonth(a.effective_year, a.effective_month, b.effective_year, b.effective_month)));
-    }
-
-    return map;
-  }, [adjustments]);
+  const selectedScenarioAdjustments = useMemo(
+    () => allAdjustments.filter((adjustment) => adjustment.scenario_id === selectedScenarioId),
+    [allAdjustments, selectedScenarioId],
+  );
 
   const filteredCostItems = useMemo(() => {
     return costItems.filter((item) => {
@@ -259,6 +282,35 @@ export default function FinanceForecast() {
     });
   }, [costItems, departmentById, departmentFilter, search]);
 
+  const scenarioSeries = useMemo(() => {
+    const orderedIds = [selectedScenarioId, ...compareScenarioIds].filter(Boolean);
+    return orderedIds
+      .map((scenarioId, index) => {
+        const scenario = scenarios.find((item) => item.id === scenarioId);
+        if (!scenario) return null;
+        return {
+          scenarioId,
+          key: `scenario_${index}`,
+          label: scenario.name,
+          color: SCENARIO_COLORS[index] ?? SCENARIO_COLORS[SCENARIO_COLORS.length - 1],
+          isPrimary: index === 0,
+        } satisfies ScenarioSeries;
+      })
+      .filter(Boolean) as ScenarioSeries[];
+  }, [compareScenarioIds, scenarios, selectedScenarioId]);
+
+  const chartConfig = useMemo(() => {
+    const dynamicConfig: ChartConfig = {
+      financePlan: { label: "Plano financeiro", color: "#94a3b8" },
+    };
+
+    for (const series of scenarioSeries) {
+      dynamicConfig[series.key] = { label: series.label, color: series.color };
+    }
+
+    return dynamicConfig;
+  }, [scenarioSeries]);
+
   const chartData = useMemo(() => {
     const financePlanByMonth = new Map<string, number>();
 
@@ -269,41 +321,68 @@ export default function FinanceForecast() {
     }
 
     return forecastMonths.map((month) => {
-      const projectedExpenses = filteredCostItems.reduce((sum, item) => {
-        let amount = monthlyBaseCostForItem(item, month, firstForecastMonth);
-        const itemAdjustments = adjustmentsByItem.get(item.id) ?? [];
-
-        for (const adjustment of itemAdjustments) {
-          if (compareMonth(adjustment.effective_year, adjustment.effective_month, month.year, month.month) > 0) continue;
-          if (adjustment.action === "stop") amount = 0;
-          if (adjustment.action === "set_amount") amount = n(adjustment.amount);
-        }
-
-        return sum + amount;
-      }, 0);
-
-      const financePlan = financePlanByMonth.get(month.key) ?? 0;
-      return {
+      const row: Record<string, string | number> = {
         month: month.label,
         key: month.key,
-        projectedExpenses,
-        financePlan,
-        total: projectedExpenses + financePlan,
+        financePlan: financePlanByMonth.get(month.key) ?? 0,
+      };
+
+      for (const series of scenarioSeries) {
+        const adjustmentsByItem = adjustmentsByScenario.get(series.scenarioId) ?? new Map<string, FinanceForecastAdjustment[]>();
+        const projectedExpenses = filteredCostItems.reduce((sum, item) => {
+          let amount = monthlyBaseCostForItem(item, month, firstForecastMonth);
+          const itemAdjustments = adjustmentsByItem.get(item.id) ?? [];
+
+          for (const adjustment of itemAdjustments) {
+            if (compareMonth(adjustment.effective_year, adjustment.effective_month, month.year, month.month) > 0) continue;
+            if (adjustment.action === "stop") amount = 0;
+            if (adjustment.action === "set_amount") amount = n(adjustment.amount);
+          }
+
+          return sum + amount;
+        }, 0);
+
+        row[series.key] = projectedExpenses + n(row.financePlan);
+      }
+
+      return row;
+    });
+  }, [adjustmentsByScenario, filteredCostItems, firstForecastMonth, forecastMonths, scenarioSeries, versionLines, versionPeriodMap]);
+
+  const primaryScenarioKey = scenarioSeries[0]?.key ?? "";
+
+  const primaryTotals = useMemo(() => {
+    const values = chartData.map((row) => n(row[primaryScenarioKey]));
+    const total = values.reduce((sum, value) => sum + value, 0);
+    const average = values.length ? total / values.length : 0;
+    const peakIndex = values.reduce((bestIndex, value, index, all) => (value > all[bestIndex] ? index : bestIndex), 0);
+    return {
+      total,
+      average,
+      peakMonth: chartData[peakIndex]?.month ?? "—",
+      peakValue: values[peakIndex] ?? 0,
+    };
+  }, [chartData, primaryScenarioKey]);
+
+  const comparedScenarioSummary = useMemo(() => {
+    return scenarioSeries.slice(1).map((series) => {
+      const total = chartData.reduce((sum, row) => sum + n(row[series.key]), 0);
+      return {
+        key: series.key,
+        label: series.label,
+        color: series.color,
+        total,
+        delta: total - primaryTotals.total,
       };
     });
-  }, [adjustmentsByItem, filteredCostItems, firstForecastMonth, forecastMonths, versionLines, versionPeriodMap]);
-
-  const totals = useMemo(() => {
-    const total = chartData.reduce((sum, item) => sum + item.total, 0);
-    const average = chartData.length ? total / chartData.length : 0;
-    const peak = chartData.reduce((best, item) => (item.total > best.total ? item : best), chartData[0] ?? { month: "—", total: 0 });
-    return { total, average, peak };
-  }, [chartData]);
+  }, [chartData, primaryTotals.total, scenarioSeries]);
 
   const monitoredRows = useMemo(() => {
+    const selectedAdjustmentsByItem = adjustmentsByScenario.get(selectedScenarioId) ?? new Map<string, FinanceForecastAdjustment[]>();
+
     return filteredCostItems
       .map((item) => {
-        const nextChange = (adjustmentsByItem.get(item.id) ?? []).find(
+        const nextChange = (selectedAdjustmentsByItem.get(item.id) ?? []).find(
           (adjustment) => compareMonth(adjustment.effective_year, adjustment.effective_month, firstForecastMonth.year, firstForecastMonth.month) >= 0,
         ) ?? null;
 
@@ -314,7 +393,28 @@ export default function FinanceForecast() {
         };
       })
       .sort((a, b) => n(b.item.total_monthly_cost) - n(a.item.total_monthly_cost) || a.item.name.localeCompare(b.item.name));
-  }, [adjustmentsByItem, departmentById, filteredCostItems, firstForecastMonth.month, firstForecastMonth.year]);
+  }, [adjustmentsByScenario, departmentById, filteredCostItems, firstForecastMonth.month, firstForecastMonth.year, selectedScenarioId]);
+
+  function handleToggleCompareScenario(scenarioId: string) {
+    if (scenarioId === selectedScenarioId) return;
+
+    setCompareScenarioIds((current) => {
+      if (current.includes(scenarioId)) {
+        return current.filter((id) => id !== scenarioId);
+      }
+
+      if (current.length >= 2) {
+        toast({
+          title: "Limite de comparação",
+          description: "Compare até 3 cenários no gráfico ao mesmo tempo.",
+          variant: "destructive",
+        });
+        return current;
+      }
+
+      return [...current, scenarioId];
+    });
+  }
 
   function openNewAdjustment(costItemId?: string) {
     setEditingAdjustment(null);
@@ -371,13 +471,13 @@ export default function FinanceForecast() {
 
       if (editingAdjustment) {
         await updateFinanceForecastAdjustment(editingAdjustment.id, payload);
-        toast({ title: "Mudança atualizada", description: "A nova regra já foi aplicada ao forecast." });
+        toast({ title: "Mudança atualizada", description: "A nova regra já foi aplicada ao cenário selecionado." });
       } else {
         await createFinanceForecastAdjustment(companyId, user.id, payload);
         toast({ title: "Mudança programada", description: "A regra futura já entrou no gráfico de previsibilidade." });
       }
 
-      await loadScenarioAdjustments(selectedScenarioId);
+      await refreshAdjustments();
       setDialogOpen(false);
       setEditingAdjustment(null);
       setDraft(defaultDraft(planningMonths));
@@ -395,7 +495,7 @@ export default function FinanceForecast() {
   async function handleDeleteAdjustment(id: string) {
     try {
       await deleteFinanceForecastAdjustment(id);
-      await loadScenarioAdjustments(selectedScenarioId);
+      await refreshAdjustments();
       toast({ title: "Mudança removida", description: "A regra saiu do forecast do cenário." });
     } catch (error) {
       toast({
@@ -426,9 +526,9 @@ export default function FinanceForecast() {
                 <Sparkles className="h-3.5 w-3.5 text-[color:var(--sinaxys-primary)]" />
                 Forecast financeiro
               </div>
-              <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-5xl">Preveja mudanças antes que elas virem surpresa.</h1>
+              <h1 className="mt-4 text-3xl font-semibold tracking-tight md:text-5xl">Compare cenários e antecipe movimentos do caixa.</h1>
               <p className="mt-3 max-w-3xl text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70 md:text-base">
-                Monte uma leitura visual dos próximos meses e programe mudanças futuras nos lançamentos recorrentes — por exemplo, encerrar uma assinatura em setembro ou reduzir o valor de uma ferramenta a partir de novembro.
+                Projete os próximos meses, veja Base vs Conservador vs Agressivo no mesmo gráfico e programe quando uma ferramenta deve acabar, reduzir ou mudar de valor.
               </p>
             </div>
 
@@ -447,7 +547,7 @@ export default function FinanceForecast() {
 
         <section className="grid gap-4 lg:grid-cols-[1fr_240px_240px]">
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cenário</Label>
+            <Label className="text-xs uppercase tracking-wide text-muted-foreground">Cenário principal</Label>
             <Select value={selectedScenarioId} onValueChange={setSelectedScenarioId}>
               <SelectTrigger className="mt-2 h-11 rounded-2xl">
                 <SelectValue placeholder="Selecione um cenário" />
@@ -460,7 +560,7 @@ export default function FinanceForecast() {
                 ))}
               </SelectContent>
             </Select>
-            <div className="mt-3 text-xs text-muted-foreground">As mudanças futuras ficam vinculadas ao cenário selecionado.</div>
+            <div className="mt-3 text-xs text-muted-foreground">As mudanças futuras são cadastradas no cenário principal selecionado.</div>
           </Card>
 
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
@@ -484,73 +584,117 @@ export default function FinanceForecast() {
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
             <div className="text-xs uppercase tracking-wide text-muted-foreground">Horizonte</div>
             <div className="mt-2 text-xl font-semibold text-[color:var(--sinaxys-ink)]">12 meses</div>
-            <div className="mt-3 text-xs text-muted-foreground">{selectedScenario?.name ?? "Sem cenário"} {selectedVersion ? `• ${selectedVersion.name}` : "• sem versão-base"}</div>
+            <div className="mt-3 text-xs text-muted-foreground">{scenarioSeries.length} cenário(s) no gráfico {selectedVersion ? `• ${selectedVersion.name}` : "• sem versão-base"}</div>
           </Card>
         </section>
 
         <section className="grid gap-4 md:grid-cols-4">
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">Total projetado</div>
-            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(totals.total)}</div>
-            <div className="mt-1 text-xs text-muted-foreground">Soma do horizonte analisado.</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Cenário principal</div>
+            <div className="mt-2 text-xl font-semibold text-[color:var(--sinaxys-ink)]">{selectedScenario?.name ?? "—"}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{brl(primaryTotals.total)} no horizonte total.</div>
           </Card>
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
               <TrendingUp className="h-4 w-4" />Média mensal
             </div>
-            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(totals.average)}</div>
-            <div className="mt-1 text-xs text-muted-foreground">Leitura média da operação projetada.</div>
+            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(primaryTotals.average)}</div>
+            <div className="mt-1 text-xs text-muted-foreground">Leitura média do cenário principal.</div>
           </Card>
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
               <CalendarClock className="h-4 w-4" />Mês de pico
             </div>
-            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{totals.peak.month}</div>
-            <div className="mt-1 text-xs text-muted-foreground">{brl(totals.peak.total)}</div>
+            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{primaryTotals.peakMonth}</div>
+            <div className="mt-1 text-xs text-muted-foreground">{brl(primaryTotals.peakValue)}</div>
           </Card>
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-5">
             <div className="flex items-center gap-2 text-xs uppercase tracking-wide text-muted-foreground">
               <LineChart className="h-4 w-4" />Mudanças programadas
             </div>
-            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{adjustments.length}</div>
-            <div className="mt-1 text-xs text-muted-foreground">Regras futuras ativas neste cenário.</div>
+            <div className="mt-2 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{selectedScenarioAdjustments.length}</div>
+            <div className="mt-1 text-xs text-muted-foreground">Regras futuras no cenário principal.</div>
           </Card>
         </section>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Gráfico de previsibilidade financeira</div>
-              <p className="mt-1 text-sm text-muted-foreground">O gráfico mostra o comportamento dos custos recorrentes com as mudanças futuras do cenário, somando também a versão-base quando ela estiver selecionada.</p>
+              <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Comparação entre cenários</div>
+              <p className="mt-1 text-sm text-muted-foreground">O cenário principal aparece em destaque e você pode comparar até mais 2 cenários no mesmo gráfico.</p>
             </div>
-            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">12 meses</Badge>
+            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">até 3 cenários</Badge>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-2">
+            {scenarios.map((scenario) => {
+              const isPrimary = scenario.id === selectedScenarioId;
+              const isCompared = compareScenarioIds.includes(scenario.id);
+              return (
+                <Button
+                  key={scenario.id}
+                  type="button"
+                  variant="outline"
+                  className={`rounded-full ${isPrimary ? "border-transparent bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90" : isCompared ? "border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]" : ""}`}
+                  onClick={() => (isPrimary ? undefined : handleToggleCompareScenario(scenario.id))}
+                >
+                  {scenario.name}
+                  {isPrimary ? " • principal" : isCompared ? " • comparando" : ""}
+                </Button>
+              );
+            })}
           </div>
 
           <div className="mt-6 rounded-[28px] border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-3 md:p-4">
-            <ChartContainer config={chartConfig} className="h-[320px] w-full">
+            <ChartContainer config={chartConfig} className="h-[340px] w-full">
               <AreaChart data={chartData} margin={{ left: 12, right: 12, top: 8, bottom: 0 }}>
                 <CartesianGrid vertical={false} />
                 <XAxis dataKey="month" tickLine={false} axisLine={false} />
                 <YAxis tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`} tickLine={false} axisLine={false} width={44} />
                 <ChartTooltip content={<ChartTooltipContent formatter={(value) => <span className="font-medium text-[color:var(--sinaxys-ink)]">{brl(Number(value))}</span>} />} />
-                <Area type="monotone" dataKey="projectedExpenses" fill="var(--color-projectedExpenses)" fillOpacity={0.22} stroke="var(--color-projectedExpenses)" strokeWidth={2} />
-                <Area type="monotone" dataKey="financePlan" fill="var(--color-financePlan)" fillOpacity={0.18} stroke="var(--color-financePlan)" strokeWidth={2} />
-                <Line type="monotone" dataKey="total" stroke="var(--color-total)" strokeWidth={3} dot={false} />
+                <ChartLegend content={<ChartLegendContent />} />
+
+                {scenarioSeries[0] ? (
+                  <Area
+                    type="monotone"
+                    dataKey={scenarioSeries[0].key}
+                    fill={`var(--color-${scenarioSeries[0].key})`}
+                    fillOpacity={0.22}
+                    stroke={`var(--color-${scenarioSeries[0].key})`}
+                    strokeWidth={3}
+                  />
+                ) : null}
+
+                {scenarioSeries.slice(1).map((series) => (
+                  <Line key={series.key} type="monotone" dataKey={series.key} stroke={`var(--color-${series.key})`} strokeWidth={3} dot={false} />
+                ))}
+
+                {selectedVersion ? (
+                  <Line type="monotone" dataKey="financePlan" stroke="var(--color-financePlan)" strokeWidth={2} strokeDasharray="6 6" dot={false} />
+                ) : null}
               </AreaChart>
             </ChartContainer>
           </div>
 
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/40 p-4 text-sm text-muted-foreground">
-              <span className="font-semibold text-[color:var(--sinaxys-ink)]">Custos recorrentes:</span> plataformas, despesas não-humanas e demais itens ativos em Costs.
+          {!!comparedScenarioSummary.length && (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {comparedScenarioSummary.map((scenario) => (
+                <div key={scenario.key} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: scenario.color }} />
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{scenario.label}</div>
+                    </div>
+                    <div className={`text-xs font-semibold ${scenario.delta <= 0 ? "text-emerald-700" : "text-orange-700"}`}>
+                      {scenario.delta <= 0 ? "Abaixo do principal" : "Acima do principal"}
+                    </div>
+                  </div>
+                  <div className="mt-2 text-sm text-muted-foreground">Total no horizonte: <span className="font-semibold text-[color:var(--sinaxys-ink)]">{brl(scenario.total)}</span></div>
+                  <div className="mt-1 text-xs text-muted-foreground">Diferença vs {selectedScenario?.name ?? "principal"}: {scenario.delta >= 0 ? "+" : ""}{brl(scenario.delta)}</div>
+                </div>
+              ))}
             </div>
-            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/40 p-4 text-sm text-muted-foreground">
-              <span className="font-semibold text-[color:var(--sinaxys-ink)]">Versão-base:</span> linhas da versão financeira selecionada, quando houver.
-            </div>
-            <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/40 p-4 text-sm text-muted-foreground">
-              <span className="font-semibold text-[color:var(--sinaxys-ink)]">Mudanças futuras:</span> alteram somente o forecast do cenário, sem mexer no cadastro original.
-            </div>
-          </div>
+          )}
         </Card>
 
         <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -558,7 +702,7 @@ export default function FinanceForecast() {
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Lançamentos monitorados</div>
-                <p className="mt-1 text-sm text-muted-foreground">Escolha qualquer despesa recorrente e programe o mês em que ela muda de comportamento.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Escolha qualquer despesa recorrente e programe o mês em que ela muda de comportamento no cenário principal.</p>
               </div>
               <Button className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90" onClick={() => openNewAdjustment()}>
                 <Plus className="mr-2 h-4 w-4" />Nova mudança
@@ -645,11 +789,11 @@ export default function FinanceForecast() {
           <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
             <div>
               <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Mudanças programadas</div>
-              <p className="mt-1 text-sm text-muted-foreground">Timeline das regras futuras que já impactam o forecast deste cenário.</p>
+              <p className="mt-1 text-sm text-muted-foreground">Timeline das regras futuras do cenário principal: <span className="font-medium text-[color:var(--sinaxys-ink)]">{selectedScenario?.name ?? "—"}</span>.</p>
             </div>
 
             <div className="mt-5 grid gap-3">
-              {adjustments.map((adjustment) => {
+              {selectedScenarioAdjustments.map((adjustment) => {
                 const item = costItems.find((costItem) => costItem.id === adjustment.cost_item_id);
                 return (
                   <div key={adjustment.id} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-4">
@@ -673,7 +817,7 @@ export default function FinanceForecast() {
                 );
               })}
 
-              {!adjustments.length && (
+              {!selectedScenarioAdjustments.length && (
                 <div className="rounded-2xl border border-dashed border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-5 text-sm text-muted-foreground">
                   Ainda não há mudanças futuras programadas para este cenário.
                 </div>
