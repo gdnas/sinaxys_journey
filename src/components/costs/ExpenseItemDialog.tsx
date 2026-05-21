@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { isCompanyWideDepartmentName } from "@/lib/companyWideDepartment";
 import { brl } from "@/lib/costs";
 import { createCostItem, suggestHeadcountAllocations, updateCostItem, type CostAllocation, type CostItem } from "@/lib/costItemsDb";
 
@@ -130,6 +131,11 @@ export function ExpenseItemDialog({
   initialAllocations?: CostAllocation[];
   onSaved: () => Promise<void> | void;
 }) {
+  const rateableDepartments = useMemo(
+    () => departments.filter((department) => !isCompanyWideDepartmentName(department.name)),
+    [departments],
+  );
+
   const [saving, setSaving] = useState(false);
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
@@ -149,14 +155,19 @@ export function ExpenseItemDialog({
     if (!open) return;
 
     if (costItem) {
+      const sanitizedOwnerDepartmentId = rateableDepartments.some((department) => department.id === costItem.owner_department_id)
+        ? costItem.owner_department_id
+        : rateableDepartments[0]?.id ?? null;
       const existingAllocations = initialAllocations?.length
-        ? initialAllocations.map((item) => ({
-            id: item.id,
-            department_id: item.department_id,
-            allocation_percentage: Number(item.allocation_percentage) || 0,
-          }))
-        : buildDefaultAllocations(departments, costItem.owner_department_id);
-      const companyWideState = detectCompanyWide(departments, existingAllocations, costItem.allocation_method);
+        ? initialAllocations
+            .filter((item) => rateableDepartments.some((department) => department.id === item.department_id))
+            .map((item) => ({
+              id: item.id,
+              department_id: item.department_id,
+              allocation_percentage: Number(item.allocation_percentage) || 0,
+            }))
+        : buildDefaultAllocations(rateableDepartments, sanitizedOwnerDepartmentId);
+      const companyWideState = detectCompanyWide(rateableDepartments, existingAllocations, costItem.allocation_method);
 
       setName(costItem.name);
       setCategory(costItem.category ?? "");
@@ -167,14 +178,14 @@ export function ExpenseItemDialog({
       setCompanyWide(companyWideState.companyWide);
       setCompanyWideMode(companyWideState.mode);
       setAllocationMethod(costItem.allocation_method);
-      setOwnerDepartmentId(costItem.owner_department_id);
+      setOwnerDepartmentId(sanitizedOwnerDepartmentId);
       setNotes(costItem.notes ?? "");
       setActive(costItem.active);
-      setAllocations(companyWideState.companyWide ? coverAllDepartments(departments, existingAllocations) : existingAllocations);
+      setAllocations(companyWideState.companyWide ? coverAllDepartments(rateableDepartments, existingAllocations) : existingAllocations);
       return;
     }
 
-    const defaultOwner = departments[0]?.id ?? null;
+    const defaultOwner = rateableDepartments[0]?.id ?? null;
     setName("");
     setCategory("Tecnologia");
     setType("fixed");
@@ -187,8 +198,8 @@ export function ExpenseItemDialog({
     setOwnerDepartmentId(defaultOwner);
     setNotes("");
     setActive(true);
-    setAllocations(buildDefaultAllocations(departments, defaultOwner));
-  }, [open, costItem, initialAllocations, departments]);
+    setAllocations(buildDefaultAllocations(rateableDepartments, defaultOwner));
+  }, [open, costItem, initialAllocations, rateableDepartments]);
 
   const totalPercentage = useMemo(
     () => allocations.reduce((sum, item) => sum + (Number(item.allocation_percentage) || 0), 0),
@@ -214,7 +225,7 @@ export function ExpenseItemDialog({
   }
 
   function handleSharedChange(next: boolean) {
-    const ensuredOwnerDepartmentId = ownerDepartmentId ?? departments[0]?.id ?? null;
+    const ensuredOwnerDepartmentId = ownerDepartmentId ?? rateableDepartments[0]?.id ?? null;
     setShared(next);
     setOwnerDepartmentId(ensuredOwnerDepartmentId);
 
@@ -231,13 +242,14 @@ export function ExpenseItemDialog({
     }
 
     setAllocations((current) => {
-      if (current.length >= 2) return current;
-      return buildSharedDefaults(departments, ensuredOwnerDepartmentId);
+      const sanitizedCurrent = current.filter((item) => rateableDepartments.some((department) => department.id === item.department_id));
+      if (sanitizedCurrent.length >= 2) return sanitizedCurrent;
+      return buildSharedDefaults(rateableDepartments, ensuredOwnerDepartmentId);
     });
   }
 
   function handleCompanyWideChange(next: boolean) {
-    const ensuredOwnerDepartmentId = ownerDepartmentId ?? departments[0]?.id ?? null;
+    const ensuredOwnerDepartmentId = ownerDepartmentId ?? rateableDepartments[0]?.id ?? null;
     setCompanyWide(next);
     setOwnerDepartmentId(ensuredOwnerDepartmentId);
 
@@ -245,18 +257,18 @@ export function ExpenseItemDialog({
       setShared(true);
       setCompanyWideMode("equal");
       setAllocationMethod("manual");
-      setAllocations(buildEqualAllocations(departments));
+      setAllocations(buildEqualAllocations(rateableDepartments));
       return;
     }
 
     setCompanyWideMode("equal");
     setAllocationMethod("manual");
-    setAllocations(buildSharedDefaults(departments, ensuredOwnerDepartmentId));
+    setAllocations(buildSharedDefaults(rateableDepartments, ensuredOwnerDepartmentId));
   }
 
   function addAllocation() {
     const used = new Set(allocations.map((item) => item.department_id));
-    const nextDepartment = departments.find((department) => !used.has(department.id)) ?? departments[0];
+    const nextDepartment = rateableDepartments.find((department) => !used.has(department.id)) ?? rateableDepartments[0];
     if (!nextDepartment) return;
 
     setAllocations((current) => [
@@ -282,10 +294,16 @@ export function ExpenseItemDialog({
       }
 
       const suggestedByDepartment = new Map(
-        suggested.map((item) => [item.department_id, Number(item.allocation_percentage) || 0] as const),
+        suggested
+          .filter((item) => rateableDepartments.some((department) => department.id === item.department_id))
+          .map((item) => [item.department_id, Number(item.allocation_percentage) || 0] as const),
       );
 
-      const nextAllocations = (companyWideOnly ? departments : departments.filter((department) => suggestedByDepartment.has(department.id)))
+      const baseDepartments = companyWideOnly
+        ? rateableDepartments
+        : rateableDepartments.filter((department) => suggestedByDepartment.has(department.id));
+
+      const nextAllocations = baseDepartments
         .map((department) => ({
           id: createId(),
           department_id: department.id,
@@ -305,16 +323,16 @@ export function ExpenseItemDialog({
 
     if (mode === "equal") {
       setAllocationMethod("manual");
-      setAllocations(buildEqualAllocations(departments));
+      setAllocations(buildEqualAllocations(rateableDepartments));
       return;
     }
 
     if (mode === "manual") {
       setAllocationMethod("manual");
       setAllocations((current) => {
-        const covered = coverAllDepartments(departments, current);
+        const covered = coverAllDepartments(rateableDepartments, current);
         const hasAnyValue = covered.some((item) => item.allocation_percentage > 0);
-        return hasAnyValue ? covered : buildEqualAllocations(departments);
+        return hasAnyValue ? covered : buildEqualAllocations(rateableDepartments);
       });
       return;
     }
@@ -360,9 +378,9 @@ export function ExpenseItemDialog({
       }
 
       if (companyWide) {
-        const coversAllDepartments = departments.every((department) => uniqueDepartments.has(department.id));
+        const coversAllDepartments = rateableDepartments.every((department) => uniqueDepartments.has(department.id));
         if (!coversAllDepartments) {
-          toast.error("Despesas da empresa toda precisam incluir todos os departamentos.");
+          toast.error("Despesas da empresa toda precisam incluir todos os departamentos reais.");
           return;
         }
       }
@@ -438,7 +456,7 @@ export function ExpenseItemDialog({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">Selecione</SelectItem>
-                  {departments.map((department) => (
+                  {rateableDepartments.map((department) => (
                     <SelectItem key={department.id} value={department.id}>
                       {department.name}
                     </SelectItem>
@@ -503,7 +521,7 @@ export function ExpenseItemDialog({
                       <Switch checked={companyWide} onCheckedChange={handleCompanyWideChange} />
                       <div>
                         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Empresa toda</div>
-                        <div className="text-xs text-muted-foreground">Inclui todos os departamentos no rateio</div>
+                        <div className="text-xs text-muted-foreground">Inclui todos os departamentos reais no rateio</div>
                       </div>
                     </div>
                   ) : null}
@@ -520,7 +538,7 @@ export function ExpenseItemDialog({
                     <div className="grid gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 md:grid-cols-[1fr_260px] md:items-end">
                       <div>
                         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Despesa da empresa toda</div>
-                        <div className="mt-1 text-sm text-muted-foreground">Escolha se o custo deve ser distribuído igualmente, por headcount ou manualmente entre todos os departamentos.</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Distribui o custo entre todos os departamentos reais. A pseudo-área “Empresa toda” não entra no rateio.</div>
                       </div>
                       <div className="grid gap-2">
                         <Label>Forma de rateio</Label>
@@ -556,14 +574,14 @@ export function ExpenseItemDialog({
                       </div>
                     ) : (
                       <div className="text-xs text-muted-foreground">
-                        {companyWideMode === "equal" ? "Todos os departamentos com o mesmo peso." : companyWideMode === "headcount" ? "Distribuição proporcional ao headcount." : "Todos os departamentos incluídos com percentuais editáveis."}
+                        {companyWideMode === "equal" ? "Todos os departamentos reais com o mesmo peso." : companyWideMode === "headcount" ? "Distribuição proporcional ao headcount dos departamentos reais." : "Todos os departamentos reais incluídos com percentuais editáveis."}
                       </div>
                     )}
                   </div>
 
                   <div className="grid gap-3">
                     {allocations.map((allocation) => {
-                      const departmentName = departments.find((department) => department.id === allocation.department_id)?.name ?? "Departamento";
+                      const departmentName = rateableDepartments.find((department) => department.id === allocation.department_id)?.name ?? "Departamento";
                       const readOnlyCompanyWide = companyWide && companyWideMode !== "manual";
 
                       return (
@@ -580,7 +598,7 @@ export function ExpenseItemDialog({
                                   <SelectValue placeholder="Selecione um departamento" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {departments.map((department) => (
+                                  {rateableDepartments.map((department) => (
                                     <SelectItem key={department.id} value={department.id}>
                                       {department.name}
                                     </SelectItem>
@@ -646,7 +664,7 @@ export function ExpenseItemDialog({
             <Button type="button" variant="outline" className="rounded-full" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="button" className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90" onClick={handleSubmit} disabled={saving}>
+            <Button type="button" className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90" onClick={handleSubmit} disabled={saving || !rateableDepartments.length}>
               {saving ? "Salvando..." : costItem ? "Salvar alterações" : "Criar despesa"}
             </Button>
           </DialogFooter>

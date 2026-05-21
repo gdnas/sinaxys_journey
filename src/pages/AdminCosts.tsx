@@ -15,6 +15,7 @@ import { ResponsiveTable } from "@/components/ResponsiveTable";
 import { ExpenseItemDialog } from "@/components/costs/ExpenseItemDialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth";
+import { isCompanyWideDepartmentName } from "@/lib/companyWideDepartment";
 import { brl } from "@/lib/costs";
 import {
   deleteCostItem,
@@ -150,6 +151,11 @@ export default function AdminCosts() {
     },
   });
 
+  const costDepartments = useMemo(
+    () => departments.filter((department) => !isCompanyWideDepartmentName(department.name)),
+    [departments],
+  );
+  const costDepartmentIds = useMemo(() => new Set(costDepartments.map((department) => department.id)), [costDepartments]);
   const deptById = useMemo(() => new Map(departments.map((department) => [department.id, department] as const)), [departments]);
   const profileById = useMemo(() => new Map(profiles.map((profile) => [profile.id, profile] as const)), [profiles]);
   const nowIso = useMemo(() => new Date().toISOString(), []);
@@ -225,7 +231,7 @@ export default function AdminCosts() {
       memberIds.set(deptId, ids);
     }
 
-    for (const department of departments) {
+    for (const department of costDepartments) {
       const head = headByDeptId.get(department.id);
       if (!head?.active) continue;
       const ids = memberIds.get(department.id);
@@ -252,7 +258,7 @@ export default function AdminCosts() {
     }
 
     return map;
-  }, [activePeople, departments, headByDeptId]);
+  }, [activePeople, costDepartments, headByDeptId]);
 
   const departmentExpenses = useMemo(() => {
     const map = new Map<string, DepartmentExpenseRow[]>();
@@ -260,6 +266,7 @@ export default function AdminCosts() {
     for (const item of activeCostItems) {
       const allocations = allocationsByItem[item.id] ?? [];
       for (const allocation of allocations) {
+        if (!costDepartmentIds.has(allocation.department_id)) continue;
         const allocatedCost = (n(item.total_monthly_cost) * n(allocation.allocation_percentage)) / 100;
         const list = map.get(allocation.department_id) ?? [];
         list.push({
@@ -280,13 +287,13 @@ export default function AdminCosts() {
     }
 
     return map;
-  }, [activeCostItems, allocationsByItem]);
+  }, [activeCostItems, allocationsByItem, costDepartmentIds]);
 
   const byDept = useMemo(() => {
     const map = new Map<string, DepartmentRow>();
     const memberIds = new Map<string, Set<string>>();
 
-    for (const department of departments) {
+    for (const department of costDepartments) {
       map.set(department.id, {
         deptId: department.id,
         deptName: department.name,
@@ -311,7 +318,7 @@ export default function AdminCosts() {
       memberIds.set(deptId, ids);
     }
 
-    for (const department of departments) {
+    for (const department of costDepartments) {
       const head = headByDeptId.get(department.id);
       if (!head?.active) continue;
       const ids = memberIds.get(department.id);
@@ -335,7 +342,7 @@ export default function AdminCosts() {
     return Array.from(map.values())
       .filter((row) => row.people > 0 || row.expenseCost > 0)
       .sort((a, b) => b.total - a.total || a.deptName.localeCompare(b.deptName));
-  }, [activePeople, departments, departmentExpenses, deptById, headByDeptId]);
+  }, [activePeople, costDepartments, departmentExpenses, deptById, headByDeptId]);
 
   const companyPeopleCost = useMemo(() => {
     let sum = 0;
@@ -610,7 +617,7 @@ export default function AdminCosts() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos os departamentos</SelectItem>
-              {departments.map((department) => (
+              {costDepartments.map((department) => (
                 <SelectItem key={department.id} value={department.id}>
                   {department.name}
                 </SelectItem>
@@ -901,7 +908,7 @@ export default function AdminCosts() {
           if (!nextOpen) setEditingExpense(null);
         }}
         companyId={companyId}
-        departments={departments.map((department) => ({ id: department.id, name: department.name }))}
+        departments={costDepartments.map((department) => ({ id: department.id, name: department.name }))}
         costItem={editingExpense}
         initialAllocations={editingExpense ? allocationsByItem[editingExpense.id] ?? [] : []}
         onSaved={refreshCosts}

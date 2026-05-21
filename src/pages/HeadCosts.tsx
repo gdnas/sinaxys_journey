@@ -10,6 +10,7 @@ import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ResponsiveTable } from "@/components/ResponsiveTable";
 import { useAuth } from "@/lib/auth";
+import { isCompanyWideDepartmentName } from "@/lib/companyWideDepartment";
 import { brl } from "@/lib/costs";
 import { listCostAllocations, listCostItems, type CostAllocation, type CostItem } from "@/lib/costItemsDb";
 import { listDepartments } from "@/lib/departmentsDb";
@@ -87,6 +88,10 @@ export default function HeadCosts() {
     },
   });
 
+  const costDepartmentIds = useMemo(
+    () => new Set(departments.filter((department) => !isCompanyWideDepartmentName(department.name)).map((department) => department.id)),
+    [departments],
+  );
   const deptName = useMemo(() => departments.find((department) => department.id === myDeptId)?.name ?? "Departamento", [departments, myDeptId]);
 
   const people = useMemo(() => {
@@ -111,7 +116,7 @@ export default function HeadCosts() {
     for (const item of costItems) {
       const allocations = allocationsByItem[item.id] ?? [];
       for (const allocation of allocations) {
-        if (allocation.department_id !== myDeptId) continue;
+        if (allocation.department_id !== myDeptId || !costDepartmentIds.has(allocation.department_id)) continue;
         rows.push({
           itemId: item.id,
           name: item.name,
@@ -125,7 +130,7 @@ export default function HeadCosts() {
     }
 
     return rows.sort((a, b) => b.allocatedCost - a.allocatedCost || a.name.localeCompare(b.name));
-  }, [allocationsByItem, costItems, myDeptId]);
+  }, [allocationsByItem, costDepartmentIds, costItems, myDeptId]);
 
   const expenseCategories = useMemo(() => {
     return Array.from(new Set(departmentExpenses.map((expense) => expense.category?.trim()).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b));

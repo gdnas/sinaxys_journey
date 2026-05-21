@@ -2,6 +2,10 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const COMPANY_WIDE_DEPARTMENT_NAME = "Empresa toda";
 
+export function isCompanyWideDepartmentName(name: string | null | undefined) {
+  return String(name ?? "").trim().toLowerCase() === COMPANY_WIDE_DEPARTMENT_NAME.toLowerCase();
+}
+
 export type DbDepartment = {
   id: string;
   company_id: string;
