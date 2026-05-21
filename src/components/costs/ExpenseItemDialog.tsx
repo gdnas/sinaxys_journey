@@ -22,6 +22,8 @@ type AllocationDraft = {
   allocation_percentage: number;
 };
 
+type CompanyWideMode = "equal" | "headcount" | "manual";
+
 function createId() {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -50,11 +52,65 @@ function buildSharedDefaults(departments: DepartmentOption[], ownerDepartmentId?
     return [{ id: createId(), department_id: selectedIds[0], allocation_percentage: 100 }];
   }
 
-  return selectedIds.map((departmentId, index) => ({
+  return selectedIds.map((departmentId) => ({
     id: createId(),
     department_id: departmentId,
-    allocation_percentage: index === 0 ? 50 : 50,
+    allocation_percentage: 50,
   }));
+}
+
+function buildEqualAllocations(departments: DepartmentOption[]) {
+  if (!departments.length) return [] as AllocationDraft[];
+
+  const base = Math.floor((100 / departments.length) * 100) / 100;
+  let consumed = 0;
+
+  return departments.map((department, index) => {
+    const percentage = index === departments.length - 1 ? Number((100 - consumed).toFixed(2)) : base;
+    consumed += percentage;
+    return {
+      id: createId(),
+      department_id: department.id,
+      allocation_percentage: percentage,
+    };
+  });
+}
+
+function coverAllDepartments(departments: DepartmentOption[], current: AllocationDraft[]) {
+  if (!departments.length) return [] as AllocationDraft[];
+
+  return departments.map((department) => ({
+    id: current.find((item) => item.department_id === department.id)?.id ?? createId(),
+    department_id: department.id,
+    allocation_percentage: current.find((item) => item.department_id === department.id)?.allocation_percentage ?? 0,
+  }));
+}
+
+function detectCompanyWide(
+  departments: DepartmentOption[],
+  allocations: AllocationDraft[],
+  method: CostItem["allocation_method"],
+) {
+  if (!departments.length || allocations.length !== departments.length) {
+    return { companyWide: false, mode: "equal" as CompanyWideMode };
+  }
+
+  const allocationIds = new Set(allocations.map((item) => item.department_id));
+  const coversAllDepartments = departments.every((department) => allocationIds.has(department.id));
+  if (!coversAllDepartments) {
+    return { companyWide: false, mode: "equal" as CompanyWideMode };
+  }
+
+  if (method === "headcount") {
+    return { companyWide: true, mode: "headcount" as CompanyWideMode };
+  }
+
+  const percentages = allocations.map((item) => Number(item.allocation_percentage) || 0);
+  const min = Math.min(...percentages);
+  const max = Math.max(...percentages);
+  const isEqual = Math.abs(max - min) <= 0.02;
+
+  return { companyWide: true, mode: isEqual ? ("equal" as CompanyWideMode) : ("manual" as CompanyWideMode) };
 }
 
 export function ExpenseItemDialog({
@@ -81,6 +137,8 @@ export function ExpenseItemDialog({
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual" | "one_time">("monthly");
   const [monthlyCost, setMonthlyCost] = useState("0");
   const [shared, setShared] = useState(false);
+  const [companyWide, setCompanyWide] = useState(false);
+  const [companyWideMode, setCompanyWideMode] = useState<CompanyWideMode>("equal");
   const [allocationMethod, setAllocationMethod] = useState<"manual" | "headcount">("manual");
   const [ownerDepartmentId, setOwnerDepartmentId] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
@@ -91,25 +149,28 @@ export function ExpenseItemDialog({
     if (!open) return;
 
     if (costItem) {
+      const existingAllocations = initialAllocations?.length
+        ? initialAllocations.map((item) => ({
+            id: item.id,
+            department_id: item.department_id,
+            allocation_percentage: Number(item.allocation_percentage) || 0,
+          }))
+        : buildDefaultAllocations(departments, costItem.owner_department_id);
+      const companyWideState = detectCompanyWide(departments, existingAllocations, costItem.allocation_method);
+
       setName(costItem.name);
       setCategory(costItem.category ?? "");
       setType(costItem.type);
       setBillingCycle(costItem.billing_cycle);
       setMonthlyCost(String(Number(costItem.total_monthly_cost) || 0));
       setShared(costItem.is_shared);
+      setCompanyWide(companyWideState.companyWide);
+      setCompanyWideMode(companyWideState.mode);
       setAllocationMethod(costItem.allocation_method);
       setOwnerDepartmentId(costItem.owner_department_id);
       setNotes(costItem.notes ?? "");
       setActive(costItem.active);
-      setAllocations(
-        initialAllocations?.length
-          ? initialAllocations.map((item) => ({
-              id: item.id,
-              department_id: item.department_id,
-              allocation_percentage: Number(item.allocation_percentage) || 0,
-            }))
-          : buildDefaultAllocations(departments, costItem.owner_department_id),
-      );
+      setAllocations(companyWideState.companyWide ? coverAllDepartments(departments, existingAllocations) : existingAllocations);
       return;
     }
 
@@ -120,6 +181,8 @@ export function ExpenseItemDialog({
     setBillingCycle("monthly");
     setMonthlyCost("0");
     setShared(false);
+    setCompanyWide(false);
+    setCompanyWideMode("equal");
     setAllocationMethod("manual");
     setOwnerDepartmentId(defaultOwner);
     setNotes("");
@@ -155,19 +218,40 @@ export function ExpenseItemDialog({
     setShared(next);
     setOwnerDepartmentId(ensuredOwnerDepartmentId);
 
-    if (next) {
-      setAllocations((current) => {
-        if (current.length >= 2) return current;
-        return buildSharedDefaults(departments, ensuredOwnerDepartmentId);
-      });
+    if (!next) {
+      setCompanyWide(false);
+      setCompanyWideMode("equal");
+      setAllocationMethod("manual");
+      if (ensuredOwnerDepartmentId) {
+        setSingleDepartment(ensuredOwnerDepartmentId);
+      } else {
+        setAllocations([]);
+      }
       return;
     }
 
-    if (ensuredOwnerDepartmentId) {
-      setSingleDepartment(ensuredOwnerDepartmentId);
-    } else {
-      setAllocations([]);
+    setAllocations((current) => {
+      if (current.length >= 2) return current;
+      return buildSharedDefaults(departments, ensuredOwnerDepartmentId);
+    });
+  }
+
+  function handleCompanyWideChange(next: boolean) {
+    const ensuredOwnerDepartmentId = ownerDepartmentId ?? departments[0]?.id ?? null;
+    setCompanyWide(next);
+    setOwnerDepartmentId(ensuredOwnerDepartmentId);
+
+    if (next) {
+      setShared(true);
+      setCompanyWideMode("equal");
+      setAllocationMethod("manual");
+      setAllocations(buildEqualAllocations(departments));
+      return;
     }
+
+    setCompanyWideMode("equal");
+    setAllocationMethod("manual");
+    setAllocations(buildSharedDefaults(departments, ensuredOwnerDepartmentId));
   }
 
   function addAllocation() {
@@ -189,20 +273,53 @@ export function ExpenseItemDialog({
     setAllocations((current) => current.filter((item) => item.id !== id));
   }
 
-  async function applyHeadcountSuggestion() {
+  async function applyHeadcountSuggestion(companyWideOnly = false) {
     try {
       const suggested = await suggestHeadcountAllocations(companyId);
-      setAllocations(
-        suggested.map((item) => ({
-          id: createId(),
-          department_id: item.department_id,
-          allocation_percentage: Number(item.allocation_percentage) || 0,
-        })),
+      if (!suggested.length) {
+        toast.error("Não foi possível gerar o rateio por headcount.");
+        return;
+      }
+
+      const suggestedByDepartment = new Map(
+        suggested.map((item) => [item.department_id, Number(item.allocation_percentage) || 0] as const),
       );
+
+      const nextAllocations = (companyWideOnly ? departments : departments.filter((department) => suggestedByDepartment.has(department.id)))
+        .map((department) => ({
+          id: createId(),
+          department_id: department.id,
+          allocation_percentage: suggestedByDepartment.get(department.id) ?? 0,
+        }))
+        .filter((item) => companyWideOnly || item.allocation_percentage > 0);
+
+      setAllocations(nextAllocations);
       setAllocationMethod("headcount");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Não foi possível sugerir o rateio.");
     }
+  }
+
+  async function handleCompanyWideModeChange(mode: CompanyWideMode) {
+    setCompanyWideMode(mode);
+
+    if (mode === "equal") {
+      setAllocationMethod("manual");
+      setAllocations(buildEqualAllocations(departments));
+      return;
+    }
+
+    if (mode === "manual") {
+      setAllocationMethod("manual");
+      setAllocations((current) => {
+        const covered = coverAllDepartments(departments, current);
+        const hasAnyValue = covered.some((item) => item.allocation_percentage > 0);
+        return hasAnyValue ? covered : buildEqualAllocations(departments);
+      });
+      return;
+    }
+
+    await applyHeadcountSuggestion(true);
   }
 
   async function handleSubmit() {
@@ -242,6 +359,14 @@ export function ExpenseItemDialog({
         return;
       }
 
+      if (companyWide) {
+        const coversAllDepartments = departments.every((department) => uniqueDepartments.has(department.id));
+        if (!coversAllDepartments) {
+          toast.error("Despesas da empresa toda precisam incluir todos os departamentos.");
+          return;
+        }
+      }
+
       if (Math.abs(totalPercentage - 100) > 0.01) {
         toast.error("A soma do rateio deve ser exatamente 100%.");
         return;
@@ -256,8 +381,8 @@ export function ExpenseItemDialog({
         type,
         billing_cycle: billingCycle,
         total_monthly_cost: monthlyCostValue,
-        is_shared: shared,
-        allocation_method: allocationMethod,
+        is_shared: companyWide ? true : shared,
+        allocation_method: companyWideMode === "headcount" ? ("headcount" as const) : allocationMethod,
         owner_department_id: ownerDepartmentId,
         notes: notes.trim() || null,
         active,
@@ -357,91 +482,149 @@ export function ExpenseItemDialog({
           </div>
 
           <div className="mt-6 rounded-[28px] border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/60 p-5">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div>
-                <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Rateio por departamento</div>
-                <p className="mt-1 text-sm text-muted-foreground">O departamento responsável classifica a despesa. O rateio define quem absorve o custo.</p>
-              </div>
-
-              <div className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-4 py-2">
-                <Switch checked={shared} onCheckedChange={handleSharedChange} />
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Compartilhada</div>
-                  <div className="text-xs text-muted-foreground">{shared ? "Rateio entre múltiplos departamentos" : "100% em um departamento"}</div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Rateio por departamento</div>
+                  <p className="mt-1 text-sm text-muted-foreground">O departamento responsável classifica a despesa. O rateio define quem absorve o custo.</p>
                 </div>
-              </div>
-            </div>
 
-            {!shared ? (
-              <div className="mt-5 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-sm text-muted-foreground">
-                Esta despesa ficará 100% alocada para o departamento responsável.
-              </div>
-            ) : (
-              <div className="mt-5 grid gap-4">
-                <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 md:flex-row md:items-center md:justify-between">
-                  <div>
-                    <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Soma do rateio</div>
-                    <div className={`mt-1 text-sm ${Math.abs(totalPercentage - 100) <= 0.01 ? "text-emerald-700" : "text-amber-700"}`}>
-                      {totalPercentage.toFixed(2)}%
+                <div className="flex flex-col gap-3 md:items-end">
+                  <div className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-4 py-2">
+                    <Switch checked={shared} onCheckedChange={handleSharedChange} />
+                    <div>
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Compartilhada</div>
+                      <div className="text-xs text-muted-foreground">{shared ? "Rateio entre múltiplos departamentos" : "100% em um departamento"}</div>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" variant="outline" className="rounded-full" onClick={applyHeadcountSuggestion}>
-                      <RefreshCw className="mr-2 h-4 w-4" />Sugestão por headcount
-                    </Button>
-                    <Button type="button" variant="outline" className="rounded-full" onClick={addAllocation}>
-                      <Plus className="mr-2 h-4 w-4" />Adicionar departamento
-                    </Button>
-                  </div>
-                </div>
 
-                <div className="grid gap-3">
-                  {allocations.map((allocation) => (
-                    <div key={allocation.id} className="grid gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 md:grid-cols-[1fr_180px_auto] md:items-end">
+                  {shared ? (
+                    <div className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-4 py-2">
+                      <Switch checked={companyWide} onCheckedChange={handleCompanyWideChange} />
+                      <div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Empresa toda</div>
+                        <div className="text-xs text-muted-foreground">Inclui todos os departamentos no rateio</div>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              {!shared ? (
+                <div className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-sm text-muted-foreground">
+                  Esta despesa ficará 100% alocada para o departamento responsável.
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {companyWide ? (
+                    <div className="grid gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 md:grid-cols-[1fr_260px] md:items-end">
+                      <div>
+                        <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Despesa da empresa toda</div>
+                        <div className="mt-1 text-sm text-muted-foreground">Escolha se o custo deve ser distribuído igualmente, por headcount ou manualmente entre todos os departamentos.</div>
+                      </div>
                       <div className="grid gap-2">
-                        <Label>Departamento</Label>
-                        <Select value={allocation.department_id} onValueChange={(value) => updateAllocation(allocation.id, { department_id: value })}>
+                        <Label>Forma de rateio</Label>
+                        <Select value={companyWideMode} onValueChange={(value: CompanyWideMode) => void handleCompanyWideModeChange(value)}>
                           <SelectTrigger className="h-11 rounded-2xl">
-                            <SelectValue placeholder="Selecione um departamento" />
+                            <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            {departments.map((department) => (
-                              <SelectItem key={department.id} value={department.id}>
-                                {department.name}
-                              </SelectItem>
-                            ))}
+                            <SelectItem value="equal">Igualitário</SelectItem>
+                            <SelectItem value="headcount">Por headcount</SelectItem>
+                            <SelectItem value="manual">Manual</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
+                    </div>
+                  ) : null}
 
-                      <div className="grid gap-2">
-                        <Label>Percentual</Label>
-                        <Input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={allocation.allocation_percentage}
-                          onChange={(e) => updateAllocation(allocation.id, { allocation_percentage: Number(e.target.value) || 0 })}
-                          className="h-11 rounded-2xl"
-                        />
-                        <div className="text-xs text-muted-foreground">{brl((monthlyCostValue * allocation.allocation_percentage) / 100)}</div>
+                  <div className="flex flex-col gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                      <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Soma do rateio</div>
+                      <div className={`mt-1 text-sm ${Math.abs(totalPercentage - 100) <= 0.01 ? "text-emerald-700" : "text-amber-700"}`}>
+                        {totalPercentage.toFixed(2)}%
                       </div>
-
-                      <Button type="button" variant="ghost" className="h-11 rounded-2xl text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => removeAllocation(allocation.id)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </div>
-                  ))}
+                    {!companyWide ? (
+                      <div className="flex flex-wrap gap-2">
+                        <Button type="button" variant="outline" className="rounded-full" onClick={() => void applyHeadcountSuggestion(false)}>
+                          <RefreshCw className="mr-2 h-4 w-4" />Sugestão por headcount
+                        </Button>
+                        <Button type="button" variant="outline" className="rounded-full" onClick={addAllocation}>
+                          <Plus className="mr-2 h-4 w-4" />Adicionar departamento
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="text-xs text-muted-foreground">
+                        {companyWideMode === "equal" ? "Todos os departamentos com o mesmo peso." : companyWideMode === "headcount" ? "Distribuição proporcional ao headcount." : "Todos os departamentos incluídos com percentuais editáveis."}
+                      </div>
+                    )}
+                  </div>
 
-                  {!allocations.length && (
-                    <div className="rounded-2xl border border-dashed border-[color:var(--sinaxys-border)] bg-white p-6 text-sm text-muted-foreground">
-                      Adicione pelo menos dois departamentos para ratear esta despesa.
-                    </div>
-                  )}
+                  <div className="grid gap-3">
+                    {allocations.map((allocation) => {
+                      const departmentName = departments.find((department) => department.id === allocation.department_id)?.name ?? "Departamento";
+                      const readOnlyCompanyWide = companyWide && companyWideMode !== "manual";
+
+                      return (
+                        <div key={allocation.id} className="grid gap-3 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 md:grid-cols-[1fr_180px_auto] md:items-end">
+                          <div className="grid gap-2">
+                            <Label>Departamento</Label>
+                            {companyWide ? (
+                              <div className="flex h-11 items-center rounded-2xl border border-[color:var(--sinaxys-border)] px-4 text-sm text-[color:var(--sinaxys-ink)]">
+                                {departmentName}
+                              </div>
+                            ) : (
+                              <Select value={allocation.department_id} onValueChange={(value) => updateAllocation(allocation.id, { department_id: value })}>
+                                <SelectTrigger className="h-11 rounded-2xl">
+                                  <SelectValue placeholder="Selecione um departamento" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {departments.map((department) => (
+                                    <SelectItem key={department.id} value={department.id}>
+                                      {department.name}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </div>
+
+                          <div className="grid gap-2">
+                            <Label>Percentual</Label>
+                            <Input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.01"
+                              value={allocation.allocation_percentage}
+                              onChange={(e) => updateAllocation(allocation.id, { allocation_percentage: Number(e.target.value) || 0 })}
+                              className="h-11 rounded-2xl"
+                              disabled={readOnlyCompanyWide}
+                            />
+                            <div className="text-xs text-muted-foreground">{brl((monthlyCostValue * allocation.allocation_percentage) / 100)}</div>
+                          </div>
+
+                          {companyWide ? (
+                            <div className="h-11" />
+                          ) : (
+                            <Button type="button" variant="ghost" className="h-11 rounded-2xl text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => removeAllocation(allocation.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {!allocations.length && (
+                      <div className="rounded-2xl border border-dashed border-[color:var(--sinaxys-border)] bg-white p-6 text-sm text-muted-foreground">
+                        Adicione pelo menos dois departamentos para ratear esta despesa.
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2">
