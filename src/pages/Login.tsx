@@ -1,5 +1,5 @@
 import { FormEvent, useMemo, useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -58,35 +58,13 @@ export default function Login() {
     <div className="min-h-screen bg-[color:var(--sinaxys-bg)] px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center justify-center">
         <div className="grid w-full gap-6 lg:grid-cols-[1.05fr_0.95fr]">
-          <section className="rounded-[2rem] border border-[color:var(--sinaxys-border)] bg-white p-8 shadow-sm sm:p-10">
-            <div className="inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--sinaxys-primary)]">
-              acesso seguro
-            </div>
-
-            <div className="mt-8 space-y-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Plataforma operacional</p>
-                <h1 className="mt-2 text-4xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-5xl">
-                  kairoos
-                </h1>
-                <p className="mt-2 text-xl font-medium text-[color:var(--sinaxys-primary)] sm:text-2xl">
-                  Executing Operating System
-                </p>
-              </div>
-
-              <p className="max-w-md text-sm leading-relaxed text-muted-foreground">
-                Entre com seu email e sua senha para acessar o ambiente de execução da sua operação.
-              </p>
-            </div>
-
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/45 p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Identidade</div>
-                <div className="mt-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">Login com email corporativo</div>
-              </div>
-              <div className="rounded-3xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/45 p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">Privacidade</div>
-                <div className="mt-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">Senha visível só quando você quiser</div>
+          <section className="flex items-center justify-center rounded-[2rem] border border-[color:var(--sinaxys-border)] bg-white p-8 shadow-sm sm:p-10">
+            <div className="text-center">
+              <h1 className="text-5xl font-semibold tracking-tight text-[color:var(--sinaxys-ink)] sm:text-6xl">
+                kairoos
+              </h1>
+              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.2em] text-[color:var(--sinaxys-primary)]">
+                acesso seguro
               </div>
             </div>
           </section>
@@ -118,7 +96,12 @@ export default function Login() {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="password">Senha</Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="password">Senha</Label>
+                  <Link to="/forgot" className="text-sm font-medium text-[color:var(--sinaxys-primary)] transition hover:opacity-80">
+                    Esqueci minha senha
+                  </Link>
+                </div>
                 <div className="relative">
                   <LockKeyhole className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
