@@ -45,6 +45,7 @@ export default function FinanceVersionDetail() {
   const [drafts, setDrafts] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [savingLineId, setSavingLineId] = useState<string | null>(null);
+  const [lockingVersion, setLockingVersion] = useState(false);
   const [editingLineId, setEditingLineId] = useState<string | null>(null);
   const [errorLineId, setErrorLineId] = useState<string | null>(null);
   const [pendingNewLineId, setPendingNewLineId] = useState<string | null>(null);
@@ -115,8 +116,9 @@ export default function FinanceVersionDetail() {
   if (!enabled) return <Navigate to="/finance" replace />;
 
   async function handleLock() {
-    if (!version) return;
+    if (!version || lockingVersion) return;
     console.info("[FINANCE_QA] version_lock_started", { role: user?.role, companyId, versionId: version.id, action: "lock_version" });
+    setLockingVersion(true);
     try {
       const locked = await lockFinanceVersion(version.id);
       setVersion(locked);
@@ -125,6 +127,8 @@ export default function FinanceVersionDetail() {
     } catch (error) {
       console.warn("[FINANCE_QA] version_lock_failed", { role: user?.role, companyId, versionId: version.id, action: "lock_version", error: error instanceof Error ? error.message : String(error) });
       throw error;
+    } finally {
+      setLockingVersion(false);
     }
   }
 
@@ -257,7 +261,7 @@ export default function FinanceVersionDetail() {
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-[color:var(--sinaxys-bg)] px-4 py-6 md:px-6">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-        <FinanceVersionHeader version={version} onSave={handleLock} saving={false} canEdit={!readOnly} />
+        <FinanceVersionHeader version={version} onLock={handleLock} saving={lockingVersion} canEdit={!readOnly} />
 
         {version.status === "locked" && (
           <div className="rounded-3xl border border-slate-300 bg-slate-50 p-4 text-sm text-slate-700">

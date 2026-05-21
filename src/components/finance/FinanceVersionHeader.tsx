@@ -1,4 +1,4 @@
-import { ArrowLeft, Lock, Save } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -6,12 +6,12 @@ import type { FinanceVersion } from "@/lib/financeDb";
 
 export function FinanceVersionHeader({
   version,
-  onSave,
+  onLock,
   saving,
   canEdit,
 }: {
   version: FinanceVersion;
-  onSave: () => void;
+  onLock: () => void;
   saving: boolean;
   canEdit: boolean;
 }) {
@@ -32,18 +32,14 @@ export function FinanceVersionHeader({
             {version.fiscal_month ? ` · M${version.fiscal_month}` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {canEdit && version.status !== "locked" && (
-            <Button onClick={onSave} disabled={saving} className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-              <Save className="mr-2 h-4 w-4" />Salvar alterações
+        {canEdit && version.status !== "locked" && (
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={onLock} disabled={saving} className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90">
+              <Lock className="mr-2 h-4 w-4" />
+              {saving ? "Bloqueando..." : "Bloquear versão"}
             </Button>
-          )}
-          {version.status !== "locked" && (
-            <Button variant="outline" className="rounded-full border-[color:var(--sinaxys-border)] bg-white/0 text-[color:var(--sinaxys-ink)] hover:bg-white/5">
-              <Lock className="mr-2 h-4 w-4" />Bloqueável
-            </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </section>
   );

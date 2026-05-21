@@ -104,6 +104,10 @@ import SquadList from "./pages/SquadList";
 import SquadDetail from "./pages/SquadDetail";
 import AssetPublicDemo from "./pages/AssetPublicDemo";
 import Finance from "./pages/Finance";
+import FinanceSetup from "./pages/FinanceSetup";
+import FinanceVersions from "./pages/FinanceVersions";
+import FinanceVersionDetail from "./pages/FinanceVersionDetail";
+import FinanceScenarios from "./pages/FinanceScenarios";
 
 const queryClient = new QueryClient();
 
@@ -148,6 +152,10 @@ const App = () => (
                         <Route path="/dashboard" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><Navigate to="/app" replace /></RequireAuth>} />
                         <Route path="/app/tracks/:assignmentId" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><TrackPlayer /></RequireAuth>} />
                         <Route path="/finance" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="FINANCE"><Finance /></RequireCompanyModule></RequireAuth>} />
+                        <Route path="/finance/setup" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceSetup /></RequireCompanyModule></RequireAuth>} />
+                        <Route path="/finance/versions" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceVersions /></RequireCompanyModule></RequireAuth>} />
+                        <Route path="/finance/versions/:id" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceVersionDetail /></RequireCompanyModule></RequireAuth>} />
+                        <Route path="/finance/scenarios" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceScenarios /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/people/:userId" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="ORG"><Person /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/password" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><ChangePassword /></RequireAuth>} />
                         <Route path="/vacation" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><VacationRequests /></RequireAuth>} />

@@ -1,4 +1,4 @@
-import { BarChart3, ShieldCheck, Wallet, ArrowRight } from "lucide-react";
+import { BarChart3, GitBranch, ShieldCheck, Wallet, ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -24,13 +24,13 @@ export default function Finance() {
 
               <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                 <Button asChild className="h-11 rounded-full bg-[color:var(--sinaxys-primary)] px-6 text-white hover:bg-[color:var(--sinaxys-primary)]/90">
-                  <Link to="/admin/modules">
-                    Ativar módulo
+                  <Link to="/finance/versions">
+                    Abrir versões
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="h-11 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 px-6 text-[color:var(--sinaxys-ink)] hover:bg-white/5">
-                  <Link to="/admin/costs">Ver custos</Link>
+                  <Link to="/finance/scenarios">Ver cenários</Link>
                 </Button>
               </div>
             </div>
@@ -41,19 +41,19 @@ export default function Finance() {
                   <Wallet className="h-5 w-5" />
                 </div>
                 <div>
-                  <div className="text-sm font-semibold">Sprint 0 pronta para expansão</div>
+                  <div className="text-sm font-semibold">Base pronta para operação</div>
                   <p className="mt-2 text-sm leading-relaxed text-[color:var(--sinaxys-ink)]/70">
-                    A base já respeita feature flag por empresa e prepara o caminho para contas, períodos, cenários e versões.
+                    Contas, períodos, cenários e versões agora já estão acessíveis dentro do fluxo financeiro.
                   </p>
                 </div>
               </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {[
-                  "Feature flag por empresa",
-                  "Integração com cost_items",
+                  "Versões por período",
+                  "Cenários comparáveis",
                   "Compatível com RLS",
-                  "Base para /finance",
+                  "Integração com custos",
                 ].map((item) => (
                   <div key={item} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white/5 px-4 py-3 text-sm font-semibold">
                     {item}
@@ -68,18 +68,18 @@ export default function Finance() {
           {[
             {
               title: "Governança",
-              desc: "Controle por empresa, com ativação/desativação centralizada.",
+              desc: "Controle por empresa, com ativação e leitura gerencial centralizada.",
               icon: <ShieldCheck className="h-5 w-5" />,
             },
             {
-              title: "Visão executiva",
-              desc: "Estrutura pensada para leitura gerencial, não contábil.",
+              title: "Versões",
+              desc: "Monte versões mensais, trimestrais ou anuais com linhas editáveis.",
               icon: <BarChart3 className="h-5 w-5" />,
             },
             {
-              title: "Próximos passos",
-              desc: "A próxima sprint cria a estrutura de contas gerenciais.",
-              icon: <Wallet className="h-5 w-5" />,
+              title: "Cenários",
+              desc: "Compare hipóteses e premie decisões com base em premissas claras.",
+              icon: <GitBranch className="h-5 w-5" />,
             },
           ].map((card) => (
             <Card key={card.title} className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white/5 p-5 backdrop-blur">
