@@ -108,6 +108,7 @@ import FinanceSetup from "./pages/FinanceSetup";
 import FinanceVersions from "./pages/FinanceVersions";
 import FinanceVersionDetail from "./pages/FinanceVersionDetail";
 import FinanceScenarios from "./pages/FinanceScenarios";
+import FinanceForecast from "./pages/FinanceForecast";
 
 const queryClient = new QueryClient();
 
@@ -156,7 +157,9 @@ const App = () => (
                         <Route path="/finance/versions" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceVersions /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/finance/versions/:id" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceVersionDetail /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/finance/scenarios" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceScenarios /></RequireCompanyModule></RequireAuth>} />
+                        <Route path="/finance/forecast" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceForecast /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/people/:userId" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="ORG"><Person /></RequireCompanyModule></RequireAuth>} />
+
                         <Route path="/password" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><ChangePassword /></RequireAuth>} />
                         <Route path="/vacation" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><VacationRequests /></RequireAuth>} />
                         <Route path="/vacation/approvals" element={<RequireAuth roles={["ADMIN", "HEAD"]}><VacationApprovals /></RequireAuth>} />

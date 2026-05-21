@@ -1,4 +1,5 @@
-import { BarChart3, GitBranch, ShieldCheck, Wallet, ArrowRight } from "lucide-react";
+import { BarChart3, GitBranch, ShieldCheck, Wallet, ArrowRight, TrendingUp } from "lucide-react";
+
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,7 +23,7 @@ export default function Finance() {
                 Uma camada gerencial para orçamento, forecast, margem e análise — sem virar ERP e sem duplicar a operação existente.
               </p>
 
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                 <Button asChild className="h-11 rounded-full bg-[color:var(--sinaxys-primary)] px-6 text-white hover:bg-[color:var(--sinaxys-primary)]/90">
                   <Link to="/finance/versions">
                     Abrir versões
@@ -32,7 +33,11 @@ export default function Finance() {
                 <Button asChild variant="outline" className="h-11 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 px-6 text-[color:var(--sinaxys-ink)] hover:bg-white/5">
                   <Link to="/finance/scenarios">Ver cenários</Link>
                 </Button>
+                <Button asChild variant="outline" className="h-11 rounded-full border-[color:var(--sinaxys-border)] bg-white/0 px-6 text-[color:var(--sinaxys-ink)] hover:bg-white/5">
+                  <Link to="/finance/forecast">Abrir forecast</Link>
+                </Button>
               </div>
+
             </div>
 
             <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/45 p-5">
@@ -53,7 +58,7 @@ export default function Finance() {
                   "Versões por período",
                   "Cenários comparáveis",
                   "Impostos e empréstimos",
-                  "Integração com custos",
+                  "Forecast com mudanças futuras",
                 ].map((item) => (
 
                   <div key={item} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-white/5 px-4 py-3 text-sm font-semibold">

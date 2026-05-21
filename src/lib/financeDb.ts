@@ -129,6 +129,23 @@ export type FinanceVersionLine = {
   updated_at: string;
 };
 
+export type FinanceForecastAdjustmentAction = "set_amount" | "stop" | (string & {});
+
+export type FinanceForecastAdjustment = {
+  id: string;
+  company_id: string;
+  scenario_id: string | null;
+  cost_item_id: string;
+  action: FinanceForecastAdjustmentAction;
+  amount: number | null;
+  effective_year: number;
+  effective_month: number;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type FinanceFiscalPeriod = {
   id: string;
   company_id: string;
@@ -156,6 +173,7 @@ const STORE_KEYS = {
   lines: "kairoos_finance_version_lines",
   periods: "kairoos_finance_fiscal_periods",
   accounts: "kairoos_finance_accounts",
+  forecastAdjustments: "kairoos_finance_forecast_adjustments",
 } as const;
 
 function sanitizeFilename(name: string) {
@@ -245,6 +263,14 @@ function getFinanceAccountsStore() {
 
 function setFinanceAccountsStore(value: FinanceAccount[]) {
   writeCollection(STORE_KEYS.accounts, value);
+}
+
+function getFinanceForecastAdjustmentsStore() {
+  return readCollection<FinanceForecastAdjustment>(STORE_KEYS.forecastAdjustments);
+}
+
+function setFinanceForecastAdjustmentsStore(value: FinanceForecastAdjustment[]) {
+  writeCollection(STORE_KEYS.forecastAdjustments, value);
 }
 
 function ensureDefaultFinanceAccounts(companyId: string) {
@@ -764,4 +790,51 @@ export async function lockFinanceVersion(id: string) {
   if (!updated) throw new Error("Versão não encontrada");
   const scenario = getFinanceScenariosStore().find((item) => item.id === updated.scenario_id) ?? null;
   return { ...updated, scenario };
+}
+
+export async function listFinanceForecastAdjustments(companyId: string, scenarioId?: string | null) {
+  return sortByCreatedDesc(
+    getFinanceForecastAdjustmentsStore().filter((item) => item.company_id === companyId && (scenarioId === undefined ? true : item.scenario_id === scenarioId)),
+  ).sort((a, b) => {
+    if (a.effective_year !== b.effective_year) return a.effective_year - b.effective_year;
+    if (a.effective_month !== b.effective_month) return a.effective_month - b.effective_month;
+    return a.created_at.localeCompare(b.created_at);
+  });
+}
+
+export async function createFinanceForecastAdjustment(
+  companyId: string,
+  userId: string,
+  payload: Omit<FinanceForecastAdjustment, "id" | "company_id" | "created_by" | "created_at" | "updated_at">,
+) {
+  const timestamp = nowIso();
+  const created: FinanceForecastAdjustment = {
+    id: createId(),
+    company_id: companyId,
+    created_by: userId,
+    created_at: timestamp,
+    updated_at: timestamp,
+    ...payload,
+  };
+  setFinanceForecastAdjustmentsStore([...getFinanceForecastAdjustmentsStore(), created]);
+  return created;
+}
+
+export async function updateFinanceForecastAdjustment(
+  id: string,
+  patch: Partial<Omit<FinanceForecastAdjustment, "id" | "company_id" | "created_by" | "created_at" | "updated_at">>,
+) {
+  let updated: FinanceForecastAdjustment | null = null;
+  const adjustments = getFinanceForecastAdjustmentsStore().map((item) => {
+    if (item.id !== id) return item;
+    updated = { ...item, ...patch, updated_at: nowIso() };
+    return updated;
+  });
+  setFinanceForecastAdjustmentsStore(adjustments);
+  if (!updated) throw new Error("Ajuste de forecast não encontrado");
+  return updated;
+}
+
+export async function deleteFinanceForecastAdjustment(id: string) {
+  setFinanceForecastAdjustmentsStore(getFinanceForecastAdjustmentsStore().filter((item) => item.id !== id));
 }
