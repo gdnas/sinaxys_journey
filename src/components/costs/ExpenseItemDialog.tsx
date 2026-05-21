@@ -143,19 +143,28 @@ export function ExpenseItemDialog({
     setAllocations([{ id: createId(), department_id: departmentId, allocation_percentage: 100 }]);
   }
 
+  function handleOwnerDepartmentChange(departmentId: string | null) {
+    setOwnerDepartmentId(departmentId);
+    if (!shared) {
+      setSingleDepartment(departmentId);
+    }
+  }
+
   function handleSharedChange(next: boolean) {
+    const ensuredOwnerDepartmentId = ownerDepartmentId ?? departments[0]?.id ?? null;
     setShared(next);
+    setOwnerDepartmentId(ensuredOwnerDepartmentId);
+
     if (next) {
       setAllocations((current) => {
         if (current.length >= 2) return current;
-        return buildSharedDefaults(departments, ownerDepartmentId);
+        return buildSharedDefaults(departments, ensuredOwnerDepartmentId);
       });
       return;
     }
 
-    const fallbackDepartmentId = ownerDepartmentId ?? allocations[0]?.department_id ?? departments[0]?.id ?? null;
-    if (fallbackDepartmentId) {
-      setSingleDepartment(fallbackDepartmentId);
+    if (ensuredOwnerDepartmentId) {
+      setSingleDepartment(ensuredOwnerDepartmentId);
     } else {
       setAllocations([]);
     }
@@ -202,6 +211,11 @@ export function ExpenseItemDialog({
       return;
     }
 
+    if (!ownerDepartmentId) {
+      toast.error("Selecione o departamento responsável pela despesa.");
+      return;
+    }
+
     if (monthlyCostValue <= 0) {
       toast.error("Informe um custo mensal maior que zero.");
       return;
@@ -214,14 +228,7 @@ export function ExpenseItemDialog({
             allocation_percentage: Number(item.allocation_percentage) || 0,
           }))
           .filter((item) => !!item.department_id)
-      : ownerDepartmentId
-        ? [{ department_id: ownerDepartmentId, allocation_percentage: 100 }]
-        : [];
-
-    if (!shared && !ownerDepartmentId) {
-      toast.error("Selecione o departamento responsável.");
-      return;
-    }
+      : [{ department_id: ownerDepartmentId, allocation_percentage: 100 }];
 
     if (shared) {
       if (normalizedAllocations.length < 2) {
@@ -283,7 +290,7 @@ export function ExpenseItemDialog({
               {costItem ? "Editar despesa" : "Nova despesa de ferramenta"}
             </DialogTitle>
             <DialogDescription>
-              Cadastre ferramentas, licenças, fornecedores e outros custos não-humanos com rateio por departamento.
+              Cadastre ferramentas, licenças, fornecedores e outros custos não-humanos com departamento responsável e rateio por área.
             </DialogDescription>
           </DialogHeader>
 
@@ -296,6 +303,23 @@ export function ExpenseItemDialog({
             <div className="grid gap-2">
               <Label>Categoria</Label>
               <Input value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex.: Tecnologia" className="h-11 rounded-2xl" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label>Departamento responsável</Label>
+              <Select value={ownerDepartmentId ?? "none"} onValueChange={(value) => handleOwnerDepartmentChange(value === "none" ? null : value)}>
+                <SelectTrigger className="h-11 rounded-2xl">
+                  <SelectValue placeholder="Selecione um departamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Selecione</SelectItem>
+                  {departments.map((department) => (
+                    <SelectItem key={department.id} value={department.id}>
+                      {department.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="grid gap-2">
@@ -336,7 +360,7 @@ export function ExpenseItemDialog({
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
               <div>
                 <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Rateio por departamento</div>
-                <p className="mt-1 text-sm text-muted-foreground">Escolha entre despesa exclusiva de um departamento ou compartilhada entre vários.</p>
+                <p className="mt-1 text-sm text-muted-foreground">O departamento responsável classifica a despesa. O rateio define quem absorve o custo.</p>
               </div>
 
               <div className="flex items-center gap-3 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-4 py-2">
@@ -349,22 +373,8 @@ export function ExpenseItemDialog({
             </div>
 
             {!shared ? (
-              <div className="mt-5 grid gap-2 md:max-w-sm">
-                <Label>Departamento responsável</Label>
-                <Select value={ownerDepartmentId ?? "none"} onValueChange={(value) => setSingleDepartment(value === "none" ? null : value)}>
-                  <SelectTrigger className="h-11 rounded-2xl bg-white">
-                    <SelectValue placeholder="Selecione um departamento" />
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    <SelectItem value="none">Selecione</SelectItem>
-                    {departments.map((department) => (
-                      <SelectItem key={department.id} value={department.id}>
-                        {department.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="mt-5 rounded-2xl border border-[color:var(--sinaxys-border)] bg-white p-4 text-sm text-muted-foreground">
+                Esta despesa ficará 100% alocada para o departamento responsável.
               </div>
             ) : (
               <div className="mt-5 grid gap-4">

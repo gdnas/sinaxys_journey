@@ -1,11 +1,13 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Building2, ChevronRight, Pencil, Plus, Receipt, Trash2, Wallet } from "lucide-react";
+import { Building2, ChevronRight, Download, Pencil, Plus, Receipt, Search, Trash2, Users, Wallet } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -69,6 +71,12 @@ function prorateForCurrentMonth(monthlyCost: number | null | undefined, schedule
   }
 }
 
+function billingCycleLabel(value: CostItem["billing_cycle"]) {
+  if (value === "monthly") return "Mensal";
+  if (value === "annual") return "Anual";
+  return "Única";
+}
+
 type CostPerson = {
   id: string;
   name: string;
@@ -111,6 +119,10 @@ export default function AdminCosts() {
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<CostItem | null>(null);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [ownerDepartmentFilter, setOwnerDepartmentFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   if (!user || !["MASTERADMIN", "ADMIN"].includes(user.role) || !companyId) return null;
 
@@ -133,9 +145,7 @@ export default function AdminCosts() {
     queryKey: ["cost-allocations-by-item", companyId, costItems.map((item) => item.id).join(",")],
     enabled: costItems.length > 0,
     queryFn: async () => {
-      const entries = await Promise.all(
-        costItems.map(async (item) => [item.id, await listCostAllocations(item.id)] as const),
-      );
+      const entries = await Promise.all(costItems.map(async (item) => [item.id, await listCostAllocations(item.id)] as const));
       return Object.fromEntries(entries) as Record<string, CostAllocation[]>;
     },
   });
@@ -266,10 +276,7 @@ export default function AdminCosts() {
     }
 
     for (const [deptId, list] of map.entries()) {
-      map.set(
-        deptId,
-        [...list].sort((a, b) => b.allocatedCost - a.allocatedCost || a.name.localeCompare(b.name)),
-      );
+      map.set(deptId, [...list].sort((a, b) => b.allocatedCost - a.allocatedCost || a.name.localeCompare(b.name)));
     }
 
     return map;
@@ -385,6 +392,41 @@ export default function AdminCosts() {
     return departmentExpenses.get(selectedDeptId) ?? [];
   }, [departmentExpenses, selectedDeptId]);
 
+  const categoryOptions = useMemo(() => {
+    return Array.from(new Set(costItems.map((item) => item.category?.trim()).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b));
+  }, [costItems]);
+
+  const filteredCostItems = useMemo(() => {
+    return costItems.filter((item) => {
+      const matchesSearch = !search.trim() || [item.name, item.category, item.notes]
+        .some((value) => value?.toLowerCase().includes(search.trim().toLowerCase()));
+      const matchesCategory = categoryFilter === "all" || (item.category ?? "") === categoryFilter;
+      const matchesDepartment = ownerDepartmentFilter === "all" || (item.owner_department_id ?? "none") === ownerDepartmentFilter;
+      const matchesStatus = statusFilter === "all" || (statusFilter === "active" ? item.active : !item.active);
+      return matchesSearch && matchesCategory && matchesDepartment && matchesStatus;
+    });
+  }, [categoryFilter, costItems, ownerDepartmentFilter, search, statusFilter]);
+
+  const groupedFilteredCostItems = useMemo(() => {
+    const map = new Map<string, CostItem[]>();
+
+    for (const item of filteredCostItems) {
+      const key = item.owner_department_id ?? "none";
+      const list = map.get(key) ?? [];
+      list.push(item);
+      map.set(key, list);
+    }
+
+    return Array.from(map.entries())
+      .map(([departmentId, items]) => ({
+        departmentId,
+        departmentName: departmentId === "none" ? "Sem departamento responsável" : deptById.get(departmentId)?.name ?? "Departamento",
+        items: [...items].sort((a, b) => a.name.localeCompare(b.name)),
+        total: items.reduce((sum, item) => sum + n(item.total_monthly_cost), 0),
+      }))
+      .sort((a, b) => a.departmentName.localeCompare(b.departmentName));
+  }, [deptById, filteredCostItems]);
+
   async function refreshCosts() {
     await queryClient.invalidateQueries({ queryKey: ["cost-items", companyId] });
     await queryClient.invalidateQueries({ queryKey: ["cost-items", companyId, "all"] });
@@ -407,6 +449,54 @@ export default function AdminCosts() {
     }
   }
 
+  function exportExpensesCsv() {
+    const headers = [
+      "departamento_responsavel",
+      "despesa",
+      "categoria",
+      "status",
+      "tipo",
+      "ciclo",
+      "custo_mensal_equivalente",
+      "rateio",
+      "observacoes",
+    ];
+
+    const rows = filteredCostItems.map((item) => {
+      const ownerDepartmentName = item.owner_department_id ? deptById.get(item.owner_department_id)?.name ?? "Departamento" : "Sem departamento";
+      const allocationLabel = (allocationsByItem[item.id] ?? [])
+        .map((allocation) => `${allocation.department_name || deptById.get(allocation.department_id)?.name || "Departamento"} ${n(allocation.allocation_percentage).toFixed(0)}%`)
+        .join(" | ");
+
+      return [
+        ownerDepartmentName,
+        item.name,
+        item.category ?? "",
+        item.active ? "ativa" : "inativa",
+        item.type === "fixed" ? "fixa" : "variavel",
+        billingCycleLabel(item.billing_cycle),
+        n(item.total_monthly_cost).toFixed(2),
+        allocationLabel,
+        item.notes ?? "",
+      ];
+    });
+
+    const csv = [headers, ...rows]
+      .map((line) => line.map((value) => `"${String(value).split('"').join('""')}"`).join(";"))
+      .join("\n");
+
+    const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const period = new Date().toISOString().slice(0, 7);
+    link.href = url;
+    link.download = `despesas-${period}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <div className="grid gap-6">
       <div className="grid gap-4 md:grid-cols-4">
@@ -424,24 +514,47 @@ export default function AdminCosts() {
         </Card>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pessoas</div>
-          <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(companyPeopleCost)}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{activeWithCost.length} pessoa(s) com custo cadastrado</div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pessoas</div>
+              <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(companyPeopleCost)}</div>
+              <div className="mt-2 text-xs text-muted-foreground">{activeWithCost.length} pessoa(s) com custo cadastrado</div>
+            </div>
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+              <Users className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+            </div>
+          </div>
           {offboardingTotals.count ? (
-            <div className="mt-3 text-xs text-amber-900">{offboardingTotals.count} em desligamento • {offboardingTotals.total > 0 ? brl(offboardingTotals.total) : "—"}</div>
+            <div className="mt-4 rounded-2xl bg-amber-50 px-3 py-2 text-xs text-amber-900">
+              {offboardingTotals.count} em desligamento • {offboardingTotals.total > 0 ? brl(offboardingTotals.total) : "—"}
+            </div>
           ) : null}
         </Card>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ferramentas e despesas</div>
-          <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(companyExpenseCost)}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{activeCostItems.length} despesa(s) ativa(s)</div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Ferramentas e despesas</div>
+              <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{brl(companyExpenseCost)}</div>
+              <div className="mt-2 text-xs text-muted-foreground">{activeCostItems.length} despesa(s) ativa(s)</div>
+            </div>
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+              <Receipt className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+            </div>
+          </div>
         </Card>
 
         <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-          <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seu departamento</div>
-          <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{myDepartmentId ? brl(myDeptTotal) : "—"}</div>
-          <div className="mt-1 text-xs text-muted-foreground">{myDepartmentId ? "Total do seu dept." : "Você está sem departamento."}</div>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Seu departamento</div>
+              <div className="mt-1 text-2xl font-semibold text-[color:var(--sinaxys-ink)]">{myDepartmentId ? brl(myDeptTotal) : "—"}</div>
+              <div className="mt-2 text-xs text-muted-foreground">{myDepartmentId ? "Total do seu dept." : "Você está sem departamento."}</div>
+            </div>
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-[color:var(--sinaxys-tint)]">
+              <Wallet className="h-5 w-5 text-[color:var(--sinaxys-primary)]" />
+            </div>
+          </div>
         </Card>
       </div>
 
@@ -449,91 +562,163 @@ export default function AdminCosts() {
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Ferramentas e despesas não-humanas</div>
-            <p className="mt-1 text-sm text-muted-foreground">Cadastre SaaS, licenças, fornecedores, mídia, infraestrutura e rateie por departamento.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Agora com filtros, exportação mensal e organização por departamento responsável.</p>
           </div>
-          <Button
-            className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
-            onClick={() => {
-              setEditingExpense(null);
-              setExpenseDialogOpen(true);
-            }}
-          >
-            <Plus className="mr-2 h-4 w-4" />Nova despesa
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" className="rounded-full" onClick={exportExpensesCsv} disabled={!filteredCostItems.length}>
+              <Download className="mr-2 h-4 w-4" />Exportar CSV
+            </Button>
+            <Button
+              className="rounded-full bg-[color:var(--sinaxys-primary)] text-white hover:bg-[color:var(--sinaxys-primary)]/90"
+              onClick={() => {
+                setEditingExpense(null);
+                setExpenseDialogOpen(true);
+              }}
+            >
+              <Plus className="mr-2 h-4 w-4" />Nova despesa
+            </Button>
+          </div>
         </div>
 
         <Separator className="my-5" />
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          {costItems.map((item) => {
-            const allocations = allocationsByItem[item.id] ?? [];
-            const ownerDepartmentName = item.owner_department_id ? deptById.get(item.owner_department_id)?.name ?? "Departamento" : null;
-            return (
-              <Card key={item.id} className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-5 shadow-none">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <div className="truncate text-base font-semibold text-[color:var(--sinaxys-ink)]">{item.name}</div>
-                      <Badge className={item.active ? "rounded-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10" : "rounded-full bg-slate-500/10 text-slate-700 hover:bg-slate-500/10"}>
-                        {item.active ? "Ativa" : "Inativa"}
-                      </Badge>
-                      <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
-                        {item.is_shared ? "Compartilhada" : "Exclusiva"}
-                      </Badge>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      <span>{item.category || "Sem categoria"}</span>
-                      <span>•</span>
-                      <span>{item.billing_cycle === "monthly" ? "Mensal" : item.billing_cycle === "annual" ? "Anual" : "Única"}</span>
-                      <span>•</span>
-                      <span>{item.type === "fixed" ? "Fixa" : "Variável"}</span>
-                    </div>
-                    {item.notes ? <p className="mt-3 text-sm text-muted-foreground">{item.notes}</p> : null}
-                  </div>
+        <div className="grid gap-3 md:grid-cols-4">
+          <div className="md:col-span-1">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar despesa" className="h-11 rounded-2xl pl-10" />
+            </div>
+          </div>
 
-                  <div className="text-right">
-                    <div className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">{brl(n(item.total_monthly_cost))}</div>
-                    <div className="text-xs text-muted-foreground">equivalente mensal</div>
-                  </div>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="h-11 rounded-2xl">
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as categorias</SelectItem>
+              {categoryOptions.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={ownerDepartmentFilter} onValueChange={setOwnerDepartmentFilter}>
+            <SelectTrigger className="h-11 rounded-2xl">
+              <SelectValue placeholder="Departamento responsável" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os departamentos</SelectItem>
+              {departments.map((department) => (
+                <SelectItem key={department.id} value={department.id}>
+                  {department.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-11 rounded-2xl">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              <SelectItem value="active">Ativas</SelectItem>
+              <SelectItem value="inactive">Inativas</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+          <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+            {filteredCostItems.length} despesa(s) filtrada(s)
+          </Badge>
+          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+            {groupedFilteredCostItems.length} grupo(s) por departamento
+          </Badge>
+        </div>
+
+        <div className="mt-6 grid gap-6">
+          {groupedFilteredCostItems.map((group) => (
+            <section key={group.departmentId} className="grid gap-4">
+              <div className="flex flex-col gap-2 rounded-[24px] border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-tint)]/45 p-4 md:flex-row md:items-center md:justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{group.departmentName}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{group.items.length} despesa(s) • {brl(group.total)} equivalentes/mês</div>
                 </div>
+                <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">Departamento responsável</Badge>
+              </div>
 
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {ownerDepartmentName ? (
-                    <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">Dono: {ownerDepartmentName}</Badge>
-                  ) : null}
-                  {allocations.map((allocation) => (
-                    <Badge key={allocation.id} className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
-                      {(allocation.department_name || deptById.get(allocation.department_id)?.name || "Departamento")} · {n(allocation.allocation_percentage).toFixed(0)}%
-                    </Badge>
-                  ))}
-                </div>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {group.items.map((item) => {
+                  const allocations = allocationsByItem[item.id] ?? [];
+                  return (
+                    <Card key={item.id} className="rounded-3xl border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-5 shadow-none">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="truncate text-base font-semibold text-[color:var(--sinaxys-ink)]">{item.name}</div>
+                            <Badge className={item.active ? "rounded-full bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/10" : "rounded-full bg-slate-500/10 text-slate-700 hover:bg-slate-500/10"}>
+                              {item.active ? "Ativa" : "Inativa"}
+                            </Badge>
+                            <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+                              {item.is_shared ? "Compartilhada" : "Exclusiva"}
+                            </Badge>
+                          </div>
+                          <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            <span>{item.category || "Sem categoria"}</span>
+                            <span>•</span>
+                            <span>{billingCycleLabel(item.billing_cycle)}</span>
+                            <span>•</span>
+                            <span>{item.type === "fixed" ? "Fixa" : "Variável"}</span>
+                          </div>
+                          {item.notes ? <p className="mt-3 text-sm text-muted-foreground">{item.notes}</p> : null}
+                        </div>
 
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    className="rounded-full"
-                    onClick={() => {
-                      setEditingExpense(item);
-                      setExpenseDialogOpen(true);
-                    }}
-                  >
-                    <Pencil className="mr-2 h-4 w-4" />Editar
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="rounded-full text-red-600 hover:bg-red-50 hover:text-red-700"
-                    onClick={() => handleDeleteExpense(item)}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />Excluir
-                  </Button>
-                </div>
-              </Card>
-            );
-          })}
+                        <div className="text-right">
+                          <div className="text-lg font-semibold text-[color:var(--sinaxys-ink)]">{brl(n(item.total_monthly_cost))}</div>
+                          <div className="text-xs text-muted-foreground">equivalente mensal</div>
+                        </div>
+                      </div>
 
-          {!costItems.length && (
-            <Card className="rounded-3xl border-dashed border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-8 text-center text-sm text-muted-foreground lg:col-span-2">
-              Nenhuma despesa cadastrada ainda. Use “Nova despesa” para lançar ferramentas, softwares e fornecedores.
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {allocations.map((allocation) => (
+                          <Badge key={allocation.id} className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+                            {(allocation.department_name || deptById.get(allocation.department_id)?.name || "Departamento")} · {n(allocation.allocation_percentage).toFixed(0)}%
+                          </Badge>
+                        ))}
+                      </div>
+
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        <Button
+                          variant="outline"
+                          className="rounded-full"
+                          onClick={() => {
+                            setEditingExpense(item);
+                            setExpenseDialogOpen(true);
+                          }}
+                        >
+                          <Pencil className="mr-2 h-4 w-4" />Editar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="rounded-full text-red-600 hover:bg-red-50 hover:text-red-700"
+                          onClick={() => handleDeleteExpense(item)}
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />Excluir
+                        </Button>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+
+          {!groupedFilteredCostItems.length && (
+            <Card className="rounded-3xl border-dashed border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-8 text-center text-sm text-muted-foreground">
+              Nenhuma despesa encontrada com os filtros atuais.
             </Card>
           )}
         </div>
@@ -543,7 +728,7 @@ export default function AdminCosts() {
         <div className="flex items-center justify-between gap-3">
           <div>
             <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">Custos por departamento</div>
-            <p className="mt-1 text-sm text-muted-foreground">Agora o consolidado inclui pessoas e ferramentas/despesas rateadas.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Separando visualmente pessoas e ferramentas/despesas no consolidado.</p>
           </div>
           <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
             {byDept.length} dept(s)
@@ -684,7 +869,7 @@ export default function AdminCosts() {
                       <div>
                         <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{expense.name}</div>
                         <div className="mt-1 text-xs text-muted-foreground">
-                          {expense.category || "Sem categoria"} • {expense.billingCycle === "monthly" ? "Mensal" : expense.billingCycle === "annual" ? "Anual" : "Única"} • {expense.allocationPercentage.toFixed(0)}%
+                          {expense.category || "Sem categoria"} • {billingCycleLabel(expense.billingCycle)} • {expense.allocationPercentage.toFixed(0)}%
                         </div>
                         {expense.notes ? <div className="mt-2 text-sm text-muted-foreground">{expense.notes}</div> : null}
                       </div>

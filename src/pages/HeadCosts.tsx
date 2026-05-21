@@ -1,9 +1,11 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Building2, Receipt, Wallet } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ResponsiveTable } from "@/components/ResponsiveTable";
@@ -16,6 +18,12 @@ import { listProfilesByCompany } from "@/lib/profilesDb";
 function n(v: unknown) {
   const x = typeof v === "number" ? v : Number(v);
   return Number.isFinite(x) ? x : 0;
+}
+
+function billingCycleLabel(value: CostItem["billing_cycle"]) {
+  if (value === "monthly") return "Mensal";
+  if (value === "annual") return "Anual";
+  return "Única";
 }
 
 type DepartmentExpenseRow = {
@@ -32,6 +40,8 @@ export default function HeadCosts() {
   const { user } = useAuth();
   const companyId = user?.companyId ?? (user as any)?.company_id ?? null;
   const myDeptId = user?.departmentId ?? (user as any)?.department_id ?? null;
+  const [expenseSearch, setExpenseSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
   if (!user || user.role !== "HEAD" || !companyId) return null;
 
@@ -72,9 +82,7 @@ export default function HeadCosts() {
     queryKey: ["cost-allocations-by-item", companyId, costItems.map((item) => item.id).join(",")],
     enabled: costItems.length > 0,
     queryFn: async () => {
-      const entries = await Promise.all(
-        costItems.map(async (item) => [item.id, await listCostAllocations(item.id)] as const),
-      );
+      const entries = await Promise.all(costItems.map(async (item) => [item.id, await listCostAllocations(item.id)] as const));
       return Object.fromEntries(entries) as Record<string, CostAllocation[]>;
     },
   });
@@ -119,7 +127,21 @@ export default function HeadCosts() {
     return rows.sort((a, b) => b.allocatedCost - a.allocatedCost || a.name.localeCompare(b.name));
   }, [allocationsByItem, costItems, myDeptId]);
 
+  const expenseCategories = useMemo(() => {
+    return Array.from(new Set(departmentExpenses.map((expense) => expense.category?.trim()).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b));
+  }, [departmentExpenses]);
+
+  const filteredDepartmentExpenses = useMemo(() => {
+    return departmentExpenses.filter((expense) => {
+      const matchesSearch = !expenseSearch.trim() || [expense.name, expense.category, expense.notes]
+        .some((value) => value?.toLowerCase().includes(expenseSearch.trim().toLowerCase()));
+      const matchesCategory = categoryFilter === "all" || (expense.category ?? "") === categoryFilter;
+      return matchesSearch && matchesCategory;
+    });
+  }, [categoryFilter, departmentExpenses, expenseSearch]);
+
   const deptExpenses = useMemo(() => departmentExpenses.reduce((sum, expense) => sum + expense.allocatedCost, 0), [departmentExpenses]);
+  const filteredDeptExpenses = useMemo(() => filteredDepartmentExpenses.reduce((sum, expense) => sum + expense.allocatedCost, 0), [filteredDepartmentExpenses]);
   const deptTotal = deptMonthly + deptExpenses;
 
   return (
@@ -209,21 +231,54 @@ export default function HeadCosts() {
       </Card>
 
       <Card className="rounded-3xl border-[color:var(--sinaxys-border)] bg-white p-6">
-        <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
-          <Receipt className="h-4 w-4" />Ferramentas e despesas rateadas
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-[color:var(--sinaxys-ink)]">
+              <Receipt className="h-4 w-4" />Ferramentas e despesas rateadas
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">Aqui entram licenças, softwares, fornecedores e outras despesas alocadas ao seu departamento.</p>
+          </div>
+          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+            Filtrado: {brl(filteredDeptExpenses)}
+          </Badge>
         </div>
-        <p className="mt-1 text-sm text-muted-foreground">Aqui entram licenças, softwares, fornecedores e outras despesas alocadas ao seu departamento.</p>
 
         <Separator className="my-5" />
 
-        <div className="grid gap-3">
-          {departmentExpenses.map((expense) => (
+        <div className="grid gap-3 md:grid-cols-[1.4fr_220px]">
+          <Input value={expenseSearch} onChange={(e) => setExpenseSearch(e.target.value)} placeholder="Buscar despesa" className="h-11 rounded-2xl" />
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="h-11 rounded-2xl">
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as categorias</SelectItem>
+              {expenseCategories.map((category) => (
+                <SelectItem key={category} value={category}>
+                  {category}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Badge className="rounded-full bg-[color:var(--sinaxys-tint)] text-[color:var(--sinaxys-ink)] hover:bg-[color:var(--sinaxys-tint)]">
+            {filteredDepartmentExpenses.length} despesa(s)
+          </Badge>
+          <Badge className="rounded-full bg-white text-[color:var(--sinaxys-ink)] hover:bg-white">
+            {expenseCategories.length || 1} categoria(s)
+          </Badge>
+        </div>
+
+        <div className="mt-5 grid gap-3">
+          {filteredDepartmentExpenses.map((expense) => (
             <div key={`${expense.itemId}-${expense.name}`} className="rounded-2xl border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/35 p-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <div className="text-sm font-semibold text-[color:var(--sinaxys-ink)]">{expense.name}</div>
                   <div className="mt-1 text-xs text-muted-foreground">
-                    {expense.category || "Sem categoria"} • {expense.billingCycle === "monthly" ? "Mensal" : expense.billingCycle === "annual" ? "Anual" : "Única"} • {expense.allocationPercentage.toFixed(0)}%
+                    {expense.category || "Sem categoria"} • {billingCycleLabel(expense.billingCycle)} • {expense.allocationPercentage.toFixed(0)}%
                   </div>
                   {expense.notes ? <div className="mt-2 text-sm text-muted-foreground">{expense.notes}</div> : null}
                 </div>
@@ -235,9 +290,9 @@ export default function HeadCosts() {
             </div>
           ))}
 
-          {!departmentExpenses.length && (
+          {!filteredDepartmentExpenses.length && (
             <div className="rounded-2xl bg-[color:var(--sinaxys-tint)] p-4 text-sm text-muted-foreground">
-              Nenhuma despesa não-humana está rateada para o seu departamento no momento.
+              Nenhuma despesa não-humana encontrada com os filtros atuais.
             </div>
           )}
         </div>
