@@ -102,6 +102,7 @@ type DraftKr =
   | {
       title: string;
       kind: "DELIVERABLE";
+      due_at: string;
     };
 
 type DraftObjective = {
@@ -130,6 +131,40 @@ type DraftDeliverable = {
 };
 
 const SELECT_NONE = "__none__";
+
+function createMetricKrDraft(): DraftKr {
+  return { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" };
+}
+
+function createDeliverableKrDraft(): DraftKr {
+  return { title: "", kind: "DELIVERABLE", due_at: "" };
+}
+
+function normalizeDraftKr(kr: DraftKr): DraftKr {
+  if (kr.kind === "METRIC") {
+    return {
+      ...kr,
+      title: kr.title.trim(),
+      metric_unit: kr.metric_unit.trim(),
+    };
+  }
+
+  return {
+    ...kr,
+    title: kr.title.trim(),
+    due_at: kr.due_at.trim(),
+  };
+}
+
+function getDeliverableKrDueDateError(kr: DraftKr) {
+  if (kr.kind !== "DELIVERABLE") return null;
+  if (kr.due_at.trim()) return null;
+  return "KRs do tipo entregável precisam de data de entrega.";
+}
+
+function getKrDueAtForSave(kr: DraftKr) {
+  return kr.kind === "DELIVERABLE" ? kr.due_at.trim() || null : null;
+}
 
 function clsx(...v: Array<string | false | null | undefined>) {
   return v.filter(Boolean).join(" ");
@@ -1358,8 +1393,8 @@ export default function OkrAssistant() {
                         description: "",
                         alignToKrId: SELECT_NONE,
                         krs: [
-                          { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
-                          { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
+                          createMetricKrDraft(),
+                          createMetricKrDraft(),
                         ],
                         performanceIndicators: [],
                       },
@@ -1420,7 +1455,7 @@ export default function OkrAssistant() {
                                                   className="h-9 rounded-xl bg-white"
                                                   onClick={() =>
                                                     setAnnualDrafts((arr) =>
-                                                      arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
+                                                      arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, createDeliverableKrDraft()] } : it)),
                                                     )
                                                   }
                                                 >
@@ -1483,15 +1518,9 @@ export default function OkrAssistant() {
                                         if (i !== idx) return it;
                                         const next = [...it.krs];
                                         if (v === "METRIC") {
-                                          next[kIdx] = {
-                                            ...next[kIdx],
-                                            kind: "METRIC",
-                                            metric_unit: "",
-                                            start_value: "",
-                                            target_value: "",
-                                          };
+                                          next[kIdx] = createMetricKrDraft();
                                         } else {
-                                          next[kIdx] = { ...next[kIdx], kind: "DELIVERABLE" };
+                                          next[kIdx] = createDeliverableKrDraft();
                                         }
                                         return { ...it, krs: next };
                                       }),
@@ -1568,7 +1597,28 @@ export default function OkrAssistant() {
                                     />
                                   </div>
                                 </div>
-                              ) : null}
+                              ) : (
+                                <div className="mt-3 grid gap-2 sm:max-w-xs">
+                                  <Label>Data de entrega</Label>
+                                  <Input
+                                    className="h-11 rounded-xl"
+                                    type="date"
+                                    value={kr.due_at}
+                                    onChange={(e) =>
+                                      setAnnualDrafts((arr) =>
+                                        arr.map((it, i) => {
+                                          if (i !== idx) return it;
+                                          const next = [...it.krs];
+                                          const cur = next[kIdx] as Extract<DraftKr, { kind: "DELIVERABLE" }>;
+                                          next[kIdx] = { ...cur, due_at: e.target.value };
+                                          return { ...it, krs: next };
+                                        }),
+                                      )
+                                    }
+                                  />
+                                  <div className="text-xs text-muted-foreground">Obrigatória para KRs do tipo entregável.</div>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -1598,7 +1648,7 @@ export default function OkrAssistant() {
                         title: o.title.trim(),
                         description: o.description.trim(),
                         krs: o.krs
-                          .map((k) => (k.kind === "METRIC" ? { ...k, title: k.title.trim(), metric_unit: k.metric_unit.trim() } : { ...k, title: k.title.trim() }))
+                          .map((k) => normalizeDraftKr(k))
                           .filter((k) => k.title.length >= 6),
                       }))
                       .filter((o) => o.title.length >= 6);
@@ -1661,6 +1711,10 @@ export default function OkrAssistant() {
                                             if (o.krs.length < 1) {
                                               validationErrors.push("Cada objetivo anual deve ter pelo menos 1 KR");
                                             }
+                                            for (const kr of o.krs) {
+                                              const dueDateError = getDeliverableKrDueDateError(kr);
+                                              if (dueDateError) validationErrors.push(dueDateError);
+                                            }
                                             // REMOVIDO: Validação de máximo de 4 KRs
                                             // Agora permite qualquer número de KRs (mínimo 1)
                     }
@@ -1722,7 +1776,7 @@ export default function OkrAssistant() {
                                                     objective_id: created.id,
                                                     title: kr.title,
                                                     kind,
-                                                    due_at: null,
+                                                    due_at: getKrDueAtForSave(kr),
                                                     achieved: false,
                                                     metric_unit: metricUnit,
                                                     start_value: kind === "METRIC" && Number.isFinite(start) ? start : null,
@@ -1853,8 +1907,8 @@ export default function OkrAssistant() {
                         description: "",
                         alignToKrId: SELECT_NONE,
                         krs: [
-                          { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
-                          { title: "", kind: "METRIC", metric_unit: "", start_value: "", target_value: "" },
+                          createMetricKrDraft(),
+                          createMetricKrDraft(),
                         ],
                         performanceIndicators: [],
                       },
@@ -1921,7 +1975,7 @@ export default function OkrAssistant() {
                                                                             disabled={d.krs.length >= 5}
                                                                             onClick={() =>
                                                                               setQuarterDrafts((arr) =>
-                                                                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
+                                                                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, createDeliverableKrDraft()] } : it)),
                                                                               )
                                                                             }
                                                 >
@@ -1964,6 +2018,54 @@ export default function OkrAssistant() {
                                                                 }
                                                               />
                                                             </div>
+
+                                                            <div className="mt-3 grid gap-2">
+                                                              <Label>Tipo</Label>
+                                                              <Select
+                                                                value={kr.kind}
+                                                                onValueChange={(v) =>
+                                                                  setQuarterDrafts((arr) =>
+                                                                    arr.map((it, i) => {
+                                                                      if (i !== idx) return it;
+                                                                      const next = [...it.krs];
+                                                                      next[kIdx] = v === "METRIC" ? createMetricKrDraft() : createDeliverableKrDraft();
+                                                                      return { ...it, krs: next };
+                                                                    }),
+                                                                  )
+                                                                }
+                                                              >
+                                                                <SelectTrigger className="h-11 rounded-xl">
+                                                                  <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent className="rounded-2xl">
+                                                                  <SelectItem value="METRIC">Métrica</SelectItem>
+                                                                  <SelectItem value="DELIVERABLE">Entregável</SelectItem>
+                                                                </SelectContent>
+                                                              </Select>
+                                                            </div>
+
+                                                            {kr.kind === "DELIVERABLE" ? (
+                                                              <div className="mt-3 grid gap-2 sm:max-w-xs">
+                                                                <Label>Data de entrega</Label>
+                                                                <Input
+                                                                  className="h-11 rounded-xl"
+                                                                  type="date"
+                                                                  value={kr.due_at}
+                                                                  onChange={(e) =>
+                                                                    setQuarterDrafts((arr) =>
+                                                                      arr.map((it, i) => {
+                                                                        if (i !== idx) return it;
+                                                                        const next = [...it.krs];
+                                                                        const cur = next[kIdx] as Extract<DraftKr, { kind: "DELIVERABLE" }>;
+                                                                        next[kIdx] = { ...cur, due_at: e.target.value };
+                                                                        return { ...it, krs: next };
+                                                                      }),
+                                                                    )
+                                                                  }
+                                                                />
+                                                                <div className="text-xs text-muted-foreground">Obrigatória para KRs do tipo entregável.</div>
+                                                              </div>
+                                                            ) : null}
                                                           </div>
                                                         ))}
                                                       </div>
@@ -2046,7 +2148,7 @@ export default function OkrAssistant() {
                         ...o,
                         title: o.title.trim(),
                         description: o.description.trim(),
-                        krs: o.krs.map((k) => ({ ...k, title: k.title.trim() })).filter((k) => k.title.length >= 6),
+                        krs: o.krs.map((k) => normalizeDraftKr(k)).filter((k) => k.title.length >= 6),
                       }))
                       .filter((o) => o.title.length >= 6);
 
@@ -2075,6 +2177,10 @@ export default function OkrAssistant() {
                                             }
                                             if (o.krs.length > 5) {
                                               validationErrors.push("Objetivo trimestral estratégico pode ter no máximo 5 KRs");
+                                            }
+                                            for (const kr of o.krs) {
+                                              const dueDateError = getDeliverableKrDueDateError(kr);
+                                              if (dueDateError) validationErrors.push(dueDateError);
                                             }
                     }
                     
@@ -2129,8 +2235,8 @@ export default function OkrAssistant() {
                                                   await createKeyResult({
                                                     objective_id: created.id,
                                                     title: kr.title,
-                                                    kind: "METRIC",
-                                                    due_at: null,
+                                                    kind: kr.kind,
+                                                    due_at: getKrDueAtForSave(kr),
                                                     achieved: false,
                                                     metric_unit: null,
                                                     start_value: null,
@@ -2231,7 +2337,7 @@ export default function OkrAssistant() {
                                             title: "",
                                             description: "",
                                             alignToKrId: SELECT_NONE,
-                                            krs: [{ title: "", kind: "DELIVERABLE" }],
+                                            krs: [createDeliverableKrDraft()],
                                             performanceIndicators: [],
                                           },
                                         ])
@@ -2321,7 +2427,7 @@ export default function OkrAssistant() {
                                                                             disabled={d.krs.length >= 5}
                                                                             onClick={() =>
                                                                               setTacticalDrafts((arr) =>
-                                                                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, { title: "", kind: "DELIVERABLE" }] } : it)),
+                                                                                arr.map((it, i) => (i === idx ? { ...it, krs: [...it.krs, createDeliverableKrDraft()] } : it)),
                                                                               )
                                                                             }
                                                 >
@@ -2365,6 +2471,54 @@ export default function OkrAssistant() {
                                                                 placeholder="Ex.: reduzir churn de 8% para 5%"
                                                               />
                                                             </div>
+
+                                                            <div className="mt-3 grid gap-2">
+                                                              <Label>Tipo</Label>
+                                                              <Select
+                                                                value={kr.kind}
+                                                                onValueChange={(v) =>
+                                                                  setTacticalDrafts((arr) =>
+                                                                    arr.map((it, i) => {
+                                                                      if (i !== idx) return it;
+                                                                      const next = [...it.krs];
+                                                                      next[kIdx] = v === "METRIC" ? createMetricKrDraft() : createDeliverableKrDraft();
+                                                                      return { ...it, krs: next };
+                                                                    }),
+                                                                  )
+                                                                }
+                                                              >
+                                                                <SelectTrigger className="h-11 rounded-xl">
+                                                                  <SelectValue />
+                                                                </SelectTrigger>
+                                                                <SelectContent className="rounded-2xl">
+                                                                  <SelectItem value="METRIC">Métrica</SelectItem>
+                                                                  <SelectItem value="DELIVERABLE">Entregável</SelectItem>
+                                                                </SelectContent>
+                                                              </Select>
+                                                            </div>
+
+                                                            {kr.kind === "DELIVERABLE" ? (
+                                                              <div className="mt-3 grid gap-2 sm:max-w-xs">
+                                                                <Label>Data de entrega</Label>
+                                                                <Input
+                                                                  className="h-11 rounded-xl"
+                                                                  type="date"
+                                                                  value={kr.due_at}
+                                                                  onChange={(e) =>
+                                                                    setTacticalDrafts((arr) =>
+                                                                      arr.map((it, i) => {
+                                                                        if (i !== idx) return it;
+                                                                        const next = [...it.krs];
+                                                                        const cur = next[kIdx] as Extract<DraftKr, { kind: "DELIVERABLE" }>;
+                                                                        next[kIdx] = { ...cur, due_at: e.target.value };
+                                                                        return { ...it, krs: next };
+                                                                      }),
+                                                                    )
+                                                                  }
+                                                                />
+                                                                <div className="text-xs text-muted-foreground">Obrigatória para KRs do tipo entregável.</div>
+                                                              </div>
+                                                            ) : null}
                                                           </div>
                                                         ))}
                                                       </div>
@@ -2438,7 +2592,7 @@ export default function OkrAssistant() {
                         ...o,
                         title: o.title.trim(),
                         description: o.description.trim(),
-                        krs: o.krs.map((k) => ({ ...k, title: k.title.trim() })).filter((k) => k.title.length >= 6),
+                        krs: o.krs.map((k) => normalizeDraftKr(k)).filter((k) => k.title.length >= 6),
                       }))
                       .filter((o) => o.title.length >= 6);
 
@@ -2474,6 +2628,10 @@ export default function OkrAssistant() {
                                             }
                                             if (o.krs.length > 5) {
                                               validationErrors.push("Objetivo tático pode ter no máximo 5 KRs");
+                                            }
+                                            for (const kr of o.krs) {
+                                              const dueDateError = getDeliverableKrDueDateError(kr);
+                                              if (dueDateError) validationErrors.push(dueDateError);
                                             }
                     }
                     
@@ -2538,8 +2696,8 @@ export default function OkrAssistant() {
                                                   await createKeyResult({
                                                     objective_id: created.id,
                                                     title: kr.title,
-                                                    kind: "DELIVERABLE",
-                                                    due_at: null,
+                                                    kind: kr.kind,
+                                                    due_at: getKrDueAtForSave(kr),
                                                     achieved: false,
                                                     metric_unit: null,
                                                     start_value: null,
