@@ -283,6 +283,11 @@ export type DbOkrObjective = {
   updated_at: string | null;
 };
 
+function normalizeObjectiveTier(tier: DbOkrObjective["tier"], level: ObjectiveLevel) {
+  if (tier) return tier;
+  return level === "COMPANY" ? "TIER1" : "TIER2";
+}
+
 const objectiveSelect =
   "id,company_id,cycle_id,parent_objective_id,strategy_objective_id,level,okr_level,department_id,tier,owner_user_id,moderator_user_id,title,description,strategic_reason,linked_fundamental,linked_fundamental_text,due_at,estimated_value_brl,estimated_effort_hours,estimated_cost_brl,estimated_roi_pct,expected_profit_brl,profit_thesis,expected_revenue_at,expected_attainment_pct,status,achieved_pct,achieved_at,head_performance_score,head_performance_notes,head_performance_reviewed_at,created_at,updated_at";
 
@@ -365,7 +370,7 @@ export async function createOkrObjective(
       level: payload.level,
       okr_level: payload.okr_level ?? (payload.level === "COMPANY" ? "strategic" : "tactical"),
       department_id: departmentId,
-      tier: payload.tier ?? null,
+      tier: normalizeObjectiveTier(payload.tier, payload.level),
       owner_user_id: payload.owner_user_id,
       moderator_user_id: payload.moderator_user_id ?? null,
       title: payload.title.trim(),
@@ -439,8 +444,23 @@ export async function updateOkrObjective(
   if ("department_id" in patch) update.department_id = patch.department_id ?? null;
   if ("parent_objective_id" in patch) update.parent_objective_id = patch.parent_objective_id ?? null;
   if ("strategy_objective_id" in patch) update.strategy_objective_id = patch.strategy_objective_id ?? null;
-  if ("tier" in patch) update.tier = patch.tier ?? null;
   if ("level" in patch) update.level = patch.level;
+  if ("tier" in patch || ("level" in patch && patch.level)) {
+    let levelForTier = patch.level;
+
+    if (!levelForTier) {
+      const { data: currentObjective, error: currentObjectiveError } = await supabase
+        .from("okr_objectives")
+        .select("level")
+        .eq("id", objectiveId)
+        .maybeSingle();
+
+      if (currentObjectiveError) throw currentObjectiveError;
+      levelForTier = (currentObjective?.level as ObjectiveLevel | undefined) ?? "COMPANY";
+    }
+
+    update.tier = normalizeObjectiveTier(patch.tier ?? null, levelForTier);
+  }
 
   if ("expected_attainment_pct" in patch) update.expected_attainment_pct = patch.expected_attainment_pct ?? null;
   if ("estimated_value_brl" in patch) update.estimated_value_brl = patch.estimated_value_brl ?? null;
