@@ -8,7 +8,8 @@ import { KrEditDialog } from "@/components/okr/KrEditDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -18,8 +19,10 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/errorMessage";
 
 import {
+
   createDeliverable,
   createKeyResult,
   createOkrObjective,
@@ -405,6 +408,19 @@ export function OkrStrategyMapCanvas(props: {
       toast({ title: "Sem permissão", description: "Você não tem permissão para criar entregáveis.", variant: "destructive" });
       return;
     }
+
+    const krObjectiveId = krToObjectiveId.get(krId) ?? null;
+    const krObjective = krObjectiveId ? allObjectivesById.get(krObjectiveId) ?? null : null;
+
+    if (!krObjective || krObjective.cycle_id !== quarterCycleId) {
+      toast({
+        title: "KR inválido para entregável",
+        description: "Entregáveis só podem ser criados em KRs do ciclo trimestral atualmente selecionado.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setCreateDelKrId(krId);
     setCreateDelTitle("");
     setCreateDelDesc("");
@@ -1446,9 +1462,13 @@ export function OkrStrategyMapCanvas(props: {
           <DialogContent className="max-h-[88vh] max-w-[92vw] overflow-y-auto rounded-3xl sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>Novo entregável (para KR Tier 2)</DialogTitle>
+              <DialogDescription>
+                Cadastre um entregável ligado ao KR selecionado. Se houver bloqueio de permissão ou validação, a mensagem exibida informará o motivo.
+              </DialogDescription>
             </DialogHeader>
 
             <div className="grid gap-4">
+
               <div className="grid gap-2">
                 <Label>Título</Label>
                 <Input className="h-11 rounded-2xl" value={createDelTitle} onChange={(e) => setCreateDelTitle(e.target.value)} disabled={creatingDel} />
@@ -1491,6 +1511,18 @@ export function OkrStrategyMapCanvas(props: {
                 disabled={creatingDel || createDelTitle.trim().length < 3 || !createDelKrId}
                 onClick={async () => {
                   if (!createDelKrId) return;
+
+                  const krObjectiveId = krToObjectiveId.get(createDelKrId) ?? null;
+                  const krObjective = krObjectiveId ? allObjectivesById.get(krObjectiveId) ?? null : null;
+                  if (!krObjective || krObjective.cycle_id !== quarterCycleId) {
+                    toast({
+                      title: "KR inválido para entregável",
+                      description: "Selecione um KR trimestral válido antes de criar o entregável.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+
                   setCreatingDel(true);
                   try {
                     await createDeliverable({
@@ -1511,13 +1543,14 @@ export function OkrStrategyMapCanvas(props: {
                   } catch (e) {
                     toast({
                       title: "Não foi possível criar",
-                      description: e instanceof Error ? e.message : "Erro inesperado.",
+                      description: getErrorMessage(e),
                       variant: "destructive",
                     });
                   } finally {
                     setCreatingDel(false);
                   }
                 }}
+
               >
                 Criar
               </Button>

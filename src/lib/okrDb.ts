@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { getErrorMessage } from "@/lib/errorMessage";
 
 export type DbCompanyFundamentals = {
   company_id: string;
@@ -808,22 +809,55 @@ export async function listDeliverablesByKeyResultIds(keyResultIds: string[]) {
 }
 
 export async function createDeliverable(payload: Omit<DbDeliverable, "id" | "created_at" | "updated_at">) {
+  const title = payload.title.trim();
+  if (title.length < 3) {
+    throw new Error("Informe um título com pelo menos 3 caracteres.");
+  }
+
+  const insertPayload = {
+    key_result_id: payload.key_result_id,
+    tier: payload.tier,
+    title,
+    description: payload.description?.trim() || null,
+    owner_user_id: payload.owner_user_id ?? null,
+    status: payload.status,
+    due_at: payload.due_at ?? null,
+    start_date: payload.start_date ?? null,
+    performance_indicator_id: payload.performance_indicator_id ?? null,
+  };
+
   const { data, error } = await supabase
     .from("okr_deliverables")
-    .insert({
-      key_result_id: payload.key_result_id,
-      tier: payload.tier,
-      title: payload.title.trim(),
-      description: payload.description ?? null,
-      owner_user_id: payload.owner_user_id ?? null,
-      status: payload.status,
-      due_at: payload.due_at ?? null,
-      start_date: payload.start_date ?? null,
-      performance_indicator_id: payload.performance_indicator_id ?? null,
-    })
+    .insert(insertPayload)
     .select("id,key_result_id,tier,title,description,owner_user_id,status,due_at,created_at,updated_at,start_date,performance_indicator_id")
     .single();
-  if (error) throw error;
+
+  if (error) {
+    const normalized = getErrorMessage(error);
+    const technical = [error.message, error.details, error.hint, error.code ? `Código: ${error.code}` : null]
+      .filter(Boolean)
+      .join(" • ")
+      .toLowerCase();
+
+    if (technical.includes("row-level security") || technical.includes("permission denied") || technical.includes("42501")) {
+      throw new Error("Você não tem permissão para criar entregáveis neste KR. Verifique seu escopo de acesso no OKR.");
+    }
+
+    if (technical.includes("violates foreign key constraint") || technical.includes("is not present in table") || technical.includes("23503")) {
+      throw new Error("O KR selecionado não é válido para este entregável ou não está mais disponível.");
+    }
+
+    if (technical.includes("null value") || technical.includes("not-null") || technical.includes("23502")) {
+      throw new Error("Faltam dados obrigatórios para criar o entregável.");
+    }
+
+    if (technical.includes("check constraint") || technical.includes("23514")) {
+      throw new Error(`Os dados do entregável não passaram na validação: ${normalized}`);
+    }
+
+    throw new Error(normalized);
+  }
+
   return data as DbDeliverable;
 }
 
