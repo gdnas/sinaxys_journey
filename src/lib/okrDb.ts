@@ -822,7 +822,7 @@ export async function createDeliverable(payload: Omit<DbDeliverable, "id" | "cre
     owner_user_id: payload.owner_user_id ?? null,
     status: payload.status,
     due_at: payload.due_at ?? null,
-    start_date: payload.start_date ?? null,
+    start_date: payload.start_date ?? new Date().toISOString(),
     performance_indicator_id: payload.performance_indicator_id ?? null,
   };
 
@@ -848,7 +848,10 @@ export async function createDeliverable(payload: Omit<DbDeliverable, "id" | "cre
     }
 
     if (technical.includes("null value") || technical.includes("not-null") || technical.includes("23502")) {
-      throw new Error("Faltam dados obrigatórios para criar o entregável.");
+      if (technical.includes("start_date")) {
+        throw new Error("A data inicial do entregável é obrigatória e não estava sendo enviada corretamente.");
+      }
+      throw new Error(`Faltam dados obrigatórios para criar o entregável. ${normalized}`);
     }
 
     if (technical.includes("check constraint") || technical.includes("23514")) {
