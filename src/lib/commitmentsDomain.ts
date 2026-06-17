@@ -176,8 +176,7 @@ export const createCommitmentInputSchema = createCommitmentInputBaseSchema.super
     });
   }
 
-  const receiverOptional = value.commitment_type === "self_commitment" || value.category === "operational";
-  if (!receiverOptional && !value.primary_receiver_user_id && !value.primary_receiver_team_id) {
+  if (!isCommitmentReceiverOptional(value.commitment_type, value.category) && !value.primary_receiver_user_id && !value.primary_receiver_team_id) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Compromissos canônicos precisam de receiver explícito, exceto auto-compromissos operacionais.",
@@ -193,7 +192,7 @@ export const createCommitmentInputSchema = createCommitmentInputBaseSchema.super
     });
   }
 
-  if (!value.strategic_context_id && value.strategic_context_type !== "manual") {
+  if (!value.strategic_context_id && value.strategic_context_type !== normalizeStrategicContextType(value.strategic_context_type, value.strategic_context_id)) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "Use strategic_context_type = manual quando não houver vínculo estratégico explícito.",
@@ -202,9 +201,33 @@ export const createCommitmentInputSchema = createCommitmentInputBaseSchema.super
   }
 });
 
-export const updateCommitmentInputSchema = createCommitmentInputBaseSchema
-  .omit({ tenant_id: true, created_by: true, parties: true, primary_owner_user_id: true })
-  .partial();
+export const updateCommitmentInputSchema = z.object({
+  title: z.string().trim().min(1).optional(),
+  description: optionalText.optional(),
+  purpose: z.string().trim().min(1).optional(),
+  scope_summary: optionalText.optional(),
+  success_criteria: optionalText.optional(),
+  conditions_of_satisfaction: optionalText.optional(),
+  category: z.enum(commitmentCategoryValues).optional(),
+  commitment_type: z.enum(commitmentTypeValues).optional(),
+  status: z.enum(commitmentStatusValues).optional(),
+  health: z.enum(commitmentHealthValues).optional().transform((value) => (value ? canonicalizeCommitmentHealth(value) : undefined)),
+  confidence_level: optionalText.optional(),
+  priority: z.enum(commitmentPriorityValues).optional(),
+  acceptance_policy: z.enum(acceptancePolicyValues).optional(),
+  evidence_required: z.boolean().optional(),
+  review_cadence: optionalText.optional(),
+  strategic_context_id: optionalUuid.optional(),
+  strategic_context_type: z.enum(strategicContextTypeValues).optional(),
+  origin_decision_id: optionalUuid.optional(),
+  primary_receiver_user_id: optionalUuid.optional(),
+  primary_receiver_team_id: optionalUuid.optional(),
+  review_owner_id: optionalUuid.optional(),
+  start_date: optionalTimestamp.optional(),
+  due_date: optionalTimestamp.optional(),
+  next_review_at: optionalTimestamp.optional(),
+  closed_reason: optionalText.optional(),
+});
 
 export type CommitmentPartyInput = z.infer<typeof commitmentPartyInputSchema>;
 export type CreateCommitmentInput = z.infer<typeof createCommitmentInputSchema>;
@@ -244,6 +267,28 @@ export function deriveAcceptedAt(acceptedByOwnerAt?: string | null, acceptedByRe
     return acceptedByOwnerAt > acceptedByReceiverAt ? acceptedByOwnerAt : acceptedByReceiverAt;
   }
   return acceptedByOwnerAt ?? acceptedByReceiverAt ?? null;
+}
+
+export function isCommitmentReceiverOptional(commitmentType?: CommitmentType | null, category?: CommitmentCategory | null) {
+  return commitmentType === "self_commitment" || category === "operational";
+}
+
+export function normalizeStrategicContextType(
+  strategicContextType?: StrategicContextType | null,
+  strategicContextId?: string | null,
+): StrategicContextType {
+  if (!strategicContextId) return "manual";
+  return strategicContextType === "key_result" ? "key_result" : "objective";
+}
+
+export function normalizeStrategicContextForPersistence(
+  strategicContextId?: string | null,
+  strategicContextType?: StrategicContextType | null,
+) {
+  return {
+    strategic_context_id: strategicContextId ?? null,
+    strategic_context_type: normalizeStrategicContextType(strategicContextType, strategicContextId),
+  };
 }
 
 export function normalizeCommitmentHealth(value?: CommitmentHealth | null): CanonicalCommitmentHealth {

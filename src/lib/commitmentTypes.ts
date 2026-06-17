@@ -206,6 +206,19 @@ export type CommitmentEventType =
   | "due_date_changed"
   | "comment_added";
 
+export const commitmentLegacyEventTypeAliasMap = {
+  commitment_updated: "commitment_updated",
+  dependency_created: "dependency_added",
+  evidence_attached: "evidence_added",
+  execution_link_created: "execution_linked",
+  review_cycle_created: "review_recorded",
+  renegotiation_opened: "renegotiation_requested",
+} as const;
+
+export type CommitmentLegacyAliasedEventType = keyof typeof commitmentLegacyEventTypeAliasMap;
+export type CommitmentReadableEventType = CommitmentEventType | "commitment_updated";
+export type CommitmentStoredEventType = CommitmentEventType | CommitmentLegacyAliasedEventType | `health_changed_to_${CommitmentHealth}`;
+
 export interface CommitmentEventDefinition {
   type: CommitmentEventType;
   immutable: true;
@@ -214,6 +227,7 @@ export interface CommitmentEventDefinition {
 }
 
 export const commitmentEventCatalog: readonly CommitmentEventDefinition[] = [
+
   {
     type: "commitment_created",
     immutable: true,
@@ -342,7 +356,48 @@ export const commitmentEventCatalog: readonly CommitmentEventDefinition[] = [
   },
 ] as const;
 
+export function isCommitmentEventType(eventType: string): eventType is CommitmentEventType {
+  return commitmentEventCatalog.some((eventDefinition) => eventDefinition.type === eventType);
+}
+
+export function canonicalizeCommitmentEventType(eventType: string): CommitmentReadableEventType | string {
+  if (isCommitmentEventType(eventType)) return eventType;
+  if (eventType in commitmentLegacyEventTypeAliasMap) {
+    return commitmentLegacyEventTypeAliasMap[eventType as CommitmentLegacyAliasedEventType];
+  }
+  if (eventType.startsWith("health_changed_to_")) {
+    return "health_changed";
+  }
+  return eventType;
+}
+
+export function normalizeCommitmentEventPayload(
+  eventType: string,
+  payload?: Record<string, unknown> | null,
+): Record<string, unknown> {
+  const normalizedPayload = { ...(payload ?? {}) };
+
+  if (eventType.startsWith("health_changed_to_") && !("health" in normalizedPayload)) {
+    normalizedPayload.health = eventType.replace("health_changed_to_", "");
+  }
+
+  return normalizedPayload;
+}
+
+export function normalizeCommitmentEventRecord<T extends { event_type: string; payload?: Record<string, unknown> | null }>(event: T) {
+  const canonicalEventType = canonicalizeCommitmentEventType(event.event_type);
+
+  return {
+    ...event,
+    raw_event_type: event.event_type,
+    canonical_event_type: canonicalEventType,
+    event_type: canonicalEventType,
+    payload: normalizeCommitmentEventPayload(event.event_type, event.payload),
+  };
+}
+
 export interface CommitmentRelationalTableBlueprint {
+
   table: string;
   role: "root" | "satellite" | "support" | "compatibility" | "derived";
   purpose: string;

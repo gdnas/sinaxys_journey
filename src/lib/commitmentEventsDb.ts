@@ -1,12 +1,18 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getErrorMessage } from "@/lib/errorMessage";
-import type { CommitmentEventType } from "@/lib/commitmentTypes";
+import {
+  normalizeCommitmentEventRecord,
+  type CommitmentEventType,
+  type CommitmentReadableEventType,
+} from "@/lib/commitmentTypes";
 
 export interface DbCommitmentEventRow {
   id: string;
   tenant_id: string;
   commitment_id: string;
-  event_type: CommitmentEventType | string;
+  event_type: CommitmentReadableEventType | string;
+  raw_event_type: string;
+  canonical_event_type: CommitmentReadableEventType | string;
   actor_user_id: string | null;
   causation_type: string | null;
   causation_id: string | null;
@@ -29,6 +35,20 @@ function formatDbError(error: unknown) {
   return new Error(getErrorMessage(error));
 }
 
+function normalizeEventRow(row: Record<string, unknown>) {
+  return normalizeCommitmentEventRecord(row as {
+    id: string;
+    tenant_id: string;
+    commitment_id: string;
+    event_type: string;
+    actor_user_id: string | null;
+    causation_type: string | null;
+    causation_id: string | null;
+    payload?: Record<string, unknown> | null;
+    created_at: string;
+  }) as DbCommitmentEventRow;
+}
+
 export async function listCommitmentTimeline(commitmentId: string) {
   const { data, error } = await supabase
     .from("commitment_events")
@@ -37,7 +57,7 @@ export async function listCommitmentTimeline(commitmentId: string) {
     .order("created_at", { ascending: true });
 
   if (error) throw formatDbError(error);
-  return (data ?? []) as DbCommitmentEventRow[];
+  return (data ?? []).map((row) => normalizeEventRow(row as Record<string, unknown>));
 }
 
 export async function appendCommitmentEvent(input: AppendCommitmentEventInput) {
@@ -57,5 +77,5 @@ export async function appendCommitmentEvent(input: AppendCommitmentEventInput) {
 export async function getCommitmentEvent(eventId: string) {
   const { data, error } = await supabase.from("commitment_events").select(eventSelect).eq("id", eventId).maybeSingle();
   if (error) throw formatDbError(error);
-  return (data ?? null) as DbCommitmentEventRow | null;
+  return data ? normalizeEventRow(data as Record<string, unknown>) : null;
 }

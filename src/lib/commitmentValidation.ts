@@ -10,11 +10,19 @@ import {
   type AcceptancePolicy,
   type CanonicalCommitmentHealth,
   type CanonicalCommitmentPartyRole,
+  type CommitmentCategory,
   type CommitmentHealth,
   type CommitmentPartyRole,
   type CommitmentStatus,
+  type CommitmentType,
 } from "@/lib/commitmentTypes";
-import { canActivateCommitment, requiresOwnerAcceptance, requiresReceiverAcceptance } from "@/lib/commitmentsDomain";
+import {
+  canActivateCommitment,
+  isCommitmentReceiverOptional,
+  normalizeStrategicContextType,
+  requiresOwnerAcceptance,
+  requiresReceiverAcceptance,
+} from "@/lib/commitmentsDomain";
 
 export interface CommitmentValidationIssue {
   code:
@@ -35,6 +43,8 @@ export interface CommitmentValidationIssue {
 export interface CommitmentAggregateValidationInput {
   status: CommitmentStatus;
   acceptance_policy: AcceptancePolicy;
+  commitment_type?: CommitmentType | null;
+  category?: CommitmentCategory | null;
   primary_owner_user_id?: string | null;
   primary_receiver_user_id?: string | null;
   primary_receiver_team_id?: string | null;
@@ -163,7 +173,11 @@ export function validateCommitmentAggregate(input: CommitmentAggregateValidation
     });
   }
 
-  if (!input.primary_receiver_user_id && !input.primary_receiver_team_id) {
+  if (
+    !isCommitmentReceiverOptional(input.commitment_type, input.category)
+    && !input.primary_receiver_user_id
+    && !input.primary_receiver_team_id
+  ) {
     issues.push({
       code: "missing_receiver",
       message: "No modelo canônico, compromisso sem receiver deve ser exceção operacional explícita.",
@@ -207,6 +221,18 @@ export function validateCommitmentAggregate(input: CommitmentAggregateValidation
     issues.push({
       code: "manual_context_mismatch",
       message: "strategic_context_id não pode coexistir com strategic_context_type = manual.",
+      severity: "error",
+    });
+  }
+
+  if (
+    !input.strategic_context_id
+    && input.strategic_context_type
+    && input.strategic_context_type !== normalizeStrategicContextType(input.strategic_context_type, input.strategic_context_id)
+  ) {
+    issues.push({
+      code: "manual_context_mismatch",
+      message: "Sem strategic_context_id, o contexto deve permanecer manual ou nulo compatível.",
       severity: "error",
     });
   }

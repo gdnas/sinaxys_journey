@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getErrorMessage } from "@/lib/errorMessage";
-import type { CommitmentHealth, CommitmentPriority, CommitmentStatus } from "@/lib/commitmentsDomain";
+import type { CanonicalCommitmentHealth, CommitmentHealth, CommitmentPriority, CommitmentStatus } from "@/lib/commitmentsDomain";
 
 export interface DbCommitmentAnalyticsOverview {
   commitment_id: string;
@@ -31,6 +31,10 @@ export interface DbCommitmentAnalyticsOverview {
   missing_required_evidence: boolean;
   created_at: string;
   updated_at: string;
+  canonical_health: CanonicalCommitmentHealth;
+  open_renegotiation_count: number;
+  last_reviewed_at: string | null;
+  next_review_at: string | null;
 }
 
 export interface DbDecisionWithoutExecution {

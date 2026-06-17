@@ -9,13 +9,13 @@ import {
   type CommitmentStatus,
   type CreateCommitmentInput,
   type DependencyKind,
-
   type DependencyStatus,
   type DependencyTargetType,
   type EvidenceType,
   type ExecutionLinkRole,
   type ExecutionLinkTargetType,
   type ReviewStatus,
+  type StrategicContextType,
   type UpdateCommitmentInput,
   buildRenegotiationSnapshot,
   canActivateCommitment,
@@ -23,10 +23,16 @@ import {
   deriveAcceptedAt,
   deriveInitialCommitmentStatus,
   normalizeSeedParties,
+  normalizeStrategicContextForPersistence,
   requiresOwnerAcceptance,
   requiresReceiverAcceptance,
   updateCommitmentInputSchema,
 } from "@/lib/commitmentsDomain";
+import {
+  normalizeCommitmentEventRecord,
+  type CommitmentEventType,
+  type CommitmentReadableEventType,
+} from "@/lib/commitmentTypes";
 
 export interface DbCommitment {
   id: string;
@@ -145,7 +151,9 @@ export interface DbCommitmentEvent {
   id: string;
   tenant_id: string;
   commitment_id: string;
-  event_type: string;
+  event_type: CommitmentReadableEventType | string;
+  raw_event_type: string;
+  canonical_event_type: CommitmentReadableEventType | string;
   actor_user_id: string | null;
   causation_type: string | null;
   causation_id: string | null;
@@ -346,13 +354,13 @@ function castRows<T>(data: unknown) {
 }
 
 async function logCommitmentEvent(
-
   commitmentId: string,
-  eventType: string,
+  eventType: CommitmentEventType,
   payload: Record<string, unknown> = {},
   causationType?: string | null,
   causationId?: string | null,
 ) {
+
   const { data, error } = await supabase.rpc("commitment_log_event", {
     p_commitment_id: commitmentId,
     p_event_type: eventType,
@@ -369,7 +377,78 @@ function hasOwn<T extends object>(source: T, key: keyof T) {
   return Object.prototype.hasOwnProperty.call(source, key);
 }
 
+async function logCommitmentEvents(
+  commitmentId: string,
+  events: Array<{ type: CommitmentEventType; payload?: Record<string, unknown> }>,
+) {
+  for (const event of events) {
+    await logCommitmentEvent(commitmentId, event.type, event.payload ?? {});
+  }
+}
+
+function buildMaterialCommitmentEvents(previous: DbCommitment, next: DbCommitment) {
+  const events: Array<{ type: CommitmentEventType; payload?: Record<string, unknown> }> = [];
+
+  if (previous.health !== next.health) {
+    events.push({
+      type: "health_changed",
+      payload: {
+        previous_health: previous.health,
+        health: next.health,
+      },
+    });
+  }
+
+  if (previous.status !== next.status) {
+    const statusEventMap: Partial<Record<CommitmentStatus, CommitmentEventType>> = {
+      active: "commitment_activated",
+      fulfilled: "commitment_fulfilled",
+      closed_unfulfilled: "commitment_closed_unfulfilled",
+      cancelled: "commitment_cancelled",
+    };
+
+    const statusEventType = statusEventMap[next.status];
+    if (statusEventType) {
+      events.push({
+        type: statusEventType,
+        payload: {
+          previous_status: previous.status,
+          status: next.status,
+        },
+      });
+    }
+  }
+
+  if (previous.due_date !== next.due_date) {
+    events.push({
+      type: "due_date_changed",
+      payload: {
+        previous_due_date: previous.due_date,
+        due_date: next.due_date,
+      },
+    });
+  }
+
+  if (
+    previous.primary_receiver_user_id !== next.primary_receiver_user_id
+    || previous.primary_receiver_team_id !== next.primary_receiver_team_id
+  ) {
+    events.push({
+      type: "receiver_changed",
+      payload: {
+        previous_primary_receiver_user_id: previous.primary_receiver_user_id,
+        primary_receiver_user_id: next.primary_receiver_user_id,
+        previous_primary_receiver_team_id: previous.primary_receiver_team_id,
+        primary_receiver_team_id: next.primary_receiver_team_id,
+      },
+    });
+  }
+
+  return events;
+}
+
 function buildPartiesInsertPayload(tenantId: string, commitmentId: string, parties: CommitmentPartyInput[]) {
+
   return parties.map((party) => ({
     tenant_id: tenantId,
     commitment_id: commitmentId,
@@ -477,7 +556,6 @@ export async function listCommitmentRenegotiations(commitmentId: string) {
 }
 
 export async function listCommitmentEvents(commitmentId: string) {
-
   const { data, error } = await supabase
     .from("commitment_events")
     .select("id,tenant_id,commitment_id,event_type,actor_user_id,causation_type,causation_id,payload,created_at")
@@ -485,7 +563,7 @@ export async function listCommitmentEvents(commitmentId: string) {
     .order("created_at", { ascending: false });
 
   if (error) throw formatDbError(error);
-  return castRows<DbCommitmentEvent>(data ?? []);
+  return (data ?? []).map((row) => normalizeCommitmentEventRecord(row as Omit<DbCommitmentEvent, "raw_event_type" | "canonical_event_type">));
 }
 
 export async function listCommitmentExecutionLinks(commitmentId: string) {
@@ -558,6 +636,8 @@ export async function createCommitment(input: CreateCommitmentInput) {
   const normalizedParties = normalizeSeedParties(parsed);
   const initialStatus = deriveInitialCommitmentStatus(parsed.acceptance_policy, parsed.status);
 
+  const strategicContext = normalizeStrategicContextForPersistence(parsed.strategic_context_id, parsed.strategic_context_type);
+
   const payload = {
     tenant_id: parsed.tenant_id,
     title: parsed.title,
@@ -575,8 +655,8 @@ export async function createCommitment(input: CreateCommitmentInput) {
     acceptance_policy: parsed.acceptance_policy,
     evidence_required: parsed.evidence_required,
     review_cadence: parsed.review_cadence,
-    strategic_context_id: parsed.strategic_context_id,
-    strategic_context_type: parsed.strategic_context_id ? parsed.strategic_context_type : null,
+    strategic_context_id: strategicContext.strategic_context_id,
+    strategic_context_type: strategicContext.strategic_context_type,
     origin_decision_id: parsed.origin_decision_id,
     primary_owner_user_id: parsed.primary_owner_user_id,
     primary_receiver_user_id: parsed.primary_receiver_user_id,
@@ -625,6 +705,8 @@ export async function createCommitment(input: CreateCommitmentInput) {
 
 export async function updateCommitment(commitmentId: string, patch: UpdateCommitmentInput) {
   const parsed = updateCommitmentInputSchema.parse(patch);
+  const current = await getCommitment(commitmentId);
+  if (!current) throw new Error("Compromisso não encontrado.");
 
   const update: Record<string, unknown> = {};
 
@@ -644,8 +726,6 @@ export async function updateCommitment(commitmentId: string, patch: UpdateCommit
     "acceptance_policy",
     "evidence_required",
     "review_cadence",
-    "strategic_context_id",
-    "strategic_context_type",
     "origin_decision_id",
     "primary_receiver_user_id",
     "primary_receiver_team_id",
@@ -662,17 +742,27 @@ export async function updateCommitment(commitmentId: string, patch: UpdateCommit
     }
   }
 
+  if (hasOwn(parsed, "strategic_context_id") || hasOwn(parsed, "strategic_context_type")) {
+    const nextStrategicContextId = hasOwn(parsed, "strategic_context_id")
+      ? parsed.strategic_context_id ?? null
+      : current.strategic_context_id;
+    const nextStrategicContextType = hasOwn(parsed, "strategic_context_type")
+      ? (parsed.strategic_context_type ?? null)
+      : (current.strategic_context_type as StrategicContextType | null);
+
+    Object.assign(update, normalizeStrategicContextForPersistence(nextStrategicContextId, nextStrategicContextType));
+  }
+
   if (Object.keys(update).length === 0) {
-    const current = await getCommitment(commitmentId);
-    if (!current) throw new Error("Compromisso não encontrado.");
     return current;
   }
 
   const { data, error } = await supabase.from("commitments").update(update).eq("id", commitmentId).select(commitmentSelect).single();
   if (error) throw formatDbError(error);
 
-  await logCommitmentEvent(commitmentId, "commitment_updated", { patch: update });
-  return castRow<DbCommitment>(data);
+  const updatedCommitment = castRow<DbCommitment>(data);
+  await logCommitmentEvents(commitmentId, buildMaterialCommitmentEvents(current, updatedCommitment));
+  return updatedCommitment;
 }
 
 export async function acceptCommitment(commitmentId: string, role: "owner" | "receiver") {
@@ -715,20 +805,41 @@ export async function acceptCommitment(commitmentId: string, role: "owner" | "re
     .eq("is_primary", true)
     .eq("active", true);
 
-  await logCommitmentEvent(commitmentId, role === "owner" ? "owner_accepted" : "receiver_accepted", {
-    accepted_at: now,
-    activated: commitment.status === "active",
-  });
+  const events: Array<{ type: CommitmentEventType; payload?: Record<string, unknown> }> = [
+    {
+      type: role === "owner" ? "owner_accepted" : "receiver_accepted",
+      payload: {
+        accepted_at: now,
+        activated: commitment.status === "active",
+      },
+    },
+  ];
+
+  if (current.status !== "active" && commitment.status === "active") {
+    events.push({
+      type: "commitment_activated",
+      payload: {
+        previous_status: current.status,
+        status: commitment.status,
+        accepted_at: update.accepted_at,
+      },
+    });
+  }
+
+  await logCommitmentEvents(commitmentId, events);
 
   return commitment;
 }
 
 export async function setCommitmentHealth(commitmentId: string, health: CommitmentHealth, reason?: string) {
+  const current = await getCommitment(commitmentId);
+  if (!current) throw new Error("Compromisso não encontrado.");
 
   const { data, error } = await supabase.from("commitments").update({ health }).eq("id", commitmentId).select(commitmentSelect).single();
   if (error) throw formatDbError(error);
 
-  await logCommitmentEvent(commitmentId, `health_changed_to_${health}`, {
+  await logCommitmentEvent(commitmentId, "health_changed", {
+    previous_health: current.health,
     reason: reason ?? null,
     health,
   });
@@ -779,7 +890,7 @@ export async function addCommitmentEvidence(input: CreateCommitmentEvidenceInput
 
   if (error) throw formatDbError(error);
   const evidence = castRow<DbCommitmentEvidence>(data);
-  await logCommitmentEvent(input.commitment_id, "evidence_attached", { evidence_id: evidence.id, is_final: evidence.is_final });
+  await logCommitmentEvent(input.commitment_id, "evidence_added", { evidence_id: evidence.id, is_final: evidence.is_final });
   return evidence;
 }
 
@@ -810,11 +921,33 @@ export async function createCommitmentDependency(input: CreateCommitmentDependen
   if (error) throw formatDbError(error);
   const dependency = castRow<DbCommitmentDependency>(data);
 
+  const events: Array<{ type: CommitmentEventType; payload?: Record<string, unknown> }> = [
+    {
+      type: "dependency_added",
+      payload: {
+        dependency_id: dependency.id,
+        is_blocking: dependency.is_blocking,
+      },
+    },
+  ];
+
   if (dependency.is_blocking && dependency.status === "open") {
+    const current = await getCommitment(input.commitment_id);
     await supabase.from("commitments").update({ health: "blocked" }).eq("id", input.commitment_id);
+    if (current && current.health !== "blocked") {
+      events.push({
+        type: "health_changed",
+        payload: {
+          previous_health: current.health,
+          health: "blocked",
+          reason: "blocking_dependency_added",
+          dependency_id: dependency.id,
+        },
+      });
+    }
   }
 
-  await logCommitmentEvent(input.commitment_id, "dependency_created", { dependency_id: dependency.id, is_blocking: dependency.is_blocking });
+  await logCommitmentEvents(input.commitment_id, events);
   return dependency;
 }
 
@@ -848,7 +981,10 @@ export async function createCommitmentRenegotiation(input: CreateCommitmentReneg
   const renegotiation = castRow<DbCommitmentRenegotiation>(data);
 
   await supabase.from("commitments").update({ status: "renegotiating" }).eq("id", input.commitment_id);
-  await logCommitmentEvent(input.commitment_id, "renegotiation_opened", { renegotiation_id: renegotiation.id, reason: renegotiation.reason });
+  await logCommitmentEvent(input.commitment_id, "renegotiation_requested", {
+    renegotiation_id: renegotiation.id,
+    reason: renegotiation.reason,
+  });
   return renegotiation;
 }
 
@@ -873,7 +1009,10 @@ export async function linkCommitmentExecution(input: CreateCommitmentExecutionLi
 
   if (error) throw formatDbError(error);
   const executionLink = castRow<DbCommitmentExecutionLink>(data);
-  await logCommitmentEvent(input.commitment_id, "execution_link_created", { execution_link_id: executionLink.id, target_type: executionLink.target_type });
+  await logCommitmentEvent(input.commitment_id, "execution_linked", {
+    execution_link_id: executionLink.id,
+    target_type: executionLink.target_type,
+  });
   return executionLink;
 }
 
@@ -906,6 +1045,10 @@ export async function scheduleCommitmentReview(input: CreateCommitmentReviewCycl
     })
     .eq("id", input.commitment_id);
 
-  await logCommitmentEvent(input.commitment_id, "review_cycle_created", { review_cycle_id: reviewCycle.id, review_status: reviewCycle.review_status });
+  await logCommitmentEvent(input.commitment_id, "review_recorded", {
+    review_cycle_id: reviewCycle.id,
+    review_status: reviewCycle.review_status,
+    review_health: reviewCycle.review_health,
+  });
   return reviewCycle;
 }

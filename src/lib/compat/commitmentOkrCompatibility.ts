@@ -1,12 +1,15 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getErrorMessage } from "@/lib/errorMessage";
+import type { StrategicContextType } from "@/lib/commitmentsDomain";
 
 export interface DbCommitmentOkrCompatibilityRow {
+
   commitment_id: string;
   tenant_id: string;
   commitment_code: string;
   commitment_title: string;
-  strategic_context_type: string | null;
+  strategic_context_type: StrategicContextType | null;
+
   strategic_context_id: string | null;
   objective_id: string | null;
   key_result_id: string | null;
