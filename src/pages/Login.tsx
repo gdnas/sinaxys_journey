@@ -159,6 +159,19 @@ export default function Login() {
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
             </form>
+
+            <div className="mt-6 rounded-[1.5rem] border border-[color:var(--sinaxys-border)] bg-[color:var(--sinaxys-bg)]/70 p-4 text-sm text-[color:var(--sinaxys-ink)]/78">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--sinaxys-primary)]">
+                Acesso técnico
+              </div>
+              <p className="mt-2 leading-6">
+                Para abrir o inspector somente leitura, entre na plataforma e acesse a rota
+                <span className="mx-1 rounded-full border border-[color:var(--sinaxys-border)] bg-white px-2 py-1 font-mono text-xs text-[color:var(--sinaxys-ink)] dark:bg-[color:var(--sinaxys-tint)]">
+                  /commitments/:commitmentId
+                </span>
+                com um ID real que seu usuário possa ler.
+              </p>
+            </div>
           </Card>
         </div>
       </div>
