@@ -99,6 +99,12 @@ begin
 end;
 $$;
 
+grant select, insert, update, delete on table pg_temp.ontology_validation_context to authenticated;
+grant select, insert, update, delete on table pg_temp.ontology_validation_artifacts to authenticated;
+grant select, insert, update, delete on table pg_temp.ontology_validation_results to authenticated;
+grant execute on function pg_temp.validation_record(text, text, boolean, text, text, jsonb) to authenticated;
+grant execute on function pg_temp.validation_set_artifact(text, uuid, jsonb) to authenticated;
+
 truncate table pg_temp.ontology_validation_artifacts;
 truncate table pg_temp.ontology_validation_results;
 truncate table pg_temp.ontology_validation_context;
