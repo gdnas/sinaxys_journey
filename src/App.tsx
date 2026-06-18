@@ -109,6 +109,7 @@ import FinanceVersions from "./pages/FinanceVersions";
 import FinanceVersionDetail from "./pages/FinanceVersionDetail";
 import FinanceScenarios from "./pages/FinanceScenarios";
 import FinanceForecast from "./pages/FinanceForecast";
+import CommitmentInspector from "./pages/CommitmentInspector";
 
 const queryClient = new QueryClient();
 
@@ -158,9 +159,11 @@ const App = () => (
                         <Route path="/finance/versions/:id" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceVersionDetail /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/finance/scenarios" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceScenarios /></RequireCompanyModule></RequireAuth>} />
                         <Route path="/finance/forecast" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD"]}><RequireCompanyModule moduleKey="FINANCE"><FinanceForecast /></RequireCompanyModule></RequireAuth>} />
+                        <Route path="/commitments/:commitmentId" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><CommitmentInspector /></RequireAuth>} />
                         <Route path="/people/:userId" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="ORG"><Person /></RequireCompanyModule></RequireAuth>} />
 
                         <Route path="/password" element={<RequireAuth roles={["MASTERADMIN", "ADMIN", "HEAD", "COLABORADOR"]}><ChangePassword /></RequireAuth>} />
+
                         <Route path="/vacation" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><VacationRequests /></RequireAuth>} />
                         <Route path="/vacation/approvals" element={<RequireAuth roles={["ADMIN", "HEAD"]}><VacationApprovals /></RequireAuth>} />
                         <Route path="/okr" element={<RequireAuth roles={["ADMIN", "HEAD", "COLABORADOR"]}><RequireCompanyModule moduleKey="OKR"><OkrHome /></RequireCompanyModule></RequireAuth>} />
